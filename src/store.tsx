@@ -50,6 +50,29 @@ export const useStore = () => {
   return v;
 };
 
+// Supabase-Fehler sichtbar machen (statt still zu scheitern) – throttled, damit
+// ein fehlgeschlagener Massen-Import nicht 100 Meldungen produziert.
+let lastAlert = 0;
+function reportErr(msg?: string) {
+  if (!msg) return;
+  console.error("[Supabase]", msg);
+  const now = Date.now();
+  if (now - lastAlert > 4000) {
+    lastAlert = now;
+    alert(
+      "Speichern/Laden fehlgeschlagen:\n" +
+        msg +
+        "\n\nMeist fehlt eine Datenbank-Spalte – bitte das SQL-Update in Supabase ausführen.",
+    );
+  }
+}
+/** Ergebnis eines Supabase-Aufrufs prüfen und Fehler melden. */
+function run(p: PromiseLike<{ error: { message: string } | null }>) {
+  return Promise.resolve(p).then((r) => {
+    if (r && r.error) reportErr(r.error.message);
+  });
+}
+
 function seed(): Student[] {
   const names: [string, string][] = [
     ["Bauer", "Lena"], ["Çelik", "Deniz"], ["Müller", "Jonas"], ["Schäfer", "Mia"],
@@ -94,9 +117,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setReady(true);
         return;
       }
-      const { data: stu } = await supabase!.from("students").select("*");
-      const { data: cfg } = await supabase!.from("app_settings").select("*").eq("id", 1).maybeSingle();
+      const { data: stu, error: stuErr } = await supabase!.from("students").select("*");
+      const { data: cfg, error: cfgErr } = await supabase!.from("app_settings").select("*").eq("id", 1).maybeSingle();
       if (!alive) return;
+      reportErr(stuErr?.message || cfgErr?.message);
       setStudents(((stu as any[]) || []).map(migrate));
       if (cfg)
         setSettingsState({
@@ -147,7 +171,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const persist = useCallback(
     async (st: Student) => {
-      if (mode === "supabase") await supabase!.from("students").upsert(toRow(st));
+      if (mode === "supabase") await run(supabase!.from("students").upsert(toRow(st)));
     },
     [mode],
   );
@@ -158,10 +182,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const patchCols = useCallback(
     (id: string, cols: Record<string, unknown>) => {
       if (mode === "supabase")
-        void supabase!
-          .from("students")
-          .update({ ...cols, updated_at: new Date().toISOString() })
-          .eq("id", id);
+        void run(
+          supabase!
+            .from("students")
+            .update({ ...cols, updated_at: new Date().toISOString() })
+            .eq("id", id),
+        );
     },
     [mode],
   );
@@ -182,7 +208,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     (nachname, vorname, beigetreten_ab) => {
       const s = newStudent(nachname, vorname, beigetreten_ab);
       setStudents((prev) => [...prev, s]);
-      if (mode === "supabase") void supabase!.from("students").insert(toRow(s));
+      if (mode === "supabase") void run(supabase!.from("students").insert(toRow(s)));
     },
     [mode],
   );
@@ -195,7 +221,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const removeStudent: StoreValue["removeStudent"] = useCallback(
     (id) => {
       setStudents((prev) => prev.filter((s) => s.id !== id));
-      if (mode === "supabase") void supabase!.from("students").delete().eq("id", id);
+      if (mode === "supabase") void run(supabase!.from("students").delete().eq("id", id));
     },
     [mode],
   );
@@ -225,12 +251,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setSettingsState((prev) => {
         const next = { ...prev, ...patch };
         if (mode === "supabase")
-          void supabase!.from("app_settings").upsert({
-            id: 1,
-            aktuelles_halbjahr: next.aktuelles_halbjahr,
-            schwelle: next.benoetigt,
-            zusatzbetrag: next.zusatz,
-          });
+          void run(
+            supabase!.from("app_settings").upsert({
+              id: 1,
+              aktuelles_halbjahr: next.aktuelles_halbjahr,
+              schwelle: next.benoetigt,
+              zusatzbetrag: next.zusatz,
+            }),
+          );
         return next;
       });
     },
@@ -280,12 +308,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         if (mode === "supabase") {
           migrated.forEach((s) => void persist(s));
           const cfg = { ...DEFAULT_SETTINGS, ...(d.settings || settings) };
-          void supabase!.from("app_settings").upsert({
-            id: 1,
-            aktuelles_halbjahr: cfg.aktuelles_halbjahr,
-            schwelle: cfg.benoetigt,
-            zusatzbetrag: cfg.zusatz,
-          });
+          void run(
+            supabase!.from("app_settings").upsert({
+              id: 1,
+              aktuelles_halbjahr: cfg.aktuelles_halbjahr,
+              schwelle: cfg.benoetigt,
+              zusatzbetrag: cfg.zusatz,
+            }),
+          );
         }
         return true;
       } catch {
