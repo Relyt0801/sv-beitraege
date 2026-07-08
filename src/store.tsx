@@ -5,7 +5,27 @@ import { hasSupabase, supabase } from "./lib/supabase";
 const LS_STUDENTS = "sv-beitraege:students";
 const LS_SETTINGS = "sv-beitraege:settings";
 
-const DEFAULT_SETTINGS: Settings = { aktuelles_halbjahr: "EF.1", schwelle: 3 };
+const DEFAULT_SETTINGS: Settings = { aktuelles_halbjahr: "EF.1", benoetigt: 3, zusatz: 25 };
+
+/** Alte Daten (Beteiligungen pro Halbjahr) auf das neue Modell (Gesamtzahl) migrieren. */
+function migrate(s: any): Student {
+  let bet = typeof s.beteiligungen === "number" ? s.beteiligungen : 0;
+  const terms: any = {};
+  for (const h of HY) {
+    const t = s.terms?.[h] ?? { status: "offen" };
+    if (typeof s.beteiligungen !== "number" && typeof t.bet === "number") bet += t.bet;
+    terms[h] = { status: t.status ?? "offen" };
+  }
+  return {
+    id: s.id,
+    nachname: s.nachname,
+    vorname: s.vorname ?? "",
+    beigetreten_ab: s.beigetreten_ab ?? "EF.1",
+    verlaesst_ab: s.verlaesst_ab ?? null,
+    beteiligungen: bet,
+    terms,
+  };
+}
 
 interface StoreValue {
   students: Student[];
@@ -16,7 +36,7 @@ interface StoreValue {
   updateStudent: (id: string, patch: Partial<Student>) => void;
   removeStudent: (id: string) => void;
   setTerm: (id: string, h: Halbjahr, status: Status) => void;
-  bumpBet: (id: string, h: Halbjahr, delta: number) => void;
+  bumpBet: (id: string, delta: number) => void;
   setSettings: (patch: Partial<Settings>) => void;
   massApply: (ids: Set<string>, h: Halbjahr, action: "offen" | "bezahlt" | "erlassen" | "bet") => void;
   exportData: () => void;
@@ -38,6 +58,19 @@ function seed(): Student[] {
   return names.map(([n, v]) => newStudent(n, v));
 }
 
+function toRow(st: Student) {
+  return {
+    id: st.id,
+    nachname: st.nachname,
+    vorname: st.vorname,
+    beigetreten_ab: st.beigetreten_ab,
+    verlaesst_ab: st.verlaesst_ab,
+    beteiligungen: st.beteiligungen,
+    terms: st.terms,
+    updated_at: new Date().toISOString(),
+  };
+}
+
 export function StoreProvider({ children }: { children: ReactNode }) {
   const mode: "local" | "supabase" = hasSupabase ? "supabase" : "local";
   const [students, setStudents] = useState<Student[]>([]);
@@ -46,7 +79,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const studentsRef = useRef<Student[]>([]);
   studentsRef.current = students;
 
-  // ---- initial load ----
   useEffect(() => {
     let alive = true;
     (async () => {
@@ -54,7 +86,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         try {
           const s = localStorage.getItem(LS_STUDENTS);
           const st = localStorage.getItem(LS_SETTINGS);
-          setStudents(s ? JSON.parse(s) : seed());
+          setStudents(s ? (JSON.parse(s) as any[]).map(migrate) : seed());
           if (st) setSettingsState({ ...DEFAULT_SETTINGS, ...JSON.parse(st) });
         } catch {
           setStudents(seed());
@@ -62,12 +94,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setReady(true);
         return;
       }
-      // supabase
       const { data: stu } = await supabase!.from("students").select("*");
       const { data: cfg } = await supabase!.from("app_settings").select("*").eq("id", 1).maybeSingle();
       if (!alive) return;
-      setStudents((stu as Student[]) || []);
-      if (cfg) setSettingsState({ aktuelles_halbjahr: cfg.aktuelles_halbjahr, schwelle: cfg.schwelle });
+      setStudents(((stu as any[]) || []).map(migrate));
+      if (cfg)
+        setSettingsState({
+          aktuelles_halbjahr: cfg.aktuelles_halbjahr,
+          benoetigt: cfg.schwelle ?? 3,
+          zusatz: cfg.zusatzbetrag ?? 25,
+        });
       setReady(true);
 
       const ch = supabase!
@@ -75,7 +111,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         .on("postgres_changes", { event: "*", schema: "public", table: "students" }, (p) => {
           setStudents((prev) => {
             if (p.eventType === "DELETE") return prev.filter((x) => x.id !== (p.old as Student).id);
-            const row = p.new as Student;
+            const row = migrate(p.new);
             const i = prev.findIndex((x) => x.id === row.id);
             if (i === -1) return [...prev, row];
             const next = [...prev];
@@ -84,8 +120,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           });
         })
         .on("postgres_changes", { event: "*", schema: "public", table: "app_settings" }, (p) => {
-          const row = p.new as Settings;
-          if (row) setSettingsState({ aktuelles_halbjahr: row.aktuelles_halbjahr, schwelle: row.schwelle });
+          const row = p.new as any;
+          if (row)
+            setSettingsState({
+              aktuelles_halbjahr: row.aktuelles_halbjahr,
+              benoetigt: row.schwelle ?? 3,
+              zusatz: row.zusatzbetrag ?? 25,
+            });
         })
         .subscribe();
       return () => {
@@ -97,7 +138,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     };
   }, [mode]);
 
-  // ---- local persistence ----
   useEffect(() => {
     if (ready && mode === "local") localStorage.setItem(LS_STUDENTS, JSON.stringify(students));
   }, [students, ready, mode]);
@@ -107,9 +147,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const persist = useCallback(
     async (st: Student) => {
-      if (mode !== "supabase") return;
-      const row = { ...st, updated_at: new Date().toISOString() };
-      await supabase!.from("students").upsert(row);
+      if (mode === "supabase") await supabase!.from("students").upsert(toRow(st));
     },
     [mode],
   );
@@ -149,16 +187,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   );
 
   const setTerm: StoreValue["setTerm"] = useCallback(
-    (id, h, status) => mutate(id, (s) => ({ ...s, terms: { ...s.terms, [h]: { ...s.terms[h], status } } })),
+    (id, h, status) => mutate(id, (s) => ({ ...s, terms: { ...s.terms, [h]: { status } } })),
     [mutate],
   );
 
   const bumpBet: StoreValue["bumpBet"] = useCallback(
-    (id, h, delta) =>
-      mutate(id, (s) => ({
-        ...s,
-        terms: { ...s.terms, [h]: { ...s.terms[h], bet: Math.max(0, s.terms[h].bet + delta) } },
-      })),
+    (id, delta) => mutate(id, (s) => ({ ...s, beteiligungen: Math.max(0, s.beteiligungen + delta) })),
     [mutate],
   );
 
@@ -166,7 +200,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     (patch) => {
       setSettingsState((prev) => {
         const next = { ...prev, ...patch };
-        if (mode === "supabase") void supabase!.from("app_settings").upsert({ id: 1, ...next });
+        if (mode === "supabase")
+          void supabase!.from("app_settings").upsert({
+            id: 1,
+            aktuelles_halbjahr: next.aktuelles_halbjahr,
+            schwelle: next.benoetigt,
+            zusatzbetrag: next.zusatz,
+          });
         return next;
       });
     },
@@ -179,12 +219,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setStudents((prev) => {
         const next = prev.map((s) => {
           if (!ids.has(s.id)) return s;
+          if (action === "bet") return { ...s, beteiligungen: Math.max(0, s.beteiligungen + 1) };
           const joinI = HY.indexOf(s.beigetreten_ab);
           const leaveI = s.verlaesst_ab ? HY.indexOf(s.verlaesst_ab) : Infinity;
-          if (i < joinI || i >= leaveI) return s; // inaktives HJ überspringen
-          const term = s.terms[h];
-          const nt = action === "bet" ? { ...term, bet: term.bet + 1 } : { ...term, status: action };
-          return { ...s, terms: { ...s.terms, [h]: nt } };
+          if (i < joinI || i >= leaveI) return s;
+          return { ...s, terms: { ...s.terms, [h]: { status: action } } };
         });
         if (mode === "supabase") next.forEach((s) => ids.has(s.id) && void persist(s));
         return next;
@@ -208,11 +247,18 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       try {
         const d = JSON.parse(raw);
         if (!d.students) return false;
-        setStudents(d.students);
+        const migrated = (d.students as any[]).map(migrate);
+        setStudents(migrated);
         if (d.settings) setSettingsState({ ...DEFAULT_SETTINGS, ...d.settings });
         if (mode === "supabase") {
-          (d.students as Student[]).forEach((s) => void persist(s));
-          void supabase!.from("app_settings").upsert({ id: 1, ...(d.settings || settings) });
+          migrated.forEach((s) => void persist(s));
+          const cfg = { ...DEFAULT_SETTINGS, ...(d.settings || settings) };
+          void supabase!.from("app_settings").upsert({
+            id: 1,
+            aktuelles_halbjahr: cfg.aktuelles_halbjahr,
+            schwelle: cfg.benoetigt,
+            zusatzbetrag: cfg.zusatz,
+          });
         }
         return true;
       } catch {
