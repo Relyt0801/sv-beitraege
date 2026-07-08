@@ -197,7 +197,12 @@ function Main() {
       </header>
 
       <main className="mt-3 grid gap-3 lg:grid-cols-2">
-        {!ready && <div className="col-span-full py-16 text-center text-slate-400">Lädt …</div>}
+        {!ready && (
+          <div className="col-span-full flex flex-col items-center justify-center gap-4 py-24 text-slate-400">
+            <div className="h-9 w-9 animate-spin rounded-full border-[3px] border-slate-300 border-t-brand dark:border-slate-700 dark:border-t-brand" />
+            <div className="text-sm font-medium">Beitragsliste wird geladen …</div>
+          </div>
+        )}
         {ready && filtered.length === 0 && (
           <div className="col-span-full py-16 text-center text-sm text-slate-400">
             Keine Treffer.{" "}

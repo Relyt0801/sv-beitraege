@@ -103,34 +103,26 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   studentsRef.current = students;
 
   useEffect(() => {
-    let alive = true;
-    (async () => {
-      if (mode === "local") {
-        try {
-          const s = localStorage.getItem(LS_STUDENTS);
-          const st = localStorage.getItem(LS_SETTINGS);
-          setStudents(s ? (JSON.parse(s) as any[]).map(migrate) : seed());
-          if (st) setSettingsState({ ...DEFAULT_SETTINGS, ...JSON.parse(st) });
-        } catch {
-          setStudents(seed());
-        }
-        setReady(true);
-        return;
+    if (mode === "local") {
+      try {
+        const s = localStorage.getItem(LS_STUDENTS);
+        const st = localStorage.getItem(LS_SETTINGS);
+        setStudents(s ? (JSON.parse(s) as any[]).map(migrate) : seed());
+        if (st) setSettingsState({ ...DEFAULT_SETTINGS, ...JSON.parse(st) });
+      } catch {
+        setStudents(seed());
       }
-      const { data: stu, error: stuErr } = await supabase!.from("students").select("*");
-      const { data: cfg, error: cfgErr } = await supabase!.from("app_settings").select("*").eq("id", 1).maybeSingle();
-      if (!alive) return;
-      reportErr(stuErr?.message || cfgErr?.message);
-      setStudents(((stu as any[]) || []).map(migrate));
-      if (cfg)
-        setSettingsState({
-          aktuelles_halbjahr: cfg.aktuelles_halbjahr,
-          benoetigt: cfg.schwelle ?? 3,
-          zusatz: cfg.zusatzbetrag ?? 25,
-        });
       setReady(true);
+      return;
+    }
 
-      const ch = supabase!
+    let alive = true;
+    let channel: ReturnType<NonNullable<typeof supabase>["channel"]> | null = null;
+    let loaded = false;
+
+    const subscribeRealtime = () => {
+      if (channel) return;
+      channel = supabase!
         .channel("sv-realtime")
         .on("postgres_changes", { event: "*", schema: "public", table: "students" }, (p) => {
           setStudents((prev) => {
@@ -153,12 +145,47 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             });
         })
         .subscribe();
-      return () => {
-        supabase!.removeChannel(ch);
-      };
-    })();
+    };
+
+    // Daten erst laden, wenn eine Session da ist (sonst blockt RLS und es kommt nichts).
+    const loadAll = async () => {
+      setReady(false);
+      const { data: stu, error: stuErr } = await supabase!.from("students").select("*");
+      const { data: cfg, error: cfgErr } = await supabase!.from("app_settings").select("*").eq("id", 1).maybeSingle();
+      if (!alive) return;
+      reportErr(stuErr?.message || cfgErr?.message);
+      setStudents(((stu as any[]) || []).map(migrate));
+      if (cfg)
+        setSettingsState({
+          aktuelles_halbjahr: cfg.aktuelles_halbjahr,
+          benoetigt: cfg.schwelle ?? 3,
+          zusatz: cfg.zusatzbetrag ?? 25,
+        });
+      setReady(true);
+      subscribeRealtime();
+    };
+
+    const { data: sub } = supabase!.auth.onAuthStateChange((event, session) => {
+      if (session && !loaded && (event === "INITIAL_SESSION" || event === "SIGNED_IN")) {
+        loaded = true;
+        void loadAll();
+      } else if (event === "SIGNED_OUT") {
+        loaded = false;
+        setStudents([]);
+        setReady(true);
+        if (channel) {
+          supabase!.removeChannel(channel);
+          channel = null;
+        }
+      } else if (event === "INITIAL_SESSION" && !session) {
+        setReady(true);
+      }
+    });
+
     return () => {
       alive = false;
+      sub.subscription.unsubscribe();
+      if (channel) supabase!.removeChannel(channel);
     };
   }, [mode]);
 
