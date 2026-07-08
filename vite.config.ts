@@ -2,7 +2,12 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
 
+declare const process: { env: Record<string, string | undefined> };
+
+// base = "/" für Vercel/eigene Domain; für GitHub Pages "/sv-beitraege/"
+// (wird im Deploy-Workflow via BASE_PATH gesetzt).
 export default defineConfig({
+  base: process.env.BASE_PATH || "/",
   plugins: [
     react(),
     VitePWA({

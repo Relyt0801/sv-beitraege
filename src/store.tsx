@@ -152,29 +152,43 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     [mode],
   );
 
-  const mutate = useCallback(
-    (id: string, fn: (s: Student) => Student) => {
-      setStudents((prev) => {
-        const next = prev.map((s) => (s.id === id ? fn(s) : s));
-        const changed = next.find((s) => s.id === id);
-        if (changed) void persist(changed);
-        return next;
-      });
+  // Spaltengenaues Update: schreibt NUR die geänderten Felder zurück, damit
+  // parallele Änderungen an verschiedenen Feldern derselben Person sich nicht
+  // gegenseitig überschreiben.
+  const patchCols = useCallback(
+    (id: string, cols: Record<string, unknown>) => {
+      if (mode === "supabase")
+        void supabase!
+          .from("students")
+          .update({ ...cols, updated_at: new Date().toISOString() })
+          .eq("id", id);
     },
-    [persist],
+    [mode],
+  );
+
+  /** Lokalen State ändern und exakt die betroffenen Spalten in der DB aktualisieren. */
+  const mutate = useCallback(
+    (id: string, fn: (s: Student) => Student, cols: (s: Student) => Record<string, unknown>) => {
+      const cur = studentsRef.current.find((s) => s.id === id);
+      if (!cur) return;
+      const changed = fn(cur);
+      setStudents((prev) => prev.map((s) => (s.id === id ? changed : s)));
+      patchCols(id, cols(changed));
+    },
+    [patchCols],
   );
 
   const addStudent: StoreValue["addStudent"] = useCallback(
     (nachname, vorname, beigetreten_ab) => {
       const s = newStudent(nachname, vorname, beigetreten_ab);
       setStudents((prev) => [...prev, s]);
-      void persist(s);
+      if (mode === "supabase") void supabase!.from("students").insert(toRow(s));
     },
-    [persist],
+    [mode],
   );
 
   const updateStudent: StoreValue["updateStudent"] = useCallback(
-    (id, patch) => mutate(id, (s) => ({ ...s, ...patch })),
+    (id, patch) => mutate(id, (s) => ({ ...s, ...patch }), () => patch),
     [mutate],
   );
 
@@ -187,12 +201,22 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   );
 
   const setTerm: StoreValue["setTerm"] = useCallback(
-    (id, h, status) => mutate(id, (s) => ({ ...s, terms: { ...s.terms, [h]: { status } } })),
+    (id, h, status) =>
+      mutate(
+        id,
+        (s) => ({ ...s, terms: { ...s.terms, [h]: { status } } }),
+        (s) => ({ terms: s.terms }),
+      ),
     [mutate],
   );
 
   const bumpBet: StoreValue["bumpBet"] = useCallback(
-    (id, delta) => mutate(id, (s) => ({ ...s, beteiligungen: Math.max(0, s.beteiligungen + delta) })),
+    (id, delta) =>
+      mutate(
+        id,
+        (s) => ({ ...s, beteiligungen: Math.max(0, s.beteiligungen + delta) }),
+        (s) => ({ beteiligungen: s.beteiligungen }),
+      ),
     [mutate],
   );
 
@@ -216,20 +240,23 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const massApply: StoreValue["massApply"] = useCallback(
     (ids, h, action) => {
       const i = HY.indexOf(h);
-      setStudents((prev) => {
-        const next = prev.map((s) => {
-          if (!ids.has(s.id)) return s;
-          if (action === "bet") return { ...s, beteiligungen: Math.max(0, s.beteiligungen + 1) };
-          const joinI = HY.indexOf(s.beigetreten_ab);
-          const leaveI = s.verlaesst_ab ? HY.indexOf(s.verlaesst_ab) : Infinity;
-          if (i < joinI || i >= leaveI) return s;
-          return { ...s, terms: { ...s.terms, [h]: { status: action } } };
-        });
-        if (mode === "supabase") next.forEach((s) => ids.has(s.id) && void persist(s));
-        return next;
-      });
+      const updates: [string, Record<string, unknown>][] = [];
+      for (const s of studentsRef.current) {
+        if (!ids.has(s.id)) continue;
+        if (action === "bet") {
+          updates.push([s.id, { beteiligungen: Math.max(0, s.beteiligungen + 1) }]);
+          continue;
+        }
+        const joinI = HY.indexOf(s.beigetreten_ab);
+        const leaveI = s.verlaesst_ab ? HY.indexOf(s.verlaesst_ab) : Infinity;
+        if (i < joinI || i >= leaveI) continue;
+        updates.push([s.id, { terms: { ...s.terms, [h]: { status: action } } }]);
+      }
+      const map = new Map(updates);
+      setStudents((prev) => prev.map((s) => (map.has(s.id) ? { ...s, ...map.get(s.id) } : s)));
+      updates.forEach(([id, cols]) => patchCols(id, cols));
     },
-    [mode, persist],
+    [patchCols],
   );
 
   const exportData: StoreValue["exportData"] = useCallback(() => {
