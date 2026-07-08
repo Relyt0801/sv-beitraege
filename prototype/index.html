@@ -1,0 +1,356 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#4f46e5">
+<title>Stufenkasse – SV Beiträge</title>
+<style>
+:root{
+  --bg:#f6f7fb; --panel:#ffffff; --panel2:#f0f2f8; --text:#1a1d29; --muted:#6b7180;
+  --border:#e3e6ef; --accent:#4f46e5; --accent-soft:#ecebfc;
+  --offen:#f59e0b; --offen-bg:#fef3d8; --bezahlt:#16a34a; --bezahlt-bg:#dcf7e6;
+  --erlassen:#3b82f6; --erlassen-bg:#e2edfd; --danger:#dc2626; --danger-bg:#fde4e4;
+  --radius:16px; --shadow:0 4px 20px rgba(20,24,45,.06);
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0e1017; --panel:#171a24; --panel2:#1f2330; --text:#e8eaf2; --muted:#9aa0b4;
+  --border:#2a2f3d; --accent:#7c74ff; --accent-soft:#26243f;
+  --offen:#fbbf24; --offen-bg:#3a2f12; --bezahlt:#34d399; --bezahlt-bg:#123021;
+  --erlassen:#60a5fa; --erlassen-bg:#132842; --danger:#f87171; --danger-bg:#3a1717;
+  --shadow:0 4px 24px rgba(0,0,0,.35);
+}}
+:root[data-theme="dark"]{
+  --bg:#0e1017; --panel:#171a24; --panel2:#1f2330; --text:#e8eaf2; --muted:#9aa0b4;
+  --border:#2a2f3d; --accent:#7c74ff; --accent-soft:#26243f;
+  --offen:#fbbf24; --offen-bg:#3a2f12; --bezahlt:#34d399; --bezahlt-bg:#123021;
+  --erlassen:#60a5fa; --erlassen-bg:#132842; --danger:#f87171; --danger-bg:#3a1717;
+  --shadow:0 4px 24px rgba(0,0,0,.35);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  background:var(--bg);color:var(--text);line-height:1.4;padding-bottom:90px}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+input,select{font-family:inherit;font-size:16px}
+
+/* header */
+header{position:sticky;top:0;z-index:20;background:var(--bg);border-bottom:1px solid var(--border);
+  padding:calc(env(safe-area-inset-top) + 10px) 14px 10px}
+.hrow{display:flex;align-items:center;gap:10px;max-width:1100px;margin:0 auto}
+.title{font-weight:700;font-size:18px;letter-spacing:-.2px;white-space:nowrap}
+.title small{display:block;font-weight:500;font-size:11px;color:var(--muted)}
+.search{flex:1;display:flex;align-items:center;gap:8px;background:var(--panel);border:1px solid var(--border);
+  border-radius:12px;padding:8px 12px;box-shadow:var(--shadow)}
+.search input{border:none;background:none;outline:none;width:100%;color:var(--text)}
+.iconbtn{width:40px;height:40px;min-width:40px;border-radius:11px;background:var(--panel);border:1px solid var(--border);
+  display:flex;align-items:center;justify-content:center;font-size:17px;box-shadow:var(--shadow)}
+.iconbtn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.hymini{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);
+  max-width:1100px;margin:8px auto 0;flex-wrap:wrap}
+.hychip{padding:3px 9px;border-radius:999px;border:1px solid var(--border);background:var(--panel);font-weight:600}
+.hychip.cur{border-color:var(--accent);color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
+
+/* filter panel */
+.filter{max-width:1100px;margin:10px auto 0;background:var(--panel);border:1px solid var(--border);
+  border-radius:14px;padding:12px;box-shadow:var(--shadow);display:none;gap:14px;flex-wrap:wrap}
+.filter.open{display:flex}
+.fgrp{display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--muted)}
+.fgrp .row{display:flex;align-items:center;gap:6px}
+.filter input[type=number]{width:64px;padding:6px 8px;border:1px solid var(--border);border-radius:8px;background:var(--panel2);color:var(--text)}
+.chkbtn{padding:6px 11px;border-radius:9px;border:1px solid var(--border);background:var(--panel2);font-size:13px;font-weight:600;color:var(--text)}
+.chkbtn.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+
+/* list */
+main{max-width:1100px;margin:0 auto;padding:12px 14px}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:12px 14px;
+  margin-bottom:10px;box-shadow:var(--shadow);display:flex;align-items:center;gap:12px;transition:.12s}
+.card.left{border-color:var(--danger);background:linear-gradient(0deg,var(--danger-bg),var(--panel))}
+.card.sel{outline:2px solid var(--accent);outline-offset:-1px}
+.selbox{width:24px;height:24px;min-width:24px;border-radius:7px;border:2px solid var(--border);
+  display:none;align-items:center;justify-content:center;font-size:14px;color:#fff}
+body.massmode .selbox{display:flex}
+.selbox.on{background:var(--accent);border-color:var(--accent)}
+.cmain{flex:1;min-width:0;cursor:pointer}
+.name{font-weight:600;font-size:16px;letter-spacing:-.2px}
+.name .badge{font-size:10px;font-weight:700;color:#fff;background:var(--danger);padding:1px 7px;border-radius:999px;margin-left:7px;vertical-align:middle}
+.terms{display:flex;gap:5px;margin-top:7px;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:2px}
+.tchip{min-width:46px;text-align:center;font-size:10px;font-weight:700;padding:4px 4px 5px;border-radius:9px;
+  border:1px solid var(--border);white-space:nowrap}
+.tchip .lbl{display:block;opacity:.7;font-size:9px;letter-spacing:.3px}
+.tchip.offen{background:var(--offen-bg);color:var(--offen)}
+.tchip.bezahlt{background:var(--bezahlt-bg);color:var(--bezahlt)}
+.tchip.erlassen{background:var(--erlassen-bg);color:var(--erlassen);text-decoration:line-through}
+.tchip.cur{box-shadow:0 0 0 2px var(--accent)}
+.tchip.dead{background:var(--danger-bg);color:var(--danger);opacity:.6}
+.cright{text-align:right;min-width:64px}
+.betrag{font-weight:800;font-size:16px}
+.betrag.paid{color:var(--bezahlt)}.betrag.due{color:var(--offen)}
+.cright small{display:block;font-size:10px;color:var(--muted)}
+.empty{text-align:center;color:var(--muted);padding:60px 20px;font-size:14px}
+
+/* bottom bar */
+.fab{position:fixed;right:16px;bottom:calc(env(safe-area-inset-bottom) + 16px);z-index:30;
+  width:56px;height:56px;border-radius:18px;background:var(--accent);color:#fff;font-size:28px;
+  display:flex;align-items:center;justify-content:center;box-shadow:0 8px 24px rgba(79,70,229,.45)}
+.massbar{position:fixed;left:0;right:0;bottom:0;z-index:35;background:var(--panel);border-top:1px solid var(--border);
+  padding:10px 14px calc(env(safe-area-inset-bottom) + 10px);display:none;gap:8px;flex-wrap:wrap;align-items:center;box-shadow:0 -4px 20px rgba(0,0,0,.1)}
+body.massmode .massbar{display:flex}
+body.massmode .fab{display:none}
+.massbar select,.massbar .mbtn{padding:9px 12px;border-radius:10px;border:1px solid var(--border);background:var(--panel2);font-size:13px;font-weight:600;color:var(--text)}
+.massbar .mbtn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.massbar .cnt{font-weight:700;font-size:13px;margin-right:auto}
+
+/* modal */
+.overlay{position:fixed;inset:0;z-index:50;background:rgba(10,12,20,.55);display:none;
+  align-items:flex-end;justify-content:center;backdrop-filter:blur(2px)}
+.overlay.open{display:flex}
+.sheet{background:var(--panel);width:100%;max-width:640px;max-height:92vh;overflow-y:auto;
+  border-radius:22px 22px 0 0;padding:18px 18px calc(env(safe-area-inset-bottom) + 24px);box-shadow:0 -10px 40px rgba(0,0,0,.3)}
+@media(min-width:700px){.overlay{align-items:center}.sheet{border-radius:22px}}
+.shead{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+.shead .nm{font-size:20px;font-weight:700;flex:1}
+.shead .x{width:34px;height:34px;border-radius:10px;background:var(--panel2);font-size:18px;display:flex;align-items:center;justify-content:center}
+.sub{color:var(--muted);font-size:13px;margin-bottom:16px}
+.tgrid{display:grid;grid-template-columns:1fr;gap:10px}
+.trow{border:1px solid var(--border);border-radius:14px;padding:12px;background:var(--panel2)}
+.trow.cur{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
+.trow.dead{opacity:.5;background:var(--danger-bg)}
+.trow .top{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.trow .hy{font-weight:800;font-size:15px}
+.trow .cur-tag{font-size:9px;font-weight:800;color:var(--accent);background:var(--accent-soft);padding:2px 7px;border-radius:999px}
+.statusbtns{display:flex;gap:6px;margin-left:auto}
+.sbtn{padding:6px 10px;border-radius:9px;border:1px solid var(--border);font-size:12px;font-weight:700;background:var(--panel)}
+.sbtn.a-offen.on{background:var(--offen);color:#fff;border-color:var(--offen)}
+.sbtn.a-bezahlt.on{background:var(--bezahlt);color:#fff;border-color:var(--bezahlt)}
+.sbtn.a-erlassen.on{background:var(--erlassen);color:#fff;border-color:var(--erlassen)}
+.betrow{display:flex;align-items:center;gap:12px}
+.betrow .lab{font-size:13px;color:var(--muted)}
+.stepper{display:flex;align-items:center;gap:0;margin-left:auto;border:1px solid var(--border);border-radius:11px;overflow:hidden}
+.stepper button{width:40px;height:40px;font-size:22px;font-weight:700;background:var(--panel)}
+.stepper .val{min-width:44px;text-align:center;font-weight:800;font-size:17px}
+.hint{font-size:11px;color:var(--erlassen);margin-top:6px;font-weight:600}
+.srow{display:flex;align-items:center;gap:10px;margin-top:16px;flex-wrap:wrap}
+.srow label{font-size:13px;color:var(--muted)}
+.srow select,.srow input{padding:9px 11px;border:1px solid var(--border);border-radius:10px;background:var(--panel2);color:var(--text)}
+.dangerbtn{padding:9px 12px;border-radius:10px;border:1px solid var(--danger);color:var(--danger);font-weight:700;font-size:13px;background:transparent}
+.savebtn{width:100%;margin-top:18px;padding:14px;border-radius:14px;background:var(--accent);color:#fff;font-weight:700;font-size:16px}
+.field{width:100%;padding:12px;border:1px solid var(--border);border-radius:12px;background:var(--panel2);color:var(--text);margin-top:8px}
+.linkbtn{color:var(--accent);font-weight:600;font-size:13px;background:none}
+.settings-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:8px}
+kbd{font:inherit;background:var(--panel2);border:1px solid var(--border);border-radius:6px;padding:1px 6px;font-size:12px}
+</style>
+
+<header>
+  <div class="hrow">
+    <div class="title">Stufenkasse<small>SV · Beiträge & Beteiligungen</small></div>
+    <div class="search">
+      <span>🔎</span><input id="q" placeholder="Name suchen…" autocomplete="off">
+    </div>
+    <button class="iconbtn" id="filterBtn" title="Filter">⚙︎</button>
+    <button class="iconbtn" id="massBtn" title="Mehrere auswählen">☑︎</button>
+    <button class="iconbtn" id="themeBtn" title="Hell/Dunkel">◐</button>
+  </div>
+  <div class="hymini" id="hymini"></div>
+  <div class="filter" id="filter">
+    <div class="fgrp"><span>Beteiligung</span><div class="row">min <input type="number" id="fmin" min="0"> max <input type="number" id="fmax" min="0"></div></div>
+    <div class="fgrp"><span>Status</span><div class="row"><button class="chkbtn" id="fopen">nur noch offen (bis aktuell)</button></div></div>
+    <div class="fgrp"><span>Aktuelles Halbjahr</span><div class="row"><select id="curHy"></select></div></div>
+    <div class="fgrp"><span>Erlass-Schwelle</span><div class="row"><input type="number" id="schwelle" min="0"> Beteiligungen/HJ</div></div>
+    <div class="fgrp"><span>Daten</span><div class="row"><button class="linkbtn" id="expBtn">Export</button> · <button class="linkbtn" id="impBtn">Import</button></div></div>
+  </div>
+</header>
+
+<main id="list"></main>
+<div class="empty" id="empty" style="display:none">Keine Treffer. <button class="linkbtn" id="clearF">Filter zurücksetzen</button></div>
+
+<button class="fab" id="addBtn">＋</button>
+
+<div class="massbar">
+  <span class="cnt" id="masscnt">0 ausgewählt</span>
+  <select id="massHy"></select>
+  <button class="mbtn a-bezahlt" data-act="bezahlt">✓ bezahlt</button>
+  <button class="mbtn a-erlassen" data-act="erlassen">~ erlassen</button>
+  <button class="mbtn a-offen" data-act="offen">offen</button>
+  <button class="mbtn" data-act="bet">+1 Beteiligung</button>
+  <button class="mbtn" id="massDone">Fertig</button>
+</div>
+
+<div class="overlay" id="overlay"><div class="sheet" id="sheet"></div></div>
+<input type="file" id="fileIn" accept="application/json" style="display:none">
+
+<script>
+const HY=["EF.1","EF.2","Q1.1","Q1.2","Q2.1","Q2.2"];
+const FEE=25;
+const KEY="sv-beitraege-v1";
+const STATI=["offen","bezahlt","erlassen"];
+
+let state=load();
+function load(){
+  try{const s=JSON.parse(localStorage.getItem(KEY));if(s&&s.students)return s;}catch(e){}
+  return {students:seed(),aktuell:"EF.1",schwelle:3,theme:null};
+}
+function save(){localStorage.setItem(KEY,JSON.stringify(state));}
+function seed(){
+  const names=[["Bauer","Lena"],["Çelik","Deniz"],["Müller","Jonas"],["Schäfer","Mia"],
+    ["Weiß","Tom"],["Ackermann","Nour"],["Özdemir","Elif"],["Brandt","Finn"]];
+  return names.map(([n,v])=>mkStudent(n,v));
+}
+function mkStudent(n,v){
+  const terms={};HY.forEach(h=>terms[h]={status:"offen",bet:0});
+  return {id:crypto.randomUUID?crypto.randomUUID():Date.now()+Math.random(),nachname:n,vorname:v,verlaesstAb:null,terms};
+}
+
+/* ---- helpers ---- */
+function norm(s){return (s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/ß/g,"ss").replace(/\s+/g," ").trim();}
+function curIdx(){return HY.indexOf(state.aktuell);}
+function leftIdx(st){return st.verlaesstAb?HY.indexOf(st.verlaesstAb):Infinity;}
+function isDead(st,i){return i>=leftIdx(st);}
+function offenBetrag(st){let n=0;const c=curIdx();HY.forEach((h,i)=>{if(i<=c&&!isDead(st,i)&&st.terms[h].status==="offen")n++;});return n*FEE;}
+function sortStudents(a){return a.slice().sort((x,y)=>x.nachname.localeCompare(y.nachname,"de")||x.vorname.localeCompare(y.vorname,"de"));}
+
+/* ---- filter state ---- */
+let fOpen=false, selMode=false, sel=new Set();
+
+/* ---- render ---- */
+function render(){
+  document.documentElement.setAttribute("data-theme", state.theme || "");
+  // header mini + selects
+  hymini.innerHTML=HY.map(h=>`<span class="hychip ${h===state.aktuell?'cur':''}">${h}</span>`).join(" → ");
+  curHy.innerHTML=HY.map(h=>`<option ${h===state.aktuell?'selected':''}>${h}</option>`).join("");
+  massHy.innerHTML=HY.map(h=>`<option>${h}</option>`).join("");
+  schwelle.value=state.schwelle;
+  fopen.classList.toggle("on",fOpen);
+  document.body.classList.toggle("massmode",selMode);
+  masscnt.textContent=sel.size+" ausgewählt";
+
+  const q=norm(qEl.value);
+  const mn=fmin.value===""?null:+fmin.value, mx=fmax.value===""?null:+fmax.value;
+  let arr=sortStudents(state.students).filter(st=>{
+    if(q && !norm(st.nachname+" "+st.vorname).includes(q) && !norm(st.vorname+" "+st.nachname).includes(q))return false;
+    const totBet=HY.reduce((s,h)=>s+st.terms[h].bet,0);
+    if(mn!==null&&totBet<mn)return false;
+    if(mx!==null&&totBet>mx)return false;
+    if(fOpen && offenBetrag(st)===0)return false;
+    return true;
+  });
+
+  list.innerHTML=arr.map(st=>cardHTML(st)).join("");
+  empty.style.display=arr.length?"none":"block";
+}
+function cardHTML(st){
+  const c=curIdx(), dead=st.verlaesstAb!=null, betr=offenBetrag(st);
+  const chips=HY.map((h,i)=>{
+    const t=st.terms[h], dd=isDead(st,i);
+    const cls=dd?"dead":t.status;
+    return `<span class="tchip ${cls} ${h===state.aktuell?'cur':''}"><span class="lbl">${h}</span>${dd?'—':t.bet>0?'●'+t.bet:''}</span>`;
+  }).join("");
+  return `<div class="card ${dead?'left':''} ${sel.has(st.id)?'sel':''}" data-id="${st.id}">
+    <div class="selbox ${sel.has(st.id)?'on':''}" data-sel="${st.id}">✓</div>
+    <div class="cmain" data-open="${st.id}">
+      <div class="name">${esc(st.nachname)}, ${esc(st.vorname)} ${dead?`<span class="badge">verlässt ${st.verlaesstAb}</span>`:''}</div>
+      <div class="terms">${chips}</div>
+    </div>
+    <div class="cright">
+      <div class="betrag ${betr>0?'due':'paid'}">${betr>0?betr+' €':'✓'}</div>
+      <small>${betr>0?'offen':'bezahlt'}</small>
+    </div>
+  </div>`;
+}
+function esc(s){return (s+"").replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+
+/* ---- detail sheet ---- */
+let openId=null;
+function openDetail(id){
+  openId=id;const st=state.students.find(s=>s.id===id);if(!st)return;
+  const c=curIdx();
+  const rows=HY.map((h,i)=>{
+    const t=st.terms[h],dd=isDead(st,i);
+    const sb=STATI.map(s=>`<button class="sbtn a-${s} ${t.status===s&&!dd?'on':''}" data-st="${id}|${h}|${s}" ${dd?'disabled':''}>${s==='offen'?'offen':s==='bezahlt'?'✓ bez.':'~ erl.'}</button>`).join("");
+    const hint=(!dd&&t.bet>=state.schwelle&&t.status==="offen")?`<div class="hint">≥ ${state.schwelle} Beteiligungen → Erlass vorschlagen?</div>`:"";
+    return `<div class="trow ${h===state.aktuell?'cur':''} ${dd?'dead':''}">
+      <div class="top"><span class="hy">${h}</span>${h===state.aktuell?'<span class="cur-tag">AKTUELL</span>':''}
+        <div class="statusbtns">${sb}</div></div>
+      <div class="betrow"><span class="lab">Beteiligungen</span>
+        <div class="stepper"><button data-bet="${id}|${h}|-1" ${dd?'disabled':''}>−</button>
+        <span class="val">${t.bet}</span><button data-bet="${id}|${h}|1" ${dd?'disabled':''}>＋</button></div></div>
+      ${hint}
+    </div>`;
+  }).join("");
+  sheet.innerHTML=`
+    <div class="shead"><span class="nm">${esc(st.nachname)}, ${esc(st.vorname)}</span>
+      <button class="x" data-x>✕</button></div>
+    <div class="sub">Offen bis ${state.aktuell}: <b>${offenBetrag(st)} €</b> · ${HY.reduce((s,h)=>s+st.terms[h].bet,0)} Beteiligungen gesamt</div>
+    <div class="tgrid">${rows}</div>
+    <div class="srow">
+      <label>Verlässt Schule ab</label>
+      <select data-left="${id}"><option value="">— bleibt —</option>${HY.map(h=>`<option ${st.verlaesstAb===h?'selected':''}>${h}</option>`).join("")}</select>
+      <button class="dangerbtn" data-del="${id}">Löschen</button>
+    </div>
+    <button class="savebtn" data-x>Fertig</button>`;
+  overlay.classList.add("open");
+}
+function closeSheet(){overlay.classList.remove("open");openId=null;}
+
+/* ---- add ---- */
+function openAdd(){
+  sheet.innerHTML=`<div class="shead"><span class="nm">Person hinzufügen</span><button class="x" data-x>✕</button></div>
+    <input class="field" id="nNach" placeholder="Nachname" autocomplete="off">
+    <input class="field" id="nVor" placeholder="Vorname" autocomplete="off">
+    <button class="savebtn" id="addSave">Hinzufügen</button>`;
+  overlay.classList.add("open");
+  setTimeout(()=>document.getElementById("nNach").focus(),50);
+  document.getElementById("addSave").onclick=()=>{
+    const n=document.getElementById("nNach").value.trim(),v=document.getElementById("nVor").value.trim();
+    if(!n){document.getElementById("nNach").focus();return;}
+    state.students.push(mkStudent(n,v));save();closeSheet();render();
+  };
+}
+
+/* ---- events ---- */
+const qEl=document.getElementById("q");
+qEl.oninput=render;
+document.getElementById("filterBtn").onclick=e=>{filter.classList.toggle("open");e.currentTarget.classList.toggle("active");};
+document.getElementById("massBtn").onclick=e=>{selMode=!selMode;if(!selMode)sel.clear();e.currentTarget.classList.toggle("active",selMode);render();};
+document.getElementById("massDone").onclick=()=>{selMode=false;sel.clear();document.getElementById("massBtn").classList.remove("active");render();};
+document.getElementById("themeBtn").onclick=()=>{const cur=state.theme||(matchMedia("(prefers-color-scheme:dark)").matches?"dark":"light");state.theme=cur==="dark"?"light":"dark";save();render();};
+document.getElementById("addBtn").onclick=openAdd;
+curHy.onchange=e=>{state.aktuell=e.target.value;save();render();};
+schwelle.onchange=e=>{state.schwelle=Math.max(0,+e.target.value||0);save();render();};
+fmin.oninput=render;fmax.oninput=render;
+fopen.onclick=()=>{fOpen=!fOpen;render();};
+document.getElementById("clearF").onclick=()=>{fmin.value="";fmax.value="";fOpen=false;qEl.value="";render();};
+
+list.onclick=e=>{
+  const selT=e.target.closest("[data-sel]"),openT=e.target.closest("[data-open]"),card=e.target.closest(".card");
+  if(selMode&&card){const id=card.dataset.id;sel.has(id)?sel.delete(id):sel.add(id);render();return;}
+  if(openT&&!selMode)openDetail(openT.dataset.open);
+};
+sheet.onclick=e=>{
+  const t=e.target;
+  if(t.closest("[data-x]"))return closeSheet();
+  const st=t.closest("[data-st]");if(st){const[id,h,s]=st.dataset.st.split("|");const stu=state.students.find(x=>x.id===id);stu.terms[h].status=s;save();openDetail(id);render();return;}
+  const bt=t.closest("[data-bet]");if(bt){const[id,h,d]=bt.dataset.bet.split("|");const stu=state.students.find(x=>x.id===id);stu.terms[h].bet=Math.max(0,stu.terms[h].bet+(+d));save();openDetail(id);render();return;}
+  const dl=t.closest("[data-del]");if(dl){const id=dl.dataset.del;if(confirm("Diese Person wirklich löschen?")){state.students=state.students.filter(s=>s.id!==id);save();closeSheet();render();}return;}
+};
+sheet.onchange=e=>{const lf=e.target.closest("[data-left]");if(lf){const id=lf.dataset.left;const stu=state.students.find(x=>x.id===id);stu.verlaesstAb=lf.value||null;save();openDetail(id);render();}};
+overlay.onclick=e=>{if(e.target===overlay)closeSheet();};
+
+// mass actions
+document.querySelector(".massbar").addEventListener("click",e=>{
+  const b=e.target.closest("[data-act]");if(!b||!sel.size)return;
+  const act=b.dataset.act,h=massHy.value;
+  state.students.forEach(st=>{if(!sel.has(st.id))return;const i=HY.indexOf(h);if(isDead(st,i))return;
+    if(act==="bet")st.terms[h].bet++;else st.terms[h].status=act;});
+  save();render();
+});
+
+// export / import
+document.getElementById("expBtn").onclick=()=>{
+  const blob=new Blob([JSON.stringify(state,null,2)],{type:"application/json"});
+  const a=document.createElement("a");a.href=URL.createObjectURL(blob);
+  a.download="stufenkasse-"+new Date().toISOString().slice(0,10)+".json";a.click();
+};
+document.getElementById("impBtn").onclick=()=>fileIn.click();
+fileIn.onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();
+  r.onload=()=>{try{const d=JSON.parse(r.result);if(d.students){state=d;save();render();alert("Import ok.");}}catch(x){alert("Ungültige Datei.");}};
+  r.readAsText(f);};
+
+render();
+</script>

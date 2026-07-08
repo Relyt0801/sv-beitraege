@@ -1,0 +1,52 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light dark;
+}
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  @apply bg-slate-50 text-slate-900 antialiased;
+  margin: 0;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: none;
+}
+.dark body {
+  @apply bg-slate-950 text-slate-100;
+}
+
+/* hide scrollbars on the horizontal term rails but keep scroll */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+@layer components {
+  .card {
+    @apply rounded-2xl border border-slate-200 bg-white shadow-card transition
+           dark:border-slate-800 dark:bg-slate-900 dark:shadow-cardDark;
+  }
+  .pill {
+    @apply inline-flex items-center rounded-full px-2.5 py-1 text-xs font-bold;
+  }
+  .iconbtn {
+    @apply flex h-10 w-10 min-w-10 items-center justify-center rounded-xl border border-slate-200
+           bg-white text-slate-600 shadow-card transition active:scale-95
+           dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:shadow-cardDark;
+  }
+  .iconbtn-active {
+    @apply border-brand bg-brand text-white dark:border-brand;
+  }
+  .field {
+    @apply w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-base outline-none
+           transition focus:border-brand focus:ring-2 focus:ring-brand/20
+           dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100;
+  }
+  .btn-primary {
+    @apply w-full rounded-xl bg-brand py-3.5 text-center text-base font-semibold text-white
+           transition active:scale-[.98] hover:bg-brand-dark;
+  }
+}
