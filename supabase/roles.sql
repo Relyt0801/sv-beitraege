@@ -15,7 +15,9 @@ create table if not exists public.profiles (
   created_at    timestamptz not null default now()
 );
 alter table public.profiles enable row level security;
-alter publication supabase_realtime add table public.profiles;
+do $$ begin
+  alter publication supabase_realtime add table public.profiles;
+exception when duplicate_object then null; end $$;
 
 -- Rolle des aktuellen Nutzers (security definer, damit RLS sich nicht selbst blockiert)
 create or replace function public.my_role() returns text
