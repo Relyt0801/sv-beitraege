@@ -1,6 +1,6 @@
-// Nutzername-Schema: nachname.vorname – alles klein, ohne Umlaute/Sonderzeichen,
-// Leerzeichen und Zweitnamen mit Bindestrich.
-//   Müller, Jonas            -> mueller.jonas   (ü->u)  ... hier: u (ohne Umlaut)
+// Nutzername-Schema: nachname.vorname – alles klein, Umlaute ausgeschrieben
+// (ä->ae, ö->oe, ü->ue, ß->ss), Leerzeichen/Zweitnamen mit Bindestrich.
+//   Müller, Jonas            -> mueller.jonas
 //   Weiß, Tom                -> weiss.tom
 //   Große Kleimann, Lotta    -> grosse-kleimann.lotta
 //   Ebbing, Anna-Lena        -> ebbing.anna-lena
@@ -9,9 +9,9 @@
 export function usernamePart(s: string): string {
   return (s || "")
     .toLowerCase()
-    .replace(/ä/g, "a")
-    .replace(/ö/g, "o")
-    .replace(/ü/g, "u")
+    .replace(/ä/g, "ae")
+    .replace(/ö/g, "oe")
+    .replace(/ü/g, "ue")
     .replace(/ß/g, "ss")
     .normalize("NFD")
     .replace(/[̀-ͯ]/g, "") // übrige Akzente (é->e, ç->c …)

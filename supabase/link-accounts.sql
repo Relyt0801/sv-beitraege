@@ -6,13 +6,15 @@
 -- ============================================================
 
 -- Namensteil normalisieren (Spiegel der JS-Logik in src/lib/username.ts)
+-- ä->ae, ö->oe, ü->ue, ß->ss; übrige Akzente -> Grundbuchstabe
 create or replace function public.username_part(s text) returns text
   language sql immutable as $$
   select trim(both '-' from regexp_replace(
     translate(
-      replace(lower(coalesce(s,'')), 'ß', 'ss'),
-      'äöüàáâãåæèéêëìíîïòóôõøùúûçčñšžýÿ',
-      'aouaaaaaaeeeeiiiiooooouuuccnszyy'),
+      replace(replace(replace(replace(lower(coalesce(s,'')),
+        'ä', 'ae'), 'ö', 'oe'), 'ü', 'ue'), 'ß', 'ss'),
+      'àáâãåæèéêëìíîïòóôõøùúûçčñšžýÿ',
+      'aaaaaaeeeeiiiiooooouuuccnszyy'),
     '[^a-z0-9]+', '-', 'g'))
 $$;
 
