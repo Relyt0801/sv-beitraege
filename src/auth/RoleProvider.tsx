@@ -49,9 +49,39 @@ export function RoleProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!hasSupabase) return;
     let alive = true;
+    let uid: string | undefined;
+    let channel: ReturnType<NonNullable<typeof supabase>["channel"]> | null = null;
+
+    const subscribe = () => {
+      if (channel) return;
+      // Live-Erkennung: Rollen-/Profiländerungen sofort übernehmen (kein Reload nötig).
+      channel = supabase!
+        .channel("sv-profiles")
+        .on("postgres_changes", { event: "*", schema: "public", table: "profiles" }, (p) => {
+          if (p.eventType === "DELETE") {
+            const old = p.old as Partial<Profile>;
+            setProfiles((prev) => prev.filter((x) => x.user_id !== old.user_id));
+            return;
+          }
+          const row = p.new as Profile;
+          if (row.user_id === uid) {
+            setRoleState(row.role); // eigene Rolle live
+            if (STAFF.includes(row.role)) void loadProfiles(true);
+          }
+          setProfiles((prev) => {
+            const i = prev.findIndex((x) => x.user_id === row.user_id);
+            if (i === -1) return [...prev, row];
+            const next = [...prev];
+            next[i] = row;
+            return next;
+          });
+        })
+        .subscribe();
+    };
+
     const load = async () => {
       const { data: s } = await supabase!.auth.getSession();
-      const uid = s.session?.user.id;
+      uid = s.session?.user.id;
       if (!uid) {
         if (alive) setReady(true);
         return;
@@ -61,21 +91,26 @@ export function RoleProvider({ children }: { children: ReactNode }) {
       if (!alive) return;
       setRoleState(r);
       setReady(true);
-      // eigenen Login-Status markieren
       void supabase!.from("profiles").update({ has_logged_in: true }).eq("user_id", uid);
       void loadProfiles(STAFF.includes(r));
+      subscribe();
     };
     void load();
     const { data: sub } = supabase!.auth.onAuthStateChange((event) => {
       if (event === "SIGNED_IN" || event === "SIGNED_OUT") {
         setReady(false);
         setProfiles([]);
+        if (channel) {
+          supabase!.removeChannel(channel);
+          channel = null;
+        }
         void load();
       }
     });
     return () => {
       alive = false;
       sub.subscription.unsubscribe();
+      if (channel) supabase!.removeChannel(channel);
     };
   }, [loadProfiles]);
 

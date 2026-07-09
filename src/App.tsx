@@ -6,28 +6,38 @@ import { hasSupabase, supabase } from "./lib/supabase";
 import { useStore } from "./store";
 import { AuthGate } from "./auth/AuthGate";
 import { RoleProvider, useRole } from "./auth/RoleProvider";
+import { EventsProvider, useEvents } from "./events-store";
 import { StudentCard, nextStatus } from "./components/StudentCard";
 import { StudentSheet } from "./components/StudentSheet";
 import { AddSheet } from "./components/AddSheet";
 import { MassBar } from "./components/MassBar";
 import { RolesTab } from "./components/RolesTab";
+import { EventsTab } from "./components/EventsTab";
+import { EventComposer } from "./components/EventComposer";
 
 export default function App() {
   return (
     <AuthGate>
       <RoleProvider>
-        <Main />
+        <EventsProvider>
+          <Main />
+        </EventsProvider>
       </RoleProvider>
     </AuthGate>
   );
 }
 
+type Tab = "kasse" | "events" | "rollen";
+
 function Main() {
   const { students, settings, ready, mode, setTerm, setSettings, exportData, importData } = useStore();
   const { canEditData, canEditBeitrag, canManageRoles, isStaff, loginByStudent } = useRole();
+  const { events: allEvents, reads } = useEvents();
   const { theme, toggle } = useTheme();
 
-  const [tab, setTab] = useState<"kasse" | "rollen">("kasse");
+  const unread = allEvents.filter((e) => !reads.has(e.id)).length;
+  const [tab, setTab] = useState<Tab>("kasse");
+  const [showComposer, setShowComposer] = useState(false);
   const [query, setQuery] = useState("");
   const [showFilter, setShowFilter] = useState(false);
   const [min, setMin] = useState("");
@@ -101,7 +111,7 @@ function Main() {
               />
             </div>
           ) : (
-            <div className="flex-1 text-lg font-bold">Rollen &amp; Rechte</div>
+            <div className="flex-1 text-lg font-bold">{tab === "events" ? "Events" : "Rollen & Rechte"}</div>
           )}
 
           {tab === "kasse" && (
@@ -123,6 +133,18 @@ function Main() {
               )}
             </>
           )}
+          <button
+            className={`iconbtn relative ${tab === "events" ? "iconbtn-active" : ""}`}
+            onClick={() => setTab(tab === "events" ? "kasse" : "events")}
+            aria-label="Events"
+          >
+            📣
+            {unread > 0 && (
+              <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[11px] font-bold text-white">
+                {unread > 9 ? "9+" : unread}
+              </span>
+            )}
+          </button>
           {canManageRoles && (
             <button
               className={`iconbtn ${tab === "rollen" ? "iconbtn-active" : ""}`}
@@ -238,6 +260,10 @@ function Main() {
         <main className="mt-3">
           <RolesTab />
         </main>
+      ) : tab === "events" ? (
+        <main className="mt-3">
+          <EventsTab />
+        </main>
       ) : (
         <main className="mt-3 grid gap-3 lg:grid-cols-2">
           {!ready && (
@@ -294,6 +320,16 @@ function Main() {
         </button>
       )}
 
+      {tab === "events" && canEditData && (
+        <button
+          onClick={() => setShowComposer(true)}
+          className="fixed bottom-[calc(env(safe-area-inset-bottom)+1rem)] right-4 z-30 flex h-14 w-14 items-center justify-center rounded-2xl bg-brand text-3xl text-white shadow-lg shadow-brand/40 transition active:scale-95 sm:right-6"
+          aria-label="Event erstellen"
+        >
+          ＋
+        </button>
+      )}
+
       {massMode && (
         <MassBar
           selected={selected}
@@ -306,6 +342,7 @@ function Main() {
 
       <StudentSheet student={openStudent} onClose={() => setOpenId(null)} />
       <AddSheet open={showAdd} onClose={() => setShowAdd(false)} />
+      <EventComposer open={showComposer} onClose={() => setShowComposer(false)} />
     </div>
   );
 }
