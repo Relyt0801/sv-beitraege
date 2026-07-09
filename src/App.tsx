@@ -1,8 +1,9 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { HY } from "./lib/types";
 import { normalize, offenGesamt, offenStufe, sortStudents } from "./lib/logic";
 import { useTheme } from "./lib/theme";
 import { hasSupabase, supabase } from "./lib/supabase";
+import { enablePush, pushConfigured, pushPermission } from "./lib/push";
 import { useStore } from "./store";
 import { AuthGate } from "./auth/AuthGate";
 import { RoleProvider, useRole } from "./auth/RoleProvider";
@@ -34,6 +35,12 @@ function Main() {
   const { canEditData, canEditBeitrag, canManageRoles, isStaff, loginByStudent } = useRole();
   const { events: allEvents, reads } = useEvents();
   const { theme, toggle } = useTheme();
+
+  // Erlaubnis schon erteilt (z. B. vor Konto-Neuanlage)? -> Abo still neu registrieren,
+  // damit dieses Konto wieder Push-Nachrichten bekommt.
+  useEffect(() => {
+    if (pushConfigured() && pushPermission() === "granted") void enablePush();
+  }, []);
 
   const unread = allEvents.filter((e) => !reads.has(e.id)).length;
   const [tab, setTab] = useState<Tab>("kasse");
