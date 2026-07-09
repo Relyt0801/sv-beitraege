@@ -1,0 +1,49 @@
+import { hasSupabase, supabase } from "./supabase";
+
+const VAPID = (import.meta.env.VITE_VAPID_PUBLIC_KEY as string | undefined) || "";
+
+export const pushSupported =
+  typeof navigator !== "undefined" && "serviceWorker" in navigator && typeof window !== "undefined" && "PushManager" in window;
+
+export const pushConfigured = () => Boolean(VAPID) && hasSupabase;
+
+export function pushPermission(): NotificationPermission | "unsupported" {
+  if (!pushSupported || typeof Notification === "undefined") return "unsupported";
+  return Notification.permission;
+}
+
+function urlBase64ToUint8Array(base64: string): Uint8Array {
+  const padding = "=".repeat((4 - (base64.length % 4)) % 4);
+  const b64 = (base64 + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const raw = atob(b64);
+  const arr = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
+  return arr;
+}
+
+/** Benachrichtigungen aktivieren: Erlaubnis holen, Abo anlegen, in Supabase speichern. */
+export async function enablePush(): Promise<{ ok: boolean; error?: string }> {
+  if (!pushSupported || !VAPID) return { ok: false, error: "nicht unterstützt" };
+  try {
+    const perm = await Notification.requestPermission();
+    if (perm !== "granted") return { ok: false, error: "keine Erlaubnis" };
+    const reg = await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) {
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(VAPID) as BufferSource,
+      });
+    }
+    const { data } = await supabase!.auth.getSession();
+    const uid = data.session?.user.id;
+    if (!uid) return { ok: false, error: "nicht eingeloggt" };
+    const { error } = await supabase!
+      .from("push_subscriptions")
+      .upsert({ user_id: uid, endpoint: sub.endpoint, subscription: sub.toJSON() }, { onConflict: "endpoint" });
+    if (error) return { ok: false, error: error.message };
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
+}

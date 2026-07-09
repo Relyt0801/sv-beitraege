@@ -1,7 +1,34 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useEvents } from "../events-store";
 import { useRole } from "../auth/RoleProvider";
 import { TYPE_META, type EventItem } from "../lib/events";
+import { enablePush, pushConfigured, pushPermission } from "../lib/push";
+
+function PushBanner() {
+  const [perm, setPerm] = useState(pushPermission());
+  const [busy, setBusy] = useState(false);
+  if (!pushConfigured() || perm === "granted" || perm === "denied" || perm === "unsupported") return null;
+  return (
+    <div className="mb-3 flex flex-wrap items-center gap-3 rounded-2xl border border-brand/30 bg-brand/5 p-3.5">
+      <span className="text-sm font-medium text-slate-600 dark:text-slate-300">
+        🔔 Benachrichtigungen bei neuen Events aufs Gerät bekommen?
+      </span>
+      <button
+        disabled={busy}
+        onClick={async () => {
+          setBusy(true);
+          const r = await enablePush();
+          setBusy(false);
+          setPerm(pushPermission());
+          if (!r.ok && r.error) alert("Konnte nicht aktivieren: " + r.error);
+        }}
+        className="ml-auto rounded-lg bg-brand px-3 py-1.5 text-sm font-semibold text-white"
+      >
+        {busy ? "…" : "Aktivieren"}
+      </button>
+    </div>
+  );
+}
 
 export function EventsTab() {
   const { events, ready, myVotes, voteCounts, reads, vote, deleteEvent, markRead } = useEvents();
@@ -21,11 +48,18 @@ export function EventsTab() {
     );
   }
   if (events.length === 0)
-    return <div className="py-16 text-center text-sm text-slate-400">Noch keine Events.</div>;
+    return (
+      <>
+        <PushBanner />
+        <div className="py-16 text-center text-sm text-slate-400">Noch keine Events.</div>
+      </>
+    );
 
   return (
-    <div className="grid gap-3 lg:grid-cols-2">
-      {events.map((e) => (
+    <>
+      <PushBanner />
+      <div className="grid gap-3 lg:grid-cols-2">
+        {events.map((e) => (
         <EventCard
           key={e.id}
           e={e}
@@ -38,8 +72,9 @@ export function EventsTab() {
             if (confirm("Dieses Event wirklich löschen?")) void deleteEvent(e.id);
           }}
         />
-      ))}
-    </div>
+        ))}
+      </div>
+    </>
   );
 }
 

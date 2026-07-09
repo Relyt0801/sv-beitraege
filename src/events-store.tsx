@@ -184,6 +184,12 @@ export function EventsProvider({ children }: { children: ReactNode }) {
           .insert(e.options.filter(Boolean).map((label, i) => ({ event_id: ev.id, label, position: i })));
       if (e.audience === "selected" && e.target_ids.length)
         await supabase!.from("event_targets").insert(e.target_ids.map((student_id) => ({ event_id: ev.id, student_id })));
+      // Push-Benachrichtigung auslösen (Function optional – Fehler ignorieren, falls noch nicht deployt)
+      try {
+        await supabase!.functions.invoke("send-push", { body: { event_id: ev.id } });
+      } catch {
+        /* Function evtl. noch nicht deployt */
+      }
       await loadAll();
     },
     [loadAll, myVotes, reads, saveLocal],
