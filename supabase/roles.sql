@@ -46,7 +46,8 @@ on conflict (user_id) do nothing;
 create or replace function public.guard_role_change() returns trigger
   language plpgsql security definer set search_path = public as $$
 begin
-  if new.role is distinct from old.role and public.my_role() <> 'admin' then
+  -- auth.uid() IS NULL = vertrauenswürdiger SQL-/service_role-Kontext (Bootstrap) -> erlaubt
+  if new.role is distinct from old.role and auth.uid() is not null and public.my_role() <> 'admin' then
     raise exception 'Nur Admin darf Rollen ändern';
   end if;
   return new;
@@ -92,7 +93,8 @@ create policy "students delete" on public.students for delete to authenticated
 create or replace function public.guard_terms_change() returns trigger
   language plpgsql security definer set search_path = public as $$
 begin
-  if new.terms is distinct from old.terms and public.my_role() not in ('kassenwart','admin') then
+  if new.terms is distinct from old.terms and auth.uid() is not null
+     and public.my_role() not in ('kassenwart','admin') then
     raise exception 'Nur der Kassenwart darf Beiträge ändern';
   end if;
   return new;
