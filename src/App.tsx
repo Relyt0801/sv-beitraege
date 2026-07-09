@@ -39,7 +39,11 @@ function Main() {
   // Erlaubnis schon erteilt (z. B. vor Konto-Neuanlage)? -> Abo still neu registrieren,
   // damit dieses Konto wieder Push-Nachrichten bekommt.
   useEffect(() => {
-    if (pushConfigured() && pushPermission() === "granted") void enablePush();
+    if (pushConfigured() && pushPermission() === "granted")
+      void enablePush().then((r) => {
+        if (!r.ok) console.warn("[push] Auto-Registrierung fehlgeschlagen:", r.error);
+      });
+    else console.log("[push] kein Auto-Abo:", { konfiguriert: pushConfigured(), erlaubnis: pushPermission() });
   }, []);
 
   const unread = allEvents.filter((e) => !reads.has(e.id)).length;
