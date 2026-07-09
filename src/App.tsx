@@ -88,6 +88,17 @@ function Main() {
     inp.click();
   }
 
+  async function changePassword() {
+    const pw = prompt("Neues Passwort (mindestens 6 Zeichen):");
+    if (!pw) return;
+    if (pw.length < 6) {
+      alert("Das Passwort muss mindestens 6 Zeichen haben.");
+      return;
+    }
+    const { error } = await supabase!.auth.updateUser({ password: pw });
+    alert(error ? "Fehler: " + error.message : "Passwort geändert ✓");
+  }
+
   const numField =
     "w-16 rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-center dark:border-slate-700 dark:bg-slate-800";
 
@@ -246,9 +257,14 @@ function Main() {
                   </>
                 )}
                 {hasSupabase && (
-                  <button onClick={() => supabase!.auth.signOut()} className="ml-auto rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-semibold text-slate-500 dark:border-slate-700">
-                    Logout
-                  </button>
+                  <>
+                    <button onClick={changePassword} className="ml-auto rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-semibold dark:border-slate-700">
+                      Passwort ändern
+                    </button>
+                    <button onClick={() => supabase!.auth.signOut()} className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-semibold text-slate-500 dark:border-slate-700">
+                      Logout
+                    </button>
+                  </>
                 )}
               </div>
             </div>
