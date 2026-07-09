@@ -1,6 +1,7 @@
 import { HY, STATI, type Halbjahr, type Student } from "../lib/types";
 import { isDead, isPreJoin, offenGesamt, zusatzFaellig } from "../lib/logic";
 import { useStore } from "../store";
+import { useRole } from "../auth/RoleProvider";
 import { Sheet } from "./Sheet";
 
 const STATUS_LABEL: Record<string, string> = { offen: "offen", bezahlt: "✓ bezahlt", erlassen: "~ erlassen" };
@@ -12,6 +13,7 @@ const STATUS_ON: Record<string, string> = {
 
 export function StudentSheet({ student, onClose }: { student: Student | null; onClose: () => void }) {
   const { settings, setTerm, bumpBet, updateStudent, removeStudent } = useStore();
+  const { canEditBeitrag, canEditData } = useRole();
 
   return (
     <Sheet open={student != null} onClose={onClose}>
@@ -40,11 +42,19 @@ export function StudentSheet({ student, onClose }: { student: Student | null; on
             <div>
               <div className="text-xs font-medium uppercase tracking-wide text-slate-500">Beteiligungen</div>
               <div className="mt-1 flex items-center overflow-hidden rounded-xl border border-slate-300 dark:border-slate-600">
-                <button onClick={() => bumpBet(student.id, -1)} className="h-11 w-11 bg-white text-2xl font-bold dark:bg-slate-900">
+                <button
+                  disabled={!canEditData}
+                  onClick={() => bumpBet(student.id, -1)}
+                  className="h-11 w-11 bg-white text-2xl font-bold disabled:opacity-30 dark:bg-slate-900"
+                >
                   −
                 </button>
                 <span className="min-w-[48px] text-center text-xl font-extrabold">{student.beteiligungen}</span>
-                <button onClick={() => bumpBet(student.id, 1)} className="h-11 w-11 bg-white text-2xl font-bold dark:bg-slate-900">
+                <button
+                  disabled={!canEditData}
+                  onClick={() => bumpBet(student.id, 1)}
+                  className="h-11 w-11 bg-white text-2xl font-bold disabled:opacity-30 dark:bg-slate-900"
+                >
                   ＋
                 </button>
               </div>
@@ -74,7 +84,7 @@ export function StudentSheet({ student, onClose }: { student: Student | null; on
                     {STATI.map((s) => (
                       <button
                         key={s}
-                        disabled={inactive}
+                        disabled={inactive || !canEditBeitrag}
                         onClick={() => setTerm(student.id, h, s)}
                         className={`rounded-lg border px-3 py-2 text-[13px] font-bold transition disabled:opacity-30 ${
                           t.status === s && !inactive
@@ -91,6 +101,7 @@ export function StudentSheet({ student, onClose }: { student: Student | null; on
             })}
           </div>
 
+          {canEditData && (
           <div className="mt-5 flex flex-wrap items-center gap-3">
             <label className="text-sm text-slate-500">Dabei ab</label>
             <select
@@ -125,6 +136,7 @@ export function StudentSheet({ student, onClose }: { student: Student | null; on
               Löschen
             </button>
           </div>
+          )}
 
           <button className="btn-primary mt-5" onClick={onClose}>
             Fertig

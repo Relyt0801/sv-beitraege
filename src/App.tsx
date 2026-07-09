@@ -1,27 +1,33 @@
 import { useMemo, useState } from "react";
-import { HY, type Halbjahr } from "./lib/types";
+import { HY } from "./lib/types";
 import { normalize, offenGesamt, offenStufe, sortStudents } from "./lib/logic";
 import { useTheme } from "./lib/theme";
 import { hasSupabase, supabase } from "./lib/supabase";
 import { useStore } from "./store";
 import { AuthGate } from "./auth/AuthGate";
+import { RoleProvider, useRole } from "./auth/RoleProvider";
 import { StudentCard, nextStatus } from "./components/StudentCard";
 import { StudentSheet } from "./components/StudentSheet";
 import { AddSheet } from "./components/AddSheet";
 import { MassBar } from "./components/MassBar";
+import { RolesTab } from "./components/RolesTab";
 
 export default function App() {
   return (
     <AuthGate>
-      <Main />
+      <RoleProvider>
+        <Main />
+      </RoleProvider>
     </AuthGate>
   );
 }
 
 function Main() {
   const { students, settings, ready, mode, setTerm, setSettings, exportData, importData } = useStore();
+  const { canEditData, canEditBeitrag, canManageRoles, isStaff, loginByStudent } = useRole();
   const { theme, toggle } = useTheme();
 
+  const [tab, setTab] = useState<"kasse" | "rollen">("kasse");
   const [query, setQuery] = useState("");
   const [showFilter, setShowFilter] = useState(false);
   const [min, setMin] = useState("");
@@ -83,57 +89,82 @@ function Main() {
             <div className="text-lg font-bold tracking-tight">Stufenkasse</div>
             <div className="text-[11px] text-slate-400">SV · Beiträge</div>
           </div>
-          <div className="flex flex-1 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 shadow-card dark:border-slate-800 dark:bg-slate-900 dark:shadow-cardDark">
-            <span className="text-slate-400">🔍</span>
-            <input
-              className="w-full bg-transparent text-base outline-none placeholder:text-slate-400"
-              placeholder="Name suchen…"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-            />
-          </div>
-          <button className={`iconbtn ${showFilter ? "iconbtn-active" : ""}`} onClick={() => setShowFilter((v) => !v)} aria-label="Filter & Einstellungen">
-            ⚙︎
-          </button>
-          <button
-            className={`iconbtn ${massMode ? "iconbtn-active" : ""}`}
-            onClick={() => {
-              setMassMode((v) => !v);
-              setSelected(new Set());
-            }}
-            aria-label="Mehrere auswählen"
-          >
-            ☑
-          </button>
+
+          {tab === "kasse" ? (
+            <div className="flex flex-1 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 shadow-card dark:border-slate-800 dark:bg-slate-900 dark:shadow-cardDark">
+              <span className="text-slate-400">🔍</span>
+              <input
+                className="w-full bg-transparent text-base outline-none placeholder:text-slate-400"
+                placeholder="Name suchen…"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+              />
+            </div>
+          ) : (
+            <div className="flex-1 text-lg font-bold">Rollen &amp; Rechte</div>
+          )}
+
+          {tab === "kasse" && (
+            <>
+              <button className={`iconbtn ${showFilter ? "iconbtn-active" : ""}`} onClick={() => setShowFilter((v) => !v)} aria-label="Filter & Einstellungen">
+                ⚙︎
+              </button>
+              {canEditData && (
+                <button
+                  className={`iconbtn ${massMode ? "iconbtn-active" : ""}`}
+                  onClick={() => {
+                    setMassMode((v) => !v);
+                    setSelected(new Set());
+                  }}
+                  aria-label="Mehrere auswählen"
+                >
+                  ☑
+                </button>
+              )}
+            </>
+          )}
+          {canManageRoles && (
+            <button
+              className={`iconbtn ${tab === "rollen" ? "iconbtn-active" : ""}`}
+              onClick={() => setTab(tab === "rollen" ? "kasse" : "rollen")}
+              aria-label="Rollen verwalten"
+            >
+              👥
+            </button>
+          )}
           <button className="iconbtn" onClick={toggle} aria-label="Hell/Dunkel">
             {theme === "dark" ? "☀" : "☾"}
           </button>
         </div>
 
-        {/* Halbjahr-Leiste + Gesamtsumme */}
-        <div className="mx-auto mt-2.5 flex max-w-5xl flex-wrap items-center gap-x-3 gap-y-2">
-          <div className="flex flex-wrap items-center gap-1.5">
-            {HY.map((h) => (
-              <button
-                key={h}
-                onClick={() => setSettings({ aktuelles_halbjahr: h })}
-                className={`rounded-full border px-3 py-1 text-xs font-bold transition ${
-                  h === settings.aktuelles_halbjahr
-                    ? "border-brand bg-brand text-white"
-                    : "border-slate-200 bg-white text-slate-500 dark:border-slate-700 dark:bg-slate-900"
-                }`}
-              >
-                {h}
-              </button>
-            ))}
+        {tab === "kasse" && (
+          <div className="mx-auto mt-2.5 flex max-w-5xl flex-wrap items-center gap-x-3 gap-y-2">
+            <div className="flex flex-wrap items-center gap-1.5">
+              {HY.map((h) => (
+                <button
+                  key={h}
+                  disabled={!canEditData}
+                  onClick={() => setSettings({ aktuelles_halbjahr: h })}
+                  className={`rounded-full border px-3 py-1 text-xs font-bold transition disabled:cursor-default ${
+                    h === settings.aktuelles_halbjahr
+                      ? "border-brand bg-brand text-white"
+                      : "border-slate-200 bg-white text-slate-500 dark:border-slate-700 dark:bg-slate-900"
+                  }`}
+                >
+                  {h}
+                </button>
+              ))}
+            </div>
+            {isStaff && (
+              <div className="ml-auto rounded-full bg-white px-3.5 py-1.5 text-sm font-semibold shadow-card dark:bg-slate-900 dark:shadow-cardDark">
+                Offen gesamt: <span className="font-extrabold text-amber-500">{totalOffen} €</span>
+                <span className="ml-1 text-slate-400">· {anzahlOffen} offen</span>
+              </div>
+            )}
           </div>
-          <div className="ml-auto rounded-full bg-white px-3.5 py-1.5 text-sm font-semibold shadow-card dark:bg-slate-900 dark:shadow-cardDark">
-            Offen gesamt: <span className="font-extrabold text-amber-500">{totalOffen} €</span>
-            <span className="ml-1 text-slate-400">· {anzahlOffen} offen</span>
-          </div>
-        </div>
+        )}
 
-        {showFilter && (
+        {tab === "kasse" && showFilter && (
           <div className="mx-auto mt-3 max-w-5xl">
             <div className="card grid grid-cols-2 gap-x-5 gap-y-4 p-4 sm:grid-cols-4">
               <label className="flex flex-col gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -143,26 +174,6 @@ function Main() {
                   <span className="text-slate-400">–</span>
                   <input type="number" className={numField} placeholder="max" value={max} onChange={(e) => setMax(e.target.value)} />
                 </div>
-              </label>
-
-              <label className="flex flex-col gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Benötigt bis Q2.2
-                <input
-                  type="number"
-                  className={numField}
-                  value={settings.benoetigt}
-                  onChange={(e) => setSettings({ benoetigt: Math.max(0, Number(e.target.value) || 0) })}
-                />
-              </label>
-
-              <label className="flex flex-col gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Zusatzbetrag €
-                <input
-                  type="number"
-                  className={numField}
-                  value={settings.zusatz}
-                  onChange={(e) => setSettings({ zusatz: Math.max(0, Number(e.target.value) || 0) })}
-                />
               </label>
 
               <div className="flex flex-col gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -177,14 +188,41 @@ function Main() {
                 </button>
               </div>
 
+              {canEditData && (
+                <>
+                  <label className="flex flex-col gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Benötigt bis Q2.2
+                    <input
+                      type="number"
+                      className={numField}
+                      value={settings.benoetigt}
+                      onChange={(e) => setSettings({ benoetigt: Math.max(0, Number(e.target.value) || 0) })}
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Zusatzbetrag €
+                    <input
+                      type="number"
+                      className={numField}
+                      value={settings.zusatz}
+                      onChange={(e) => setSettings({ zusatz: Math.max(0, Number(e.target.value) || 0) })}
+                    />
+                  </label>
+                </>
+              )}
+
               <div className="col-span-2 flex flex-wrap items-center gap-2 border-t border-slate-200 pt-3 dark:border-slate-700 sm:col-span-4">
                 <span className="mr-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Daten</span>
-                <button onClick={exportData} className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-semibold dark:border-slate-700">
-                  Export
-                </button>
-                <button onClick={onImport} className="rounded-lg bg-brand px-3 py-1.5 text-sm font-semibold text-white">
-                  Import
-                </button>
+                {canEditData && (
+                  <>
+                    <button onClick={exportData} className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-semibold dark:border-slate-700">
+                      Export
+                    </button>
+                    <button onClick={onImport} className="rounded-lg bg-brand px-3 py-1.5 text-sm font-semibold text-white">
+                      Import
+                    </button>
+                  </>
+                )}
                 {hasSupabase && (
                   <button onClick={() => supabase!.auth.signOut()} className="ml-auto rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-semibold text-slate-500 dark:border-slate-700">
                     Logout
@@ -196,49 +234,57 @@ function Main() {
         )}
       </header>
 
-      <main className="mt-3 grid gap-3 lg:grid-cols-2">
-        {!ready && (
-          <div className="col-span-full flex flex-col items-center justify-center gap-4 py-24 text-slate-400">
-            <div className="h-9 w-9 animate-spin rounded-full border-[3px] border-slate-300 border-t-brand dark:border-slate-700 dark:border-t-brand" />
-            <div className="text-sm font-medium">Beitragsliste wird geladen …</div>
-          </div>
-        )}
-        {ready && filtered.length === 0 && (
-          <div className="col-span-full py-16 text-center text-sm text-slate-400">
-            Keine Treffer.{" "}
-            <button
-              className="font-semibold text-brand"
-              onClick={() => {
-                setQuery("");
-                setMin("");
-                setMax("");
-                setOnlyOpen(false);
-              }}
-            >
-              Filter zurücksetzen
-            </button>
-          </div>
-        )}
-        {filtered.map((st) => (
-          <StudentCard
-            key={st.id}
-            student={st}
-            settings={settings}
-            selectable={massMode}
-            selected={selected.has(st.id)}
-            onOpen={() => setOpenId(st.id)}
-            onToggleSelect={() => toggleSelect(st.id)}
-            onToggleTerm={(h) => setTerm(st.id, h, nextStatus(st.terms[h].status))}
-          />
-        ))}
-        {mode === "local" && ready && (
-          <p className="col-span-full pt-2 text-center text-[11px] text-slate-400">
-            Lokaler Modus – Daten nur auf diesem Gerät.
-          </p>
-        )}
-      </main>
+      {tab === "rollen" ? (
+        <main className="mt-3">
+          <RolesTab />
+        </main>
+      ) : (
+        <main className="mt-3 grid gap-3 lg:grid-cols-2">
+          {!ready && (
+            <div className="col-span-full flex flex-col items-center justify-center gap-4 py-24 text-slate-400">
+              <div className="h-9 w-9 animate-spin rounded-full border-[3px] border-slate-300 border-t-brand dark:border-slate-700 dark:border-t-brand" />
+              <div className="text-sm font-medium">Beitragsliste wird geladen …</div>
+            </div>
+          )}
+          {ready && filtered.length === 0 && (
+            <div className="col-span-full py-16 text-center text-sm text-slate-400">
+              Keine Treffer.{" "}
+              <button
+                className="font-semibold text-brand"
+                onClick={() => {
+                  setQuery("");
+                  setMin("");
+                  setMax("");
+                  setOnlyOpen(false);
+                }}
+              >
+                Filter zurücksetzen
+              </button>
+            </div>
+          )}
+          {filtered.map((st) => (
+            <StudentCard
+              key={st.id}
+              student={st}
+              settings={settings}
+              selectable={massMode}
+              selected={selected.has(st.id)}
+              canToggleBeitrag={canEditBeitrag}
+              loginState={isStaff ? (loginByStudent[st.id] ?? false) : null}
+              onOpen={() => setOpenId(st.id)}
+              onToggleSelect={() => toggleSelect(st.id)}
+              onToggleTerm={(h) => setTerm(st.id, h, nextStatus(st.terms[h].status))}
+            />
+          ))}
+          {mode === "local" && ready && (
+            <p className="col-span-full pt-2 text-center text-[11px] text-slate-400">
+              Lokaler Modus – Daten nur auf diesem Gerät.
+            </p>
+          )}
+        </main>
+      )}
 
-      {!massMode && (
+      {tab === "kasse" && canEditData && !massMode && (
         <button
           onClick={() => setShowAdd(true)}
           className="fixed bottom-[calc(env(safe-area-inset-bottom)+1rem)] right-4 z-30 flex h-14 w-14 items-center justify-center rounded-2xl bg-brand text-3xl text-white shadow-lg shadow-brand/40 transition active:scale-95 sm:right-6"

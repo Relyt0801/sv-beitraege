@@ -7,6 +7,8 @@ export function StudentCard({
   settings,
   selectable,
   selected,
+  canToggleBeitrag,
+  loginState,
   onOpen,
   onToggleSelect,
   onToggleTerm,
@@ -15,6 +17,8 @@ export function StudentCard({
   settings: Settings;
   selectable: boolean;
   selected: boolean;
+  canToggleBeitrag: boolean;
+  loginState?: boolean | null;
   onOpen: () => void;
   onToggleSelect: () => void;
   onToggleTerm: (h: (typeof HY)[number]) => void;
@@ -47,6 +51,14 @@ export function StudentCard({
           className="min-w-0 flex-1 text-left"
         >
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            {loginState != null && (
+              <span
+                title={loginState ? "hat sich schon angemeldet" : "noch nie angemeldet"}
+                className={`h-2.5 w-2.5 shrink-0 rounded-full ${
+                  loginState ? "bg-emerald-500" : "bg-slate-300 dark:bg-slate-600"
+                }`}
+              />
+            )}
             <span className="text-[17px] font-semibold leading-tight">
               {student.nachname}, {student.vorname}
             </span>
@@ -84,7 +96,7 @@ export function StudentCard({
             h={h}
             i={i}
             current={settings.aktuelles_halbjahr}
-            onToggle={selectable ? undefined : () => onToggleTerm(h)}
+            onToggle={!selectable && canToggleBeitrag ? () => onToggleTerm(h) : undefined}
           />
         ))}
       </div>
