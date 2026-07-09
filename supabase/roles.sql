@@ -117,4 +117,4 @@ create policy "settings write"  on public.app_settings for all to authenticated
 
 -- 4) DICH zum Admin machen (nur der Nutzername – KEIN Passwort im Klartext)
 update public.profiles set role = 'admin'
-where user_id in (select id from auth.users where email = 'relyt0801@sv-beitraege.local');
+where user_id in (select id from auth.users where email = 'adams.tyler@sv-beitraege.local');
