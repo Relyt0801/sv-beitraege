@@ -21,14 +21,15 @@ if (!URL || !KEY || !file) {
   process.exit(1);
 }
 
-function usernamePart(s) {
-  return (s || "")
-    .toLowerCase()
+function clean(s) {
+  return (s || "").toLowerCase()
     .replace(/ä/g, "ae").replace(/ö/g, "oe").replace(/ü/g, "ue").replace(/ß/g, "ss")
     .normalize("NFD").replace(/[̀-ͯ]/g, "")
-    .replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+    .replace(/[^a-z0-9 -]/g, "").replace(/\s+/g, " ").trim();
 }
-const makeUsername = (n, v) => `${usernamePart(n)}.${usernamePart(v)}`;
+const vornamePart = (s) => clean(s).split(" ")[0].replace(/^-+|-+$/g, "");
+const nachnamePart = (s) => clean(s).replace(/ /g, "").replace(/^-+|-+$/g, "");
+const makeUsername = (n, v) => `${nachnamePart(n)}.${vornamePart(v)}`;
 
 function makePassword(len = 8) {
   const abc = "abcdefghijkmnpqrstuvwxyz23456789"; // ohne verwechselbare Zeichen

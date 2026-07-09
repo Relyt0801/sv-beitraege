@@ -9,22 +9,35 @@
 -- die App erzwingt dann vor dem ersten Nutzen einen Passwortwechsel)
 alter table public.profiles add column if not exists must_change_password boolean not null default false;
 
--- Namensteil normalisieren (Spiegel der JS-Logik in src/lib/username.ts)
--- ä->ae, ö->oe, ü->ue, ß->ss; übrige Akzente -> Grundbuchstabe
-create or replace function public.username_part(s text) returns text
+-- Namens-Normalisierung (Spiegel der JS-Logik in src/lib/username.ts),
+-- angelehnt an die Schulmail vorname.nachname@…:
+--   Bindestrich-Vornamen bleiben (anna-lena), Zweitname mit Leerzeichen fällt weg (juli),
+--   mehrteilige Nachnamen zusammengezogen (vonlaszewski, grossekleimann),
+--   ä->ae ö->oe ü->ue ß->ss, Akzente -> Grundbuchstabe.
+create or replace function public.name_clean(s text) returns text
   language sql immutable as $$
-  select trim(both '-' from regexp_replace(
+  select trim(regexp_replace(regexp_replace(
     translate(
       replace(replace(replace(replace(lower(coalesce(s,'')),
         'ä', 'ae'), 'ö', 'oe'), 'ü', 'ue'), 'ß', 'ss'),
       'àáâãåæèéêëìíîïòóôõøùúûçčñšžýÿ',
       'aaaaaaeeeeiiiiooooouuuccnszyy'),
-    '[^a-z0-9]+', '-', 'g'))
+    '[^a-z0-9 -]', '', 'g'), '\s+', ' ', 'g'))
+$$;
+
+create or replace function public.vorname_part(s text) returns text
+  language sql immutable as $$
+  select trim(both '-' from split_part(public.name_clean(s), ' ', 1))
+$$;
+
+create or replace function public.nachname_part(s text) returns text
+  language sql immutable as $$
+  select trim(both '-' from replace(public.name_clean(s), ' ', ''))
 $$;
 
 create or replace function public.username_for(nachname text, vorname text) returns text
   language sql immutable as $$
-  select public.username_part(nachname) || '.' || public.username_part(vorname)
+  select public.nachname_part(nachname) || '.' || public.vorname_part(vorname)
 $$;
 
 -- Trigger ersetzen: neues Konto -> Profil anlegen UND Schüler automatisch verknüpfen
