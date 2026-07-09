@@ -23,8 +23,15 @@ Deno.serve(async (req) => {
       Deno.env.get("VAPID_PRIVATE_KEY")!,
     );
 
-    const { data: ev } = await supabase.from("events").select("*").eq("id", event_id).single();
-    if (!ev) return new Response(JSON.stringify({ error: "event not found" }), { status: 404, headers: cors });
+    console.log("send-push aufgerufen, event_id:", event_id);
+    console.log("VAPID keys gesetzt:", Boolean(Deno.env.get("VAPID_PUBLIC_KEY")), Boolean(Deno.env.get("VAPID_PRIVATE_KEY")));
+
+    const { data: ev, error: evErr } = await supabase.from("events").select("*").eq("id", event_id).single();
+    if (!ev) {
+      console.log("Event nicht gefunden:", evErr?.message);
+      return new Response(JSON.stringify({ error: "event not found" }), { status: 404, headers: cors });
+    }
+    console.log("Event:", ev.title, "| audience:", ev.audience);
 
     // Empfänger bestimmen
     let userIds: string[] = [];
@@ -39,9 +46,11 @@ Deno.serve(async (req) => {
         userIds = (p || []).map((x: { user_id: string }) => x.user_id);
       }
     }
+    console.log("Empfänger (userIds):", userIds.length);
     if (!userIds.length) return new Response(JSON.stringify({ sent: 0 }), { headers: cors });
 
-    const { data: subs } = await supabase.from("push_subscriptions").select("*").in("user_id", userIds);
+    const { data: subs, error: subErr } = await supabase.from("push_subscriptions").select("*").in("user_id", userIds);
+    console.log("Push-Abos gefunden:", subs?.length || 0, subErr ? "Fehler: " + subErr.message : "");
     const title = ev.is_warning ? "⚠️ " + ev.title : ev.title;
     const payload = JSON.stringify({ title, body: (ev.body || "").slice(0, 120), url: "/" });
 
@@ -53,12 +62,15 @@ Deno.serve(async (req) => {
           sent++;
         } catch (err) {
           const code = (err as { statusCode?: number })?.statusCode;
+          console.log("Versand-Fehler:", code, (err as Error)?.message, "endpoint:", s.endpoint.slice(0, 60));
           if (code === 404 || code === 410) await supabase.from("push_subscriptions").delete().eq("endpoint", s.endpoint);
         }
       }),
     );
+    console.log("Gesendet:", sent);
     return new Response(JSON.stringify({ sent }), { headers: { ...cors, "content-type": "application/json" } });
   } catch (e) {
+    console.log("FEHLER:", String(e));
     return new Response(JSON.stringify({ error: String(e) }), { status: 500, headers: cors });
   }
 });
