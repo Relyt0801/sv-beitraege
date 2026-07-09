@@ -5,6 +5,10 @@
 -- Leerzeichen/Zweitnamen -> Bindestrich)
 -- ============================================================
 
+-- Pflicht-Passwortwechsel-Flag (wird vom Konto-Skript auf true gesetzt;
+-- die App erzwingt dann vor dem ersten Nutzen einen Passwortwechsel)
+alter table public.profiles add column if not exists must_change_password boolean not null default false;
+
 -- Namensteil normalisieren (Spiegel der JS-Logik in src/lib/username.ts)
 -- ä->ae, ö->oe, ü->ue, ß->ss; übrige Akzente -> Grundbuchstabe
 create or replace function public.username_part(s text) returns text

@@ -6,6 +6,7 @@ import { hasSupabase, supabase } from "./lib/supabase";
 import { enablePush, pushConfigured, pushPermission } from "./lib/push";
 import { useStore } from "./store";
 import { AuthGate } from "./auth/AuthGate";
+import { PasswordGate } from "./auth/PasswordGate";
 import { RoleProvider, useRole } from "./auth/RoleProvider";
 import { EventsProvider, useEvents } from "./events-store";
 import { StudentCard, nextStatus } from "./components/StudentCard";
@@ -19,11 +20,13 @@ import { EventComposer } from "./components/EventComposer";
 export default function App() {
   return (
     <AuthGate>
-      <RoleProvider>
-        <EventsProvider>
-          <Main />
-        </EventsProvider>
-      </RoleProvider>
+      <PasswordGate>
+        <RoleProvider>
+          <EventsProvider>
+            <Main />
+          </EventsProvider>
+        </RoleProvider>
+      </PasswordGate>
     </AuthGate>
   );
 }

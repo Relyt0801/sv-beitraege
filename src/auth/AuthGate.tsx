@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { ACCESS_CODE, hasSupabase, supabase, usernameToEmail } from "../lib/supabase";
+import { enablePush, pushConfigured, pushSupported } from "../lib/push";
 import type { Session } from "@supabase/supabase-js";
 
 export function AuthGate({ children }: { children: ReactNode }) {
@@ -36,6 +37,7 @@ function LoginForm() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
+  const [wantPush, setWantPush] = useState(true);
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -58,6 +60,13 @@ function LoginForm() {
       } else {
         const { error } = await supabase!.auth.signInWithPassword({ email, password });
         if (error) throw error;
+      }
+      // Direkt nach erfolgreichem Login/Registrieren: Benachrichtigungen aktivieren
+      // (Browser fragt um Erlaubnis). Später jederzeit im 📣-Reiter änderbar.
+      if (wantPush && pushSupported && pushConfigured()) {
+        void enablePush().then((r) => {
+          if (!r.ok) console.warn("[push] Aktivierung beim Login fehlgeschlagen:", r.error);
+        });
       }
     } catch (e: any) {
       setErr(e?.message === "Invalid login credentials" ? "Benutzername oder Passwort falsch." : e?.message || "Fehler.");
@@ -96,6 +105,20 @@ function LoginForm() {
             value={code}
             onChange={(e) => setCode(e.target.value)}
           />
+        )}
+
+        {pushSupported && pushConfigured() && (
+          <label className="mb-3 flex cursor-pointer items-start gap-2.5 rounded-xl bg-slate-100 p-3 dark:bg-slate-800">
+            <input
+              type="checkbox"
+              className="mt-0.5 h-4 w-4 accent-brand"
+              checked={wantPush}
+              onChange={(e) => setWantPush(e.target.checked)}
+            />
+            <span className="text-sm text-slate-600 dark:text-slate-300">
+              🔔 Benachrichtigungen aktivieren – bitte anlassen, damit du <b>Abstimmungen &amp; Mitteilungen</b> mitbekommst.
+            </span>
+          </label>
         )}
 
         {err && <div className="mb-3 text-sm font-medium text-red-500">{err}</div>}

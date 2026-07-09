@@ -60,8 +60,11 @@ for (const st of students) {
     console.error(`⚠ ${username}: ${error.message}`);
     continue;
   }
-  // Profil mit Schüler verknüpfen (Rolle bleibt schueler)
-  await supabase.from("profiles").update({ student_id: st.id, username }).eq("user_id", data.user.id);
+  // Profil mit Schüler verknüpfen (Rolle bleibt schueler); Startpasswort -> Wechsel erzwingen
+  await supabase
+    .from("profiles")
+    .update({ student_id: st.id, username, must_change_password: true })
+    .eq("user_id", data.user.id);
   rows.push([st.nachname, st.vorname, username, password]);
   console.log(`✓ ${username}`);
 }

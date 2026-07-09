@@ -40,6 +40,7 @@ if (error) {
   console.error("Fehler:", error.message);
   process.exit(1);
 }
+await supabase.from("profiles").update({ must_change_password: true }).eq("user_id", prof.user_id);
 console.log(`✓ Passwort für ${username} (${email}) neu gesetzt:`);
 console.log(`  ${password}`);
 console.log("Der Person mitteilen und ans Ändern erinnern (App -> ⚙︎ -> Passwort ändern).");
