@@ -94,21 +94,26 @@ if (missing.length) console.log("Ohne Kontakt (Zettel nötig):", missing.join(" 
 if (mode === "whatsapp") {
   const withPhone = rows.filter((r) => r.handy);
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-  const items = withPhone.map((r, i) => {
-    const link = `https://wa.me/${phoneIntl(r.handy)}?text=${encodeURIComponent(message(r.vorname, r.user, r.pass))}`;
+  const items = withPhone.map((r) => {
+    const num = phoneIntl(r.handy);
+    const txt = encodeURIComponent(message(r.vorname, r.user, r.pass));
+    // web.whatsapp.com/send öffnet den Chat DIREKT mit fertigem Text (WhatsApp Web muss eingeloggt sein)
+    const webLink = `https://web.whatsapp.com/send?phone=${num}&text=${txt}`;
+    const mobLink = `https://wa.me/${num}?text=${txt}`;
     return `<li><label><input type="checkbox" onchange="this.closest('li').classList.toggle('done',this.checked)">
       <b>${esc(r.nachname)}, ${esc(r.vorname)}</b></label>
-      <a href="${esc(link)}" target="_blank" rel="noopener">WhatsApp öffnen →</a></li>`;
+      <a href="${esc(webLink)}" target="_blank" rel="noopener">Chat öffnen →</a>
+      <a class="alt" href="${esc(mobLink)}" target="_blank" rel="noopener">(Handy)</a></li>`;
   }).join("\n");
   writeFileSync("whatsapp-versand.html", `<!doctype html><html lang="de"><head><meta charset="utf-8">
 <title>WhatsApp-Versand Stufenkasse</title>
 <style>body{font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:640px;margin:24px auto;padding:0 16px}
 ul{list-style:none;padding:0}li{display:flex;gap:12px;align-items:center;padding:10px 12px;border-bottom:1px solid #ddd}
 li.done{opacity:.35;text-decoration:line-through}label{flex:1;display:flex;gap:8px;align-items:center;cursor:pointer}
-a{font-weight:600;color:#4f46e5;text-decoration:none}</style></head><body>
+a{font-weight:600;color:#4f46e5;text-decoration:none}a.alt{font-weight:400;font-size:12px;color:#999}</style></head><body>
 <h2>WhatsApp-Versand (${withPhone.length} Personen)</h2>
-<p>Pro Person: Link klicken → WhatsApp öffnet mit fertiger Nachricht → <b>Senden</b> drücken → hier abhaken.<br>
-(Am besten am PC mit WhatsApp Web.)</p><ul>${items}</ul></body></html>`);
+<p><b>Vorher:</b> <a href="https://web.whatsapp.com" target="_blank">web.whatsapp.com</a> in diesem Browser einloggen (QR-Code mit Handy scannen).<br>
+Dann pro Person: <b>Chat öffnen</b> → Nachricht steht schon drin → <b>Senden</b> → hier abhaken.</p><ul>${items}</ul></body></html>`);
   console.log(`✓ whatsapp-versand.html erzeugt (${withPhone.length} Links). Öffnen, klicken, senden, abhaken.`);
   process.exit(0);
 }
