@@ -9,6 +9,10 @@
 -- die App erzwingt dann vor dem ersten Nutzen einen Passwortwechsel)
 alter table public.profiles add column if not exists must_change_password boolean not null default false;
 
+-- Zustimmung zu den Nutzungsbedingungen (Zeitstempel; null = noch nicht zugestimmt
+-- -> die App zeigt vor der ersten Nutzung den Zustimmungsscreen)
+alter table public.profiles add column if not exists terms_accepted_at timestamptz;
+
 -- Namens-Normalisierung (Spiegel der JS-Logik in src/lib/username.ts),
 -- angelehnt an die Schulmail vorname.nachname@…:
 --   Bindestrich-Vornamen bleiben (anna-lena), Zweitname mit Leerzeichen fällt weg (juli),

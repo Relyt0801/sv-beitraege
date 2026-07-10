@@ -6,8 +6,11 @@ import { hasSupabase, supabase } from "./lib/supabase";
 import { enablePush, pushConfigured, pushPermission } from "./lib/push";
 import { useStore } from "./store";
 import { AuthGate } from "./auth/AuthGate";
+import { TermsGate } from "./auth/TermsGate";
 import { PasswordGate } from "./auth/PasswordGate";
 import { RoleProvider, useRole } from "./auth/RoleProvider";
+import { Sheet } from "./components/Sheet";
+import { TermsText } from "./components/TermsText";
 import { EventsProvider, useEvents } from "./events-store";
 import { StudentCard, nextStatus } from "./components/StudentCard";
 import { StudentSheet } from "./components/StudentSheet";
@@ -20,13 +23,15 @@ import { EventComposer } from "./components/EventComposer";
 export default function App() {
   return (
     <AuthGate>
-      <PasswordGate>
-        <RoleProvider>
-          <EventsProvider>
-            <Main />
-          </EventsProvider>
-        </RoleProvider>
-      </PasswordGate>
+      <TermsGate>
+        <PasswordGate>
+          <RoleProvider>
+            <EventsProvider>
+              <Main />
+            </EventsProvider>
+          </RoleProvider>
+        </PasswordGate>
+      </TermsGate>
     </AuthGate>
   );
 }
@@ -62,6 +67,7 @@ function Main() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [openId, setOpenId] = useState<string | null>(null);
   const [showAdd, setShowAdd] = useState(false);
+  const [showTerms, setShowTerms] = useState(false);
 
   const filtered = useMemo(() => {
     const q = normalize(query);
@@ -270,6 +276,9 @@ function Main() {
                     </button>
                   </>
                 )}
+                <button onClick={() => setShowTerms(true)} className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-semibold text-slate-500 dark:border-slate-700">
+                  Nutzungsbedingungen
+                </button>
                 {hasSupabase && (
                   <>
                     <button onClick={changePassword} className="ml-auto rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-semibold dark:border-slate-700">
@@ -373,6 +382,12 @@ function Main() {
       <StudentSheet student={openStudent} onClose={() => setOpenId(null)} />
       <AddSheet open={showAdd} onClose={() => setShowAdd(false)} />
       <EventComposer open={showComposer} onClose={() => setShowComposer(false)} />
+      <Sheet open={showTerms} onClose={() => setShowTerms(false)}>
+        <TermsText />
+        <button className="btn-primary mt-5" onClick={() => setShowTerms(false)}>
+          Schließen
+        </button>
+      </Sheet>
     </div>
   );
 }
