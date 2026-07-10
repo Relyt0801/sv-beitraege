@@ -6,7 +6,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 
 const accFile = process.argv[2] || "accounts.csv";
-const appUrl = process.argv[3] || "https://sv-beitraege.vercel.app";
+const appUrl = process.argv[3] || "https://sv-beitraege.vercel.app/";
 
 function parseCSV(text) {
   return text.trim().split(/\r?\n/).map((line) => {

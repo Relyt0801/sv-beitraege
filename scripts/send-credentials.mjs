@@ -16,7 +16,7 @@
 
 import { readFileSync, writeFileSync } from "node:fs";
 
-const [accFile = "accounts.csv", kontFile = "kontakte.csv", mode = "whatsapp", appUrl = "https://sv-beitraege.vercel.app"] =
+const [accFile = "accounts.csv", kontFile = "kontakte.csv", mode = "whatsapp", appUrl = "https://sv-beitraege.vercel.app/"] =
   process.argv.slice(2);
 
 // ---------- Helfer ----------
