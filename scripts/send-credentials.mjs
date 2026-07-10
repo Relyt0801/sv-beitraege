@@ -122,14 +122,16 @@ Dann pro Person: <b>Chat öffnen</b> → Nachricht steht schon drin → <b>Sende
 if (mode === "email") {
   const { default: nodemailer } = await import("nodemailer");
   const user = process.env.SMTP_USER, pass = process.env.SMTP_PASS;
+  const from = process.env.SMTP_FROM || user; // Absender darf vom SMTP-Login abweichen (z. B. Brevo)
   if (!user || !pass) {
-    console.error("SMTP_USER und SMTP_PASS setzen (Gmail: App-Passwort unter myaccount.google.com/apppasswords).");
+    console.error("SMTP_USER und SMTP_PASS setzen (z. B. Brevo: Login + SMTP-Schlüssel, SMTP_HOST=smtp-relay.brevo.com).");
     process.exit(1);
   }
+  const port = Number(process.env.SMTP_PORT || 587);
   const transport = nodemailer.createTransport({
-    host: process.env.SMTP_HOST || "smtp.gmail.com",
-    port: Number(process.env.SMTP_PORT || 465),
-    secure: true,
+    host: process.env.SMTP_HOST || "smtp-relay.brevo.com",
+    port,
+    secure: port === 465, // 465 = SSL, 587 = STARTTLS
     auth: { user, pass },
   });
   const withMail = rows.filter((r) => r.email);
@@ -138,7 +140,7 @@ if (mode === "email") {
   for (const r of withMail) {
     try {
       await transport.sendMail({
-        from: `"Stufenkasse Abi 28" <${user}>`,
+        from: `"Stufenkasse Abi 28" <${from}>`,
         to: r.email,
         subject: "Dein Zugang zur Stufenkasse-App",
         text: message(r.vorname, r.user, r.pass),
