@@ -1,0 +1,260 @@
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { hasSupabase, supabase } from "./lib/supabase";
+import { pushToUsers } from "./lib/push";
+
+export type TopicItemType = "nachricht" | "todo" | "umfrage";
+
+export interface Topic {
+  id: string;
+  title: string;
+  tag: string;
+  pinned: boolean;
+  created_by: string | null;
+  created_at: string;
+}
+export interface TopicItem {
+  id: string;
+  topic_id: string;
+  type: TopicItemType;
+  body: string;
+  options: { id: string; label: string }[] | null;
+  done: boolean;
+  pinned: boolean;
+  author: string;
+  created_by: string | null;
+  created_at: string;
+}
+
+const LS = "sv-beitraege:topics";
+const uuid = () => (crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random()));
+
+interface TopicsValue {
+  topics: Topic[];
+  items: TopicItem[];
+  members: Record<string, string[]>; // topicId -> userIds
+  myVotes: Record<string, string[]>; // itemId -> optionIds
+  voteCounts: Record<string, Record<string, number>>;
+  reads: Record<string, string>; // topicId -> last_read ISO
+  uid: string;
+  ready: boolean;
+  createTopic: (title: string, tag: string) => Promise<void>;
+  updateTopic: (id: string, patch: Partial<Pick<Topic, "title" | "tag" | "pinned">>) => Promise<void>;
+  deleteTopic: (id: string) => Promise<void>;
+  setMembers: (topicId: string, topicTitle: string, userIds: string[]) => Promise<void>;
+  postItem: (topic: Topic, type: TopicItemType, body: string, options?: string[]) => Promise<void>;
+  updateItem: (id: string, patch: Partial<Pick<TopicItem, "done" | "pinned">>) => Promise<void>;
+  deleteItem: (id: string) => Promise<void>;
+  vote: (itemId: string, optionId: string) => Promise<void>;
+  markRead: (topicId: string) => void;
+  unreadCount: (topicId: string) => number;
+}
+
+const Ctx = createContext<TopicsValue | null>(null);
+export const useTopics = () => {
+  const v = useContext(Ctx);
+  if (!v) throw new Error("useTopics outside provider");
+  return v;
+};
+
+export function TopicsProvider({ children }: { children: ReactNode }) {
+  const [topics, setTopics] = useState<Topic[]>([]);
+  const [items, setItems] = useState<TopicItem[]>([]);
+  const [members, setMembersState] = useState<Record<string, string[]>>({});
+  const [myVotes, setMyVotes] = useState<Record<string, string[]>>({});
+  const [voteCounts, setVoteCounts] = useState<Record<string, Record<string, number>>>({});
+  const [reads, setReads] = useState<Record<string, string>>({});
+  const [ready, setReady] = useState(!hasSupabase);
+  const uidRef = useRef("local-user");
+  const nameRef = useRef("du");
+  const stateRef = useRef({ topics, items, members, myVotes, reads });
+  stateRef.current = { topics, items, members, myVotes, reads };
+
+  // ---------- lokal (Testmodus) ----------
+  const saveLocal = useCallback(() => {
+    if (hasSupabase) return;
+    const s = stateRef.current;
+    localStorage.setItem(LS, JSON.stringify(s));
+  }, []);
+  useEffect(() => {
+    if (hasSupabase) return;
+    try {
+      const d = JSON.parse(localStorage.getItem(LS) || "{}");
+      setTopics(d.topics || []);
+      setItems(d.items || []);
+      setMembersState(d.members || {});
+      setMyVotes(d.myVotes || {});
+      setReads(d.reads || {});
+    } catch { /* ignore */ }
+  }, []);
+  useEffect(() => {
+    if (!hasSupabase) {
+      const counts: Record<string, Record<string, number>> = {};
+      for (const [iid, opts] of Object.entries(myVotes)) {
+        counts[iid] = {};
+        for (const o of opts) counts[iid][o] = 1;
+      }
+      setVoteCounts(counts);
+      saveLocal();
+    }
+  }, [myVotes, topics, items, members, reads, saveLocal]);
+
+  // ---------- Supabase ----------
+  const loadAll = useCallback(async () => {
+    const [{ data: t }, { data: it }, { data: m }, { data: v }, { data: r }] = await Promise.all([
+      supabase!.from("topics").select("*").order("created_at", { ascending: false }),
+      supabase!.from("topic_items").select("*").order("created_at"),
+      supabase!.from("topic_members").select("*"),
+      supabase!.from("topic_votes").select("*"),
+      supabase!.from("topic_reads").select("*"),
+    ]);
+    setTopics((t as Topic[]) || []);
+    setItems((it as TopicItem[]) || []);
+    const mm: Record<string, string[]> = {};
+    for (const row of m || []) (mm[row.topic_id] ||= []).push(row.user_id);
+    setMembersState(mm);
+    const mine: Record<string, string[]> = {};
+    const counts: Record<string, Record<string, number>> = {};
+    for (const row of v || []) {
+      counts[row.item_id] ||= {};
+      counts[row.item_id][row.option_id] = (counts[row.item_id][row.option_id] || 0) + 1;
+      if (row.user_id === uidRef.current) (mine[row.item_id] ||= []).push(row.option_id);
+    }
+    setMyVotes(mine);
+    setVoteCounts(counts);
+    const rr: Record<string, string> = {};
+    for (const row of r || []) if (row.user_id === uidRef.current) rr[row.topic_id] = row.last_read;
+    setReads(rr);
+    setReady(true);
+  }, []);
+
+  useEffect(() => {
+    if (!hasSupabase) return;
+    let channel: ReturnType<NonNullable<typeof supabase>["channel"]> | null = null;
+    const start = async () => {
+      const { data } = await supabase!.auth.getSession();
+      if (!data.session) {
+        setReady(true);
+        return;
+      }
+      uidRef.current = data.session.user.id;
+      const { data: prof } = await supabase!.from("profiles").select("username").eq("user_id", uidRef.current).maybeSingle();
+      nameRef.current = prof?.username || "unbekannt";
+      await loadAll();
+      if (channel) return;
+      channel = supabase!
+        .channel("sv-topics")
+        .on("postgres_changes", { event: "*", schema: "public", table: "topics" }, () => void loadAll())
+        .on("postgres_changes", { event: "*", schema: "public", table: "topic_items" }, () => void loadAll())
+        .on("postgres_changes", { event: "*", schema: "public", table: "topic_members" }, () => void loadAll())
+        .on("postgres_changes", { event: "*", schema: "public", table: "topic_votes" }, () => void loadAll())
+        .subscribe();
+    };
+    void start();
+    const { data: sub } = supabase!.auth.onAuthStateChange((event) => {
+      if (event === "SIGNED_IN" || event === "SIGNED_OUT") {
+        setTopics([]); setItems([]); setMembersState({}); setMyVotes({}); setReads({});
+        if (channel) { supabase!.removeChannel(channel); channel = null; }
+        void start();
+      }
+    });
+    return () => {
+      sub.subscription.unsubscribe();
+      if (channel) supabase!.removeChannel(channel);
+    };
+  }, [loadAll]);
+
+  // ---------- Aktionen ----------
+  const createTopic: TopicsValue["createTopic"] = useCallback(async (title, tag) => {
+    const topic: Topic = { id: uuid(), title: title.trim(), tag: tag.trim(), pinned: false, created_by: uidRef.current, created_at: new Date().toISOString() };
+    if (!hasSupabase) { setTopics((p) => [topic, ...p]); return; }
+    const { error } = await supabase!.from("topics").insert({ id: topic.id, title: topic.title, tag: topic.tag, created_by: uidRef.current });
+    if (error) alert("Thema anlegen fehlgeschlagen: " + error.message);
+    await loadAll();
+  }, [loadAll]);
+
+  const updateTopic: TopicsValue["updateTopic"] = useCallback(async (id, patch) => {
+    setTopics((p) => p.map((t) => (t.id === id ? { ...t, ...patch } : t)));
+    if (hasSupabase) await supabase!.from("topics").update(patch).eq("id", id);
+  }, []);
+
+  const deleteTopic: TopicsValue["deleteTopic"] = useCallback(async (id) => {
+    setTopics((p) => p.filter((t) => t.id !== id));
+    setItems((p) => p.filter((i) => i.topic_id !== id));
+    if (hasSupabase) await supabase!.from("topics").delete().eq("id", id);
+  }, []);
+
+  const setMembers: TopicsValue["setMembers"] = useCallback(async (topicId, topicTitle, userIds) => {
+    const before = stateRef.current.members[topicId] || [];
+    const added = userIds.filter((u) => !before.includes(u));
+    setMembersState((p) => ({ ...p, [topicId]: userIds }));
+    if (hasSupabase) {
+      await supabase!.from("topic_members").delete().eq("topic_id", topicId);
+      if (userIds.length)
+        await supabase!.from("topic_members").insert(userIds.map((user_id) => ({ topic_id: topicId, user_id })));
+      if (added.length)
+        void pushToUsers(added, "Neues Thema für dich", `Du wurdest zu „${topicTitle}" hinzugefügt.`);
+    }
+  }, []);
+
+  const postItem: TopicsValue["postItem"] = useCallback(async (topic, type, body, options) => {
+    const item: TopicItem = {
+      id: uuid(), topic_id: topic.id, type, body: body.trim(),
+      options: type === "umfrage" ? (options || []).filter(Boolean).map((label) => ({ id: uuid(), label })) : null,
+      done: false, pinned: false, author: nameRef.current, created_by: uidRef.current, created_at: new Date().toISOString(),
+    };
+    if (!hasSupabase) { setItems((p) => [...p, item]); return; }
+    const { error } = await supabase!.from("topic_items").insert({
+      id: item.id, topic_id: item.topic_id, type: item.type, body: item.body,
+      options: item.options, author: item.author, created_by: uidRef.current,
+    });
+    if (error) { alert("Senden fehlgeschlagen: " + error.message); return; }
+    const recipients = (stateRef.current.members[topic.id] || []).filter((u) => u !== uidRef.current);
+    void pushToUsers(recipients, `Neues in „${topic.title}"`, body.slice(0, 100));
+    await loadAll();
+  }, [loadAll]);
+
+  const updateItem: TopicsValue["updateItem"] = useCallback(async (id, patch) => {
+    setItems((p) => p.map((i) => (i.id === id ? { ...i, ...patch } : i)));
+    if (hasSupabase) await supabase!.from("topic_items").update(patch).eq("id", id);
+  }, []);
+
+  const deleteItem: TopicsValue["deleteItem"] = useCallback(async (id) => {
+    setItems((p) => p.filter((i) => i.id !== id));
+    if (hasSupabase) await supabase!.from("topic_items").delete().eq("id", id);
+  }, []);
+
+  const vote: TopicsValue["vote"] = useCallback(async (itemId, optionId) => {
+    const had = (stateRef.current.myVotes[itemId] || []).includes(optionId);
+    if (!hasSupabase) {
+      setMyVotes((p) => ({ ...p, [itemId]: had ? [] : [optionId] }));
+      return;
+    }
+    await supabase!.from("topic_votes").delete().eq("item_id", itemId).eq("user_id", uidRef.current);
+    if (!had) await supabase!.from("topic_votes").insert({ item_id: itemId, option_id: optionId, user_id: uidRef.current });
+    await loadAll();
+  }, [loadAll]);
+
+  const markRead: TopicsValue["markRead"] = useCallback((topicId) => {
+    const now = new Date().toISOString();
+    setReads((p) => ({ ...p, [topicId]: now }));
+    if (hasSupabase)
+      void supabase!.from("topic_reads").upsert({ topic_id: topicId, user_id: uidRef.current, last_read: now });
+  }, []);
+
+  const unreadCount: TopicsValue["unreadCount"] = useCallback(
+    (topicId) => {
+      const last = stateRef.current.reads[topicId] || "1970-01-01";
+      return stateRef.current.items.filter(
+        (i) => i.topic_id === topicId && i.created_at > last && i.created_by !== uidRef.current,
+      ).length;
+    },
+    // items/reads über stateRef aktuell
+    [items, reads],
+  );
+
+  const value: TopicsValue = {
+    topics, items, members, myVotes, voteCounts, reads, uid: uidRef.current, ready,
+    createTopic, updateTopic, deleteTopic, setMembers, postItem, updateItem, deleteItem, vote, markRead, unreadCount,
+  };
+  return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
+}

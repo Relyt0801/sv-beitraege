@@ -12,6 +12,8 @@ import { RoleProvider, useRole } from "./auth/RoleProvider";
 import { Sheet } from "./components/Sheet";
 import { TermsText } from "./components/TermsText";
 import { EventsProvider, useEvents } from "./events-store";
+import { TopicsProvider, useTopics } from "./topics-store";
+import { TopicsTab } from "./components/TopicsTab";
 import { StudentCard, nextStatus } from "./components/StudentCard";
 import { StudentSheet } from "./components/StudentSheet";
 import { AddSheet } from "./components/AddSheet";
@@ -27,7 +29,9 @@ export default function App() {
         <PasswordGate>
           <RoleProvider>
             <EventsProvider>
-              <Main />
+              <TopicsProvider>
+                <Main />
+              </TopicsProvider>
             </EventsProvider>
           </RoleProvider>
         </PasswordGate>
@@ -36,13 +40,17 @@ export default function App() {
   );
 }
 
-type Tab = "kasse" | "events" | "rollen";
+type Tab = "kasse" | "events" | "themen" | "rollen";
 
 function Main() {
   const { students, settings, ready, mode, setTerm, setSettings, exportData, importData } = useStore();
   const { canEditData, canEditBeitrag, canManageRoles, isStaff, loginByStudent } = useRole();
   const { events: allEvents, reads } = useEvents();
+  const { topics, unreadCount } = useTopics();
   const { theme, toggle } = useTheme();
+
+  const showTopicsTab = isStaff || topics.length > 0;
+  const topicsUnread = topics.reduce((s, t) => s + unreadCount(t.id), 0);
 
   // Erlaubnis schon erteilt (z. B. vor Konto-Neuanlage)? -> Abo still neu registrieren,
   // damit dieses Konto wieder Push-Nachrichten bekommt.
@@ -142,7 +150,9 @@ function Main() {
               />
             </div>
           ) : (
-            <div className="flex-1 text-lg font-bold">{tab === "events" ? "Events" : "Rollen & Rechte"}</div>
+            <div className="flex-1 text-lg font-bold">
+              {tab === "events" ? "Events" : tab === "themen" ? "Übersicht" : "Rollen & Rechte"}
+            </div>
           )}
 
           {tab === "kasse" && (
@@ -176,6 +186,20 @@ function Main() {
               </span>
             )}
           </button>
+          {showTopicsTab && (
+            <button
+              className={`iconbtn relative ${tab === "themen" ? "iconbtn-active" : ""}`}
+              onClick={() => setTab(tab === "themen" ? "kasse" : "themen")}
+              aria-label="Übersicht"
+            >
+              🗂
+              {topicsUnread > 0 && (
+                <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[11px] font-bold text-white">
+                  {topicsUnread > 9 ? "9+" : topicsUnread}
+                </span>
+              )}
+            </button>
+          )}
           {canManageRoles && (
             <button
               className={`iconbtn ${tab === "rollen" ? "iconbtn-active" : ""}`}
@@ -302,6 +326,10 @@ function Main() {
       ) : tab === "events" ? (
         <main className="mt-3">
           <EventsTab />
+        </main>
+      ) : tab === "themen" ? (
+        <main className="mt-3 pb-4">
+          <TopicsTab />
         </main>
       ) : (
         <main className="mt-3 grid gap-3 lg:grid-cols-2">

@@ -15,7 +15,7 @@ const cors = {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   try {
-    const { event_id } = await req.json();
+    const { event_id, user_ids, title: directTitle, body: directBody } = await req.json();
     const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
     webpush.setVapidDetails(
       Deno.env.get("VAPID_SUBJECT") || "mailto:kasse@sv-beitraege.local",
@@ -23,36 +23,45 @@ Deno.serve(async (req) => {
       Deno.env.get("VAPID_PRIVATE_KEY")!,
     );
 
-    console.log("send-push aufgerufen, event_id:", event_id);
-    console.log("VAPID keys gesetzt:", Boolean(Deno.env.get("VAPID_PUBLIC_KEY")), Boolean(Deno.env.get("VAPID_PRIVATE_KEY")));
+    console.log("send-push aufgerufen, event_id:", event_id, "| direkt an:", user_ids?.length || 0);
 
-    const { data: ev, error: evErr } = await supabase.from("events").select("*").eq("id", event_id).single();
-    if (!ev) {
-      console.log("Event nicht gefunden:", evErr?.message);
-      return new Response(JSON.stringify({ error: "event not found" }), { status: 404, headers: cors });
-    }
-    console.log("Event:", ev.title, "| audience:", ev.audience);
-
-    // Empfänger bestimmen
     let userIds: string[] = [];
-    if (ev.audience === "all") {
-      const { data } = await supabase.from("profiles").select("user_id");
-      userIds = (data || []).map((p: { user_id: string }) => p.user_id);
+    let title = "";
+    let body = "";
+
+    if (Array.isArray(user_ids) && user_ids.length) {
+      // Direkt-Modus (z. B. Themen-Benachrichtigungen)
+      userIds = user_ids;
+      title = String(directTitle || "Stufenkasse");
+      body = String(directBody || "");
     } else {
-      const { data: t } = await supabase.from("event_targets").select("student_id").eq("event_id", event_id);
-      const sids = (t || []).map((x: { student_id: string }) => x.student_id);
-      if (sids.length) {
-        const { data: p } = await supabase.from("profiles").select("user_id").in("student_id", sids);
-        userIds = (p || []).map((x: { user_id: string }) => x.user_id);
+      const { data: ev, error: evErr } = await supabase.from("events").select("*").eq("id", event_id).single();
+      if (!ev) {
+        console.log("Event nicht gefunden:", evErr?.message);
+        return new Response(JSON.stringify({ error: "event not found" }), { status: 404, headers: cors });
       }
+      console.log("Event:", ev.title, "| audience:", ev.audience);
+      if (ev.audience === "all") {
+        const { data } = await supabase.from("profiles").select("user_id");
+        userIds = (data || []).map((p: { user_id: string }) => p.user_id);
+      } else {
+        const { data: t } = await supabase.from("event_targets").select("student_id").eq("event_id", event_id);
+        const sids = (t || []).map((x: { student_id: string }) => x.student_id);
+        if (sids.length) {
+          const { data: p } = await supabase.from("profiles").select("user_id").in("student_id", sids);
+          userIds = (p || []).map((x: { user_id: string }) => x.user_id);
+        }
+      }
+      title = ev.is_warning ? "⚠️ " + ev.title : ev.title;
+      body = (ev.body || "").slice(0, 120);
     }
+
     console.log("Empfänger (userIds):", userIds.length);
     if (!userIds.length) return new Response(JSON.stringify({ sent: 0 }), { headers: cors });
 
     const { data: subs, error: subErr } = await supabase.from("push_subscriptions").select("*").in("user_id", userIds);
     console.log("Push-Abos gefunden:", subs?.length || 0, subErr ? "Fehler: " + subErr.message : "");
-    const title = ev.is_warning ? "⚠️ " + ev.title : ev.title;
-    const payload = JSON.stringify({ title, body: (ev.body || "").slice(0, 120), url: "/" });
+    const payload = JSON.stringify({ title, body: body.slice(0, 120), url: "/" });
 
     let sent = 0;
     await Promise.all(

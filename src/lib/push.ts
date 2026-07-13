@@ -21,6 +21,16 @@ function urlBase64ToUint8Array(base64: string): Uint8Array {
   return arr;
 }
 
+/** Push direkt an bestimmte Nutzer senden (via Edge Function, best effort). */
+export async function pushToUsers(user_ids: string[], title: string, body: string): Promise<void> {
+  if (!hasSupabase || !user_ids.length) return;
+  try {
+    await supabase!.functions.invoke("send-push", { body: { user_ids, title, body } });
+  } catch {
+    /* Function evtl. nicht deployt – Benachrichtigung ist optional */
+  }
+}
+
 /** Benachrichtigungen aktivieren: Erlaubnis holen, Abo anlegen, in Supabase speichern. */
 export async function enablePush(): Promise<{ ok: boolean; error?: string }> {
   if (!pushSupported || !VAPID) return { ok: false, error: "nicht unterstützt/konfiguriert" };
