@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { hasSupabase, supabase } from "../lib/supabase";
+import { enablePush } from "../lib/push";
 import { TermsText } from "../components/TermsText";
 
 /**
@@ -68,6 +69,14 @@ function AcceptScreen({ onDone }: { onDone: () => void }) {
     if (error) {
       setErr("Speichern fehlgeschlagen: " + error.message);
       return;
+    }
+    // Erst JETZT (nach der Einwilligung) das beim Login gewünschte Push-Abo anlegen –
+    // der Klick auf "Zustimmen" liefert zugleich die nötige Nutzergeste für den Browser.
+    if (localStorage.getItem("sv:push-optin") === "1") {
+      localStorage.removeItem("sv:push-optin");
+      void enablePush().then((r) => {
+        if (!r.ok) console.warn("[push] Aktivierung nach Zustimmung fehlgeschlagen:", r.error);
+      });
     }
     onDone();
   }

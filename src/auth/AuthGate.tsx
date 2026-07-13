@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { ACCESS_CODE, hasSupabase, supabase, usernameToEmail } from "../lib/supabase";
-import { enablePush, pushConfigured, pushSupported } from "../lib/push";
+import { pushConfigured, pushSupported } from "../lib/push";
 import type { Session } from "@supabase/supabase-js";
 
 export function AuthGate({ children }: { children: ReactNode }) {
@@ -61,13 +61,10 @@ function LoginForm() {
         const { error } = await supabase!.auth.signInWithPassword({ email, password });
         if (error) throw error;
       }
-      // Direkt nach erfolgreichem Login/Registrieren: Benachrichtigungen aktivieren
-      // (Browser fragt um Erlaubnis). Später jederzeit im 📣-Reiter änderbar.
-      if (wantPush && pushSupported && pushConfigured()) {
-        void enablePush().then((r) => {
-          if (!r.ok) console.warn("[push] Aktivierung beim Login fehlgeschlagen:", r.error);
-        });
-      }
+      // Wunsch merken – das Push-Abo wird erst NACH der Zustimmung zu den
+      // Nutzungsbedingungen angelegt (DSGVO: keine Datenspeicherung vor Einwilligung).
+      if (wantPush && pushSupported && pushConfigured()) localStorage.setItem("sv:push-optin", "1");
+      else localStorage.removeItem("sv:push-optin");
     } catch (e: any) {
       setErr(e?.message === "Invalid login credentials" ? "Benutzername oder Passwort falsch." : e?.message || "Fehler.");
     } finally {

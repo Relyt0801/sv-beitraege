@@ -52,14 +52,17 @@ function Main() {
   const showTopicsTab = isStaff || topics.length > 0;
   const topicsUnread = topics.reduce((s, t) => s + unreadCount(t.id), 0);
 
-  // Erlaubnis schon erteilt (z. B. vor Konto-Neuanlage)? -> Abo still neu registrieren,
-  // damit dieses Konto wieder Push-Nachrichten bekommt.
+  // Läuft erst NACH Zustimmungs- und Passwort-Gate (Main sitzt dahinter):
+  // - Erlaubnis schon erteilt -> Abo still (neu) registrieren
+  // - Login-Häkchen gesetzt (Rückkehrer, Zustimmung lag schon vor) -> jetzt aktivieren
   useEffect(() => {
-    if (pushConfigured() && pushPermission() === "granted")
+    const optin = localStorage.getItem("sv:push-optin") === "1";
+    if (pushConfigured() && (pushPermission() === "granted" || optin)) {
+      localStorage.removeItem("sv:push-optin");
       void enablePush().then((r) => {
         if (!r.ok) console.warn("[push] Auto-Registrierung fehlgeschlagen:", r.error);
       });
-    else console.log("[push] kein Auto-Abo:", { konfiguriert: pushConfigured(), erlaubnis: pushPermission() });
+    } else console.log("[push] kein Auto-Abo:", { konfiguriert: pushConfigured(), erlaubnis: pushPermission() });
   }, []);
 
   const unread = allEvents.filter((e) => !reads.has(e.id)).length;

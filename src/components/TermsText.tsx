@@ -59,14 +59,22 @@ export function TermsText() {
         jeweilige Mitteilungstext.
       </p>
 
-      <div className={h}>6. Rechtsgrundlage &amp; Freiwilligkeit</div>
+      <div className={h}>6. Rechtsgrundlagen &amp; Freiwilligkeit</div>
       <p className={p}>
-        Die Verarbeitung erfolgt auf Grundlage deiner Einwilligung (Art. 6 Abs. 1 lit. a DSGVO), die du
-        mit dem Bestätigen dieser Bedingungen erteilst. Die Nutzung ist freiwillig. Du kannst deine
-        Einwilligung jederzeit mit Wirkung für die Zukunft widerrufen (beim Stufenteam melden) – dann
-        werden dein Konto und deine personenbezogenen Daten aus der App gelöscht; die Kassenführung
-        erfolgt für dich dann außerhalb der App. Benachrichtigungen sind separat freiwillig und können
-        jederzeit in den Browser-/Geräteeinstellungen deaktiviert werden.
+        <b>Kassenliste:</b> Die Stufenkasse (Name und Beitragsstatus) führt das Stufenteam unabhängig
+        von dieser App – vorher auf Papier, jetzt digital. Rechtsgrundlage dafür ist das berechtigte
+        Interesse der Jahrgangsstufe an einer geordneten Kassenführung (Art. 6 Abs. 1 lit. f DSGVO).
+        Du kannst dieser Verarbeitung widersprechen; deine Beiträge werden dann außerhalb der App
+        (z. B. auf Papier) verwaltet.
+      </p>
+      <p className={p}>
+        <b>App-Nutzung:</b> Dein Konto, Abstimmungen, Mitteilungen, Benachrichtigungen und alles
+        Weitere in der App beruhen auf deiner Einwilligung (Art. 6 Abs. 1 lit. a DSGVO), die du mit dem
+        Bestätigen dieser Bedingungen erteilst. Die Nutzung ist freiwillig. Du kannst die Einwilligung
+        jederzeit mit Wirkung für die Zukunft widerrufen (beim Stufenteam melden) – dann werden dein
+        Konto und deine App-Daten gelöscht. Benachrichtigungen sind separat freiwillig und können
+        jederzeit in den Browser-/Geräteeinstellungen deaktiviert werden. Bist du unter 16 Jahre alt,
+        besprich die Nutzung bitte mit deinen Erziehungsberechtigten.
       </p>
 
       <div className={h}>7. Deine Rechte</div>
