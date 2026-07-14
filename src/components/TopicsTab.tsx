@@ -5,26 +5,29 @@ import { Sheet } from "./Sheet";
 import { normalize } from "../lib/logic";
 
 export function TopicsTab() {
-  const { topics, ready, unreadCount, createTopic } = useTopics();
+  const { topics, ready, unreadCount, createTopic, items } = useTopics();
   const { canEditData } = useRole();
-  const [openId, setOpenId] = useState<string | null>(null);
+  const [stack, setStack] = useState<string[]>([]); // Navigations-Pfad (Ordner in Ordnern)
   const [showNew, setShowNew] = useState(false);
   const [title, setTitle] = useState("");
   const [tag, setTag] = useState("");
+  const [manageTag, setManageTag] = useState<string | null>(null);
 
-  const openTopic = topics.find((t) => t.id === openId) ?? null;
+  const openTopic = stack.length ? (topics.find((t) => t.id === stack[stack.length - 1]) ?? null) : null;
+  const roots = useMemo(() => topics.filter((t) => !t.parent_id), [topics]);
+
+  // Ungelesen inkl. aller Unterordner
+  const unreadDeep = (id: string): number =>
+    unreadCount(id) + topics.filter((t) => t.parent_id === id).reduce((s, t) => s + unreadDeep(t.id), 0);
 
   const grouped = useMemo(() => {
-    const pinned = topics.filter((t) => t.pinned);
-    const rest = topics.filter((t) => !t.pinned);
+    const pinned = roots.filter((t) => t.pinned);
+    const rest = roots.filter((t) => !t.pinned);
     const byTag = new Map<string, Topic[]>();
-    for (const t of rest) {
-      const k = t.tag || "";
-      byTag.set(k, [...(byTag.get(k) || []), t]);
-    }
+    for (const t of rest) byTag.set(t.tag || "", [...(byTag.get(t.tag || "") || []), t]);
     const tags = [...byTag.keys()].sort((a, b) => (a === "" ? 1 : b === "" ? -1 : a.localeCompare(b, "de")));
     return { pinned, tags, byTag };
-  }, [topics]);
+  }, [roots]);
 
   if (!ready)
     return (
@@ -35,19 +38,20 @@ export function TopicsTab() {
     );
 
   const card = (t: Topic) => {
-    const unread = unreadCount(t.id);
+    const unread = unreadDeep(t.id);
+    const subCount = topics.filter((x) => x.parent_id === t.id).length;
+    const itemCount = items.filter((i) => i.topic_id === t.id).length;
     return (
-      <button key={t.id} onClick={() => setOpenId(t.id)} className="card flex w-full items-center gap-3 p-4 text-left">
+      <button key={t.id} onClick={() => setStack([t.id])} className="card flex w-full items-center gap-3 p-4 text-left">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             {t.pinned && <span title="angeheftet">📌</span>}
             <span className="truncate text-[16px] font-semibold">{t.title}</span>
           </div>
-          {t.tag && (
-            <span className="mt-1 inline-block rounded-full bg-brand/10 px-2.5 py-0.5 text-xs font-bold text-brand">
-              #{t.tag}
-            </span>
-          )}
+          <div className="mt-1 text-xs text-slate-400">
+            {subCount > 0 && <span className="mr-2">📁 {subCount}</span>}
+            {itemCount > 0 && <span>{itemCount} Beitr{itemCount === 1 ? "ag" : "äge"}</span>}
+          </div>
         </div>
         {unread > 0 && (
           <span className="flex h-6 min-w-6 items-center justify-center rounded-full bg-red-500 px-1.5 text-xs font-bold text-white">
@@ -61,9 +65,9 @@ export function TopicsTab() {
 
   return (
     <div className="space-y-4">
-      {topics.length === 0 && (
+      {roots.length === 0 && (
         <div className="py-16 text-center text-sm text-slate-400">
-          Noch keine Themen. {canEditData ? "Lege mit ＋ das erste an (z. B. Sportfest)." : ""}
+          Noch keine Ordner. {canEditData ? "Lege mit ＋ den ersten an (z. B. Sportfest)." : ""}
         </div>
       )}
 
@@ -75,8 +79,14 @@ export function TopicsTab() {
       )}
       {grouped.tags.map((tg) => (
         <section key={tg || "_"}>
-          <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-400">
+          <h3 className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-slate-400">
             {tg ? `#${tg}` : "Ohne Tag"}
+            {tg && canEditData && (
+              <button onClick={() => setManageTag(tg)} title="Komitee-Mitglieder verwalten"
+                className="rounded-md bg-slate-200 px-2 py-0.5 text-[11px] font-bold normal-case text-slate-600 dark:bg-slate-700 dark:text-slate-300">
+                👥 Komitee
+              </button>
+            )}
           </h3>
           <div className="grid gap-2.5 lg:grid-cols-2">{grouped.byTag.get(tg)!.map(card)}</div>
         </section>
@@ -86,7 +96,7 @@ export function TopicsTab() {
         <button
           onClick={() => setShowNew(true)}
           className="fixed bottom-[calc(env(safe-area-inset-bottom)+1rem)] right-4 z-30 flex h-14 w-14 items-center justify-center rounded-2xl bg-brand text-3xl text-white shadow-lg shadow-brand/40 transition active:scale-95 sm:right-6"
-          aria-label="Thema erstellen"
+          aria-label="Ordner erstellen"
         >
           ＋
         </button>
@@ -94,11 +104,11 @@ export function TopicsTab() {
 
       <Sheet open={showNew} onClose={() => setShowNew(false)}>
         <div className="mb-4 flex items-center gap-3">
-          <span className="flex-1 text-xl font-bold">Neues Thema</span>
+          <span className="flex-1 text-xl font-bold">Neuer Ordner</span>
           <button className="iconbtn" onClick={() => setShowNew(false)}>✕</button>
         </div>
         <input className="field mb-3" placeholder="Titel (z. B. Sportfest)" autoFocus value={title} onChange={(e) => setTitle(e.target.value)} />
-        <input className="field mb-4" placeholder="Tag (z. B. veranstaltungen) – optional" value={tag} onChange={(e) => setTag(e.target.value)} />
+        <input className="field mb-4" placeholder="Komitee-Tag (z. B. abikomitee) – optional" value={tag} onChange={(e) => setTag(e.target.value)} />
         <button
           className="btn-primary"
           disabled={!title.trim()}
@@ -111,12 +121,61 @@ export function TopicsTab() {
         </button>
       </Sheet>
 
-      <TopicView topic={openTopic} onClose={() => setOpenId(null)} />
+      {manageTag && <TagMembersSheet tag={manageTag} onClose={() => setManageTag(null)} />}
+
+      <TopicView
+        topic={openTopic}
+        onOpenSub={(id) => setStack((s) => [...s, id])}
+        onBack={stack.length > 1 ? () => setStack((s) => s.slice(0, -1)) : undefined}
+        onClose={() => setStack([])}
+      />
     </div>
   );
 }
 
-/* ================= Themen-Ansicht ================= */
+/* ================= Komitee-Mitglieder (Tag) ================= */
+
+function TagMembersSheet({ tag, onClose }: { tag: string; onClose: () => void }) {
+  const { tagMembers, setTagMembers } = useTopics();
+  const { profiles } = useRole();
+  const [q, setQ] = useState("");
+  const current = tagMembers[tag] || [];
+
+  return (
+    <Sheet open onClose={onClose}>
+      <div className="mb-1 flex items-center gap-3">
+        <span className="flex-1 text-xl font-bold">Komitee #{tag}</span>
+        <button className="iconbtn" onClick={onClose}>✕</button>
+      </div>
+      <p className="mb-3 text-sm text-slate-500">
+        Mitglieder sehen <b>alle</b> Ordner mit diesem Tag, können dort schreiben und bekommen Push bei Neuigkeiten.
+      </p>
+      <input className="field mb-2" placeholder="Person suchen…" value={q} onChange={(e) => setQ(e.target.value)} />
+      <div className="max-h-72 overflow-y-auto">
+        {profiles
+          .filter((p) => !q || normalize(p.username || "").includes(normalize(q)))
+          .map((p) => {
+            const on = current.includes(p.user_id);
+            return (
+              <button
+                key={p.user_id}
+                onClick={() => setTagMembers(tag, on ? current.filter((x) => x !== p.user_id) : [...current, p.user_id])}
+                className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm hover:bg-slate-100 dark:hover:bg-slate-800"
+              >
+                <span className={`flex h-5 w-5 items-center justify-center rounded border text-xs text-white ${on ? "border-brand bg-brand" : "border-slate-300 dark:border-slate-600"}`}>
+                  {on ? "✓" : ""}
+                </span>
+                {p.username}
+              </button>
+            );
+          })}
+      </div>
+      <div className="pt-2 text-xs text-slate-400">{current.length} Mitglied{current.length === 1 ? "" : "er"}</div>
+    </Sheet>
+  );
+}
+
+/* ================= Ordner-Ansicht ================= */
 
 const TYPE_TABS: { t: TopicItemType; label: string }[] = [
   { t: "nachricht", label: "💬 Nachricht" },
@@ -124,10 +183,18 @@ const TYPE_TABS: { t: TopicItemType; label: string }[] = [
   { t: "umfrage", label: "🗳️ Abstimmung" },
 ];
 
-function TopicView({ topic, onClose }: { topic: Topic | null; onClose: () => void }) {
-  const { items, members, uid, postItem, updateItem, deleteItem, updateTopic, deleteTopic, markRead, myVotes, voteCounts, vote, setMembers } = useTopics();
+function TopicView({
+  topic, onOpenSub, onBack, onClose,
+}: {
+  topic: Topic | null;
+  onOpenSub: (id: string) => void;
+  onBack?: () => void;
+  onClose: () => void;
+}) {
+  const { topics, items, members, tagMembers, uid, postItem, updateItem, deleteItem, updateTopic, deleteTopic, createTopic, markRead, myVotes, voteCounts, vote, setMembers, unreadCount } = useTopics();
   const { canEditData, profiles } = useRole();
   const [type, setType] = useState<TopicItemType>("nachricht");
+  const [itemTitle, setItemTitle] = useState("");
   const [text, setText] = useState("");
   const [opts, setOpts] = useState<string[]>(["", ""]);
   const [showMembers, setShowMembers] = useState(false);
@@ -138,32 +205,36 @@ function TopicView({ topic, onClose }: { topic: Topic | null; onClose: () => voi
   const pinnedItems = list.filter((i) => i.pinned);
   const stream = list.filter((i) => !i.pinned);
   const memberIds = members[topic.id] || [];
+  const komitee = topic.tag ? (tagMembers[topic.tag] || []).length : 0;
+  const children = topics.filter((t) => t.parent_id === topic.id);
 
-  // beim Öffnen als gelesen markieren
   markReadOnce(topic.id, markRead);
 
   async function send() {
     if (!text.trim()) return;
-    await postItem(topic!, type, text, type === "umfrage" ? opts : undefined);
-    setText(""); setOpts(["", ""]); setType("nachricht");
+    await postItem(topic!, type, text, type === "umfrage" ? opts : undefined, itemTitle);
+    setText(""); setItemTitle(""); setOpts(["", ""]); setType("nachricht");
+  }
+
+  function addSubfolder() {
+    const name = prompt("Titel des Unterordners:");
+    if (name?.trim()) void createTopic(name, topic!.tag, topic!.id);
   }
 
   return (
     <Sheet open onClose={onClose}>
       {/* Kopf */}
       <div className="mb-1 flex items-center gap-2">
+        {onBack && <button className="iconbtn" onClick={onBack} aria-label="Zurück">‹</button>}
         <span className="flex-1 truncate text-xl font-bold">{topic.title}</span>
         {canEditData && (
           <>
             <button className="iconbtn" title={topic.pinned ? "Lösen" : "Anheften"} onClick={() => updateTopic(topic.id, { pinned: !topic.pinned })}>
               {topic.pinned ? "📌" : "📍"}
             </button>
-            <button className="iconbtn" title="Mitglieder" onClick={() => setShowMembers((v) => !v)}>👥</button>
-            <button
-              className="iconbtn"
-              title="Thema löschen"
-              onClick={() => { if (confirm("Thema samt Inhalt löschen?")) { void deleteTopic(topic.id); onClose(); } }}
-            >
+            <button className="iconbtn" title="Ordner-Mitglieder" onClick={() => setShowMembers((v) => !v)}>👥</button>
+            <button className="iconbtn" title="Ordner löschen"
+              onClick={() => { if (confirm("Ordner samt Unterordnern und Inhalt löschen?")) { void deleteTopic(topic.id); onClose(); } }}>
               🗑
             </button>
           </>
@@ -172,13 +243,16 @@ function TopicView({ topic, onClose }: { topic: Topic | null; onClose: () => voi
       </div>
       <div className="mb-3 text-xs text-slate-400">
         {topic.tag && <span className="mr-2 rounded-full bg-brand/10 px-2 py-0.5 font-bold text-brand">#{topic.tag}</span>}
-        {memberIds.length} Mitglied{memberIds.length === 1 ? "" : "er"}
+        {topic.tag && <span className="mr-2">{komitee} im Komitee</span>}
+        {memberIds.length > 0 && <span>+{memberIds.length} direkt</span>}
       </div>
 
-      {/* Mitglieder verwalten */}
+      {/* Ordner-Mitglieder (zusätzlich zum Komitee) */}
       {showMembers && canEditData && (
         <div className="mb-4 rounded-2xl border border-slate-200 p-3 dark:border-slate-700">
-          <div className="mb-2 text-sm font-semibold text-slate-500">Mitglieder (sehen dieses Thema &amp; bekommen Push)</div>
+          <div className="mb-2 text-sm font-semibold text-slate-500">
+            Direkte Mitglieder (nur dieser Ordner) – Komitee-Mitglieder (#{topic.tag || "–"}) haben automatisch Zugriff
+          </div>
           <input className="field mb-2" placeholder="Person suchen…" value={q} onChange={(e) => setQ(e.target.value)} />
           <div className="max-h-44 overflow-y-auto">
             {profiles
@@ -202,6 +276,35 @@ function TopicView({ topic, onClose }: { topic: Topic | null; onClose: () => voi
         </div>
       )}
 
+      {/* Unterordner */}
+      {(children.length > 0 || canEditData) && (
+        <div className="mb-4">
+          <div className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-slate-400">
+            📁 Unterordner
+            {canEditData && (
+              <button onClick={addSubfolder} className="rounded-md bg-slate-200 px-2 py-0.5 text-[11px] font-bold normal-case text-slate-600 dark:bg-slate-700 dark:text-slate-300">
+                + Neu
+              </button>
+            )}
+          </div>
+          {children.length > 0 && (
+            <div className="grid gap-2">
+              {children.map((c) => {
+                const unread = unreadCount(c.id);
+                return (
+                  <button key={c.id} onClick={() => onOpenSub(c.id)}
+                    className="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2.5 text-left text-sm font-semibold dark:border-slate-700">
+                    📁 <span className="flex-1 truncate">{c.title}</span>
+                    {unread > 0 && <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[11px] font-bold text-white">{unread}</span>}
+                    <span className="text-slate-300 dark:text-slate-600">›</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Key-Infos */}
       {pinnedItems.length > 0 && (
         <div className="mb-4 rounded-2xl border-2 border-brand/30 bg-brand/5 p-3">
@@ -217,7 +320,7 @@ function TopicView({ topic, onClose }: { topic: Topic | null; onClose: () => voi
 
       {/* Stream */}
       <div className="space-y-2">
-        {stream.length === 0 && pinnedItems.length === 0 && (
+        {stream.length === 0 && pinnedItems.length === 0 && children.length === 0 && (
           <div className="py-10 text-center text-sm text-slate-400">Noch nichts hier – schreib den ersten Beitrag.</div>
         )}
         {stream.map((i) => (
@@ -236,6 +339,7 @@ function TopicView({ topic, onClose }: { topic: Topic | null; onClose: () => voi
             </button>
           ))}
         </div>
+        <input className="field mb-2" placeholder="Titel (optional)" value={itemTitle} onChange={(e) => setItemTitle(e.target.value)} />
         <textarea
           className="field min-h-[60px] resize-y"
           placeholder={type === "todo" ? "Was ist zu tun?" : type === "umfrage" ? "Frage…" : "Nachricht…"}
@@ -299,6 +403,8 @@ function ItemRow({
           {mayDelete && <button title="Löschen" onClick={() => onDelete(i.id)}>🗑</button>}
         </span>
       </div>
+
+      {i.title && <div className="mb-0.5 text-[15px] font-bold">{i.title}</div>}
 
       {i.type === "todo" ? (
         <label className="flex cursor-pointer items-start gap-2.5">
