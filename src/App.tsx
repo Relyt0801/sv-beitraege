@@ -133,8 +133,15 @@ function Main() {
   const numField =
     "w-16 rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-center dark:border-slate-700 dark:bg-slate-800";
 
+  const navItems: { key: Tab; icon: string; label: string; badge?: number; show: boolean }[] = [
+    { key: "kasse", icon: "💶", label: "Kasse", show: true },
+    { key: "events", icon: "📣", label: "Events", badge: unread, show: true },
+    { key: "themen", icon: "🗂", label: "Übersicht", badge: topicsUnread, show: showTopicsTab },
+    { key: "rollen", icon: "👥", label: "Rollen", show: canManageRoles },
+  ];
+
   return (
-    <div className="mx-auto max-w-5xl px-3 pb-28 sm:px-5">
+    <div className="mx-auto max-w-5xl px-3 pb-36 sm:px-5">
       <header className="sticky top-0 z-20 -mx-3 border-b border-slate-200 bg-slate-50/90 px-3 pb-3 pt-[calc(env(safe-area-inset-top)+0.7rem)] backdrop-blur dark:border-slate-800 dark:bg-slate-950/90 sm:-mx-5 sm:px-5">
         <div className="mx-auto flex max-w-5xl items-center gap-2.5">
           <div className="leading-tight">
@@ -176,41 +183,6 @@ function Main() {
                 </button>
               )}
             </>
-          )}
-          <button
-            className={`iconbtn relative ${tab === "events" ? "iconbtn-active" : ""}`}
-            onClick={() => setTab(tab === "events" ? "kasse" : "events")}
-            aria-label="Events"
-          >
-            📣
-            {unread > 0 && (
-              <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[11px] font-bold text-white">
-                {unread > 9 ? "9+" : unread}
-              </span>
-            )}
-          </button>
-          {showTopicsTab && (
-            <button
-              className={`iconbtn relative ${tab === "themen" ? "iconbtn-active" : ""}`}
-              onClick={() => setTab(tab === "themen" ? "kasse" : "themen")}
-              aria-label="Übersicht"
-            >
-              🗂
-              {topicsUnread > 0 && (
-                <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[11px] font-bold text-white">
-                  {topicsUnread > 9 ? "9+" : topicsUnread}
-                </span>
-              )}
-            </button>
-          )}
-          {canManageRoles && (
-            <button
-              className={`iconbtn ${tab === "rollen" ? "iconbtn-active" : ""}`}
-              onClick={() => setTab(tab === "rollen" ? "kasse" : "rollen")}
-              aria-label="Rollen verwalten"
-            >
-              👥
-            </button>
           )}
           <button className="iconbtn" onClick={toggle} aria-label="Hell/Dunkel">
             {theme === "dark" ? "☀" : "☾"}
@@ -383,7 +355,7 @@ function Main() {
       {tab === "kasse" && canEditData && !massMode && (
         <button
           onClick={() => setShowAdd(true)}
-          className="fixed bottom-[calc(env(safe-area-inset-bottom)+1rem)] right-4 z-30 flex h-14 w-14 items-center justify-center rounded-2xl bg-brand text-3xl text-white shadow-lg shadow-brand/40 transition active:scale-95 sm:right-6"
+          className="fixed bottom-[calc(env(safe-area-inset-bottom)+5rem)] right-4 z-30 flex h-14 w-14 items-center justify-center rounded-2xl bg-brand text-3xl text-white shadow-lg shadow-brand/40 transition active:scale-95 sm:right-6"
           aria-label="Person hinzufügen"
         >
           ＋
@@ -393,7 +365,7 @@ function Main() {
       {tab === "events" && canEditData && (
         <button
           onClick={() => setShowComposer(true)}
-          className="fixed bottom-[calc(env(safe-area-inset-bottom)+1rem)] right-4 z-30 flex h-14 w-14 items-center justify-center rounded-2xl bg-brand text-3xl text-white shadow-lg shadow-brand/40 transition active:scale-95 sm:right-6"
+          className="fixed bottom-[calc(env(safe-area-inset-bottom)+5rem)] right-4 z-30 flex h-14 w-14 items-center justify-center rounded-2xl bg-brand text-3xl text-white shadow-lg shadow-brand/40 transition active:scale-95 sm:right-6"
           aria-label="Event erstellen"
         >
           ＋
@@ -408,6 +380,34 @@ function Main() {
             setSelected(new Set());
           }}
         />
+      )}
+
+      {/* Feste Tab-Bar unten */}
+      {!massMode && (
+        <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95">
+          <div className="mx-auto flex max-w-5xl items-stretch justify-around pb-[env(safe-area-inset-bottom)]">
+            {navItems.filter((n) => n.show).map((n) => (
+              <button
+                key={n.key}
+                onClick={() => setTab(n.key)}
+                className={`relative flex flex-1 flex-col items-center gap-0.5 py-2 text-[11px] font-semibold transition ${
+                  tab === n.key ? "text-brand" : "text-slate-400"
+                }`}
+                aria-label={n.label}
+              >
+                <span className="relative text-[22px] leading-none">
+                  {n.icon}
+                  {(n.badge ?? 0) > 0 && (
+                    <span className="absolute -right-3 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+                      {n.badge! > 9 ? "9+" : n.badge}
+                    </span>
+                  )}
+                </span>
+                {n.label}
+              </button>
+            ))}
+          </div>
+        </nav>
       )}
 
       <StudentSheet student={openStudent} onClose={() => setOpenId(null)} />

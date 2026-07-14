@@ -9,6 +9,7 @@ export interface Topic {
   title: string;
   tag: string;
   pinned: boolean;
+  admin_only: boolean;
   parent_id: string | null;
   created_by: string | null;
   created_at: string;
@@ -41,7 +42,7 @@ interface TopicsValue {
   uid: string;
   ready: boolean;
   createTopic: (title: string, tag: string, parentId?: string | null) => Promise<void>;
-  updateTopic: (id: string, patch: Partial<Pick<Topic, "title" | "tag" | "pinned">>) => Promise<void>;
+  updateTopic: (id: string, patch: Partial<Pick<Topic, "title" | "tag" | "pinned" | "admin_only">>) => Promise<void>;
   deleteTopic: (id: string) => Promise<void>;
   setMembers: (topicId: string, topicTitle: string, userIds: string[]) => Promise<void>;
   setTagMembers: (tag: string, userIds: string[]) => Promise<void>;
@@ -176,7 +177,7 @@ export function TopicsProvider({ children }: { children: ReactNode }) {
 
   // ---------- Aktionen ----------
   const createTopic: TopicsValue["createTopic"] = useCallback(async (title, tag, parentId = null) => {
-    const topic: Topic = { id: uuid(), title: title.trim(), tag: tag.trim(), pinned: false, parent_id: parentId, created_by: uidRef.current, created_at: new Date().toISOString() };
+    const topic: Topic = { id: uuid(), title: title.trim(), tag: tag.trim(), pinned: false, admin_only: false, parent_id: parentId, created_by: uidRef.current, created_at: new Date().toISOString() };
     if (!hasSupabase) { setTopics((p) => [topic, ...p]); return; }
     const { error } = await supabase!.from("topics").insert({ id: topic.id, title: topic.title, tag: topic.tag, parent_id: parentId, created_by: uidRef.current });
     if (error) alert("Ordner anlegen fehlgeschlagen: " + error.message);

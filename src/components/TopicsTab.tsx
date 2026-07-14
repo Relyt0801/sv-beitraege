@@ -46,6 +46,7 @@ export function TopicsTab() {
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             {t.pinned && <span title="angeheftet">📌</span>}
+            {t.admin_only && <span title="nur Admin sichtbar">🔒</span>}
             <span className="truncate text-[16px] font-semibold">{t.title}</span>
           </div>
           <div className="mt-1 text-xs text-slate-400">
@@ -95,7 +96,7 @@ export function TopicsTab() {
       {canEditData && (
         <button
           onClick={() => setShowNew(true)}
-          className="fixed bottom-[calc(env(safe-area-inset-bottom)+1rem)] right-4 z-30 flex h-14 w-14 items-center justify-center rounded-2xl bg-brand text-3xl text-white shadow-lg shadow-brand/40 transition active:scale-95 sm:right-6"
+          className="fixed bottom-[calc(env(safe-area-inset-bottom)+5rem)] right-4 z-30 flex h-14 w-14 items-center justify-center rounded-2xl bg-brand text-3xl text-white shadow-lg shadow-brand/40 transition active:scale-95 sm:right-6"
           aria-label="Ordner erstellen"
         >
           ＋
@@ -192,12 +193,14 @@ function TopicView({
   onClose: () => void;
 }) {
   const { topics, items, members, tagMembers, uid, postItem, updateItem, deleteItem, updateTopic, deleteTopic, createTopic, markRead, myVotes, voteCounts, vote, setMembers, unreadCount } = useTopics();
-  const { canEditData, profiles } = useRole();
+  const { canEditData, isAdmin, profiles } = useRole();
   const [type, setType] = useState<TopicItemType>("nachricht");
   const [itemTitle, setItemTitle] = useState("");
   const [text, setText] = useState("");
   const [opts, setOpts] = useState<string[]>(["", ""]);
   const [showMembers, setShowMembers] = useState(false);
+  const [showNewSub, setShowNewSub] = useState(false);
+  const [subTitle, setSubTitle] = useState("");
   const [q, setQ] = useState("");
 
   if (!topic) return null;
@@ -216,10 +219,6 @@ function TopicView({
     setText(""); setItemTitle(""); setOpts(["", ""]); setType("nachricht");
   }
 
-  function addSubfolder() {
-    const name = prompt("Titel des Unterordners:");
-    if (name?.trim()) void createTopic(name, topic!.tag, topic!.id);
-  }
 
   return (
     <Sheet open onClose={onClose}>
@@ -229,6 +228,15 @@ function TopicView({
         <span className="flex-1 truncate text-xl font-bold">{topic.title}</span>
         {canEditData && (
           <>
+            {isAdmin && (
+              <button
+                className={`iconbtn ${topic.admin_only ? "iconbtn-active" : ""}`}
+                title={topic.admin_only ? "Nur Admin sichtbar – wieder freigeben" : "Nur für Admin sichtbar machen"}
+                onClick={() => updateTopic(topic.id, { admin_only: !topic.admin_only })}
+              >
+                {topic.admin_only ? "🔒" : "🔓"}
+              </button>
+            )}
             <button className="iconbtn" title={topic.pinned ? "Lösen" : "Anheften"} onClick={() => updateTopic(topic.id, { pinned: !topic.pinned })}>
               {topic.pinned ? "📌" : "📍"}
             </button>
@@ -242,6 +250,7 @@ function TopicView({
         <button className="iconbtn" onClick={onClose}>✕</button>
       </div>
       <div className="mb-3 text-xs text-slate-400">
+        {topic.admin_only && <span className="mr-2 rounded-full bg-red-500/10 px-2 py-0.5 font-bold text-red-500">🔒 nur Admin</span>}
         {topic.tag && <span className="mr-2 rounded-full bg-brand/10 px-2 py-0.5 font-bold text-brand">#{topic.tag}</span>}
         {topic.tag && <span className="mr-2">{komitee} im Komitee</span>}
         {memberIds.length > 0 && <span>+{memberIds.length} direkt</span>}
@@ -282,8 +291,8 @@ function TopicView({
           <div className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-slate-400">
             📁 Unterordner
             {canEditData && (
-              <button onClick={addSubfolder} className="rounded-md bg-slate-200 px-2 py-0.5 text-[11px] font-bold normal-case text-slate-600 dark:bg-slate-700 dark:text-slate-300">
-                + Neu
+              <button onClick={() => setShowNewSub(true)} className="flex h-6 w-6 items-center justify-center rounded-lg bg-brand text-sm font-bold text-white" aria-label="Unterordner erstellen">
+                ＋
               </button>
             )}
           </div>
@@ -357,6 +366,32 @@ function TopicView({
         )}
         <button className="btn-primary mt-3" disabled={!text.trim()} onClick={send}>Senden</button>
       </div>
+
+      {/* Unterordner erstellen – gleiches Prinzip wie der Haupt-＋ */}
+      {showNewSub && (
+        <Sheet open onClose={() => setShowNewSub(false)}>
+          <div className="mb-4 flex items-center gap-3">
+            <span className="flex-1 text-xl font-bold">Neuer Unterordner</span>
+            <button className="iconbtn" onClick={() => setShowNewSub(false)}>✕</button>
+          </div>
+          <div className="mb-3 text-sm text-slate-500">
+            In <b>{topic.title}</b>
+            {topic.tag && <> · erbt Komitee-Tag <span className="font-bold text-brand">#{topic.tag}</span></>}
+          </div>
+          <input className="field mb-4" placeholder="Titel (z. B. Getränke-Team)" autoFocus value={subTitle} onChange={(e) => setSubTitle(e.target.value)} />
+          <button
+            className="btn-primary"
+            disabled={!subTitle.trim()}
+            onClick={async () => {
+              await createTopic(subTitle, topic.tag, topic.id);
+              setSubTitle("");
+              setShowNewSub(false);
+            }}
+          >
+            Erstellen
+          </button>
+        </Sheet>
+      )}
     </Sheet>
   );
 }
