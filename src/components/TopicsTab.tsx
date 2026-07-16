@@ -227,6 +227,7 @@ function FolderPage({
   const [text, setText] = useState("");
   const [opts, setOpts] = useState<string[]>(["", ""]);
   const [showMembers, setShowMembers] = useState(false);
+  const [composerOpen, setComposerOpen] = useState(false);
   const [q, setQ] = useState("");
 
   const list = items.filter((i) => i.topic_id === topic.id);
@@ -241,6 +242,7 @@ function FolderPage({
     if (!text.trim()) return;
     await postItem(topic, type, text, type === "umfrage" ? opts : undefined, itemTitle);
     setText(""); setItemTitle(""); setOpts(["", ""]); setType("nachricht");
+    setComposerOpen(false);
   }
 
   return (
@@ -329,8 +331,8 @@ function FolderPage({
         {stream.map((i) => <ItemRow key={i.id} i={i} uid={uid} canEditData={canEditData} myVotes={myVotes} voteCounts={voteCounts} onVote={vote} onUpdate={updateItem} onDelete={deleteItem} />)}
       </div>
 
-      {/* Composer */}
-      {banned ? (
+      {/* Gesperrt-Hinweis statt Composer */}
+      {banned && (
         <div className="rounded-2xl border-2 border-red-300 bg-red-500/5 p-4 text-center text-sm dark:border-red-500/40">
           <div className="mb-1 text-2xl">🚫</div>
           <div className="font-bold text-red-500">Du bist aktuell vom Posten gesperrt.</div>
@@ -341,15 +343,32 @@ function FolderPage({
           )}
           {bannedUntil === PERMANENT_UNTIL && <div className="mt-1 text-xs text-slate-400">Wende dich an das Stufenteam.</div>}
         </div>
-      ) : (
-        <div className="rounded-2xl border border-slate-200 p-3 dark:border-slate-700">
+      )}
+
+      {/* Neuer Beitrag: schwebender ＋ statt fest angehängtem Formular */}
+      {!banned && (
+        <button
+          onClick={() => setComposerOpen(true)}
+          className="fixed bottom-[calc(env(safe-area-inset-bottom)+5rem)] right-4 z-30 flex h-14 w-14 items-center justify-center rounded-2xl bg-brand text-3xl text-white shadow-lg shadow-brand/40 transition active:scale-95 sm:right-6"
+          aria-label="Neuer Beitrag"
+        >
+          ＋
+        </button>
+      )}
+
+      {composerOpen && (
+        <Sheet open onClose={() => setComposerOpen(false)}>
+          <div className="mb-4 flex items-center gap-3">
+            <span className="flex-1 text-xl font-bold">Neuer Beitrag</span>
+            <button className="iconbtn" onClick={() => setComposerOpen(false)}>✕</button>
+          </div>
           <div className="mb-2 flex gap-1.5 rounded-xl bg-slate-100 p-1 dark:bg-slate-800">
             {TYPE_TABS.map(({ t, label }) => (
               <button key={t} onClick={() => setType(t)} className={`flex-1 rounded-lg py-1.5 text-[13px] font-bold transition ${type === t ? "bg-brand text-white" : "text-slate-500"}`}>{label}</button>
             ))}
           </div>
-          <input className="field mb-2" placeholder="Titel (optional)" value={itemTitle} onChange={(e) => setItemTitle(e.target.value)} />
-          <textarea className="field min-h-[60px] resize-y" placeholder={type === "todo" ? "Was ist zu tun?" : type === "umfrage" ? "Frage…" : "Nachricht…"} value={text} onChange={(e) => setText(e.target.value)} />
+          <input className="field mb-2" placeholder="Titel (optional)" autoFocus value={itemTitle} onChange={(e) => setItemTitle(e.target.value)} />
+          <textarea className="field min-h-[90px] resize-y" placeholder={type === "todo" ? "Was ist zu tun?" : type === "umfrage" ? "Frage…" : "Nachricht…"} value={text} onChange={(e) => setText(e.target.value)} />
           {type === "umfrage" && (
             <div className="mt-2 space-y-2">
               {opts.map((o, i) => <input key={i} className="field" placeholder={`Option ${i + 1}`} value={o} onChange={(e) => setOpts((p) => p.map((x, j) => (j === i ? e.target.value : x)))} />)}
@@ -357,7 +376,7 @@ function FolderPage({
             </div>
           )}
           <button className="btn-primary mt-3" disabled={!text.trim()} onClick={send}>Senden</button>
-        </div>
+        </Sheet>
       )}
     </div>
   );
