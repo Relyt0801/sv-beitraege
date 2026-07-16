@@ -125,10 +125,11 @@ function FolderCard({ t, unread, subCount, onOpen }: { t: Topic; unread: number;
 type VisMode = "privat" | "stufenteam" | "custom";
 
 function CreateFolderSheet({ init, onClose }: { init: { parentId: string | null; tag: string }; onClose: () => void }) {
-  const { createTopic } = useTopics();
+  const { createTopic, committeesOf, uid } = useTopics();
   const { profiles } = useRole();
+  const myKoms = committeesOf(uid);
   const [title, setTitle] = useState("");
-  const [tag, setTag] = useState(init.tag);
+  const [tag, setTag] = useState(init.tag || myKoms[0] || ""); // Kategorie: eigenes Komitee vorbelegt
   const [mode, setMode] = useState<VisMode>("privat");
   const [members, setMembers] = useState<Set<string>>(new Set());
   const [koms, setKoms] = useState<Set<string>>(new Set());
@@ -268,8 +269,8 @@ function FolderPage({
   onCreateSub: () => void;
   onDeleted: () => void;
 }) {
-  const { topics, items, members, uid, postItem, updateItem, deleteItem, updateTopic, deleteTopic, markRead, myVotes, voteCounts, vote, setMembers, unreadCount } = useTopics();
-  const { canEditData, isAdmin, profiles, banned, bannedUntil } = useRole();
+  const { topics, items, members, topicTags, uid, postItem, updateItem, deleteItem, updateTopic, deleteTopic, markRead, myVotes, voteCounts, vote, setMembers, committeesOf, unreadCount } = useTopics();
+  const { role, canEditData, isAdmin, profiles, banned, bannedUntil } = useRole();
   const [type, setType] = useState<TopicItemType>("nachricht");
   const [itemTitle, setItemTitle] = useState("");
   const [text, setText] = useState("");
@@ -284,11 +285,16 @@ function FolderPage({
   const memberIds = members[topic.id] || [];
   const children = topics.filter((t) => t.parent_id === topic.id);
 
+  // Komitees dieses Ordners (Sichtbarkeit + Kategorie) → für die Autoren-Markierung
+  const folderKoms = new Set([...(topicTags[topic.id] || []), ...(topic.tag ? [topic.tag] : [])]);
+  const myAll = committeesOf(uid);
+  const myFolderKoms = folderKoms.size ? myAll.filter((s) => folderKoms.has(s)) : myAll;
+
   markReadOnce(topic.id, markRead);
 
   async function send() {
     if (!text.trim()) return;
-    await postItem(topic, type, text, type === "umfrage" ? opts : undefined, itemTitle);
+    await postItem(topic, type, text, type === "umfrage" ? opts : undefined, itemTitle, { role, koms: myFolderKoms });
     setText(""); setItemTitle(""); setOpts(["", ""]); setType("nachricht");
     setComposerOpen(false);
   }
@@ -437,6 +443,36 @@ function markReadOnce(topicId: string, markRead: (id: string) => void) {
   setTimeout(() => { markRead(topicId); markedOnce.delete(topicId); }, 800);
 }
 
+/** Twitch-ähnliches Mod-Icon: grünes Schild-Quadrat mit weißem Schwert. */
+function ModBadge() {
+  return (
+    <span title="Admin (Moderator)" className="inline-flex h-[16px] w-[16px] shrink-0 items-center justify-center rounded-[4px] bg-emerald-500">
+      <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="white" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M20 4v5l-9 9-4-4 9-9z" />
+        <path d="M6.5 11.5l6 6" />
+        <path d="M3 21l3-3" />
+      </svg>
+    </span>
+  );
+}
+
+/** Rollen- und Komitee-Markierung hinter dem Autor-Namen. */
+function AuthorBadges({ role, koms }: { role: string | null; koms: string[] | null }) {
+  return (
+    <>
+      {role === "admin" && <ModBadge />}
+      {role === "stufenteam" && (
+        <span className="rounded bg-brand/15 px-1.5 py-px text-[10px] font-bold text-brand">Stufenteam</span>
+      )}
+      {(koms || []).map((s) => (
+        <span key={s} className="rounded bg-amber-500/15 px-1.5 py-px text-[10px] font-bold text-amber-600 dark:text-amber-400">
+          {committeeLabel(s)}
+        </span>
+      ))}
+    </>
+  );
+}
+
 function ItemRow({
   i, uid, canEditData, myVotes, voteCounts, onVote, onUpdate, onDelete,
 }: {
@@ -453,8 +489,9 @@ function ItemRow({
 
   return (
     <div className={`rounded-xl border border-slate-200 p-3 dark:border-slate-700 ${i.done ? "opacity-60" : ""}`}>
-      <div className="mb-1 flex items-center gap-2 text-[11px] text-slate-400">
-        <span className="font-semibold">{i.author}</span>
+      <div className="mb-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-slate-400">
+        <span className="font-semibold text-slate-500 dark:text-slate-300">{i.author}</span>
+        <AuthorBadges role={i.author_role} koms={i.author_koms} />
         <span>{time}</span>
         <span className="ml-auto flex gap-1">
           {canEditData && <button title={i.pinned ? "Lösen" : "Als Key-Info anheften"} onClick={() => onUpdate(i.id, { pinned: !i.pinned })}>{i.pinned ? "📌" : "📍"}</button>}

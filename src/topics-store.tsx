@@ -34,6 +34,8 @@ export interface TopicItem {
   done: boolean;
   pinned: boolean;
   author: string;
+  author_role: string | null; // Rolle des Autors beim Schreiben (schueler/stufenteam/kassenwart/admin)
+  author_koms: string[] | null; // relevante Komitees des Autors (Slugs)
   created_by: string | null;
   created_at: string;
 }
@@ -59,7 +61,7 @@ interface TopicsValue {
   setTagMembers: (tag: string, userIds: string[]) => Promise<void>;
   setUserCommittee: (userId: string, slug: string, on: boolean) => Promise<void>;
   committeesOf: (userId: string) => string[];
-  postItem: (topic: Topic, type: TopicItemType, body: string, options?: string[], title?: string) => Promise<void>;
+  postItem: (topic: Topic, type: TopicItemType, body: string, options?: string[], title?: string, meta?: { role?: string | null; koms?: string[] }) => Promise<void>;
   updateItem: (id: string, patch: Partial<Pick<TopicItem, "done" | "pinned">>) => Promise<void>;
   deleteItem: (id: string) => Promise<void>;
   vote: (itemId: string, optionId: string) => Promise<void>;
@@ -284,16 +286,18 @@ export function TopicsProvider({ children }: { children: ReactNode }) {
     [tagMembers],
   );
 
-  const postItem: TopicsValue["postItem"] = useCallback(async (topic, type, body, options, title = "") => {
+  const postItem: TopicsValue["postItem"] = useCallback(async (topic, type, body, options, title = "", meta) => {
     const item: TopicItem = {
       id: uuid(), topic_id: topic.id, type, title: title.trim(), body: body.trim(),
       options: type === "umfrage" ? (options || []).filter(Boolean).map((label) => ({ id: uuid(), label })) : null,
-      done: false, pinned: false, author: nameRef.current, created_by: uidRef.current, created_at: new Date().toISOString(),
+      done: false, pinned: false, author: nameRef.current,
+      author_role: meta?.role ?? null, author_koms: meta?.koms?.length ? meta.koms : null,
+      created_by: uidRef.current, created_at: new Date().toISOString(),
     };
     if (!hasSupabase) { setItems((p) => [...p, item]); return; }
     const { error } = await supabase!.from("topic_items").insert({
       id: item.id, topic_id: item.topic_id, type: item.type, title: item.title, body: item.body,
-      options: item.options, author: item.author, created_by: uidRef.current,
+      options: item.options, author: item.author, author_role: item.author_role, author_koms: item.author_koms, created_by: uidRef.current,
     });
     if (error) { alert("Senden fehlgeschlagen: " + error.message); return; }
     // Empfänger: Ordner-Mitglieder + Komitee-Mitglieder (Tag), ohne Autor
