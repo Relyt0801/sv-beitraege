@@ -1,7 +1,9 @@
 import { useMemo, useState } from "react";
-import { normalize, sortStudents } from "../lib/logic";
+import { normalize } from "../lib/logic";
 import { useStore } from "../store";
 import { useRole, type Role } from "../auth/RoleProvider";
+import { useTopics } from "../topics-store";
+import { COMMITTEES } from "../lib/committees";
 
 const ROLE_LABEL: Record<Role, string> = {
   schueler: "Schüler",
@@ -13,7 +15,9 @@ const ROLE_LABEL: Record<Role, string> = {
 export function RolesTab() {
   const { profiles, setRole } = useRole();
   const { students } = useStore();
+  const { committeesOf, setUserCommittee } = useTopics();
   const [q, setQ] = useState("");
+  const [openKom, setOpenKom] = useState<string | null>(null);
 
   const nameFor = (studentId: string | null) => {
     const s = studentId ? students.find((x) => x.id === studentId) : null;
@@ -44,31 +48,62 @@ export function RolesTab() {
       </div>
 
       <div className="grid gap-2.5">
-        {rows.map(({ p, name }) => (
-          <div key={p.user_id} className="card flex flex-wrap items-center gap-3 p-4">
-            <span
-              title={p.has_logged_in ? "hat sich schon angemeldet" : "noch nie angemeldet"}
-              className={`h-3 w-3 shrink-0 rounded-full ${
-                p.has_logged_in ? "bg-emerald-500" : "bg-slate-300 dark:bg-slate-600"
-              }`}
-            />
-            <div className="min-w-0 flex-1">
-              <div className="truncate font-semibold">{name ?? p.username ?? "—"}</div>
-              <div className="truncate text-[13px] text-slate-400">{p.username}</div>
+        {rows.map(({ p, name }) => {
+          const koms = committeesOf(p.user_id);
+          return (
+            <div key={p.user_id} className="card p-4">
+              <div className="flex flex-wrap items-center gap-3">
+                <span
+                  title={p.has_logged_in ? "hat sich schon angemeldet" : "noch nie angemeldet"}
+                  className={`h-3 w-3 shrink-0 rounded-full ${p.has_logged_in ? "bg-emerald-500" : "bg-slate-300 dark:bg-slate-600"}`}
+                />
+                <div className="min-w-0 flex-1">
+                  <div className="truncate font-semibold">{name ?? p.username ?? "—"}</div>
+                  <div className="truncate text-[13px] text-slate-400">{p.username}</div>
+                </div>
+                <select
+                  className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 font-semibold dark:border-slate-700 dark:bg-slate-800"
+                  value={p.role}
+                  onChange={(e) => setRole(p.user_id, e.target.value as Role)}
+                >
+                  {(Object.keys(ROLE_LABEL) as Role[]).map((r) => (
+                    <option key={r} value={r}>{ROLE_LABEL[r]}</option>
+                  ))}
+                </select>
+              </div>
+
+              <button
+                onClick={() => setOpenKom(openKom === p.user_id ? null : p.user_id)}
+                className="mt-2 flex w-full items-center gap-2 text-left text-xs text-slate-500"
+              >
+                <span className="font-semibold">Komitees:</span>
+                <span className="flex-1 truncate">
+                  {koms.length ? koms.map((s) => COMMITTEES.find((c) => c.slug === s)?.label || s).join(", ") : "keine"}
+                </span>
+                <span>{openKom === p.user_id ? "▲" : "▼"}</span>
+              </button>
+
+              {openKom === p.user_id && (
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {COMMITTEES.map((c) => {
+                    const on = koms.includes(c.slug);
+                    return (
+                      <button
+                        key={c.slug}
+                        onClick={() => setUserCommittee(p.user_id, c.slug, !on)}
+                        className={`rounded-full border px-3 py-1 text-xs font-bold transition ${
+                          on ? "border-brand bg-brand text-white" : "border-slate-200 text-slate-500 dark:border-slate-700"
+                        }`}
+                      >
+                        {on ? "✓ " : ""}{c.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
-            <select
-              className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 font-semibold dark:border-slate-700 dark:bg-slate-800"
-              value={p.role}
-              onChange={(e) => setRole(p.user_id, e.target.value as Role)}
-            >
-              {(Object.keys(ROLE_LABEL) as Role[]).map((r) => (
-                <option key={r} value={r}>
-                  {ROLE_LABEL[r]}
-                </option>
-              ))}
-            </select>
-          </div>
-        ))}
+          );
+        })}
         {rows.length === 0 && (
           <div className="py-16 text-center text-sm text-slate-400">
             Noch keine Konten. Sobald Konten angelegt sind, erscheinen sie hier.

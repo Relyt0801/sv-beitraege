@@ -136,7 +136,7 @@ function Main() {
   const navItems: { key: Tab; icon: string; label: string; badge?: number; show: boolean }[] = [
     { key: "kasse", icon: "💶", label: "Kasse", show: true },
     { key: "events", icon: "📣", label: "Events", badge: unread, show: true },
-    { key: "themen", icon: "🗂", label: "Übersicht", badge: topicsUnread, show: showTopicsTab },
+    { key: "themen", icon: "📋", label: "Übersicht", badge: topicsUnread, show: showTopicsTab },
     { key: "rollen", icon: "👥", label: "Rollen", show: canManageRoles },
   ];
 
