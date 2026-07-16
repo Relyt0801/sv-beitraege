@@ -126,10 +126,12 @@ type VisMode = "privat" | "stufenteam" | "custom";
 
 function CreateFolderSheet({ init, onClose }: { init: { parentId: string | null; tag: string }; onClose: () => void }) {
   const { createTopic, committeesOf, uid } = useTopics();
-  const { profiles } = useRole();
+  const { profiles, role } = useRole();
   const myKoms = committeesOf(uid);
+  // Kategorie automatisch = eigenes Komitee des Erstellers; Stufenteam/Kassenwart bekommen keine.
+  const teamRole = role === "stufenteam" || role === "kassenwart";
+  const tag = init.tag || (teamRole ? "" : myKoms[0] || "");
   const [title, setTitle] = useState("");
-  const [tag, setTag] = useState(init.tag || myKoms[0] || ""); // Kategorie: eigenes Komitee vorbelegt
   const [mode, setMode] = useState<VisMode>("privat");
   const [members, setMembers] = useState<Set<string>>(new Set());
   const [koms, setKoms] = useState<Set<string>>(new Set());
@@ -182,13 +184,9 @@ function CreateFolderSheet({ init, onClose }: { init: { parentId: string | null;
         <span className="flex-1 text-xl font-bold">{init.parentId ? "Neuer Unterordner" : "Neuer Ordner"}</span>
         <button className="iconbtn" onClick={onClose}>✕</button>
       </div>
-      <input className="field mb-3" placeholder="Titel (z. B. Sportfest)" autoFocus value={title} onChange={(e) => setTitle(e.target.value)} />
-
-      <label className="mb-1 block text-sm font-semibold text-slate-500">Komitee-Kategorie (optional)</label>
-      <select className="field mb-4" value={tag} onChange={(e) => setTag(e.target.value)}>
-        <option value="">— keine Kategorie —</option>
-        {COMMITTEES.map((c) => <option key={c.slug} value={c.slug}>{c.label}</option>)}
-      </select>
+      <input className="field mb-1" placeholder="Titel (z. B. Sportfest)" autoFocus value={title} onChange={(e) => setTitle(e.target.value)} />
+      {tag && <p className="mb-3 text-xs text-slate-400">Kategorie: <b>{committeeLabel(tag)}</b> (dein Komitee)</p>}
+      {!tag && <div className="mb-3" />}
 
       <label className="mb-1 block text-sm font-semibold text-slate-500">Wer kann das sehen?</label>
       <div className="mb-2 grid grid-cols-2 gap-1.5">
