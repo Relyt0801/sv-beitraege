@@ -196,7 +196,7 @@ function CreateFolderSheet({ init, onClose }: { init: { parentId: string | null;
         {btn(mode === "custom" && (showKoms || koms.size > 0), "Komitees", () => { setMode("custom"); setShowKoms((v) => !v); })}
       </div>
       <p className="mb-3 text-xs text-slate-400">
-        {mode === "privat" && "Nur du (und der Admin) siehst diesen Ordner."}
+        {mode === "privat" && "Nur du siehst diesen Ordner."}
         {mode === "stufenteam" && "Das ganze Stufenteam sieht & schreibt hier."}
         {mode === "custom" && "Wähle beliebig viele Personen und/oder Komitees – alle können sehen & schreiben."}
       </p>
