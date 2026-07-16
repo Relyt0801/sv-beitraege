@@ -7,12 +7,13 @@ import { COMMITTEES, committeeLabel } from "../lib/committees";
 
 const PERMANENT_UNTIL = "2099-12-31T00:00:00.000Z";
 
-const VIS: { v: Visibility; label: string }[] = [
-  { v: "privat", label: "Nur ich" },
-  { v: "personen", label: "Bestimmte Personen" },
-  { v: "stufenteam", label: "Stufenteam" },
-  { v: "komitee", label: "Komitee" },
-];
+const VIS_LABEL: Record<Visibility, string> = {
+  privat: "Nur ich",
+  stufenteam: "Stufenteam",
+  personen: "Bestimmte Personen",
+  komitee: "Komitee",
+  custom: "Ausgewählte Personen / Komitees",
+};
 
 export function TopicsTab() {
   const { topics, ready, unreadCount } = useTopics();
@@ -121,28 +122,58 @@ function FolderCard({ t, unread, subCount, onOpen }: { t: Topic; unread: number;
 
 /* ================= Ordner erstellen ================= */
 
+type VisMode = "privat" | "stufenteam" | "custom";
+
 function CreateFolderSheet({ init, onClose }: { init: { parentId: string | null; tag: string }; onClose: () => void }) {
   const { createTopic } = useTopics();
   const { profiles } = useRole();
   const [title, setTitle] = useState("");
   const [tag, setTag] = useState(init.tag);
-  const [visibility, setVisibility] = useState<Visibility>("privat");
+  const [mode, setMode] = useState<VisMode>("privat");
   const [members, setMembers] = useState<Set<string>>(new Set());
+  const [koms, setKoms] = useState<Set<string>>(new Set());
+  const [showPersons, setShowPersons] = useState(false);
+  const [showKoms, setShowKoms] = useState(false);
   const [q, setQ] = useState("");
   const [busy, setBusy] = useState(false);
 
+  const nothingPicked = mode === "custom" && members.size === 0 && koms.size === 0;
+
+  const pickBase = (m: "privat" | "stufenteam") => {
+    setMode(m);
+    setMembers(new Set());
+    setKoms(new Set());
+    setShowPersons(false);
+    setShowKoms(false);
+  };
+
   async function submit() {
-    if (!title.trim()) return;
-    if (visibility === "komitee" && !tag) return;
+    if (!title.trim() || nothingPicked) return;
+    const custom = mode === "custom";
     setBusy(true);
     const nt: NewTopic = {
-      title, tag: visibility === "komitee" ? tag : tag, visibility,
-      memberIds: visibility === "personen" ? [...members] : [], parentId: init.parentId,
+      title,
+      tag,
+      visibility: custom ? "custom" : mode,
+      memberIds: custom ? [...members] : [],
+      komiteeSlugs: custom ? [...koms] : [],
+      parentId: init.parentId,
     };
     await createTopic(nt);
     setBusy(false);
     onClose();
   }
+
+  const btn = (active: boolean, label: string, onClick: () => void) => (
+    <button
+      onClick={onClick}
+      className={`rounded-xl border py-2 text-sm font-bold transition ${
+        active ? "border-brand bg-brand text-white" : "border-slate-200 dark:border-slate-700"
+      }`}
+    >
+      {label}
+    </button>
+  );
 
   return (
     <Sheet open onClose={onClose}>
@@ -152,33 +183,31 @@ function CreateFolderSheet({ init, onClose }: { init: { parentId: string | null;
       </div>
       <input className="field mb-3" placeholder="Titel (z. B. Sportfest)" autoFocus value={title} onChange={(e) => setTitle(e.target.value)} />
 
-      <label className="mb-1 block text-sm font-semibold text-slate-500">Komitee (optional)</label>
+      <label className="mb-1 block text-sm font-semibold text-slate-500">Komitee-Kategorie (optional)</label>
       <select className="field mb-4" value={tag} onChange={(e) => setTag(e.target.value)}>
-        <option value="">— kein Komitee —</option>
+        <option value="">— keine Kategorie —</option>
         {COMMITTEES.map((c) => <option key={c.slug} value={c.slug}>{c.label}</option>)}
       </select>
 
       <label className="mb-1 block text-sm font-semibold text-slate-500">Wer kann das sehen?</label>
-      <div className="mb-3 grid grid-cols-2 gap-1.5">
-        {VIS.map(({ v, label }) => {
-          const disabled = v === "komitee" && !tag;
-          return (
-            <button key={v} disabled={disabled} onClick={() => setVisibility(v)}
-              className={`rounded-xl border py-2 text-sm font-bold transition disabled:opacity-30 ${
-                visibility === v ? "border-brand bg-brand text-white" : "border-slate-200 dark:border-slate-700"
-              }`}>
-              {label}
-            </button>
-          );
-        })}
+      <div className="mb-2 grid grid-cols-2 gap-1.5">
+        {btn(mode === "privat", "Nur ich", () => pickBase("privat"))}
+        {btn(mode === "stufenteam", "Stufenteam", () => pickBase("stufenteam"))}
+        {btn(mode === "custom" && (showPersons || members.size > 0), "Bestimmte Personen", () => { setMode("custom"); setShowPersons((v) => !v); })}
+        {btn(mode === "custom" && (showKoms || koms.size > 0), "Komitees", () => { setMode("custom"); setShowKoms((v) => !v); })}
       </div>
-      {visibility === "komitee" && tag && (
-        <p className="mb-3 text-xs text-slate-400">Alle im Komitee <b>{committeeLabel(tag)}</b> sehen &amp; schreiben hier.</p>
-      )}
-      {visibility === "privat" && <p className="mb-3 text-xs text-slate-400">Nur du (und der Admin) siehst diesen Ordner.</p>}
+      <p className="mb-3 text-xs text-slate-400">
+        {mode === "privat" && "Nur du (und der Admin) siehst diesen Ordner."}
+        {mode === "stufenteam" && "Das ganze Stufenteam sieht & schreibt hier."}
+        {mode === "custom" && "Wähle beliebig viele Personen und/oder Komitees – alle können sehen & schreiben."}
+      </p>
 
-      {visibility === "personen" && (
+      {mode === "custom" && showPersons && (
         <div className="mb-3 rounded-2xl border border-slate-200 p-2 dark:border-slate-700">
+          <div className="mb-2 flex items-center gap-2">
+            <span className="text-sm font-semibold text-slate-500">Personen</span>
+            <span className="ml-auto text-xs text-slate-400">{members.size} gewählt</span>
+          </div>
           <input className="field mb-2" placeholder="Person suchen…" value={q} onChange={(e) => setQ(e.target.value)} />
           <div className="max-h-44 overflow-y-auto">
             {profiles.filter((p) => !q || normalize(p.username || "").includes(normalize(q))).map((p) => {
@@ -186,18 +215,37 @@ function CreateFolderSheet({ init, onClose }: { init: { parentId: string | null;
               return (
                 <button key={p.user_id} onClick={() => setMembers((s) => { const n = new Set(s); on ? n.delete(p.user_id) : n.add(p.user_id); return n; })}
                   className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm hover:bg-slate-100 dark:hover:bg-slate-800">
-                  <span className={`flex h-5 w-5 items-center justify-center rounded border text-xs text-white ${on ? "border-brand bg-brand" : "border-slate-300 dark:border-slate-600"}`}>{on ? "✓" : ""}</span>
+                  <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border text-xs text-white ${on ? "border-brand bg-brand" : "border-slate-300 dark:border-slate-600"}`}>{on ? "✓" : ""}</span>
                   {p.username}
                 </button>
               );
             })}
           </div>
-          <div className="px-2 pt-1 text-xs text-slate-400">{members.size} ausgewählt</div>
         </div>
       )}
 
-      <button className="btn-primary" disabled={busy || !title.trim() || (visibility === "komitee" && !tag)} onClick={submit}>
-        {busy ? "…" : "Erstellen"}
+      {mode === "custom" && showKoms && (
+        <div className="mb-3 rounded-2xl border border-slate-200 p-2 dark:border-slate-700">
+          <div className="mb-2 flex items-center gap-2">
+            <span className="text-sm font-semibold text-slate-500">Komitees</span>
+            <span className="ml-auto text-xs text-slate-400">{koms.size} gewählt</span>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {COMMITTEES.map((c) => {
+              const on = koms.has(c.slug);
+              return (
+                <button key={c.slug} onClick={() => setKoms((s) => { const n = new Set(s); on ? n.delete(c.slug) : n.add(c.slug); return n; })}
+                  className={`rounded-full border px-3 py-1 text-xs font-bold transition ${on ? "border-brand bg-brand text-white" : "border-slate-200 text-slate-500 dark:border-slate-700"}`}>
+                  {on ? "✓ " : ""}{c.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      <button className="btn-primary" disabled={busy || !title.trim() || nothingPicked} onClick={submit}>
+        {busy ? "…" : nothingPicked ? "Personen oder Komitees wählen" : "Erstellen"}
       </button>
     </Sheet>
   );
@@ -258,7 +306,7 @@ function FolderPage({
                 onClick={() => updateTopic(topic.id, { admin_only: !topic.admin_only })}>{topic.admin_only ? "🔒" : "🔓"}</button>
             )}
             <button className="iconbtn" title={topic.pinned ? "Lösen" : "Anheften"} onClick={() => updateTopic(topic.id, { pinned: !topic.pinned })}>{topic.pinned ? "📌" : "📍"}</button>
-            {topic.visibility === "personen" && <button className="iconbtn" title="Personen verwalten" onClick={() => setShowMembers((v) => !v)}>👥</button>}
+            {(topic.visibility === "personen" || topic.visibility === "custom") && <button className="iconbtn" title="Personen verwalten" onClick={() => setShowMembers((v) => !v)}>👥</button>}
             <button className="iconbtn" title="Ordner löschen" onClick={() => { if (confirm("Ordner samt Inhalt löschen?")) { void deleteTopic(topic.id); onDeleted(); } }}>🗑</button>
           </>
         )}
@@ -267,10 +315,10 @@ function FolderPage({
       <div className="text-xs text-slate-400">
         {topic.admin_only && <span className="mr-2 rounded-full bg-red-500/10 px-2 py-0.5 font-bold text-red-500">🔒 nur Admin</span>}
         {topic.tag && <span className="mr-2 rounded-full bg-brand/10 px-2 py-0.5 font-bold text-brand">{committeeLabel(topic.tag)}</span>}
-        <span>Sichtbar: {VIS.find((x) => x.v === topic.visibility)?.label}</span>
+        <span>Sichtbar: {VIS_LABEL[topic.visibility]}</span>
       </div>
 
-      {showMembers && canEditData && topic.visibility === "personen" && (
+      {showMembers && canEditData && (topic.visibility === "personen" || topic.visibility === "custom") && (
         <div className="rounded-2xl border border-slate-200 p-3 dark:border-slate-700">
           <div className="mb-2 text-sm font-semibold text-slate-500">Wer darf rein?</div>
           <input className="field mb-2" placeholder="Person suchen…" value={q} onChange={(e) => setQ(e.target.value)} />
