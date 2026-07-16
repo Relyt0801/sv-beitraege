@@ -12,12 +12,17 @@ const ROLE_LABEL: Record<Role, string> = {
   admin: "Admin",
 };
 
+const inDays = (d: number) => new Date(Date.now() + d * 86400000).toISOString();
+const PERMANENT = "2099-12-31T00:00:00.000Z";
+const isBannedUntil = (u: string | null) => !!u && new Date(u) > new Date();
+
 export function RolesTab() {
-  const { profiles, setRole } = useRole();
+  const { profiles, setRole, setBan, isAdmin } = useRole();
   const { students } = useStore();
   const { committeesOf, setUserCommittee } = useTopics();
   const [q, setQ] = useState("");
   const [openKom, setOpenKom] = useState<string | null>(null);
+  const [openBan, setOpenBan] = useState<string | null>(null);
 
   const nameFor = (studentId: string | null) => {
     const s = studentId ? students.find((x) => x.id === studentId) : null;
@@ -100,6 +105,37 @@ export function RolesTab() {
                     );
                   })}
                 </div>
+              )}
+
+              {isAdmin && (
+                <>
+                  <button
+                    onClick={() => setOpenBan(openBan === p.user_id ? null : p.user_id)}
+                    className="mt-2 flex w-full items-center gap-2 text-left text-xs"
+                  >
+                    <span className="font-semibold text-slate-500">Chat-Sperre:</span>
+                    <span className={`flex-1 truncate ${isBannedUntil(p.chat_banned_until) ? "font-bold text-red-500" : "text-slate-400"}`}>
+                      {isBannedUntil(p.chat_banned_until)
+                        ? p.chat_banned_until === PERMANENT
+                          ? "dauerhaft gesperrt"
+                          : "gesperrt bis " + new Date(p.chat_banned_until!).toLocaleString("de-DE", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })
+                        : "aktiv (nicht gesperrt)"}
+                    </span>
+                    <span>{openBan === p.user_id ? "▲" : "▼"}</span>
+                  </button>
+                  {openBan === p.user_id && (
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {isBannedUntil(p.chat_banned_until) && (
+                        <button onClick={() => setBan(p.user_id, null)} className="rounded-full border border-emerald-400 px-3 py-1 text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                          ✓ Entsperren
+                        </button>
+                      )}
+                      <button onClick={() => setBan(p.user_id, inDays(1))} className="rounded-full border border-slate-200 px-3 py-1 text-xs font-bold text-slate-500 dark:border-slate-700">1 Tag</button>
+                      <button onClick={() => setBan(p.user_id, inDays(7))} className="rounded-full border border-slate-200 px-3 py-1 text-xs font-bold text-slate-500 dark:border-slate-700">7 Tage</button>
+                      <button onClick={() => setBan(p.user_id, PERMANENT)} className="rounded-full border border-red-300 px-3 py-1 text-xs font-bold text-red-500">Dauerhaft</button>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           );

@@ -9,6 +9,7 @@ export interface Profile {
   role: Role;
   student_id: string | null;
   has_logged_in: boolean;
+  chat_banned_until: string | null;
 }
 
 interface RoleCtx {
@@ -21,7 +22,10 @@ interface RoleCtx {
   canManageRoles: boolean; // admin
   profiles: Profile[];
   loginByStudent: Record<string, boolean>;
+  banned: boolean;
+  bannedUntil: string | null;
   setRole: (userId: string, role: Role) => Promise<void>;
+  setBan: (userId: string, until: string | null) => Promise<void>;
   refreshProfiles: () => void;
 }
 
@@ -39,6 +43,7 @@ export function RoleProvider({ children }: { children: ReactNode }) {
   const [role, setRoleState] = useState<Role>(hasSupabase ? "schueler" : "admin");
   const [ready, setReady] = useState(!hasSupabase);
   const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [bannedUntil, setBannedUntil] = useState<string | null>(null);
 
   const loadProfiles = useCallback(async (asStaff: boolean) => {
     if (!hasSupabase || !asStaff) return;
@@ -66,6 +71,7 @@ export function RoleProvider({ children }: { children: ReactNode }) {
           const row = p.new as Profile;
           if (row.user_id === uid) {
             setRoleState(row.role); // eigene Rolle live
+            setBannedUntil(row.chat_banned_until ?? null); // Sperre live
             if (STAFF.includes(row.role)) void loadProfiles(true);
           }
           setProfiles((prev) => {
@@ -86,10 +92,11 @@ export function RoleProvider({ children }: { children: ReactNode }) {
         if (alive) setReady(true);
         return;
       }
-      const { data: me } = await supabase!.from("profiles").select("role").eq("user_id", uid).maybeSingle();
+      const { data: me } = await supabase!.from("profiles").select("role, chat_banned_until").eq("user_id", uid).maybeSingle();
       const r = (me?.role as Role) || "schueler";
       if (!alive) return;
       setRoleState(r);
+      setBannedUntil((me?.chat_banned_until as string | null) ?? null);
       setReady(true);
       void supabase!.from("profiles").update({ has_logged_in: true }).eq("user_id", uid);
       void loadProfiles(STAFF.includes(r));
@@ -127,7 +134,18 @@ export function RoleProvider({ children }: { children: ReactNode }) {
     [],
   );
 
+  const setBan = useCallback(async (userId: string, until: string | null) => {
+    if (!hasSupabase) return;
+    const { error } = await supabase!.from("profiles").update({ chat_banned_until: until }).eq("user_id", userId);
+    if (error) {
+      alert("Sperre setzen fehlgeschlagen: " + error.message);
+      return;
+    }
+    setProfiles((prev) => prev.map((p) => (p.user_id === userId ? { ...p, chat_banned_until: until } : p)));
+  }, []);
+
   const isStaff = STAFF.includes(role);
+  const banned = bannedUntil != null && new Date(bannedUntil) > new Date();
   const loginByStudent: Record<string, boolean> = {};
   for (const p of profiles) if (p.student_id) loginByStudent[p.student_id] = p.has_logged_in;
 
@@ -141,7 +159,10 @@ export function RoleProvider({ children }: { children: ReactNode }) {
     canManageRoles: role === "admin",
     profiles,
     loginByStudent,
+    banned,
+    bannedUntil,
     setRole,
+    setBan,
     refreshProfiles: () => loadProfiles(isStaff),
   };
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

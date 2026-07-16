@@ -5,6 +5,8 @@ import { Sheet } from "./Sheet";
 import { normalize } from "../lib/logic";
 import { COMMITTEES, committeeLabel } from "../lib/committees";
 
+const PERMANENT_UNTIL = "2099-12-31T00:00:00.000Z";
+
 const VIS: { v: Visibility; label: string }[] = [
   { v: "privat", label: "Nur ich" },
   { v: "personen", label: "Bestimmte Personen" },
@@ -219,7 +221,7 @@ function FolderPage({
   onDeleted: () => void;
 }) {
   const { topics, items, members, uid, postItem, updateItem, deleteItem, updateTopic, deleteTopic, markRead, myVotes, voteCounts, vote, setMembers, unreadCount } = useTopics();
-  const { canEditData, isAdmin, profiles } = useRole();
+  const { canEditData, isAdmin, profiles, banned, bannedUntil } = useRole();
   const [type, setType] = useState<TopicItemType>("nachricht");
   const [itemTitle, setItemTitle] = useState("");
   const [text, setText] = useState("");
@@ -328,22 +330,35 @@ function FolderPage({
       </div>
 
       {/* Composer */}
-      <div className="rounded-2xl border border-slate-200 p-3 dark:border-slate-700">
-        <div className="mb-2 flex gap-1.5 rounded-xl bg-slate-100 p-1 dark:bg-slate-800">
-          {TYPE_TABS.map(({ t, label }) => (
-            <button key={t} onClick={() => setType(t)} className={`flex-1 rounded-lg py-1.5 text-[13px] font-bold transition ${type === t ? "bg-brand text-white" : "text-slate-500"}`}>{label}</button>
-          ))}
+      {banned ? (
+        <div className="rounded-2xl border-2 border-red-300 bg-red-500/5 p-4 text-center text-sm dark:border-red-500/40">
+          <div className="mb-1 text-2xl">🚫</div>
+          <div className="font-bold text-red-500">Du bist aktuell vom Posten gesperrt.</div>
+          {bannedUntil && bannedUntil !== PERMANENT_UNTIL && (
+            <div className="mt-1 text-xs text-slate-400">
+              Gesperrt bis {new Date(bannedUntil).toLocaleString("de-DE", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" })}
+            </div>
+          )}
+          {bannedUntil === PERMANENT_UNTIL && <div className="mt-1 text-xs text-slate-400">Wende dich an das Stufenteam.</div>}
         </div>
-        <input className="field mb-2" placeholder="Titel (optional)" value={itemTitle} onChange={(e) => setItemTitle(e.target.value)} />
-        <textarea className="field min-h-[60px] resize-y" placeholder={type === "todo" ? "Was ist zu tun?" : type === "umfrage" ? "Frage…" : "Nachricht…"} value={text} onChange={(e) => setText(e.target.value)} />
-        {type === "umfrage" && (
-          <div className="mt-2 space-y-2">
-            {opts.map((o, i) => <input key={i} className="field" placeholder={`Option ${i + 1}`} value={o} onChange={(e) => setOpts((p) => p.map((x, j) => (j === i ? e.target.value : x)))} />)}
-            <button onClick={() => setOpts((p) => [...p, ""])} className="text-sm font-semibold text-brand">+ Option</button>
+      ) : (
+        <div className="rounded-2xl border border-slate-200 p-3 dark:border-slate-700">
+          <div className="mb-2 flex gap-1.5 rounded-xl bg-slate-100 p-1 dark:bg-slate-800">
+            {TYPE_TABS.map(({ t, label }) => (
+              <button key={t} onClick={() => setType(t)} className={`flex-1 rounded-lg py-1.5 text-[13px] font-bold transition ${type === t ? "bg-brand text-white" : "text-slate-500"}`}>{label}</button>
+            ))}
           </div>
-        )}
-        <button className="btn-primary mt-3" disabled={!text.trim()} onClick={send}>Senden</button>
-      </div>
+          <input className="field mb-2" placeholder="Titel (optional)" value={itemTitle} onChange={(e) => setItemTitle(e.target.value)} />
+          <textarea className="field min-h-[60px] resize-y" placeholder={type === "todo" ? "Was ist zu tun?" : type === "umfrage" ? "Frage…" : "Nachricht…"} value={text} onChange={(e) => setText(e.target.value)} />
+          {type === "umfrage" && (
+            <div className="mt-2 space-y-2">
+              {opts.map((o, i) => <input key={i} className="field" placeholder={`Option ${i + 1}`} value={o} onChange={(e) => setOpts((p) => p.map((x, j) => (j === i ? e.target.value : x)))} />)}
+              <button onClick={() => setOpts((p) => [...p, ""])} className="text-sm font-semibold text-brand">+ Option</button>
+            </div>
+          )}
+          <button className="btn-primary mt-3" disabled={!text.trim()} onClick={send}>Senden</button>
+        </div>
+      )}
     </div>
   );
 }
