@@ -19,6 +19,8 @@ import { StudentSheet } from "./components/StudentSheet";
 import { AddSheet } from "./components/AddSheet";
 import { MassBar } from "./components/MassBar";
 import { RolesTab } from "./components/RolesTab";
+import { PermissionsTab } from "./components/PermissionsTab";
+import { MyCommittee } from "./components/MyCommittee";
 import { EventsTab } from "./components/EventsTab";
 import { EventComposer } from "./components/EventComposer";
 
@@ -40,11 +42,11 @@ export default function App() {
   );
 }
 
-type Tab = "kasse" | "events" | "themen" | "rollen";
+type Tab = "kasse" | "events" | "themen" | "rollen" | "rechte";
 
 function Main() {
   const { students, settings, ready, mode, setTerm, setSettings, exportData, importData } = useStore();
-  const { canEditData, canEditBeitrag, canManageRoles, isStaff, loginByStudent } = useRole();
+  const { can, canEditData, canEditBeitrag, canManageRoles, isStaff, loginByStudent } = useRole();
   const { events: allEvents, reads } = useEvents();
   const { topics, unreadCount } = useTopics();
   const { theme, toggle } = useTheme();
@@ -138,6 +140,7 @@ function Main() {
     { key: "events", icon: "📣", label: "Events", badge: unread, show: true },
     { key: "themen", icon: "📋", label: "Übersicht", badge: topicsUnread, show: showTopicsTab },
     { key: "rollen", icon: "👥", label: "Rollen", show: canManageRoles },
+    { key: "rechte", icon: "🛡️", label: "Rechte", show: can("perms.manage") },
   ];
 
   return (
@@ -161,7 +164,7 @@ function Main() {
             </div>
           ) : (
             <div className="flex-1 text-lg font-bold">
-              {tab === "events" ? "Events" : tab === "themen" ? "Übersicht" : "Rollen & Rechte"}
+              {tab === "events" ? "Events" : tab === "themen" ? "Übersicht" : tab === "rechte" ? "Berechtigungen" : "Rollen & Rechte"}
             </div>
           )}
 
@@ -289,6 +292,8 @@ function Main() {
                   </>
                 )}
               </div>
+
+              <MyCommittee />
             </div>
           </div>
         )}
@@ -297,6 +302,10 @@ function Main() {
       {tab === "rollen" ? (
         <main className="mt-3">
           <RolesTab />
+        </main>
+      ) : tab === "rechte" ? (
+        <main className="mt-3 pb-4">
+          <PermissionsTab />
         </main>
       ) : tab === "events" ? (
         <main className="mt-3">

@@ -16,7 +16,9 @@ const PERMANENT = "2099-12-31T00:00:00.000Z";
 const isBanned = (u: string | null) => !!u && new Date(u) > new Date();
 
 export function RolesTab() {
-  const { profiles, setRole, setBan, isAdmin } = useRole();
+  const { profiles, setRole, setBan, can } = useRole();
+  const canAssignKom = can("komitees.assign");
+  const canTimeout = can("mod.timeout");
   const { students } = useStore();
   const { committeesOf, setUserCommittee } = useTopics();
   const [q, setQ] = useState("");
@@ -78,6 +80,7 @@ export function RolesTab() {
                 </select>
 
                 {/* Komitees als Dropdown */}
+                {canAssignKom && (
                 <div className="relative">
                   <button
                     onClick={() => setOpenKom(openKom === p.user_id ? null : p.user_id)}
@@ -110,9 +113,10 @@ export function RolesTab() {
                     </>
                   )}
                 </div>
+                )}
 
-                {/* Chat-Sperre (nur Admin) */}
-                {isAdmin && (
+                {/* Chat-Sperre (mit Timeout-Recht) */}
+                {canTimeout && (
                   <button
                     onClick={() => setBan(p.user_id, banned ? null : PERMANENT)}
                     title={banned ? "Chat-Sperre aufheben" : "Vom Chat sperren"}

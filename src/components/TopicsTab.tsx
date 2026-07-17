@@ -17,7 +17,8 @@ const VIS_LABEL: Record<Visibility, string> = {
 
 export function TopicsTab() {
   const { topics, ready, unreadCount } = useTopics();
-  const { canEditData } = useRole();
+  const { can } = useRole();
+  const canEditData = can("chats.manage");
   const [stack, setStack] = useState<string[]>([]);
   const [createParent, setCreateParent] = useState<{ parentId: string | null; tag: string } | null>(null);
 
@@ -268,7 +269,9 @@ function FolderPage({
   onDeleted: () => void;
 }) {
   const { topics, items, members, topicTags, uid, postItem, updateItem, deleteItem, updateTopic, deleteTopic, markRead, myVotes, voteCounts, vote, setMembers, committeesOf, unreadCount } = useTopics();
-  const { role, canEditData, isAdmin, profiles, banned, bannedUntil } = useRole();
+  const { role, can, isAdmin, profiles, banned, bannedUntil } = useRole();
+  const canEditData = can("chats.manage");
+  const canDelete = can("chats.delete_messages");
   const [type, setType] = useState<TopicItemType>("nachricht");
   const [itemTitle, setItemTitle] = useState("");
   const [text, setText] = useState("");
@@ -370,7 +373,7 @@ function FolderPage({
         <div className="rounded-2xl border-2 border-brand/30 bg-brand/5 p-3">
           <div className="mb-2 text-xs font-bold uppercase tracking-wide text-brand">📌 Key-Infos</div>
           <div className="space-y-2">
-            {pinnedItems.map((i) => <ItemRow key={i.id} i={i} uid={uid} canEditData={canEditData} myVotes={myVotes} voteCounts={voteCounts} onVote={vote} onUpdate={updateItem} onDelete={deleteItem} />)}
+            {pinnedItems.map((i) => <ItemRow key={i.id} i={i} uid={uid} canEditData={canEditData} canDelete={canDelete} myVotes={myVotes} voteCounts={voteCounts} onVote={vote} onUpdate={updateItem} onDelete={deleteItem} />)}
           </div>
         </div>
       )}
@@ -380,7 +383,7 @@ function FolderPage({
         {stream.length === 0 && pinnedItems.length === 0 && children.length === 0 && (
           <div className="py-8 text-center text-sm text-slate-400">Noch nichts hier – schreib den ersten Beitrag oder leg einen Unterordner an.</div>
         )}
-        {stream.map((i) => <ItemRow key={i.id} i={i} uid={uid} canEditData={canEditData} myVotes={myVotes} voteCounts={voteCounts} onVote={vote} onUpdate={updateItem} onDelete={deleteItem} />)}
+        {stream.map((i) => <ItemRow key={i.id} i={i} uid={uid} canEditData={canEditData} canDelete={canDelete} myVotes={myVotes} voteCounts={voteCounts} onVote={vote} onUpdate={updateItem} onDelete={deleteItem} />)}
       </div>
 
       {/* Gesperrt-Hinweis statt Composer */}
@@ -472,16 +475,16 @@ function AuthorBadges({ role, koms }: { role: string | null; koms: string[] | nu
 }
 
 function ItemRow({
-  i, uid, canEditData, myVotes, voteCounts, onVote, onUpdate, onDelete,
+  i, uid, canEditData, canDelete, myVotes, voteCounts, onVote, onUpdate, onDelete,
 }: {
-  i: TopicItem; uid: string; canEditData: boolean;
+  i: TopicItem; uid: string; canEditData: boolean; canDelete: boolean;
   myVotes: Record<string, string[]>; voteCounts: Record<string, Record<string, number>>;
   onVote: (itemId: string, optionId: string) => void;
   onUpdate: (id: string, patch: Partial<Pick<TopicItem, "done" | "pinned">>) => void;
   onDelete: (id: string) => void;
 }) {
   const time = new Date(i.created_at).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" }) + " " + new Date(i.created_at).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
-  const mayDelete = canEditData || i.created_by === uid;
+  const mayDelete = canDelete || i.created_by === uid;
   const counts = voteCounts[i.id] || {};
   const total = Object.values(counts).reduce((a, b) => a + b, 0);
 

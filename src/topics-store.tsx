@@ -60,6 +60,7 @@ interface TopicsValue {
   setMembers: (topicId: string, topicTitle: string, userIds: string[]) => Promise<void>;
   setTagMembers: (tag: string, userIds: string[]) => Promise<void>;
   setUserCommittee: (userId: string, slug: string, on: boolean) => Promise<void>;
+  selfAssignCommittee: (slug: string) => Promise<boolean>;
   committeesOf: (userId: string) => string[];
   postItem: (topic: Topic, type: TopicItemType, body: string, options?: string[], title?: string, meta?: { role?: string | null; koms?: string[] }) => Promise<void>;
   updateItem: (id: string, patch: Partial<Pick<TopicItem, "done" | "pinned">>) => Promise<void>;
@@ -280,6 +281,22 @@ export function TopicsProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  // Selbstzuweisung genau einmal: nur erlaubt, solange man in KEINEM Komitee ist.
+  const selfAssignCommittee: TopicsValue["selfAssignCommittee"] = useCallback(async (slug) => {
+    const uid = uidRef.current;
+    if ((stateRef.current.tagMembers && Object.values(stateRef.current.tagMembers).some((ids) => ids.includes(uid)))) return false;
+    setTagMembersState((p) => {
+      const cur = new Set(p[slug] || []);
+      cur.add(uid);
+      return { ...p, [slug]: [...cur] };
+    });
+    if (hasSupabase) {
+      const { error } = await supabase!.from("tag_members").insert({ tag: slug, user_id: uid });
+      if (error) { alert("Komitee setzen fehlgeschlagen: " + error.message); return false; }
+    }
+    return true;
+  }, []);
+
   const committeesOf = useCallback(
     (userId: string) =>
       Object.entries(stateRef.current.tagMembers).filter(([, ids]) => ids.includes(userId)).map(([slug]) => slug),
@@ -351,7 +368,7 @@ export function TopicsProvider({ children }: { children: ReactNode }) {
 
   const value: TopicsValue = {
     topics, items, members, topicTags, tagMembers, myVotes, voteCounts, reads, uid: uidRef.current, ready,
-    createTopic, updateTopic, deleteTopic, setMembers, setTagMembers, setUserCommittee, committeesOf, postItem, updateItem, deleteItem, vote, markRead, unreadCount,
+    createTopic, updateTopic, deleteTopic, setMembers, setTagMembers, setUserCommittee, selfAssignCommittee, committeesOf, postItem, updateItem, deleteItem, vote, markRead, unreadCount,
   };
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
