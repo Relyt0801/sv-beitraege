@@ -95,7 +95,7 @@ export function RolesTab() {
                   {openKom === p.user_id && (
                     <>
                       <button className="fixed inset-0 z-20 cursor-default" onClick={() => setOpenKom(null)} aria-label="Schließen" />
-                      <div className="absolute right-0 z-30 mt-1 max-h-64 w-60 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1.5 shadow-lg dark:border-slate-700 dark:bg-slate-900">
+                      <div className="absolute left-0 z-30 mt-1 max-h-64 w-[min(15rem,calc(100vw-3rem))] overflow-y-auto rounded-xl border border-slate-200 bg-white p-1.5 shadow-lg dark:border-slate-700 dark:bg-slate-900 sm:left-auto sm:right-0 sm:w-60">
                         {COMMITTEES.map((c) => {
                           const on = koms.includes(c.slug);
                           return (
