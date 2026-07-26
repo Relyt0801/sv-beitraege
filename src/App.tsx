@@ -152,45 +152,49 @@ function Main() {
             <div className="text-[11px] text-slate-400">SV · Beiträge</div>
           </div>
 
-          {tab === "kasse" ? (
-            <div className="flex flex-1 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 shadow-card dark:border-slate-800 dark:bg-slate-900 dark:shadow-cardDark">
-              <span className="text-slate-400">🔍</span>
-              <input
-                className="w-full bg-transparent text-base outline-none placeholder:text-slate-400"
-                placeholder="Name suchen…"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-              />
-            </div>
-          ) : (
-            <div className="flex-1 text-lg font-bold">
+          {tab !== "kasse" && (
+            <div className="min-w-0 flex-1 truncate text-lg font-bold">
               {tab === "events" ? "Events" : tab === "themen" ? "Übersicht" : tab === "rechte" ? "Berechtigungen" : "Rollen & Rechte"}
             </div>
           )}
 
-          {tab === "kasse" && (
-            <>
-              <button className={`iconbtn ${showFilter ? "iconbtn-active" : ""}`} onClick={() => setShowFilter((v) => !v)} aria-label="Filter & Einstellungen">
-                ⚙︎
-              </button>
-              {canEditData && (
-                <button
-                  className={`iconbtn ${massMode ? "iconbtn-active" : ""}`}
-                  onClick={() => {
-                    setMassMode((v) => !v);
-                    setSelected(new Set());
-                  }}
-                  aria-label="Mehrere auswählen"
-                >
-                  ☑
+          <div className="ml-auto flex shrink-0 items-center gap-2">
+            {tab === "kasse" && (
+              <>
+                <button className={`iconbtn ${showFilter ? "iconbtn-active" : ""}`} onClick={() => setShowFilter((v) => !v)} aria-label="Filter & Einstellungen">
+                  ⚙︎
                 </button>
-              )}
-            </>
-          )}
-          <button className="iconbtn" onClick={toggle} aria-label="Hell/Dunkel">
-            {theme === "dark" ? "☀" : "☾"}
-          </button>
+                {canEditData && (
+                  <button
+                    className={`iconbtn ${massMode ? "iconbtn-active" : ""}`}
+                    onClick={() => {
+                      setMassMode((v) => !v);
+                      setSelected(new Set());
+                    }}
+                    aria-label="Mehrere auswählen"
+                  >
+                    ☑
+                  </button>
+                )}
+              </>
+            )}
+            <button className="iconbtn" onClick={toggle} aria-label="Hell/Dunkel">
+              {theme === "dark" ? "☀" : "☾"}
+            </button>
+          </div>
         </div>
+
+        {tab === "kasse" && (
+          <div className="mx-auto mt-2.5 flex max-w-5xl items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 shadow-card dark:border-slate-800 dark:bg-slate-900 dark:shadow-cardDark">
+            <span className="text-slate-400">🔍</span>
+            <input
+              className="w-full bg-transparent text-base outline-none placeholder:text-slate-400"
+              placeholder="Name suchen…"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+            />
+          </div>
+        )}
 
         {tab === "kasse" && (
           <div className="mx-auto mt-2.5 flex max-w-5xl flex-wrap items-center gap-x-3 gap-y-2">
