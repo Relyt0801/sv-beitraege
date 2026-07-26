@@ -58,7 +58,7 @@ export function RolesTab() {
           const banned = isBanned(p.chat_banned_until);
           return (
             <div key={p.user_id} className="card p-4">
-              {/* Zeile 1: Name + Rolle */}
+              {/* Zeile 1: Name */}
               <div className="flex items-center gap-3">
                 <span
                   title={p.has_logged_in ? "hat sich schon angemeldet" : "noch nie angemeldet"}
@@ -68,8 +68,12 @@ export function RolesTab() {
                   <div className="truncate font-semibold">{name ?? p.username ?? "—"}</div>
                   <div className="truncate text-[13px] text-slate-400">{p.username}</div>
                 </div>
+              </div>
+
+              {/* Zeile 2: Rolle + Komitees + Chat-Sperre nebeneinander */}
+              <div className="mt-2.5 flex items-stretch gap-2">
                 <select
-                  className="h-[42px] shrink-0 rounded-xl border border-slate-200 bg-slate-50 px-3 font-semibold dark:border-slate-700 dark:bg-slate-800"
+                  className="h-[42px] shrink-0 rounded-xl border border-slate-200 bg-slate-50 px-2.5 font-semibold dark:border-slate-700 dark:bg-slate-800"
                   value={p.role}
                   onChange={(e) => setRole(p.user_id, e.target.value as Role)}
                 >
@@ -77,61 +81,56 @@ export function RolesTab() {
                     <option key={r} value={r}>{ROLE_LABEL[r]}</option>
                   ))}
                 </select>
-              </div>
 
-              {/* Zeile 2: Komitees + Chat-Sperre */}
-              {(canAssignKom || canTimeout) && (
-                <div className="mt-2.5 flex items-center gap-2 pl-6">
-                  {canAssignKom && (
-                    <div className="relative flex-1">
-                      <button
-                        onClick={() => setOpenKom(openKom === p.user_id ? null : p.user_id)}
-                        className="flex h-[42px] w-full items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3 font-semibold dark:border-slate-700 dark:bg-slate-800"
-                      >
-                        <span className="text-slate-500 dark:text-slate-300">Komitees</span>
-                        {koms.length > 0 && (
-                          <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-brand px-1 text-xs font-bold text-white">{koms.length}</span>
-                        )}
-                        <span className="ml-auto text-slate-400">▾</span>
-                      </button>
-                      {openKom === p.user_id && (
-                        <>
-                          <button className="fixed inset-0 z-20 cursor-default" onClick={() => setOpenKom(null)} aria-label="Schließen" />
-                          <div className="absolute left-0 right-0 z-30 mt-1 max-h-64 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1.5 shadow-lg dark:border-slate-700 dark:bg-slate-900">
-                            {COMMITTEES.map((c) => {
-                              const on = koms.includes(c.slug);
-                              return (
-                                <button
-                                  key={c.slug}
-                                  onClick={() => setUserCommittee(p.user_id, c.slug, !on)}
-                                  className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm hover:bg-slate-100 dark:hover:bg-slate-800"
-                                >
-                                  <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border text-xs text-white ${on ? "border-brand bg-brand" : "border-slate-300 dark:border-slate-600"}`}>{on ? "✓" : ""}</span>
-                                  {c.label}
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  )}
-
-                  {canTimeout && (
+                {canAssignKom && (
+                  <div className="relative min-w-0 flex-1">
                     <button
-                      onClick={() => setBan(p.user_id, banned ? null : PERMANENT)}
-                      title={banned ? "Chat-Sperre aufheben" : "Vom Chat sperren"}
-                      className={`flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-xl border text-lg transition ${
-                        banned
-                          ? "border-red-300 bg-red-500/10 text-red-500"
-                          : "border-slate-200 text-slate-400 hover:text-slate-600 dark:border-slate-700 dark:hover:text-slate-200"
-                      } ${canAssignKom ? "" : "ml-auto"}`}
+                      onClick={() => setOpenKom(openKom === p.user_id ? null : p.user_id)}
+                      className="flex h-[42px] w-full items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3 font-semibold dark:border-slate-700 dark:bg-slate-800"
                     >
-                      {banned ? "🚫" : "💬"}
+                      <span className="truncate text-slate-500 dark:text-slate-300">Komitees</span>
+                      {koms.length > 0 && (
+                        <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-brand px-1 text-xs font-bold text-white">{koms.length}</span>
+                      )}
+                      <span className="ml-auto text-slate-400">▾</span>
                     </button>
-                  )}
-                </div>
-              )}
+                    {openKom === p.user_id && (
+                      <>
+                        <button className="fixed inset-0 z-20 cursor-default" onClick={() => setOpenKom(null)} aria-label="Schließen" />
+                        <div className="absolute left-0 right-0 z-30 mt-1 max-h-64 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1.5 shadow-lg dark:border-slate-700 dark:bg-slate-900">
+                          {COMMITTEES.map((c) => {
+                            const on = koms.includes(c.slug);
+                            return (
+                              <button
+                                key={c.slug}
+                                onClick={() => setUserCommittee(p.user_id, c.slug, !on)}
+                                className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm hover:bg-slate-100 dark:hover:bg-slate-800"
+                              >
+                                <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border text-xs text-white ${on ? "border-brand bg-brand" : "border-slate-300 dark:border-slate-600"}`}>{on ? "✓" : ""}</span>
+                                {c.label}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
+
+                {canTimeout && (
+                  <button
+                    onClick={() => setBan(p.user_id, banned ? null : PERMANENT)}
+                    title={banned ? "Chat-Sperre aufheben" : "Vom Chat sperren"}
+                    className={`flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-xl border text-lg transition ${canAssignKom ? "" : "ml-auto"} ${
+                      banned
+                        ? "border-red-300 bg-red-500/10 text-red-500"
+                        : "border-slate-200 text-slate-400 hover:text-slate-600 dark:border-slate-700 dark:hover:text-slate-200"
+                    }`}
+                  >
+                    {banned ? "🚫" : "💬"}
+                  </button>
+                )}
+              </div>
             </div>
           );
         })}

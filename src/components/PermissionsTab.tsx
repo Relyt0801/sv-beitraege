@@ -7,6 +7,9 @@ import { PERM_CATEGORIES, PERM_ROLES, ALL_PERMS, ROLE_DEFAULTS, type PermKey } f
 
 type Matrix = Record<string, Record<string, boolean>>;
 
+// Kurzlabels für die Rollen-Pills, damit alle 4 auch auf schmalen Handys nebeneinander passen.
+const ROLE_SHORT: Record<string, string> = { schueler: "Schüler", stufenteam: "Team", kassenwart: "Kasse", admin: "Admin" };
+
 export function PermissionsTab() {
   const { profiles } = useRole();
   const { students } = useStore();
@@ -85,43 +88,33 @@ export function PermissionsTab() {
       {PERM_CATEGORIES.map((cat) => (
         <section key={cat.label} className="card p-4">
           <h3 className="mb-3 flex items-center gap-2 font-bold">{cat.icon} {cat.label}</h3>
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse text-sm">
-              <thead>
-                <tr className="text-[11px] uppercase tracking-wide text-slate-400">
-                  <th className="sticky left-0 z-10 bg-white py-1 text-left dark:bg-slate-900">Recht</th>
-                  {PERM_ROLES.map((r) => <th key={r.key} className="px-1.5 text-center font-bold">{r.label}</th>)}
-                </tr>
-              </thead>
-              <tbody>
-                {cat.perms.map((perm) => (
-                  <tr key={perm.key} className="border-t border-slate-100 dark:border-slate-800">
-                    <td className="sticky left-0 z-10 min-w-[160px] max-w-[220px] bg-white py-2 pr-3 dark:bg-slate-900">
-                      <div className="font-semibold">{perm.label}</div>
-                      <div className="text-[11px] text-slate-400">{perm.desc}</div>
-                    </td>
-                    {PERM_ROLES.map((r) => {
-                      const on = !!roleMatrix[r.key]?.[perm.key];
-                      const locked = r.key === "admin";
-                      return (
-                        <td key={r.key} className="px-1.5 text-center align-middle">
-                          <button
-                            disabled={locked}
-                            onClick={() => toggleRole(r.key, perm.key)}
-                            aria-label={`${perm.label} für ${r.label}`}
-                            className={`mx-auto flex h-7 w-7 items-center justify-center rounded-lg border text-sm font-bold transition ${
-                              on ? "border-brand bg-brand text-white" : "border-slate-200 text-transparent dark:border-slate-700"
-                            } ${locked ? "opacity-60" : ""}`}
-                          >
-                            ✓
-                          </button>
-                        </td>
-                      );
-                    })}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="space-y-3.5">
+            {cat.perms.map((perm) => (
+              <div key={perm.key}>
+                <div className="text-[15px] font-semibold">{perm.label}</div>
+                <div className="mb-1.5 text-[11px] leading-snug text-slate-400">{perm.desc}</div>
+                <div className="flex gap-1.5">
+                  {PERM_ROLES.map((r) => {
+                    const on = !!roleMatrix[r.key]?.[perm.key];
+                    const locked = r.key === "admin";
+                    return (
+                      <button
+                        key={r.key}
+                        disabled={locked}
+                        onClick={() => toggleRole(r.key, perm.key)}
+                        aria-label={`${perm.label} für ${r.label}`}
+                        className={`flex min-w-0 flex-1 items-center justify-center gap-1 rounded-lg border px-1 py-1.5 text-center text-[11px] font-bold leading-tight transition ${
+                          on ? "border-brand bg-brand text-white" : "border-slate-200 text-slate-500 dark:border-slate-700"
+                        } ${locked ? "opacity-60" : ""}`}
+                      >
+                        <span className="truncate">{ROLE_SHORT[r.key]}</span>
+                        {on && <span aria-hidden>✓</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
           </div>
         </section>
       ))}

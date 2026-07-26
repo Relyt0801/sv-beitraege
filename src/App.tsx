@@ -197,14 +197,14 @@ function Main() {
         )}
 
         {tab === "kasse" && (
-          <div className="mx-auto mt-2.5 flex max-w-5xl flex-wrap items-center gap-x-3 gap-y-2">
-            <div className="flex flex-wrap items-center gap-1.5">
+          <div className="mx-auto mt-2.5 max-w-5xl space-y-2">
+            <div className="flex gap-1.5">
               {HY.map((h) => (
                 <button
                   key={h}
                   disabled={!canEditData}
                   onClick={() => setSettings({ aktuelles_halbjahr: h })}
-                  className={`rounded-full border px-3 py-1 text-xs font-bold transition disabled:cursor-default ${
+                  className={`flex-1 rounded-full border px-1 py-1.5 text-xs font-bold transition disabled:cursor-default ${
                     h === settings.aktuelles_halbjahr
                       ? "border-brand bg-brand text-white"
                       : "border-slate-200 bg-white text-slate-500 dark:border-slate-700 dark:bg-slate-900"
@@ -215,7 +215,7 @@ function Main() {
               ))}
             </div>
             {isStaff && (
-              <div className="ml-auto rounded-full bg-white px-3.5 py-1.5 text-sm font-semibold shadow-card dark:bg-slate-900 dark:shadow-cardDark">
+              <div className="w-full rounded-full bg-white px-3.5 py-2 text-center text-sm font-semibold shadow-card dark:bg-slate-900 dark:shadow-cardDark">
                 Offen gesamt: <span className="font-extrabold text-amber-500">{totalOffen} €</span>
                 <span className="ml-1 text-slate-400">· {anzahlOffen} offen</span>
               </div>
