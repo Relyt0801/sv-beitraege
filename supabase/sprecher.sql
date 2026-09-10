@@ -9,6 +9,19 @@ alter table public.profiles drop constraint if exists profiles_role_check;
 alter table public.profiles add constraint profiles_role_check
   check (role in ('schueler','stufenteam','kassenwart','admin','sprecher','stv_sprecher'));
 
+-- 1b) Auch die Rechte-Tabelle kennt die neuen Rollen
+do $$
+declare c text;
+begin
+  select conname into c from pg_constraint
+   where conrelid = 'public.role_permissions'::regclass
+     and contype = 'c'
+     and pg_get_constraintdef(oid) like '%role%';
+  if c is not null then execute format('alter table public.role_permissions drop constraint %I', c); end if;
+end $$;
+alter table public.role_permissions add constraint role_permissions_role_check
+  check (role in ('schueler','stufenteam','kassenwart','admin','sprecher','stv_sprecher'));
+
 -- 2) Jede der beiden Rollen darf es nur einmal geben
 create unique index if not exists profiles_sprecher_eindeutig
   on public.profiles(role) where role in ('sprecher','stv_sprecher');
