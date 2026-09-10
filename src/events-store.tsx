@@ -63,10 +63,11 @@ export function EventsProvider({ children }: { children: ReactNode }) {
   // ---------- SUPABASE MODE ----------
   const loadAll = useCallback(async () => {
     const uid = uidRef.current;
-    const [{ data: evs }, { data: opts }, { data: tgts }, { data: votes }, { data: rd }] = await Promise.all([
+    const [{ data: evs }, { data: opts }, { data: tgts }, { data: koms }, { data: votes }, { data: rd }] = await Promise.all([
       supabase!.from("events").select("*").order("created_at", { ascending: false }),
       supabase!.from("poll_options").select("*").order("position"),
       supabase!.from("event_targets").select("*"),
+      supabase!.from("event_committees").select("*"),
       supabase!.from("poll_votes").select("*"),
       supabase!.from("event_reads").select("event_id"),
     ]);
@@ -74,11 +75,14 @@ export function EventsProvider({ children }: { children: ReactNode }) {
     for (const o of opts || []) (optsByEvent[o.event_id] ||= []).push({ id: o.id, label: o.label });
     const tgtByEvent: Record<string, string[]> = {};
     for (const t of tgts || []) (tgtByEvent[t.event_id] ||= []).push(t.student_id);
+    const komByEvent: Record<string, string[]> = {};
+    for (const k of koms || []) (komByEvent[k.event_id] ||= []).push(k.tag);
     setEvents(
       (evs || []).map((e: any) => ({
         ...e,
         options: optsByEvent[e.id] || [],
         target_ids: tgtByEvent[e.id] || [],
+        tags: komByEvent[e.id] || [],
       })),
     );
     const mine: Record<string, string[]> = {};
@@ -151,6 +155,7 @@ export function EventsProvider({ children }: { children: ReactNode }) {
           created_at: new Date().toISOString(),
           options: e.options.filter(Boolean).map((label) => ({ id: uuid(), label })),
           target_ids: e.target_ids,
+          tags: e.tags,
         };
         setEvents((prev) => {
           const next = [item, ...prev];
@@ -184,6 +189,8 @@ export function EventsProvider({ children }: { children: ReactNode }) {
           .insert(e.options.filter(Boolean).map((label, i) => ({ event_id: ev.id, label, position: i })));
       if (e.audience === "selected" && e.target_ids.length)
         await supabase!.from("event_targets").insert(e.target_ids.map((student_id) => ({ event_id: ev.id, student_id })));
+      if (e.audience === "komitee" && e.tags.length)
+        await supabase!.from("event_committees").insert(e.tags.map((tag) => ({ event_id: ev.id, tag })));
       // Push-Benachrichtigung auslösen (Function optional – Fehler ignorieren, falls noch nicht deployt)
       try {
         await supabase!.functions.invoke("send-push", { body: { event_id: ev.id } });

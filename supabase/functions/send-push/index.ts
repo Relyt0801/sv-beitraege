@@ -44,6 +44,14 @@ Deno.serve(async (req) => {
       if (ev.audience === "all") {
         const { data } = await supabase.from("profiles").select("user_id");
         userIds = (data || []).map((p: { user_id: string }) => p.user_id);
+      } else if (ev.audience === "komitee") {
+        // Alle Mitglieder der ausgewählten Komitees
+        const { data: koms } = await supabase.from("event_committees").select("tag").eq("event_id", event_id);
+        const tags = (koms || []).map((k: { tag: string }) => k.tag);
+        if (tags.length) {
+          const { data: g } = await supabase.from("tag_members").select("user_id").in("tag", tags);
+          userIds = [...new Set((g || []).map((x: { user_id: string }) => x.user_id))];
+        }
       } else {
         const { data: t } = await supabase.from("event_targets").select("student_id").eq("event_id", event_id);
         const sids = (t || []).map((x: { student_id: string }) => x.student_id);

@@ -4,6 +4,7 @@ export type PermKey =
   | "chats.delete_messages"
   | "chats.manage"
   | "komitees.assign"
+  | "komitees.access"
   | "mod.timeout"
   | "kasse.edit"
   | "data.edit"
@@ -24,6 +25,7 @@ export const PERM_CATEGORIES: PermCategory[] = [
   {
     label: "Komitees", icon: "🏷️", perms: [
       { key: "komitees.assign", label: "Komitees zuweisen", desc: "Anderen Personen Komitees geben oder entziehen." },
+      { key: "komitees.access", label: "Fremdzugriff verwalten", desc: "Personen oder ganzen Komitees Lese- oder Schreibrechte an fremden Komitees geben." },
     ],
   },
   {

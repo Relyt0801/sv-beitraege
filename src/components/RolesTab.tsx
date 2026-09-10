@@ -12,17 +12,24 @@ const ROLE_LABEL: Record<Role, string> = {
   admin: "Admin",
 };
 
-const PERMANENT = "2099-12-31T00:00:00.000Z";
-const isBanned = (u: string | null) => !!u && new Date(u) > new Date();
+const isBanned = (p: { chat_banned_until: string | null; chat_ban_permanent?: boolean }) =>
+  Boolean(p.chat_ban_permanent) || (!!p.chat_banned_until && new Date(p.chat_banned_until) > new Date());
+
+const DAUERN: { label: string; ms: number | null }[] = [
+  { label: "1 Stunde", ms: 60 * 60 * 1000 },
+  { label: "1 Tag", ms: 24 * 60 * 60 * 1000 },
+  { label: "Dauerhaft", ms: null },
+];
 
 export function RolesTab() {
-  const { profiles, setRole, setBan, can } = useRole();
+  const { profiles, setRole, setBan, can, opUserId } = useRole();
   const canAssignKom = can("komitees.assign");
   const canTimeout = can("mod.timeout");
   const { students } = useStore();
   const { committeesOf, setUserCommittee } = useTopics();
   const [q, setQ] = useState("");
   const [openKom, setOpenKom] = useState<string | null>(null);
+  const [openBan, setOpenBan] = useState<string | null>(null);
 
   const nameFor = (studentId: string | null) => {
     const s = studentId ? students.find((x) => x.id === studentId) : null;
@@ -55,7 +62,8 @@ export function RolesTab() {
       <div className="grid gap-2.5">
         {rows.map(({ p, name }) => {
           const koms = committeesOf(p.user_id);
-          const banned = isBanned(p.chat_banned_until);
+          const banned = isBanned(p);
+          const geschuetzt = p.is_op || p.user_id === opUserId;
           return (
             <div key={p.user_id} className="card p-4">
               {/* Zeile 1: Name */}
@@ -73,7 +81,9 @@ export function RolesTab() {
               {/* Zeile 2: Rolle + Komitees + Chat-Sperre nebeneinander */}
               <div className="mt-2.5 flex items-stretch gap-2">
                 <select
-                  className="h-[42px] shrink-0 rounded-xl border border-slate-200 bg-slate-50 px-2.5 font-semibold dark:border-slate-700 dark:bg-slate-800"
+                  disabled={geschuetzt}
+                  title={geschuetzt ? "Dieses Konto ist geschützt" : undefined}
+                  className="h-[42px] shrink-0 rounded-xl border border-slate-200 bg-slate-50 px-2.5 font-semibold disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800"
                   value={p.role}
                   onChange={(e) => setRole(p.user_id, e.target.value as Role)}
                 >
@@ -117,18 +127,49 @@ export function RolesTab() {
                   </div>
                 )}
 
-                {canTimeout && (
-                  <button
-                    onClick={() => setBan(p.user_id, banned ? null : PERMANENT)}
-                    title={banned ? "Chat-Sperre aufheben" : "Vom Chat sperren"}
-                    className={`flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-xl border text-lg transition ${canAssignKom ? "" : "ml-auto"} ${
-                      banned
-                        ? "border-red-300 bg-red-500/10 text-red-500"
-                        : "border-slate-200 text-slate-400 hover:text-slate-600 dark:border-slate-700 dark:hover:text-slate-200"
-                    }`}
-                  >
-                    {banned ? "🚫" : "💬"}
-                  </button>
+                {canTimeout && !geschuetzt && (
+                  <div className={`relative shrink-0 ${canAssignKom ? "" : "ml-auto"}`}>
+                    <button
+                      onClick={() => (banned ? setBan(p.user_id, null, false) : setOpenBan(openBan === p.user_id ? null : p.user_id))}
+                      title={banned ? "Sperre aufheben" : "Vom Chat sperren"}
+                      className={`flex h-[42px] w-[42px] items-center justify-center rounded-xl border text-lg transition ${
+                        banned
+                          ? "border-red-300 bg-red-500/10 text-red-500"
+                          : "border-slate-200 text-slate-400 hover:text-slate-600 dark:border-slate-700 dark:hover:text-slate-200"
+                      }`}
+                    >
+                      {banned ? "🚫" : "💬"}
+                    </button>
+                    {openBan === p.user_id && !banned && (
+                      <>
+                        <button className="fixed inset-0 z-20 cursor-default" onClick={() => setOpenBan(null)} aria-label="Schließen" />
+                        <div className="absolute right-0 z-30 mt-1 w-40 rounded-xl border border-slate-200 bg-white p-1.5 shadow-lg dark:border-slate-700 dark:bg-slate-900">
+                          <div className="px-2 py-1 text-[11px] font-bold uppercase tracking-wide text-slate-400">Sperren für</div>
+                          {DAUERN.map((d) => (
+                            <button
+                              key={d.label}
+                              onClick={() => {
+                                setOpenBan(null);
+                                void setBan(
+                                  p.user_id,
+                                  d.ms ? new Date(Date.now() + d.ms).toISOString() : null,
+                                  d.ms === null,
+                                );
+                              }}
+                              className="w-full rounded-lg px-2 py-2 text-left text-sm font-semibold hover:bg-slate-100 dark:hover:bg-slate-800"
+                            >
+                              {d.label}
+                            </button>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
+                {geschuetzt && (
+                  <span className={`shrink-0 rounded-xl bg-amber-500/10 px-2.5 py-2 text-xs font-bold text-amber-600 dark:text-amber-400 ${canAssignKom ? "" : "ml-auto"}`}>
+                    🛡 geschützt
+                  </span>
                 )}
               </div>
             </div>

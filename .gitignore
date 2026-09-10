@@ -32,6 +32,9 @@ stufenkasse-export*.json
 *-export.json
 *.csv
 
+# Von Claude gelieferte Dateien (Screenshots o. Ä.)
+Claude outputs/
+
 # Supabase CLI (Projekt-Refs, lokale Zustände)
 supabase/.temp/
 supabase/.branches/

@@ -11,7 +11,7 @@ export interface EventItem {
   title: string;
   body: string;
   is_warning: boolean;
-  audience: "all" | "selected";
+  audience: "all" | "selected" | "komitee";
   poll_multiple: boolean;
   poll_min_one: boolean;
   poll_show_results: boolean;
@@ -19,6 +19,8 @@ export interface EventItem {
   created_at: string;
   options: PollOption[];
   target_ids: string[];
+  /** Komitee-Slugs, wenn audience = "komitee" */
+  tags: string[];
 }
 
 export interface NewEvent {
@@ -26,8 +28,9 @@ export interface NewEvent {
   title: string;
   body: string;
   is_warning: boolean;
-  audience: "all" | "selected";
+  audience: "all" | "selected" | "komitee";
   target_ids: string[];
+  tags: string[];
   poll_multiple: boolean;
   poll_min_one: boolean;
   poll_show_results: boolean;

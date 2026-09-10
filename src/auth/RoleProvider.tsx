@@ -11,6 +11,8 @@ export interface Profile {
   student_id: string | null;
   has_logged_in: boolean;
   chat_banned_until: string | null;
+  chat_ban_permanent?: boolean;
+  is_op?: boolean;
 }
 
 interface RoleCtx {
@@ -26,8 +28,13 @@ interface RoleCtx {
   loginByStudent: Record<string, boolean>;
   banned: boolean;
   bannedUntil: string | null;
+  bannPermanent: boolean;
+  /** Geschütztes Konto (OP) – unantastbar für alle anderen. */
+  isOp: boolean;
+  opUserId: string | null;
   setRole: (userId: string, role: Role) => Promise<void>;
-  setBan: (userId: string, until: string | null) => Promise<void>;
+  /** until = Zeitpunkt oder null; permanent = dauerhafte Sperre. */
+  setBan: (userId: string, until: string | null, permanent?: boolean) => Promise<void>;
   refreshProfiles: () => void;
 }
 
@@ -46,6 +53,8 @@ export function RoleProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(!hasSupabase);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [bannedUntil, setBannedUntil] = useState<string | null>(null);
+  const [bannPerm, setBannPerm] = useState(false);
+  const [isOp, setIsOp] = useState(false);
   const [perms, setPerms] = useState<Set<string>>(new Set());
   const roleRef = useRef<Role>(role);
   const uidRef = useRef<string | undefined>(undefined);
@@ -94,6 +103,8 @@ export function RoleProvider({ children }: { children: ReactNode }) {
           if (row.user_id === uidRef.current) {
             setRoleState(row.role); // eigene Rolle live
             setBannedUntil(row.chat_banned_until ?? null); // Sperre live
+            setBannPerm(Boolean(row.chat_ban_permanent));
+            setIsOp(Boolean(row.is_op));
             void loadPerms(row.role, uidRef.current);
             if (STAFF.includes(row.role)) void loadProfiles(true);
           }
@@ -118,11 +129,17 @@ export function RoleProvider({ children }: { children: ReactNode }) {
         if (alive) setReady(true);
         return;
       }
-      const { data: me } = await supabase!.from("profiles").select("role, chat_banned_until").eq("user_id", uid).maybeSingle();
+      const { data: me } = await supabase!
+        .from("profiles")
+        .select("role, chat_banned_until, chat_ban_permanent, is_op")
+        .eq("user_id", uid)
+        .maybeSingle();
       const r = (me?.role as Role) || "schueler";
       if (!alive) return;
       setRoleState(r);
       setBannedUntil((me?.chat_banned_until as string | null) ?? null);
+      setBannPerm(Boolean((me as { chat_ban_permanent?: boolean } | null)?.chat_ban_permanent));
+      setIsOp(Boolean((me as { is_op?: boolean } | null)?.is_op));
       await loadPerms(r, uid);
       setReady(true);
       void supabase!.from("profiles").update({ has_logged_in: true }).eq("user_id", uid);
@@ -162,20 +179,22 @@ export function RoleProvider({ children }: { children: ReactNode }) {
     [],
   );
 
-  const setBan = useCallback(async (userId: string, until: string | null) => {
+  const setBan = useCallback(async (userId: string, until: string | null, permanent = false) => {
     if (!hasSupabase) return;
-    const { error } = await supabase!.from("profiles").update({ chat_banned_until: until }).eq("user_id", userId);
+    const patch = { chat_banned_until: permanent ? null : until, chat_ban_permanent: permanent };
+    const { error } = await supabase!.from("profiles").update(patch).eq("user_id", userId);
     if (error) {
       alert("Sperre setzen fehlgeschlagen: " + error.message);
       return;
     }
-    setProfiles((prev) => prev.map((p) => (p.user_id === userId ? { ...p, chat_banned_until: until } : p)));
+    setProfiles((prev) => prev.map((p) => (p.user_id === userId ? { ...p, ...patch } : p)));
   }, []);
 
   const isAdmin = role === "admin";
   const isStaff = STAFF.includes(role);
   const can = useCallback((perm: PermKey) => isAdmin || perms.has(perm), [isAdmin, perms]);
-  const banned = bannedUntil != null && new Date(bannedUntil) > new Date();
+  const banned = bannPerm || (bannedUntil != null && new Date(bannedUntil) > new Date());
+  const opUserId = profiles.find((p) => p.is_op)?.user_id ?? (isOp ? (uidRef.current ?? null) : null);
   const loginByStudent: Record<string, boolean> = {};
   for (const p of profiles) if (p.student_id) loginByStudent[p.student_id] = p.has_logged_in;
 
@@ -192,6 +211,9 @@ export function RoleProvider({ children }: { children: ReactNode }) {
     loginByStudent,
     banned,
     bannedUntil,
+    bannPermanent: bannPerm,
+    isOp,
+    opUserId,
     setRole,
     setBan,
     refreshProfiles: () => loadProfiles(isStaff),

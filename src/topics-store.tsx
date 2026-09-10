@@ -40,6 +40,10 @@ export interface TopicItem {
   options: { id: string; label: string }[] | null;
   done: boolean;
   pinned: boolean;
+  /** Umfrage-Einstellungen */
+  poll_multi?: boolean;
+  poll_anon?: boolean;
+  poll_deadline?: string | null;
   author: string;
   author_role: string | null; // Rolle des Autors beim Schreiben (schueler/stufenteam/kassenwart/admin)
   author_koms: string[] | null; // relevante Komitees des Autors (Slugs)
@@ -61,6 +65,8 @@ interface TopicsValue {
   tagMembers: Record<string, string[]>; // tag -> userIds (Komitee)
   myVotes: Record<string, string[]>; // itemId -> optionIds
   voteCounts: Record<string, Record<string, number>>;
+  /** Rohe Stimmen je Beitrag – für nicht-anonyme Abstimmungen (nur sichtbar, wer Profile sieht). */
+  voters: Record<string, { user_id: string; option_id: string }[]>;
   reads: Record<string, string>; // topicId -> last_read ISO
   uid: string;
   ready: boolean;
@@ -72,10 +78,10 @@ interface TopicsValue {
   setUserCommittee: (userId: string, slug: string, on: boolean) => Promise<void>;
   selfAssignCommittee: (slug: string) => Promise<boolean>;
   committeesOf: (userId: string) => string[];
-  postItem: (topic: Topic, type: TopicItemType, body: string, options?: string[], title?: string, meta?: { role?: string | null; koms?: string[] }) => Promise<void>;
+  postItem: (topic: Topic, type: TopicItemType, body: string, options?: string[], title?: string, meta?: { role?: string | null; koms?: string[]; pinned?: boolean; poll?: { multi?: boolean; anon?: boolean; deadline?: string | null } }) => Promise<void>;
   updateItem: (id: string, patch: Partial<Pick<TopicItem, "done" | "pinned">>) => Promise<void>;
   deleteItem: (id: string) => Promise<void>;
-  vote: (itemId: string, optionId: string) => Promise<void>;
+  vote: (itemId: string, optionId: string, multi?: boolean) => Promise<void>;
   markRead: (topicId: string) => void;
   unreadCount: (topicId: string) => number;
 }
@@ -95,6 +101,7 @@ export function TopicsProvider({ children }: { children: ReactNode }) {
   const [tagMembers, setTagMembersState] = useState<Record<string, string[]>>({});
   const [myVotes, setMyVotes] = useState<Record<string, string[]>>({});
   const [voteCounts, setVoteCounts] = useState<Record<string, Record<string, number>>>({});
+  const [voters, setVoters] = useState<Record<string, { user_id: string; option_id: string }[]>>({});
   const [reads, setReads] = useState<Record<string, string>>({});
   const [ready, setReady] = useState(!hasSupabase);
   const uidRef = useRef("local-user");
@@ -124,11 +131,16 @@ export function TopicsProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!hasSupabase) {
       const counts: Record<string, Record<string, number>> = {};
+      const roh: Record<string, { user_id: string; option_id: string }[]> = {};
       for (const [iid, opts] of Object.entries(myVotes)) {
         counts[iid] = {};
-        for (const o of opts) counts[iid][o] = 1;
+        for (const o of opts) {
+          counts[iid][o] = 1;
+          (roh[iid] ||= []).push({ user_id: uidRef.current, option_id: o });
+        }
       }
       setVoteCounts(counts);
+      setVoters(roh);
       saveLocal();
     }
   }, [myVotes, topics, items, members, topicTags, reads, saveLocal]);
@@ -157,13 +169,16 @@ export function TopicsProvider({ children }: { children: ReactNode }) {
     setTagMembersState(gg);
     const mine: Record<string, string[]> = {};
     const counts: Record<string, Record<string, number>> = {};
+    const roh: Record<string, { user_id: string; option_id: string }[]> = {};
     for (const row of v || []) {
       counts[row.item_id] ||= {};
       counts[row.item_id][row.option_id] = (counts[row.item_id][row.option_id] || 0) + 1;
+      (roh[row.item_id] ||= []).push({ user_id: row.user_id, option_id: row.option_id });
       if (row.user_id === uidRef.current) (mine[row.item_id] ||= []).push(row.option_id);
     }
     setMyVotes(mine);
     setVoteCounts(counts);
+    setVoters(roh);
     const rr: Record<string, string> = {};
     for (const row of r || []) if (row.user_id === uidRef.current) rr[row.topic_id] = row.last_read;
     setReads(rr);
@@ -180,8 +195,21 @@ export function TopicsProvider({ children }: { children: ReactNode }) {
         return;
       }
       uidRef.current = data.session.user.id;
-      const { data: prof } = await supabase!.from("profiles").select("username").eq("user_id", uidRef.current).maybeSingle();
+      const { data: prof } = await supabase!
+        .from("profiles")
+        .select("username, student_id")
+        .eq("user_id", uidRef.current)
+        .maybeSingle();
+      // Anzeigename: "Vorname Nachname" (die eigene Zeile darf jeder lesen)
       nameRef.current = prof?.username || "unbekannt";
+      if (prof?.student_id) {
+        const { data: st } = await supabase!
+          .from("students")
+          .select("vorname, nachname")
+          .eq("id", prof.student_id)
+          .maybeSingle();
+        if (st) nameRef.current = `${st.vorname ?? ""} ${st.nachname ?? ""}`.trim() || nameRef.current;
+      }
       await loadAll();
       if (channel) return;
       channel = supabase!
@@ -319,14 +347,18 @@ export function TopicsProvider({ children }: { children: ReactNode }) {
     const item: TopicItem = {
       id: uuid(), topic_id: topic.id, type, title: title.trim(), body: body.trim(),
       options: type === "umfrage" ? (options || []).filter(Boolean).map((label) => ({ id: uuid(), label })) : null,
-      done: false, pinned: false, author: nameRef.current,
+      done: false, pinned: Boolean(meta?.pinned), author: nameRef.current,
+      poll_multi: Boolean(meta?.poll?.multi), poll_anon: Boolean(meta?.poll?.anon),
+      poll_deadline: meta?.poll?.deadline ?? null,
       author_role: meta?.role ?? null, author_koms: meta?.koms?.length ? meta.koms : null,
       created_by: uidRef.current, created_at: new Date().toISOString(),
     };
     if (!hasSupabase) { setItems((p) => [...p, item]); return; }
     const { error } = await supabase!.from("topic_items").insert({
       id: item.id, topic_id: item.topic_id, type: item.type, title: item.title, body: item.body,
-      options: item.options, author: item.author, author_role: item.author_role, author_koms: item.author_koms, created_by: uidRef.current,
+      options: item.options, pinned: item.pinned, author: item.author,
+      poll_multi: item.poll_multi, poll_anon: item.poll_anon, poll_deadline: item.poll_deadline,
+      author_role: item.author_role, author_koms: item.author_koms, created_by: uidRef.current,
     });
     if (error) { alert("Senden fehlgeschlagen: " + error.message); return; }
     // Empfänger: Ordner-Mitglieder + Komitee-Mitglieder (Tag), ohne Autor
@@ -349,14 +381,30 @@ export function TopicsProvider({ children }: { children: ReactNode }) {
     if (hasSupabase) await supabase!.from("topic_items").delete().eq("id", id);
   }, []);
 
-  const vote: TopicsValue["vote"] = useCallback(async (itemId, optionId) => {
-    const had = (stateRef.current.myVotes[itemId] || []).includes(optionId);
+  const vote: TopicsValue["vote"] = useCallback(async (itemId, optionId, multi = false) => {
+    const bisher = stateRef.current.myVotes[itemId] || [];
+    const had = bisher.includes(optionId);
     if (!hasSupabase) {
-      setMyVotes((p) => ({ ...p, [itemId]: had ? [] : [optionId] }));
+      setMyVotes((p) => ({
+        ...p,
+        [itemId]: multi
+          ? had ? bisher.filter((x) => x !== optionId) : [...bisher, optionId]
+          : had ? [] : [optionId],
+      }));
       return;
     }
-    await supabase!.from("topic_votes").delete().eq("item_id", itemId).eq("user_id", uidRef.current);
-    if (!had) await supabase!.from("topic_votes").insert({ item_id: itemId, option_id: optionId, user_id: uidRef.current });
+    if (multi) {
+      // Mehrfachwahl: nur diese eine Option umschalten
+      if (had)
+        await supabase!.from("topic_votes").delete()
+          .eq("item_id", itemId).eq("user_id", uidRef.current).eq("option_id", optionId);
+      else
+        await supabase!.from("topic_votes")
+          .insert({ item_id: itemId, option_id: optionId, user_id: uidRef.current });
+    } else {
+      await supabase!.from("topic_votes").delete().eq("item_id", itemId).eq("user_id", uidRef.current);
+      if (!had) await supabase!.from("topic_votes").insert({ item_id: itemId, option_id: optionId, user_id: uidRef.current });
+    }
     await loadAll();
   }, [loadAll]);
 
@@ -379,7 +427,7 @@ export function TopicsProvider({ children }: { children: ReactNode }) {
   );
 
   const value: TopicsValue = {
-    topics, items, members, topicTags, tagMembers, myVotes, voteCounts, reads, uid: uidRef.current, ready,
+    topics, items, members, topicTags, tagMembers, myVotes, voteCounts, voters, reads, uid: uidRef.current, ready,
     createTopic, updateTopic, deleteTopic, setMembers, setTagMembers, setUserCommittee, selfAssignCommittee, committeesOf, postItem, updateItem, deleteItem, vote, markRead, unreadCount,
   };
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

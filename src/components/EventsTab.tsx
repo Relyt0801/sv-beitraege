@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
 import { useEvents } from "../events-store";
 import { useRole } from "../auth/RoleProvider";
+import { committeeLabel } from "../lib/committees";
+import { UnbanRequests } from "./UnbanRequests";
+import { KomiteeRequests } from "./KomiteeRequests";
 import { TYPE_META, type EventItem } from "../lib/events";
 import { enablePush, pushConfigured, pushPermission } from "../lib/push";
 
@@ -10,6 +13,8 @@ function PushBanner() {
   if (!pushConfigured() || perm === "granted" || perm === "denied" || perm === "unsupported") return null;
   return (
     <div className="mb-3 flex flex-wrap items-center gap-3 rounded-2xl border border-brand/30 bg-brand/5 p-3.5">
+      <UnbanRequests />
+      <KomiteeRequests />
       <span className="text-sm font-medium text-slate-600 dark:text-slate-300">
         🔔 Benachrichtigungen bei neuen Events aufs Gerät bekommen?
       </span>
@@ -105,6 +110,7 @@ function EventCard({
         <span>{e.is_warning ? "⚠️" : meta.icon}</span>
         <span>{e.is_warning ? "Warnung" : meta.label}</span>
         {e.audience === "selected" && <span>· gezielt</span>}
+        {e.audience === "komitee" && <span>· {(e.tags || []).map(committeeLabel).join(", ") || "Komitees"}</span>}
         <span className="ml-auto">{date}</span>
         {canDelete && (
           <button onClick={onDelete} className="ml-1 text-slate-400 hover:text-red-500" aria-label="Löschen">

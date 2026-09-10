@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Sheet } from "./Sheet";
 import { useStore } from "../store";
 import { useRole } from "../auth/RoleProvider";
+import { COMMITTEES, committeeIcon } from "../lib/committees";
 import { useEvents } from "../events-store";
 import { normalize, offenGesamt, sortStudents } from "../lib/logic";
 import { TYPE_META, type EventType } from "../lib/events";
@@ -15,7 +16,8 @@ export function EventComposer({ open, onClose }: { open: boolean; onClose: () =>
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [isWarning, setIsWarning] = useState(false);
-  const [audience, setAudience] = useState<"all" | "selected">("all");
+  const [audience, setAudience] = useState<"all" | "selected" | "komitee">("all");
+  const [tags, setTags] = useState<Set<string>>(new Set());
   const [targets, setTargets] = useState<Set<string>>(new Set());
   const [q, setQ] = useState("");
   const [options, setOptions] = useState<string[]>(["", ""]);
@@ -31,7 +33,7 @@ export function EventComposer({ open, onClose }: { open: boolean; onClose: () =>
 
   function reset() {
     setType("info"); setTitle(""); setBody(""); setIsWarning(false);
-    setAudience("all"); setTargets(new Set()); setQ("");
+    setAudience("all"); setTargets(new Set()); setTags(new Set()); setQ("");
     setOptions(["", ""]); setMultiple(false); setMinOne(true); setShowResults(true);
   }
 
@@ -51,6 +53,7 @@ export function EventComposer({ open, onClose }: { open: boolean; onClose: () =>
       is_warning: type === "nachricht" && isWarning,
       audience,
       target_ids: audience === "selected" ? [...targets] : [],
+      tags: audience === "komitee" ? [...tags] : [],
       poll_multiple: multiple,
       poll_min_one: minOne,
       poll_show_results: showResults,
@@ -137,10 +140,45 @@ export function EventComposer({ open, onClose }: { open: boolean; onClose: () =>
         <button onClick={() => setAudience("all")} className={`${seg} ${audience === "all" ? "bg-brand text-white" : "text-slate-500"}`}>
           Alle
         </button>
+        <button onClick={() => setAudience("komitee")} className={`${seg} ${audience === "komitee" ? "bg-brand text-white" : "text-slate-500"}`}>
+          Komitees
+        </button>
         <button onClick={() => setAudience("selected")} className={`${seg} ${audience === "selected" ? "bg-brand text-white" : "text-slate-500"}`}>
-          Auswahl
+          Personen
         </button>
       </div>
+
+      {audience === "komitee" && (
+        <div className="mb-3 grid gap-1.5 rounded-2xl border border-slate-200 p-2 dark:border-slate-700 sm:grid-cols-2">
+          {COMMITTEES.map((c) => {
+            const on = tags.has(c.slug);
+            return (
+              <button
+                key={c.slug}
+                onClick={() =>
+                  setTags((prev) => {
+                    const n = new Set(prev);
+                    on ? n.delete(c.slug) : n.add(c.slug);
+                    return n;
+                  })
+                }
+                className={`flex items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm font-semibold transition ${
+                  on ? "bg-brand/10 text-brand" : "hover:bg-slate-100 dark:hover:bg-slate-800"
+                }`}
+              >
+                <span className={`flex h-5 w-5 items-center justify-center rounded border text-xs text-white ${on ? "border-brand bg-brand" : "border-slate-300 dark:border-slate-600"}`}>
+                  {on ? "✓" : ""}
+                </span>
+                <span>{committeeIcon(c.slug)}</span>
+                {c.label}
+              </button>
+            );
+          })}
+          <div className="px-2 pt-1 text-xs text-slate-400 sm:col-span-2">
+            {tags.size === 0 ? "Noch kein Komitee gewählt" : `${tags.size} Komitee(s) – alle Mitglieder sehen den Beitrag`}
+          </div>
+        </div>
+      )}
       {type === "nachricht" && canEditBeitrag && (
         <button onClick={selectUnpaid} className="mb-2 text-sm font-semibold text-brand">
           → alle mit offenem Beitrag (bis {settings.aktuelles_halbjahr}) auswählen

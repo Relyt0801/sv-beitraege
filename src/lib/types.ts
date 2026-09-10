@@ -39,6 +39,14 @@ export interface Contribution {
   created_at?: string;
 }
 
+/** Vorlage für typische Beiträge ("Kuchen gebacken", 5 Punkte). */
+export interface ContribTemplate {
+  id: string;
+  titel: string;
+  punkte: number;
+  sort: number;
+}
+
 export const FEE = 25;
 
 export function emptyTerms(): Record<Halbjahr, Term> {

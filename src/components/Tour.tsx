@@ -114,16 +114,18 @@ export function tourSteps(opts: { staff: boolean; ziel: number; zusatz: number }
     return [
       { anchor: "meine-karte", title: "Deine Kasse", text: "Hier steht, wie viel du der Stufenkasse noch schuldest." },
       { anchor: "meine-halbjahre", title: "Die sechs Halbjahre", text: "25 € pro Halbjahr. Grün = bezahlt, blau = erlassen, grau = noch offen." },
-      { anchor: "meine-punkte", title: "Beitragspunkte", text: `Fürs Mithelfen gibt es Punkte. Tippe drauf und du siehst jede Aktion einzeln. Unter ${opts.ziel} Punkten kommen am Ende ${opts.zusatz} € dazu.` },
+      { anchor: "meine-punkte", title: "Beitragspunkte", text: `Fürs Mithelfen gibt es Punkte. Tippe drauf: dort steht jede Aktion einzeln mit ihrem Wert. Unter ${opts.ziel} Punkten kommen am Ende ${opts.zusatz} € dazu.` },
       { anchor: "tab-events", title: "Events", text: "Mitteilungen und Abstimmungen vom Stufenteam. Die rote Zahl heißt: ungelesen." },
-      { anchor: "tab-themen", title: "Chats", text: "Der Chat deines Komitees – und hier stellst du Fragen ans Stufenteam." },
-      { anchor: "einstellungen", title: "Einstellungen", text: "Passwort ändern, Nutzungsbedingungen und diese Einführung noch mal starten." },
+      { anchor: "tab-themen", title: "Chats", text: "Dein Komitee: oben Angepinntes, Abstimmungen und To-dos, darunter der Chat. Hier stellst du auch Fragen ans Stufenteam." },
+      { anchor: "profil", title: "Dein Profil", text: "Profilbild hochladen, Farbe für deinen Namen wählen, Passwort ändern, Komitee-Wechsel beantragen und diese Einführung neu starten." },
     ];
 
   return [
     { anchor: "person", title: "Eine Person", text: "Betrag, Halbjahre und Beitragspunkte auf einen Blick. Antippen öffnet die Person – dort trägst du ihre Beiträge ein." },
+    { anchor: "person", title: "Beiträge eintragen", text: "In der Person auf „Beiträge bearbeiten\": oben stehen Vorlagen wie „Kuchen gebacken +5\" – antippen, fertig. Die Vorlagen kannst du dort auch ändern." },
+    { anchor: "massen", title: "Mehrere gleichzeitig", text: "Personen auswählen und mit „＋ Beitragspunkte\" allen dieselbe Hilfe gutschreiben." },
     { anchor: "einstellungen", title: "Filter & Einstellungen", text: `Suche eingrenzen, Zielpunkte (${opts.ziel}) und Zusatzbetrag (${opts.zusatz} €) setzen, Import/Export.` },
-    { anchor: "massen", title: "Mehrere auf einmal", text: "Personen auswählen und gemeinsam auf bezahlt setzen." },
+    { anchor: "profil", title: "Dein Profil", text: "Profilbild, Namensfarbe, Passwort und diese Einführung." },
     { anchor: "tab-events", title: "Events", text: "Nur euer Team postet hier – und legt fest, wer die Mitteilung bekommt." },
     { anchor: "tab-themen", title: "Chats & Tickets", text: "Alle Komitee-Chats seht ihr. Fragen der Stufe landen als Ticket im Stufenteam-Chat." },
     { anchor: "tab-rollen", title: "Rollen", text: "Wer ist Schüler, Stufenteam, Kassenwart oder Admin." },

@@ -3,6 +3,7 @@ import { hasSupabase, supabase } from "../lib/supabase";
 import { useRole } from "../auth/RoleProvider";
 import { useStore } from "../store";
 import { normalize } from "../lib/logic";
+import { KomiteeZugriff } from "./KomiteeZugriff";
 import { PERM_CATEGORIES, PERM_ROLES, ALL_PERMS, ROLE_DEFAULTS, type PermKey } from "../lib/permissions";
 
 type Matrix = Record<string, Record<string, boolean>>;
@@ -121,7 +122,7 @@ export function PermissionsTab() {
 
       <section className="card p-4">
         <h3 className="font-bold">Einzelne Personen</h3>
-        <p className="mb-3 text-[11px] text-slate-400">Ausnahmen für eine Person – „Standard" folgt der Rolle.</p>
+        <p className="mb-3 text-[11px] text-slate-400">Ausnahmen für eine Person. Ohne Auswahl gilt, was die Rolle erlaubt.</p>
         <input className="field mb-3" placeholder="Person suchen…" value={q} onChange={(e) => setQ(e.target.value)} />
         <div className="space-y-2">
           {rows.map(({ p, name }) => {
@@ -149,9 +150,23 @@ export function PermissionsTab() {
                             <div key={perm.key} className="mb-1.5 flex flex-wrap items-center gap-2">
                               <span className="flex-1 text-sm">{perm.label}</span>
                               <div className="flex gap-1">
-                                <TriBtn active={val === undefined} label={`Standard (${roleHas ? "an" : "aus"})`} onClick={() => setOverride(p.user_id, perm.key, null)} />
-                                <TriBtn active={val === true} tone="green" label="Erlauben" onClick={() => setOverride(p.user_id, perm.key, true)} />
-                                <TriBtn active={val === false} tone="red" label="Verbieten" onClick={() => setOverride(p.user_id, perm.key, false)} />
+                                <TriBtn
+                                  active={val === true}
+                                  tone="green"
+                                  label="Erlauben"
+                                  onClick={() => setOverride(p.user_id, perm.key, val === true ? null : true)}
+                                />
+                                <TriBtn
+                                  active={val === false}
+                                  tone="red"
+                                  label="Verbieten"
+                                  onClick={() => setOverride(p.user_id, perm.key, val === false ? null : false)}
+                                />
+                                {val === undefined && (
+                                  <span className="self-center pl-1 text-[11px] text-slate-400">
+                                    Rolle: {roleHas ? "erlaubt" : "verboten"}
+                                  </span>
+                                )}
                               </div>
                             </div>
                           );
@@ -166,6 +181,8 @@ export function PermissionsTab() {
           {rows.length === 0 && <div className="py-8 text-center text-sm text-slate-400">Keine Person gefunden.</div>}
         </div>
       </section>
+
+      <KomiteeZugriff />
     </div>
   );
 }

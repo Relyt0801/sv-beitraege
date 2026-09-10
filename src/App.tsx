@@ -3,7 +3,8 @@ import { HY } from "./lib/types";
 import { normalize, offenGesamt, offenStufe, sortStudents } from "./lib/logic";
 import { MyKasse } from "./components/MyKasse";
 import { PunkteSheet } from "./components/PunkteSheet";
-import { SettingsSheet } from "./components/SettingsSheet";
+import { ProfilSheet } from "./components/ProfilSheet";
+import { Avatar } from "./components/Avatar";
 import { Tour, tourSteps } from "./components/Tour";
 import { useTheme } from "./lib/theme";
 import { hasSupabase, supabase } from "./lib/supabase";
@@ -15,6 +16,7 @@ import { PasswordGate } from "./auth/PasswordGate";
 import { RoleProvider, useRole } from "./auth/RoleProvider";
 import { Sheet } from "./components/Sheet";
 import { TermsText } from "./components/TermsText";
+import { ProfilesProvider } from "./profiles-store";
 import { EventsProvider, useEvents } from "./events-store";
 import { TopicsProvider, useTopics } from "./topics-store";
 import { ChatsTab } from "./components/ChatsTab";
@@ -33,11 +35,13 @@ export default function App() {
       <TermsGate>
         <PasswordGate>
           <RoleProvider>
+            <ProfilesProvider>
             <EventsProvider>
               <TopicsProvider>
                 <Main />
               </TopicsProvider>
             </EventsProvider>
+            </ProfilesProvider>
           </RoleProvider>
         </PasswordGate>
       </TermsGate>
@@ -51,7 +55,7 @@ function Main() {
   const { students, punkte, settings, ready, mode, reload, setTerm, setSettings, exportData, importData } = useStore();
   const { can, canEditData, canEditBeitrag, canManageRoles, isStaff, ready: roleReady, role, loginByStudent } = useRole();
   const { events: allEvents, reads } = useEvents();
-  const { topics, unreadCount } = useTopics();
+  const { topics, unreadCount, uid } = useTopics();
   const { theme, toggle } = useTheme();
 
   const showTopicsTab = true;
@@ -187,14 +191,16 @@ function Main() {
           <div className="ml-auto flex shrink-0 items-center gap-2">
             {tab === "kasse" && (
               <>
-                <button
-                  data-tour="einstellungen"
-                  className={`iconbtn ${showFilter ? "iconbtn-active" : ""}`}
-                  onClick={() => (teamView ? setShowFilter((v) => !v) : setShowSettings(true))}
-                  aria-label={teamView ? "Filter & Einstellungen" : "Einstellungen"}
-                >
-                  ⚙︎
-                </button>
+                {teamView && (
+                  <button
+                    data-tour="einstellungen"
+                    className={`iconbtn ${showFilter ? "iconbtn-active" : ""}`}
+                    onClick={() => setShowFilter((v) => !v)}
+                    aria-label="Filter & Einstellungen"
+                  >
+                    ⚙︎
+                  </button>
+                )}
                 {teamView && canEditData && (
                   <button
                     data-tour="massen"
@@ -212,6 +218,14 @@ function Main() {
             )}
             <button className="iconbtn" onClick={toggle} aria-label="Hell/Dunkel">
               {theme === "dark" ? "☀" : "☾"}
+            </button>
+            <button
+              data-tour="profil"
+              onClick={() => setShowSettings(true)}
+              className="rounded-full transition active:scale-95"
+              aria-label="Mein Profil"
+            >
+              <Avatar userId={uid} size={40} />
             </button>
           </div>
         </div>
@@ -470,7 +484,7 @@ function Main() {
       <StudentSheet student={openStudent} punkte={punkte[openStudent?.id ?? ""] || 0} onClose={() => setOpenId(null)} />
       <AddSheet open={showAdd} onClose={() => setShowAdd(false)} />
       <EventComposer open={showComposer} onClose={() => setShowComposer(false)} />
-      <SettingsSheet
+      <ProfilSheet
         open={showSettings}
         onClose={() => setShowSettings(false)}
         onTerms={() => {
@@ -480,10 +494,6 @@ function Main() {
         onTutorial={() => {
           setShowSettings(false);
           setShowTour(true);
-        }}
-        onChangePassword={() => {
-          setShowSettings(false);
-          void changePassword();
         }}
       />
       <Tour

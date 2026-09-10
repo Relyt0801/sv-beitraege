@@ -1,10 +1,11 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
-import { HY, type Contribution, type Halbjahr, type Settings, type Status, type Student, newStudent } from "./lib/types";
+import { HY, type ContribTemplate, type Contribution, type Halbjahr, type Settings, type Status, type Student, newStudent } from "./lib/types";
 import { hasSupabase, supabase } from "./lib/supabase";
 
 const LS_STUDENTS = "sv-beitraege:students";
 const LS_SETTINGS = "sv-beitraege:settings";
 const LS_CONTRIB = "sv-beitraege:contributions";
+const LS_TPL = "sv-beitraege:templates";
 
 const DEFAULT_SETTINGS: Settings = { aktuelles_halbjahr: "EF.1", ziel_punkte: 30, zusatz: 25 };
 
@@ -42,7 +43,13 @@ interface StoreValue {
   updateStudent: (id: string, patch: Partial<Student>) => void;
   removeStudent: (id: string) => void;
   setTerm: (id: string, h: Halbjahr, status: Status) => void;
+  templates: ContribTemplate[];
   addContribution: (studentId: string, titel: string, punkte: number, datum?: string) => void;
+  /** Denselben Beitrag mehreren Personen gutschreiben. */
+  addContributionMany: (studentIds: string[], titel: string, punkte: number) => void;
+  addTemplate: (titel: string, punkte: number) => void;
+  updateTemplate: (id: string, patch: Partial<Pick<ContribTemplate, "titel" | "punkte">>) => void;
+  removeTemplate: (id: string) => void;
   updateContribution: (id: string, patch: Partial<Pick<Contribution, "titel" | "punkte" | "datum">>) => void;
   removeContribution: (id: string) => void;
   setSettings: (patch: Partial<Settings>) => void;
@@ -106,6 +113,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const mode: "local" | "supabase" = hasSupabase ? "supabase" : "local";
   const [students, setStudents] = useState<Student[]>([]);
   const [contributions, setContributions] = useState<Contribution[]>([]);
+  const [templates, setTemplates] = useState<ContribTemplate[]>([]);
   const [settings, setSettingsState] = useState<Settings>(DEFAULT_SETTINGS);
   const [ready, setReady] = useState(false);
   const studentsRef = useRef<Student[]>([]);
@@ -121,6 +129,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         if (st) setSettingsState({ ...DEFAULT_SETTINGS, ...JSON.parse(st) });
         const c = localStorage.getItem(LS_CONTRIB);
         if (c) setContributions(JSON.parse(c) as Contribution[]);
+        const tp = localStorage.getItem(LS_TPL);
+        setTemplates(
+          tp
+            ? (JSON.parse(tp) as ContribTemplate[])
+            : [
+                { id: "t1", titel: "Kuchen gebacken", punkte: 5, sort: 10 },
+                { id: "t2", titel: "Kuchenverkauf – Schicht", punkte: 8, sort: 20 },
+                { id: "t3", titel: "Auf-/Abbau bei einer Aktion", punkte: 8, sort: 30 },
+              ],
+        );
       } catch {
         setStudents(seed());
       }
@@ -158,6 +176,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             return next;
           });
         })
+        .on("postgres_changes", { event: "*", schema: "public", table: "contribution_templates" }, () => {
+          void supabase!
+            .from("contribution_templates")
+            .select("*")
+            .order("sort")
+            .then(({ data }) => setTemplates(((data as ContribTemplate[]) || [])));
+        })
         .on("postgres_changes", { event: "*", schema: "public", table: "app_settings" }, (p) => {
           const row = p.new as any;
           if (row)
@@ -175,12 +200,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setReady(false);
       const { data: stu, error: stuErr } = await supabase!.from("students").select("*");
       const { data: con, error: conErr } = await supabase!.from("contributions").select("*").order("datum", { ascending: false });
+      const { data: tpl } = await supabase!.from("contribution_templates").select("*").order("sort");
       const { data: cfg, error: cfgErr } = await supabase!.from("app_settings").select("*").eq("id", 1).maybeSingle();
       if (!alive) return;
       reportErr(stuErr?.message || cfgErr?.message);
       if (conErr && !/does not exist|schema cache/i.test(conErr.message)) reportErr(conErr.message);
       setStudents(((stu as any[]) || []).map(migrate));
       setContributions(((con as Contribution[]) || []));
+      setTemplates(((tpl as ContribTemplate[]) || []));
       if (cfg)
         setSettingsState({
           aktuelles_halbjahr: cfg.aktuelles_halbjahr,
@@ -226,6 +253,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (ready && mode === "local") localStorage.setItem(LS_CONTRIB, JSON.stringify(contributions));
   }, [contributions, ready, mode]);
+  useEffect(() => {
+    if (ready && mode === "local") localStorage.setItem(LS_TPL, JSON.stringify(templates));
+  }, [templates, ready, mode]);
 
   const persist = useCallback(
     async (st: Student) => {
@@ -310,6 +340,59 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             id: c.id, student_id: c.student_id, titel: c.titel, punkte: c.punkte, datum: c.datum,
           }),
         );
+    },
+    [mode],
+  );
+
+  const addContributionMany: StoreValue["addContributionMany"] = useCallback(
+    (studentIds, titel, punkte) => {
+      const datum = new Date().toISOString().slice(0, 10);
+      const neu: Contribution[] = studentIds.map((student_id) => ({
+        id: crypto.randomUUID(),
+        student_id,
+        titel: titel.trim() || "Beitrag",
+        punkte: Math.max(0, Math.round(punkte) || 0),
+        datum,
+      }));
+      if (!neu.length) return;
+      setContributions((prev) => [...neu, ...prev]);
+      if (mode === "supabase")
+        void run(
+          supabase!.from("contributions").insert(
+            neu.map((c) => ({ id: c.id, student_id: c.student_id, titel: c.titel, punkte: c.punkte, datum: c.datum })),
+          ),
+        );
+    },
+    [mode],
+  );
+
+  const addTemplate: StoreValue["addTemplate"] = useCallback(
+    (titel, punkte) => {
+      const t: ContribTemplate = {
+        id: crypto.randomUUID(),
+        titel: titel.trim(),
+        punkte: Math.max(0, Math.round(punkte) || 0),
+        sort: 100,
+      };
+      if (!t.titel) return;
+      setTemplates((prev) => [...prev, t]);
+      if (mode === "supabase") void run(supabase!.from("contribution_templates").insert(t));
+    },
+    [mode],
+  );
+
+  const updateTemplate: StoreValue["updateTemplate"] = useCallback(
+    (id, patch) => {
+      setTemplates((prev) => prev.map((t) => (t.id === id ? { ...t, ...patch } : t)));
+      if (mode === "supabase") void run(supabase!.from("contribution_templates").update(patch).eq("id", id));
+    },
+    [mode],
+  );
+
+  const removeTemplate: StoreValue["removeTemplate"] = useCallback(
+    (id) => {
+      setTemplates((prev) => prev.filter((t) => t.id !== id));
+      if (mode === "supabase") void run(supabase!.from("contribution_templates").delete().eq("id", id));
     },
     [mode],
   );
@@ -411,10 +494,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   for (const c of contributions) punkte[c.student_id] = (punkte[c.student_id] || 0) + c.punkte;
 
   const value: StoreValue = {
-    students, contributions, punkte, settings, ready, mode,
+    students, contributions, templates, punkte, settings, ready, mode,
     reload: () => reloadRef.current?.(),
     addStudent, updateStudent, removeStudent, setTerm,
-    addContribution, updateContribution, removeContribution,
+    addContribution, addContributionMany, updateContribution, removeContribution,
+    addTemplate, updateTemplate, removeTemplate,
     setSettings, massApply, exportData, importData,
   };
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

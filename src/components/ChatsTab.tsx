@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTopics, type Topic } from "../topics-store";
 import { useRole } from "../auth/RoleProvider";
-import { COMMITTEES, committeeLabel } from "../lib/committees";
+import { COMMITTEES, committeeIcon, committeeLabel } from "../lib/committees";
+import { Avatar, NameText } from "./Avatar";
+import { KomiteePage } from "./KomiteePage";
+import { BannHinweis } from "./BannHinweis";
 import { TopicsTab } from "./TopicsTab";
 
 const TEAM_CHAT_TITLE = "Stufenteam";
@@ -68,7 +71,12 @@ export function ChatsTab() {
     );
 
   const offen = topics.find((t) => t.id === openId) ?? null;
-  if (offen) return <ChatPage topic={offen} onBack={() => setOpenId(null)} />;
+  if (offen)
+    return offen.kind === "chat" && offen.tag ? (
+      <KomiteePage topic={offen} onBack={() => setOpenId(null)} />
+    ) : (
+      <ChatPage topic={offen} onBack={() => setOpenId(null)} />
+    );
 
   const reihenfolge = new Map(COMMITTEES.map((c, i) => [c.slug, i]));
   const komiteeChats = chats
@@ -100,7 +108,7 @@ export function ChatsTab() {
               <ChatCard
                 key={t.id}
                 titel={committeeLabel(t.tag)}
-                icon="💬"
+                icon={committeeIcon(t.tag)}
                 unread={unreadCount(t.id)}
                 mine={meineKoms.includes(t.tag)}
                 onOpen={() => setOpenId(t.id)}
@@ -248,7 +256,7 @@ function TicketForm({
 /** Chat-Ansicht: Nachrichten von unten nach oben, ein Eingabefeld, sonst nichts. */
 function ChatPage({ topic, onBack }: { topic: Topic; onBack: () => void }) {
   const { items, postItem, deleteItem, markRead, uid, committeesOf, updateTopic } = useTopics();
-  const { role, can, isStaff, profiles, banned, bannedUntil } = useRole();
+  const { role, can, isStaff, profiles, banned } = useRole();
   const darfLoeschen = can("chats.delete_messages");
   const [text, setText] = useState("");
   const ende = useRef<HTMLDivElement | null>(null);
@@ -307,16 +315,14 @@ function ChatPage({ topic, onBack }: { topic: Topic; onBack: () => void }) {
           return (
             <div key={m.id} className={`flex ${meins ? "justify-end" : "justify-start"}`}>
               <div
-                className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 ${
+                className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 sm:max-w-[70%] lg:max-w-[55%] ${
                   meins ? "bg-brand text-white" : "bg-white shadow-card dark:bg-slate-900 dark:shadow-cardDark"
                 }`}
               >
                 {!meins && (
-                  <div className="mb-0.5 text-[11px] font-bold text-slate-400">
-                    {m.author || nameVon(m.created_by)}
-                    {m.author_role && m.author_role !== "schueler" && (
-                      <span className="ml-1.5 rounded-full bg-brand/15 px-1.5 py-0.5 text-[10px] text-brand">Team</span>
-                    )}
+                  <div className="mb-1 flex items-center gap-1.5">
+                    <Avatar userId={m.created_by} name={m.author} size={20} />
+                    <NameText userId={m.created_by} name={m.author || nameVon(m.created_by)} className="text-[11px] font-bold" />
                   </div>
                 )}
                 <div className="whitespace-pre-wrap break-words text-[15px] leading-snug">{m.body}</div>
@@ -339,8 +345,8 @@ function ChatPage({ topic, onBack }: { topic: Topic; onBack: () => void }) {
       </div>
 
       {banned ? (
-        <div className="sticky bottom-[calc(env(safe-area-inset-bottom)+3.9rem)] rounded-2xl bg-red-500/10 p-3 text-center text-sm font-semibold text-red-500">
-          Du bist bis {bannedUntil ? new Date(bannedUntil).toLocaleString("de-DE") : "auf Weiteres"} gesperrt.
+        <div className="sticky bottom-[calc(env(safe-area-inset-bottom)+3.9rem)]">
+          <BannHinweis />
         </div>
       ) : (
         <div className="sticky bottom-[calc(env(safe-area-inset-bottom)+3.9rem)] -mx-3 flex items-end gap-2 border-t border-slate-200 bg-slate-50/95 px-3 py-2 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95 sm:-mx-5 sm:px-5">

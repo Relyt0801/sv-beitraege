@@ -22,10 +22,11 @@ export function PunkteSheet({
   open: boolean;
   onClose: () => void;
 }) {
-  const { contributions, addContribution, updateContribution, removeContribution } = useStore();
+  const { contributions, templates, addContribution, updateContribution, removeContribution, addTemplate, updateTemplate, removeTemplate } = useStore();
   const [addOpen, setAddOpen] = useState(false);
   const [titel, setTitel] = useState("");
   const [punkte, setPunkte] = useState("5");
+  const [tplOpen, setTplOpen] = useState(false);
 
   if (!student) return null;
   const list = contributions
@@ -96,6 +97,32 @@ export function PunkteSheet({
         <div className="mt-4">
           {addOpen ? (
             <div className="rounded-2xl border border-brand/40 bg-brand/5 p-3">
+              {/* Vorlagen: ein Tipp genügt für die typischen Sachen */}
+              {templates.length > 0 && (
+                <div className="mb-2.5">
+                  <div className="mb-1.5 text-[11px] font-bold uppercase tracking-wide text-slate-400">Vorlagen</div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {templates.map((t) => (
+                      <button
+                        key={t.id}
+                        onClick={() => {
+                          setTitel(t.titel);
+                          setPunkte(String(t.punkte));
+                        }}
+                        className="rounded-full border border-brand/40 bg-white px-2.5 py-1 text-[13px] font-semibold text-brand dark:bg-slate-900"
+                      >
+                        {t.titel} <span className="opacity-60">+{t.punkte}</span>
+                      </button>
+                    ))}
+                    <button
+                      onClick={() => setTplOpen(true)}
+                      className="rounded-full border border-dashed border-slate-300 px-2.5 py-1 text-[13px] font-semibold text-slate-400 dark:border-slate-600"
+                    >
+                      ✎ Vorlagen bearbeiten
+                    </button>
+                  </div>
+                </div>
+              )}
               <input
                 className="field mb-2"
                 autoFocus
@@ -142,6 +169,44 @@ export function PunkteSheet({
       <button className="btn-primary mt-5" onClick={onClose}>
         Fertig
       </button>
+
+      {tplOpen && (
+        <div className="mt-4 rounded-2xl border border-slate-200 p-3 dark:border-slate-700">
+          <div className="mb-2 flex items-center gap-2">
+            <span className="flex-1 text-sm font-bold">Vorlagen verwalten</span>
+            <button onClick={() => setTplOpen(false)} className="text-sm font-semibold text-slate-400">
+              fertig
+            </button>
+          </div>
+          <div className="grid gap-1.5">
+            {templates.map((t) => (
+              <div key={t.id} className="flex items-center gap-2">
+                <input
+                  className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-800"
+                  value={t.titel}
+                  onChange={(e) => updateTemplate(t.id, { titel: e.target.value })}
+                />
+                <input
+                  type="number"
+                  min={0}
+                  className="w-16 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-center text-sm dark:border-slate-700 dark:bg-slate-800"
+                  value={t.punkte}
+                  onChange={(e) => updateTemplate(t.id, { punkte: Number(e.target.value) || 0 })}
+                />
+                <button onClick={() => confirm(`Vorlage „${t.titel}" löschen?`) && removeTemplate(t.id)} className="text-slate-400">
+                  🗑
+                </button>
+              </div>
+            ))}
+          </div>
+          <button
+            onClick={() => addTemplate("Neue Vorlage", 5)}
+            className="mt-2 w-full rounded-xl border border-dashed border-brand/50 py-2 text-sm font-bold text-brand"
+          >
+            ＋ Vorlage
+          </button>
+        </div>
+      )}
     </Sheet>
   );
 }

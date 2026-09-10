@@ -45,7 +45,7 @@ export function MyKasse({
 
   return (
     <>
-      <div className="card p-5" data-tour="meine-karte">
+      <div className="card mx-auto max-w-2xl p-5 sm:p-6" data-tour="meine-karte">
         <div className="text-sm text-slate-500">Deine Stufenkasse</div>
         <div className="mt-0.5 text-xl font-bold leading-tight">
           {student.vorname} {student.nachname}
