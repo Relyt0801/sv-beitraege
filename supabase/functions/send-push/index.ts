@@ -61,7 +61,13 @@ Deno.serve(async (req) => {
 
     const { data: subs, error: subErr } = await supabase.from("push_subscriptions").select("*").in("user_id", userIds);
     console.log("Push-Abos gefunden:", subs?.length || 0, subErr ? "Fehler: " + subErr.message : "");
-    const payload = JSON.stringify({ title, body: body.slice(0, 120), url: "/" });
+    // tag: Meldungen zum selben Event ersetzen sich, statt sich zu stapeln.
+    const payload = JSON.stringify({
+      title,
+      body: body.slice(0, 120),
+      url: "./",
+      tag: event_id ? `event-${event_id}` : undefined,
+    });
 
     let sent = 0;
     await Promise.all(

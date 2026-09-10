@@ -1,10 +1,37 @@
+# ── Build / Abhängigkeiten ────────────────────────────────────
 node_modules
 dist
 dist-ssr
 *.local
-.env
-.env.*
-!.env.example
 .DS_Store
 .vscode/*
 !.vscode/extensions.json
+
+# ── Secrets ───────────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+service-role*
+*vapid*private*
+
+# ── VERTRAULICH: Personendaten der Stufe ──────────────────────
+# Alles Vertrauliche gehört in privat/ (wird komplett ignoriert).
+privat/
+/**/privat/
+
+# Sicherheitsnetz: Alt-Pfade im Projektstamm, falls doch dort erzeugt.
+accounts.csv
+kontakte.csv
+nachrichten.html
+zettel.html
+whatsapp-versand.html
+daten.json
+stufenkasse-export*.json
+*-export.json
+*.csv
+
+# Supabase CLI (Projekt-Refs, lokale Zustände)
+supabase/.temp/
+supabase/.branches/

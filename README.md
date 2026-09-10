@@ -45,6 +45,22 @@ gut zum Ausprobieren.
 - Environment Variables setzen: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_ACCESS_CODE`.
 - Build Command `npm run build`, Output `dist`.
 
+## Vertrauliche Daten (Personendaten)
+
+**Regel: Personenbezogene Daten leben in der Datenbank (Supabase), nie im Repo.**
+
+- Alle Skripte lesen und schreiben Arbeitskopien ausschliesslich in `privat/`
+  (`accounts.csv`, `kontakte.csv`, `nachrichten.html`, `zettel.html`,
+  `whatsapp-versand.html`, Exporte). Der Ordner ist per `.gitignore` ausgeschlossen.
+- Ein Pre-Commit-Hook blockiert zusaetzlich Commits mit solchen Dateien oder mit
+  Secrets im Diff (Service-Role-Key, JWT, VAPID-Private-Key).
+- **Nach dem Klonen einmalig aktivieren:**
+  ```bash
+  git config core.hooksPath .githooks
+  ```
+- Arbeitskopien nach dem Verteilen der Zugangsdaten wieder loeschen.
+- `.env` ist ignoriert; nur `.env.example` (ohne Werte) gehoert ins Repo.
+
 ## Sicherheit / Datenschutz
 - Daten von Minderjährigen → Supabase in EU-Region, Datenminimierung (nur Name + Beträge/Beteiligung).
 - RLS: nur eingeloggte Nutzer haben Zugriff.
