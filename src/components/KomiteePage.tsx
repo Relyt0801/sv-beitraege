@@ -29,7 +29,9 @@ export function KomiteePage({ topic, onBack }: { topic: Topic; onBack: () => voi
   const todos = alle.filter((i) => i.type === "todo");
   const chat = alle.filter((i) => i.type === "nachricht" && !i.pinned);
 
-  useEffect(() => markRead(topic.id), [topic.id, alle.length, markRead]);
+  useEffect(() => {
+    markRead(topic.id);
+  }, [topic.id, alle.length, markRead]);
 
   const titel = topic.tag ? committeeLabel(topic.tag) : topic.title;
   const icon = topic.tag ? committeeIcon(topic.tag) : "💬";
@@ -209,7 +211,7 @@ function UmfrageKarte({
       </div>
 
       <div className="mt-3 grid gap-1.5">
-        {(item.options || []).map((o) => {
+        {(Array.isArray(item.options) ? item.options : []).map((o) => {
           const n = counts[o.id] || 0;
           const pct = gesamt ? Math.round((n / gesamt) * 100) : 0;
           const gewaehlt = meine.includes(o.id);
@@ -262,7 +264,9 @@ function ChatBereich({
   const [text, setText] = useState("");
   const ende = useRef<HTMLDivElement | null>(null);
 
-  useEffect(() => ende.current?.scrollIntoView({ block: "end" }), [liste.length]);
+  useEffect(() => {
+    ende.current?.scrollIntoView({ block: "end" });
+  }, [liste.length]);
 
   async function senden() {
     if (!text.trim()) return;
@@ -278,14 +282,18 @@ function ChatBereich({
         {liste.map((m) => {
           const meins = m.created_by === uid;
           return (
-            <div key={m.id} className={`flex ${meins ? "justify-end" : "justify-start"}`}>
+            <div key={m.id} className={`flex flex-col ${meins ? "items-end" : "items-start"}`}>
+              <div className={`mb-1 flex items-center gap-1.5 ${meins ? "flex-row-reverse" : ""}`}>
+                <Avatar userId={m.created_by} name={m.author} size={20} />
+                <PersonName
+                  userId={m.created_by}
+                  name={m.author}
+                  role={m.author_role}
+                  koms={m.author_koms}
+                  className="text-[11px] font-bold"
+                />
+              </div>
               <div className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 sm:max-w-[70%] lg:max-w-[55%] ${meins ? "bg-brand text-white" : "bg-white shadow-card dark:bg-slate-900 dark:shadow-cardDark"}`}>
-                {!meins && (
-                  <div className="mb-1 flex items-center gap-1.5">
-                    <Avatar userId={m.created_by} name={m.author} size={20} />
-                    <PersonName userId={m.created_by} name={m.author} role={m.author_role} koms={m.author_koms} className="text-[11px] font-bold" />
-                  </div>
-                )}
                 <div className="whitespace-pre-wrap break-words text-[15px] leading-snug">{m.body}</div>
                 <div className={`mt-1 text-right text-[10px] ${meins ? "text-white/70" : "text-slate-400"}`}>
                   {new Date(m.created_at).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })}

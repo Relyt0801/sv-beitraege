@@ -37,6 +37,8 @@ export const committeeIcon = (slug: string): string => iconBySlug.get(slug) || "
  */
 export function personIcon(role?: string | null, koms?: string[] | null): string {
   if (role && ROLE_ICON[role]) return ROLE_ICON[role];
-  const first = koms?.find((k) => iconBySlug.has(k));
+  // koms kann aus der Datenbank auch mal kein Array sein – dann nicht abstürzen.
+  const liste = Array.isArray(koms) ? koms : [];
+  const first = liste.find((k) => iconBySlug.has(k));
   return first ? iconBySlug.get(first)! : "🙂";
 }

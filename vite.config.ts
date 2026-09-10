@@ -7,6 +7,9 @@ declare const process: { env: Record<string, string | undefined> };
 // base = "/" für Vercel/eigene Domain; für GitHub Pages "/sv-beitraege/"
 // (wird im Deploy-Workflow via BASE_PATH gesetzt).
 export default defineConfig({
+  // Sourcemaps: im Fehlerfall steht die echte Datei/Zeile in der Meldung
+  // statt minifiziertem Kauderwelsch wie "n is not a function".
+  build: { sourcemap: true },
   base: process.env.BASE_PATH || "/",
   plugins: [
     react(),

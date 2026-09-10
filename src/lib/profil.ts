@@ -36,7 +36,7 @@ export const NAME_FARBEN: NamensFarbe[] = [
   { key: "braun", label: "Braun", hell: "#92400e", dunkel: "#d6bfa6" },
   { key: "grau", label: "Grau", hell: "#475569", dunkel: "#cbd5e1" },
   { key: "weiss", label: "Weiß", hell: "#ffffff", dunkel: "#ffffff", schrift: "#1f2937", kontur: true },
-  { key: "schwarz", label: "Schwarz", hell: "#0f172a", dunkel: "#0f172a", kontur: true, stufe: "team" },
+  { key: "schwarz", label: "Schwarz", hell: "#0f172a", dunkel: "#1e293b", kontur: true, stufe: "team" },
   { key: "magenta", label: "Magenta", hell: "#c026d3", dunkel: "#f0abfc", stufe: "op" },
 ];
 
@@ -50,6 +50,20 @@ export function farbe(key: string | null | undefined): NamensFarbe {
 export function farbwert(key: string | null | undefined, dunkel: boolean): string {
   const f = farbe(key);
   return dunkel ? f.dunkel : f.hell;
+}
+
+/**
+ * Lesbare Schriftfarbe auf einem Untergrund – rechnet die Helligkeit aus,
+ * damit Initialen weder auf Schwarz noch auf Weiß untergehen.
+ */
+export function schriftAuf(hex: string): string {
+  const h = hex.replace("#", "");
+  const r = parseInt(h.slice(0, 2), 16) / 255;
+  const g = parseInt(h.slice(2, 4), 16) / 255;
+  const b = parseInt(h.slice(4, 6), 16) / 255;
+  const kanal = (c: number) => (c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4));
+  const L = 0.2126 * kanal(r) + 0.7152 * kanal(g) + 0.0722 * kanal(b);
+  return L > 0.45 ? "#111827" : "#ffffff";
 }
 
 /** Kontur für Weiß auf Hell bzw. Schwarz auf Dunkel, sonst nichts. */

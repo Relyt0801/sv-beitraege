@@ -313,18 +313,22 @@ function ChatPage({ topic, onBack }: { topic: Topic; onBack: () => void }) {
         {liste.map((m) => {
           const meins = m.created_by === uid;
           return (
-            <div key={m.id} className={`flex ${meins ? "justify-end" : "justify-start"}`}>
+            <div key={m.id} className={`flex flex-col ${meins ? "items-end" : "items-start"}`}>
+              <div className={`mb-1 flex items-center gap-1.5 ${meins ? "flex-row-reverse" : ""}`}>
+                <Avatar userId={m.created_by} name={m.author} size={20} />
+                <PersonName
+                  userId={m.created_by}
+                  name={m.author || nameVon(m.created_by)}
+                  role={m.author_role}
+                  koms={m.author_koms}
+                  className="text-[11px] font-bold"
+                />
+              </div>
               <div
                 className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 sm:max-w-[70%] lg:max-w-[55%] ${
                   meins ? "bg-brand text-white" : "bg-white shadow-card dark:bg-slate-900 dark:shadow-cardDark"
                 }`}
               >
-                {!meins && (
-                  <div className="mb-1 flex items-center gap-1.5">
-                    <Avatar userId={m.created_by} name={m.author} size={20} />
-                    <PersonName userId={m.created_by} name={m.author || nameVon(m.created_by)} role={m.author_role} koms={m.author_koms} className="text-[11px] font-bold" />
-                  </div>
-                )}
                 <div className="whitespace-pre-wrap break-words text-[15px] leading-snug">{m.body}</div>
                 <div className={`mt-1 text-right text-[10px] ${meins ? "text-white/70" : "text-slate-400"}`}>
                   {new Date(m.created_at).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })}

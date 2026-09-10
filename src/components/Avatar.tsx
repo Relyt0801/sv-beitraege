@@ -1,5 +1,5 @@
 import { useProfiles } from "../profiles-store";
-import { farbe as farbeVon, farbKontur, farbwert, initialen as initialenVon, lesbarerName } from "../lib/profil";
+import { farbe as farbeVon, farbKontur, farbwert, initialen as initialenVon, lesbarerName, schriftAuf } from "../lib/profil";
 import { personIcon } from "../lib/committees";
 import { useTheme } from "../lib/theme";
 
@@ -41,7 +41,7 @@ export function Avatar({
       } ${onClick ? "transition active:scale-95" : ""}`}
     >
       <span
-        style={{ fontSize: Math.round(size * 0.4), color: f.schrift || (dunkel ? "#0f172a" : "#ffffff") }}
+        style={{ fontSize: Math.round(size * 0.4), color: schriftAuf(dunkel ? f.dunkel : f.hell) }}
         className="font-extrabold leading-none"
       >
         {kurz}

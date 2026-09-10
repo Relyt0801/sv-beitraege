@@ -30,6 +30,7 @@ export function ProfilSheet({
   const [wunsch, setWunsch] = useState("");
   const [grund, setGrund] = useState("");
   const [antragOffen, setAntragOffen] = useState(false);
+  const [farbFehler, setFarbFehler] = useState("");
   const [hatAntrag, setHatAntrag] = useState(false);
 
   const meine = committeesOf(uid);
@@ -86,7 +87,16 @@ export function ProfilSheet({
               title={f.label}
               onClick={async () => {
                 aktualisiere({ farbe: f.key });
-                await speichereProfil({ farbe: f.key });
+                setFarbFehler("");
+                const r = await speichereProfil({ farbe: f.key });
+                if (!r.ok) {
+                  setFarbFehler(
+                    /public_profiles|does not exist|schema cache/i.test(r.error || "")
+                      ? "Farbe konnte nicht gespeichert werden – in der Datenbank fehlt noch profile.sql."
+                      : "Farbe konnte nicht gespeichert werden: " + r.error,
+                  );
+                  return;
+                }
                 neuLaden();
               }}
               style={{
@@ -100,6 +110,12 @@ export function ProfilSheet({
           );
         })}
       </div>
+
+      {farbFehler && (
+        <div className="mb-4 rounded-xl bg-red-500/10 px-3 py-2 text-[13px] font-semibold text-red-500">
+          {farbFehler}
+        </div>
+      )}
 
       {/* Komitee-Wechsel */}
       {!isStaff && (
