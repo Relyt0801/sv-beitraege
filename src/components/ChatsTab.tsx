@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useTopics, type Topic } from "../topics-store";
 import { useRole } from "../auth/RoleProvider";
 import { COMMITTEES, committeeIcon, committeeLabel } from "../lib/committees";
-import { Avatar, NameText } from "./Avatar";
+import { Avatar, PersonName } from "./Avatar";
 import { KomiteePage } from "./KomiteePage";
 import { BannHinweis } from "./BannHinweis";
 import { TopicsTab } from "./TopicsTab";
@@ -322,7 +322,7 @@ function ChatPage({ topic, onBack }: { topic: Topic; onBack: () => void }) {
                 {!meins && (
                   <div className="mb-1 flex items-center gap-1.5">
                     <Avatar userId={m.created_by} name={m.author} size={20} />
-                    <NameText userId={m.created_by} name={m.author || nameVon(m.created_by)} className="text-[11px] font-bold" />
+                    <PersonName userId={m.created_by} name={m.author || nameVon(m.created_by)} role={m.author_role} koms={m.author_koms} className="text-[11px] font-bold" />
                   </div>
                 )}
                 <div className="whitespace-pre-wrap break-words text-[15px] leading-snug">{m.body}</div>

@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { Sheet } from "./Sheet";
 import { Avatar } from "./Avatar";
+import { personIcon } from "../lib/committees";
 import { useProfiles } from "../profiles-store";
 import { useTopics } from "../topics-store";
 import { useRole } from "../auth/RoleProvider";
 import { hasSupabase, supabase } from "../lib/supabase";
-import { NAME_FARBEN, farbwert, speichereProfil } from "../lib/profil";
+import { farbKontur, farbwert, lesbarerName, speichereProfil, waehlbareFarben } from "../lib/profil";
 import { SELECTABLE_COMMITTEES, committeeIcon, committeeLabel } from "../lib/committees";
 import { ladeKomiteeAntraege, stelleKomiteeAntrag } from "../lib/komitee-antrag";
 import { useTheme } from "../lib/theme";
@@ -24,7 +25,7 @@ export function ProfilSheet({
 }) {
   const { mein, uid, aktualisiere, neuLaden } = useProfiles();
   const { committeesOf } = useTopics();
-  const { isStaff } = useRole();
+  const { isStaff, isOp, role } = useRole();
   const { theme } = useTheme();
   const [wunsch, setWunsch] = useState("");
   const [grund, setGrund] = useState("");
@@ -62,8 +63,11 @@ export function ProfilSheet({
       <div className="mb-5 flex items-center gap-4">
         <Avatar userId={uid} size={64} />
         <div className="min-w-0 flex-1">
-          <div className="truncate text-lg font-bold" style={{ color: farbwert(mein?.farbe, theme === "dark") }}>
-            {mein?.anzeigename || "Dein Name"}
+          <div
+            className="truncate text-lg font-bold"
+            style={{ color: farbwert(mein?.farbe, theme === "dark"), textShadow: farbKontur(mein?.farbe, theme === "dark") }}
+          >
+            {personIcon(role, meine)} | {lesbarerName(mein?.anzeigename || "") || "Dein Name"}
           </div>
           <div className="text-[12px] text-slate-400">
             {meine.length ? meine.map(committeeLabel).join(", ") : "noch kein Komitee"}
@@ -74,7 +78,7 @@ export function ProfilSheet({
       {/* Farbe */}
       <div className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-400">Farbe deines Namens</div>
       <div className="mb-5 grid max-w-sm grid-cols-8 gap-2 sm:gap-2.5">
-        {NAME_FARBEN.map((f) => {
+        {waehlbareFarben({ staff: isStaff, op: isOp }).map((f) => {
           const aktiv = (mein?.farbe || "indigo") === f.key;
           return (
             <button
@@ -85,7 +89,10 @@ export function ProfilSheet({
                 await speichereProfil({ farbe: f.key });
                 neuLaden();
               }}
-              style={{ backgroundColor: theme === "dark" ? f.dunkel : f.hell }}
+              style={{
+                backgroundColor: theme === "dark" ? f.dunkel : f.hell,
+                border: f.kontur ? "1px solid rgba(100,116,139,.5)" : undefined,
+              }}
               className={`aspect-square w-full rounded-full transition active:scale-90 ${
                 aktiv ? "ring-2 ring-slate-900 ring-offset-2 dark:ring-white dark:ring-offset-slate-900" : ""
               }`}

@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { hasSupabase, supabase } from "./lib/supabase";
 import { pushToUsers } from "./lib/push";
+import { lesbarerName } from "./lib/profil";
 
 export type TopicItemType = "nachricht" | "todo" | "umfrage";
 
@@ -201,7 +202,7 @@ export function TopicsProvider({ children }: { children: ReactNode }) {
         .eq("user_id", uidRef.current)
         .maybeSingle();
       // Anzeigename: "Vorname Nachname" (die eigene Zeile darf jeder lesen)
-      nameRef.current = prof?.username || "unbekannt";
+      nameRef.current = lesbarerName(prof?.username || "") || "unbekannt";
       if (prof?.student_id) {
         const { data: st } = await supabase!
           .from("students")

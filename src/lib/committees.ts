@@ -19,7 +19,7 @@ export const COMMITTEES: { slug: string; label: string; icon: string; teamOnly?:
 /** Emoji je Rolle – sticht das Komitee-Emoji. */
 export const ROLE_ICON: Record<string, string> = {
   admin: "💻",
-  kassenwart: "👑",
+  kassenwart: "💸",
   stufenteam: "👑",
 };
 

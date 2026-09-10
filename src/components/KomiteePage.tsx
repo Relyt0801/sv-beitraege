@@ -3,7 +3,7 @@ import { useTopics, type Topic, type TopicItem } from "../topics-store";
 import { useRole } from "../auth/RoleProvider";
 import { useStore } from "../store";
 import { committeeIcon, committeeLabel } from "../lib/committees";
-import { Avatar, NameText } from "./Avatar";
+import { Avatar, PersonName } from "./Avatar";
 import { BannHinweis } from "./BannHinweis";
 import { Sheet } from "./Sheet";
 
@@ -67,7 +67,10 @@ export function KomiteePage({ topic, onBack }: { topic: Topic; onBack: () => voi
           <Abschnitt titel="Angepinnt" icon="📌" leer="Nichts angepinnt.">
             {pins.map((p) => (
               <div key={p.id} className="card flex items-start gap-2 p-3">
-                <span className="min-w-0 flex-1 text-[15px] font-semibold">{p.body}</span>
+                <div className="min-w-0 flex-1">
+                  <div className="text-[15px] font-semibold">{p.body}</div>
+                  <PersonName userId={p.created_by} name={p.author} role={p.author_role} koms={p.author_koms} className="text-[11px] font-semibold" />
+                </div>
                 {(p.created_by === uid || darfLoeschen) && (
                   <button onClick={() => confirm("Loslösen?") && updateItem(p.id, { pinned: false })} className="text-slate-400">
                     ✕
@@ -100,7 +103,7 @@ export function KomiteePage({ topic, onBack }: { topic: Topic; onBack: () => voi
                 <span className={`min-w-0 flex-1 text-[15px] ${t.done ? "text-slate-400 line-through" : "font-semibold"}`}>
                   {t.body}
                 </span>
-                <span className="shrink-0 text-[11px] text-slate-400">{t.author}</span>
+                <PersonName userId={t.created_by} name={t.author} role={t.author_role} koms={t.author_koms} className="shrink-0 text-[11px] font-semibold" />
               </button>
             ))}
           </Abschnitt>
@@ -196,7 +199,7 @@ function UmfrageKarte({
         </div>
         <span className="flex shrink-0 items-center gap-1.5 text-[11px] text-slate-400">
           <Avatar userId={item.created_by} name={item.author} size={20} />
-          <NameText userId={item.created_by} name={item.author} className="font-semibold" />
+          <PersonName userId={item.created_by} name={item.author} role={item.author_role} koms={item.author_koms} className="font-semibold" />
         </span>
         {kannLoeschen && (
           <button onClick={() => confirm("Abstimmung löschen?") && onDelete()} className="shrink-0 text-slate-400">
@@ -280,7 +283,7 @@ function ChatBereich({
                 {!meins && (
                   <div className="mb-1 flex items-center gap-1.5">
                     <Avatar userId={m.created_by} name={m.author} size={20} />
-                    <NameText userId={m.created_by} name={m.author} className="text-[11px] font-bold" />
+                    <PersonName userId={m.created_by} name={m.author} role={m.author_role} koms={m.author_koms} className="text-[11px] font-bold" />
                   </div>
                 )}
                 <div className="whitespace-pre-wrap break-words text-[15px] leading-snug">{m.body}</div>

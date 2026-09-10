@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { hasSupabase, supabase } from "./lib/supabase";
-import { initialen as initialenVon, type PublicProfile } from "./lib/profil";
+import { initialen as initialenVon, lesbarerName, type PublicProfile } from "./lib/profil";
 import { useStore } from "./store";
 
 interface ProfilesValue {
@@ -71,15 +71,26 @@ export function ProfilesProvider({ children }: { children: ReactNode }) {
     const vorhanden = profile[uid];
     if (vorhanden?.anzeigename) return;
     void (async () => {
-      const { data: prof } = await supabase!.from("profiles").select("student_id, username").eq("user_id", uid).maybeSingle();
-      let name = (prof?.username as string) || "";
+      const { data: prof } = await supabase!
+        .from("profiles")
+        .select("student_id, username, is_op")
+        .eq("user_id", uid)
+        .maybeSingle();
+      // Nutzernamen wie "adams.tyler" umdrehen, sonst stünde dort "AT" statt "TA"
+      let name = lesbarerName((prof?.username as string) || "");
       const sid = prof?.student_id as string | undefined;
       const st = sid ? students.find((x) => x.id === sid) : null;
       if (st) name = `${st.vorname} ${st.nachname}`.trim();
       if (!name) return;
       angelegt.current = true;
+      const istOp = Boolean((prof as { is_op?: boolean } | null)?.is_op);
       await supabase!.from("public_profiles").upsert(
-        { user_id: uid, anzeigename: name, initialen: initialenVon(name), farbe: vorhanden?.farbe || "indigo" },
+        {
+          user_id: uid,
+          anzeigename: name,
+          initialen: initialenVon(name),
+          farbe: vorhanden?.farbe || (istOp ? "magenta" : "indigo"),
+        },
         { onConflict: "user_id" },
       );
       void laden();
