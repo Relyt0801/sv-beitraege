@@ -5,16 +5,20 @@ import { Sheet } from "./Sheet";
 import { normalize } from "../lib/logic";
 import { COMMITTEES, committeeLabel } from "../lib/committees";
 
-const VIS: { v: Visibility; label: string }[] = [
-  { v: "privat", label: "Nur ich" },
-  { v: "personen", label: "Bestimmte Personen" },
-  { v: "stufenteam", label: "Stufenteam" },
-  { v: "komitee", label: "Komitee" },
-];
+const PERMANENT_UNTIL = "2099-12-31T00:00:00.000Z";
+
+const VIS_LABEL: Record<Visibility, string> = {
+  privat: "Nur ich",
+  stufenteam: "Stufenteam",
+  personen: "Bestimmte Personen",
+  komitee: "Komitee",
+  custom: "Ausgewählte Personen / Komitees",
+};
 
 export function TopicsTab() {
   const { topics, ready, unreadCount } = useTopics();
-  const { canEditData } = useRole();
+  const { can } = useRole();
+  const canEditData = can("chats.manage");
   const [stack, setStack] = useState<string[]>([]);
   const [createParent, setCreateParent] = useState<{ parentId: string | null; tag: string } | null>(null);
 
@@ -119,28 +123,61 @@ function FolderCard({ t, unread, subCount, onOpen }: { t: Topic; unread: number;
 
 /* ================= Ordner erstellen ================= */
 
+type VisMode = "privat" | "stufenteam" | "custom";
+
 function CreateFolderSheet({ init, onClose }: { init: { parentId: string | null; tag: string }; onClose: () => void }) {
-  const { createTopic } = useTopics();
-  const { profiles } = useRole();
+  const { createTopic, committeesOf, uid } = useTopics();
+  const { profiles, role } = useRole();
+  const myKoms = committeesOf(uid);
+  // Kategorie automatisch = eigenes Komitee des Erstellers; Stufenteam/Kassenwart bekommen keine.
+  const teamRole = role === "stufenteam" || role === "kassenwart";
+  const tag = init.tag || (teamRole ? "" : myKoms[0] || "");
   const [title, setTitle] = useState("");
-  const [tag, setTag] = useState(init.tag);
-  const [visibility, setVisibility] = useState<Visibility>("privat");
+  const [mode, setMode] = useState<VisMode>("privat");
   const [members, setMembers] = useState<Set<string>>(new Set());
+  const [koms, setKoms] = useState<Set<string>>(new Set());
+  const [showPersons, setShowPersons] = useState(false);
+  const [showKoms, setShowKoms] = useState(false);
   const [q, setQ] = useState("");
   const [busy, setBusy] = useState(false);
 
+  const nothingPicked = mode === "custom" && members.size === 0 && koms.size === 0;
+
+  const pickBase = (m: "privat" | "stufenteam") => {
+    setMode(m);
+    setMembers(new Set());
+    setKoms(new Set());
+    setShowPersons(false);
+    setShowKoms(false);
+  };
+
   async function submit() {
-    if (!title.trim()) return;
-    if (visibility === "komitee" && !tag) return;
+    if (!title.trim() || nothingPicked) return;
+    const custom = mode === "custom";
     setBusy(true);
     const nt: NewTopic = {
-      title, tag: visibility === "komitee" ? tag : tag, visibility,
-      memberIds: visibility === "personen" ? [...members] : [], parentId: init.parentId,
+      title,
+      tag,
+      visibility: custom ? "custom" : mode,
+      memberIds: custom ? [...members] : [],
+      komiteeSlugs: custom ? [...koms] : [],
+      parentId: init.parentId,
     };
     await createTopic(nt);
     setBusy(false);
     onClose();
   }
+
+  const btn = (active: boolean, label: string, onClick: () => void) => (
+    <button
+      onClick={onClick}
+      className={`rounded-xl border py-2 text-sm font-bold transition ${
+        active ? "border-brand bg-brand text-white" : "border-slate-200 dark:border-slate-700"
+      }`}
+    >
+      {label}
+    </button>
+  );
 
   return (
     <Sheet open onClose={onClose}>
@@ -148,35 +185,29 @@ function CreateFolderSheet({ init, onClose }: { init: { parentId: string | null;
         <span className="flex-1 text-xl font-bold">{init.parentId ? "Neuer Unterordner" : "Neuer Ordner"}</span>
         <button className="iconbtn" onClick={onClose}>✕</button>
       </div>
-      <input className="field mb-3" placeholder="Titel (z. B. Sportfest)" autoFocus value={title} onChange={(e) => setTitle(e.target.value)} />
-
-      <label className="mb-1 block text-sm font-semibold text-slate-500">Komitee (optional)</label>
-      <select className="field mb-4" value={tag} onChange={(e) => setTag(e.target.value)}>
-        <option value="">— kein Komitee —</option>
-        {COMMITTEES.map((c) => <option key={c.slug} value={c.slug}>{c.label}</option>)}
-      </select>
+      <input className="field mb-1" placeholder="Titel (z. B. Sportfest)" autoFocus value={title} onChange={(e) => setTitle(e.target.value)} />
+      {tag && <p className="mb-3 text-xs text-slate-400">Kategorie: <b>{committeeLabel(tag)}</b> (dein Komitee)</p>}
+      {!tag && <div className="mb-3" />}
 
       <label className="mb-1 block text-sm font-semibold text-slate-500">Wer kann das sehen?</label>
-      <div className="mb-3 grid grid-cols-2 gap-1.5">
-        {VIS.map(({ v, label }) => {
-          const disabled = v === "komitee" && !tag;
-          return (
-            <button key={v} disabled={disabled} onClick={() => setVisibility(v)}
-              className={`rounded-xl border py-2 text-sm font-bold transition disabled:opacity-30 ${
-                visibility === v ? "border-brand bg-brand text-white" : "border-slate-200 dark:border-slate-700"
-              }`}>
-              {label}
-            </button>
-          );
-        })}
+      <div className="mb-2 grid grid-cols-2 gap-1.5">
+        {btn(mode === "privat", "Nur ich", () => pickBase("privat"))}
+        {btn(mode === "stufenteam", "Stufenteam", () => pickBase("stufenteam"))}
+        {btn(mode === "custom" && (showPersons || members.size > 0), "Bestimmte Personen", () => { setMode("custom"); setShowPersons((v) => !v); })}
+        {btn(mode === "custom" && (showKoms || koms.size > 0), "Komitees", () => { setMode("custom"); setShowKoms((v) => !v); })}
       </div>
-      {visibility === "komitee" && tag && (
-        <p className="mb-3 text-xs text-slate-400">Alle im Komitee <b>{committeeLabel(tag)}</b> sehen &amp; schreiben hier.</p>
-      )}
-      {visibility === "privat" && <p className="mb-3 text-xs text-slate-400">Nur du (und der Admin) siehst diesen Ordner.</p>}
+      <p className="mb-3 text-xs text-slate-400">
+        {mode === "privat" && "Nur du siehst diesen Ordner."}
+        {mode === "stufenteam" && "Das ganze Stufenteam sieht & schreibt hier."}
+        {mode === "custom" && "Wähle beliebig viele Personen und/oder Komitees – alle können sehen & schreiben."}
+      </p>
 
-      {visibility === "personen" && (
+      {mode === "custom" && showPersons && (
         <div className="mb-3 rounded-2xl border border-slate-200 p-2 dark:border-slate-700">
+          <div className="mb-2 flex items-center gap-2">
+            <span className="text-sm font-semibold text-slate-500">Personen</span>
+            <span className="ml-auto text-xs text-slate-400">{members.size} gewählt</span>
+          </div>
           <input className="field mb-2" placeholder="Person suchen…" value={q} onChange={(e) => setQ(e.target.value)} />
           <div className="max-h-44 overflow-y-auto">
             {profiles.filter((p) => !q || normalize(p.username || "").includes(normalize(q))).map((p) => {
@@ -184,18 +215,37 @@ function CreateFolderSheet({ init, onClose }: { init: { parentId: string | null;
               return (
                 <button key={p.user_id} onClick={() => setMembers((s) => { const n = new Set(s); on ? n.delete(p.user_id) : n.add(p.user_id); return n; })}
                   className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm hover:bg-slate-100 dark:hover:bg-slate-800">
-                  <span className={`flex h-5 w-5 items-center justify-center rounded border text-xs text-white ${on ? "border-brand bg-brand" : "border-slate-300 dark:border-slate-600"}`}>{on ? "✓" : ""}</span>
+                  <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border text-xs text-white ${on ? "border-brand bg-brand" : "border-slate-300 dark:border-slate-600"}`}>{on ? "✓" : ""}</span>
                   {p.username}
                 </button>
               );
             })}
           </div>
-          <div className="px-2 pt-1 text-xs text-slate-400">{members.size} ausgewählt</div>
         </div>
       )}
 
-      <button className="btn-primary" disabled={busy || !title.trim() || (visibility === "komitee" && !tag)} onClick={submit}>
-        {busy ? "…" : "Erstellen"}
+      {mode === "custom" && showKoms && (
+        <div className="mb-3 rounded-2xl border border-slate-200 p-2 dark:border-slate-700">
+          <div className="mb-2 flex items-center gap-2">
+            <span className="text-sm font-semibold text-slate-500">Komitees</span>
+            <span className="ml-auto text-xs text-slate-400">{koms.size} gewählt</span>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {COMMITTEES.map((c) => {
+              const on = koms.has(c.slug);
+              return (
+                <button key={c.slug} onClick={() => setKoms((s) => { const n = new Set(s); on ? n.delete(c.slug) : n.add(c.slug); return n; })}
+                  className={`rounded-full border px-3 py-1 text-xs font-bold transition ${on ? "border-brand bg-brand text-white" : "border-slate-200 text-slate-500 dark:border-slate-700"}`}>
+                  {on ? "✓ " : ""}{c.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      <button className="btn-primary" disabled={busy || !title.trim() || nothingPicked} onClick={submit}>
+        {busy ? "…" : nothingPicked ? "Personen oder Komitees wählen" : "Erstellen"}
       </button>
     </Sheet>
   );
@@ -218,13 +268,16 @@ function FolderPage({
   onCreateSub: () => void;
   onDeleted: () => void;
 }) {
-  const { topics, items, members, uid, postItem, updateItem, deleteItem, updateTopic, deleteTopic, markRead, myVotes, voteCounts, vote, setMembers, unreadCount } = useTopics();
-  const { canEditData, isAdmin, profiles } = useRole();
+  const { topics, items, members, topicTags, uid, postItem, updateItem, deleteItem, updateTopic, deleteTopic, markRead, myVotes, voteCounts, vote, setMembers, committeesOf, unreadCount } = useTopics();
+  const { role, can, isAdmin, profiles, banned, bannedUntil } = useRole();
+  const canEditData = can("chats.manage");
+  const canDelete = can("chats.delete_messages");
   const [type, setType] = useState<TopicItemType>("nachricht");
   const [itemTitle, setItemTitle] = useState("");
   const [text, setText] = useState("");
   const [opts, setOpts] = useState<string[]>(["", ""]);
   const [showMembers, setShowMembers] = useState(false);
+  const [composerOpen, setComposerOpen] = useState(false);
   const [q, setQ] = useState("");
 
   const list = items.filter((i) => i.topic_id === topic.id);
@@ -233,12 +286,18 @@ function FolderPage({
   const memberIds = members[topic.id] || [];
   const children = topics.filter((t) => t.parent_id === topic.id);
 
+  // Komitees dieses Ordners (Sichtbarkeit + Kategorie) → für die Autoren-Markierung
+  const folderKoms = new Set([...(topicTags[topic.id] || []), ...(topic.tag ? [topic.tag] : [])]);
+  const myAll = committeesOf(uid);
+  const myFolderKoms = folderKoms.size ? myAll.filter((s) => folderKoms.has(s)) : myAll;
+
   markReadOnce(topic.id, markRead);
 
   async function send() {
     if (!text.trim()) return;
-    await postItem(topic, type, text, type === "umfrage" ? opts : undefined, itemTitle);
+    await postItem(topic, type, text, type === "umfrage" ? opts : undefined, itemTitle, { role, koms: myFolderKoms });
     setText(""); setItemTitle(""); setOpts(["", ""]); setType("nachricht");
+    setComposerOpen(false);
   }
 
   return (
@@ -254,7 +313,7 @@ function FolderPage({
                 onClick={() => updateTopic(topic.id, { admin_only: !topic.admin_only })}>{topic.admin_only ? "🔒" : "🔓"}</button>
             )}
             <button className="iconbtn" title={topic.pinned ? "Lösen" : "Anheften"} onClick={() => updateTopic(topic.id, { pinned: !topic.pinned })}>{topic.pinned ? "📌" : "📍"}</button>
-            {topic.visibility === "personen" && <button className="iconbtn" title="Personen verwalten" onClick={() => setShowMembers((v) => !v)}>👥</button>}
+            {(topic.visibility === "personen" || topic.visibility === "custom") && <button className="iconbtn" title="Personen verwalten" onClick={() => setShowMembers((v) => !v)}>👥</button>}
             <button className="iconbtn" title="Ordner löschen" onClick={() => { if (confirm("Ordner samt Inhalt löschen?")) { void deleteTopic(topic.id); onDeleted(); } }}>🗑</button>
           </>
         )}
@@ -263,10 +322,10 @@ function FolderPage({
       <div className="text-xs text-slate-400">
         {topic.admin_only && <span className="mr-2 rounded-full bg-red-500/10 px-2 py-0.5 font-bold text-red-500">🔒 nur Admin</span>}
         {topic.tag && <span className="mr-2 rounded-full bg-brand/10 px-2 py-0.5 font-bold text-brand">{committeeLabel(topic.tag)}</span>}
-        <span>Sichtbar: {VIS.find((x) => x.v === topic.visibility)?.label}</span>
+        <span>Sichtbar: {VIS_LABEL[topic.visibility]}</span>
       </div>
 
-      {showMembers && canEditData && topic.visibility === "personen" && (
+      {showMembers && canEditData && (topic.visibility === "personen" || topic.visibility === "custom") && (
         <div className="rounded-2xl border border-slate-200 p-3 dark:border-slate-700">
           <div className="mb-2 text-sm font-semibold text-slate-500">Wer darf rein?</div>
           <input className="field mb-2" placeholder="Person suchen…" value={q} onChange={(e) => setQ(e.target.value)} />
@@ -314,7 +373,7 @@ function FolderPage({
         <div className="rounded-2xl border-2 border-brand/30 bg-brand/5 p-3">
           <div className="mb-2 text-xs font-bold uppercase tracking-wide text-brand">📌 Key-Infos</div>
           <div className="space-y-2">
-            {pinnedItems.map((i) => <ItemRow key={i.id} i={i} uid={uid} canEditData={canEditData} myVotes={myVotes} voteCounts={voteCounts} onVote={vote} onUpdate={updateItem} onDelete={deleteItem} />)}
+            {pinnedItems.map((i) => <ItemRow key={i.id} i={i} uid={uid} canEditData={canEditData} canDelete={canDelete} myVotes={myVotes} voteCounts={voteCounts} onVote={vote} onUpdate={updateItem} onDelete={deleteItem} />)}
           </div>
         </div>
       )}
@@ -324,26 +383,56 @@ function FolderPage({
         {stream.length === 0 && pinnedItems.length === 0 && children.length === 0 && (
           <div className="py-8 text-center text-sm text-slate-400">Noch nichts hier – schreib den ersten Beitrag oder leg einen Unterordner an.</div>
         )}
-        {stream.map((i) => <ItemRow key={i.id} i={i} uid={uid} canEditData={canEditData} myVotes={myVotes} voteCounts={voteCounts} onVote={vote} onUpdate={updateItem} onDelete={deleteItem} />)}
+        {stream.map((i) => <ItemRow key={i.id} i={i} uid={uid} canEditData={canEditData} canDelete={canDelete} myVotes={myVotes} voteCounts={voteCounts} onVote={vote} onUpdate={updateItem} onDelete={deleteItem} />)}
       </div>
 
-      {/* Composer */}
-      <div className="rounded-2xl border border-slate-200 p-3 dark:border-slate-700">
-        <div className="mb-2 flex gap-1.5 rounded-xl bg-slate-100 p-1 dark:bg-slate-800">
-          {TYPE_TABS.map(({ t, label }) => (
-            <button key={t} onClick={() => setType(t)} className={`flex-1 rounded-lg py-1.5 text-[13px] font-bold transition ${type === t ? "bg-brand text-white" : "text-slate-500"}`}>{label}</button>
-          ))}
+      {/* Gesperrt-Hinweis statt Composer */}
+      {banned && (
+        <div className="rounded-2xl border-2 border-red-300 bg-red-500/5 p-4 text-center text-sm dark:border-red-500/40">
+          <div className="mb-1 text-2xl">🚫</div>
+          <div className="font-bold text-red-500">Du bist aktuell vom Posten gesperrt.</div>
+          {bannedUntil && bannedUntil !== PERMANENT_UNTIL && (
+            <div className="mt-1 text-xs text-slate-400">
+              Gesperrt bis {new Date(bannedUntil).toLocaleString("de-DE", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" })}
+            </div>
+          )}
+          {bannedUntil === PERMANENT_UNTIL && <div className="mt-1 text-xs text-slate-400">Wende dich an das Stufenteam.</div>}
         </div>
-        <input className="field mb-2" placeholder="Titel (optional)" value={itemTitle} onChange={(e) => setItemTitle(e.target.value)} />
-        <textarea className="field min-h-[60px] resize-y" placeholder={type === "todo" ? "Was ist zu tun?" : type === "umfrage" ? "Frage…" : "Nachricht…"} value={text} onChange={(e) => setText(e.target.value)} />
-        {type === "umfrage" && (
-          <div className="mt-2 space-y-2">
-            {opts.map((o, i) => <input key={i} className="field" placeholder={`Option ${i + 1}`} value={o} onChange={(e) => setOpts((p) => p.map((x, j) => (j === i ? e.target.value : x)))} />)}
-            <button onClick={() => setOpts((p) => [...p, ""])} className="text-sm font-semibold text-brand">+ Option</button>
+      )}
+
+      {/* Neuer Beitrag: schwebender ＋ statt fest angehängtem Formular */}
+      {!banned && (
+        <button
+          onClick={() => setComposerOpen(true)}
+          className="fixed bottom-[calc(env(safe-area-inset-bottom)+5rem)] right-4 z-30 flex h-14 w-14 items-center justify-center rounded-2xl bg-brand text-3xl text-white shadow-lg shadow-brand/40 transition active:scale-95 sm:right-6"
+          aria-label="Neuer Beitrag"
+        >
+          ＋
+        </button>
+      )}
+
+      {composerOpen && (
+        <Sheet open onClose={() => setComposerOpen(false)}>
+          <div className="mb-4 flex items-center gap-3">
+            <span className="flex-1 text-xl font-bold">Neuer Beitrag</span>
+            <button className="iconbtn" onClick={() => setComposerOpen(false)}>✕</button>
           </div>
-        )}
-        <button className="btn-primary mt-3" disabled={!text.trim()} onClick={send}>Senden</button>
-      </div>
+          <div className="mb-2 flex gap-1.5 rounded-xl bg-slate-100 p-1 dark:bg-slate-800">
+            {TYPE_TABS.map(({ t, label }) => (
+              <button key={t} onClick={() => setType(t)} className={`flex-1 rounded-lg py-1.5 text-[13px] font-bold transition ${type === t ? "bg-brand text-white" : "text-slate-500"}`}>{label}</button>
+            ))}
+          </div>
+          <input className="field mb-2" placeholder="Titel (optional)" autoFocus value={itemTitle} onChange={(e) => setItemTitle(e.target.value)} />
+          <textarea className="field min-h-[90px] resize-y" placeholder={type === "todo" ? "Was ist zu tun?" : type === "umfrage" ? "Frage…" : "Nachricht…"} value={text} onChange={(e) => setText(e.target.value)} />
+          {type === "umfrage" && (
+            <div className="mt-2 space-y-2">
+              {opts.map((o, i) => <input key={i} className="field" placeholder={`Option ${i + 1}`} value={o} onChange={(e) => setOpts((p) => p.map((x, j) => (j === i ? e.target.value : x)))} />)}
+              <button onClick={() => setOpts((p) => [...p, ""])} className="text-sm font-semibold text-brand">+ Option</button>
+            </div>
+          )}
+          <button className="btn-primary mt-3" disabled={!text.trim()} onClick={send}>Senden</button>
+        </Sheet>
+      )}
     </div>
   );
 }
@@ -355,24 +444,55 @@ function markReadOnce(topicId: string, markRead: (id: string) => void) {
   setTimeout(() => { markRead(topicId); markedOnce.delete(topicId); }, 800);
 }
 
+/** Twitch-ähnliches Mod-Icon: grünes Schild-Quadrat mit weißem Schwert. */
+function ModBadge() {
+  return (
+    <span title="Admin (Moderator)" className="inline-flex h-[16px] w-[16px] shrink-0 items-center justify-center rounded-[4px] bg-emerald-500">
+      <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="white" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M20 4v5l-9 9-4-4 9-9z" />
+        <path d="M6.5 11.5l6 6" />
+        <path d="M3 21l3-3" />
+      </svg>
+    </span>
+  );
+}
+
+/** Rollen- und Komitee-Markierung hinter dem Autor-Namen. */
+function AuthorBadges({ role, koms }: { role: string | null; koms: string[] | null }) {
+  return (
+    <>
+      {role === "admin" && <ModBadge />}
+      {role === "stufenteam" && (
+        <span className="rounded bg-brand/15 px-1.5 py-px text-[10px] font-bold text-brand">Stufenteam</span>
+      )}
+      {(koms || []).map((s) => (
+        <span key={s} className="rounded bg-amber-500/15 px-1.5 py-px text-[10px] font-bold text-amber-600 dark:text-amber-400">
+          {committeeLabel(s)}
+        </span>
+      ))}
+    </>
+  );
+}
+
 function ItemRow({
-  i, uid, canEditData, myVotes, voteCounts, onVote, onUpdate, onDelete,
+  i, uid, canEditData, canDelete, myVotes, voteCounts, onVote, onUpdate, onDelete,
 }: {
-  i: TopicItem; uid: string; canEditData: boolean;
+  i: TopicItem; uid: string; canEditData: boolean; canDelete: boolean;
   myVotes: Record<string, string[]>; voteCounts: Record<string, Record<string, number>>;
   onVote: (itemId: string, optionId: string) => void;
   onUpdate: (id: string, patch: Partial<Pick<TopicItem, "done" | "pinned">>) => void;
   onDelete: (id: string) => void;
 }) {
   const time = new Date(i.created_at).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" }) + " " + new Date(i.created_at).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
-  const mayDelete = canEditData || i.created_by === uid;
+  const mayDelete = canDelete || i.created_by === uid;
   const counts = voteCounts[i.id] || {};
   const total = Object.values(counts).reduce((a, b) => a + b, 0);
 
   return (
     <div className={`rounded-xl border border-slate-200 p-3 dark:border-slate-700 ${i.done ? "opacity-60" : ""}`}>
-      <div className="mb-1 flex items-center gap-2 text-[11px] text-slate-400">
-        <span className="font-semibold">{i.author}</span>
+      <div className="mb-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-slate-400">
+        <span className="font-semibold text-slate-500 dark:text-slate-300">{i.author}</span>
+        <AuthorBadges role={i.author_role} koms={i.author_koms} />
         <span>{time}</span>
         <span className="ml-auto flex gap-1">
           {canEditData && <button title={i.pinned ? "Lösen" : "Als Key-Info anheften"} onClick={() => onUpdate(i.id, { pinned: !i.pinned })}>{i.pinned ? "📌" : "📍"}</button>}

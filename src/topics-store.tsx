@@ -4,7 +4,7 @@ import { pushToUsers } from "./lib/push";
 
 export type TopicItemType = "nachricht" | "todo" | "umfrage";
 
-export type Visibility = "privat" | "personen" | "stufenteam" | "komitee";
+export type Visibility = "privat" | "personen" | "stufenteam" | "komitee" | "custom";
 export interface Topic {
   id: string;
   title: string;
@@ -21,6 +21,7 @@ export interface NewTopic {
   tag: string;
   visibility: Visibility;
   memberIds: string[];
+  komiteeSlugs: string[];
   parentId?: string | null;
 }
 export interface TopicItem {
@@ -33,6 +34,8 @@ export interface TopicItem {
   done: boolean;
   pinned: boolean;
   author: string;
+  author_role: string | null; // Rolle des Autors beim Schreiben (schueler/stufenteam/kassenwart/admin)
+  author_koms: string[] | null; // relevante Komitees des Autors (Slugs)
   created_by: string | null;
   created_at: string;
 }
@@ -44,6 +47,7 @@ interface TopicsValue {
   topics: Topic[];
   items: TopicItem[];
   members: Record<string, string[]>; // topicId -> userIds
+  topicTags: Record<string, string[]>; // topicId -> Komitee-Slugs (Sichtbarkeit)
   tagMembers: Record<string, string[]>; // tag -> userIds (Komitee)
   myVotes: Record<string, string[]>; // itemId -> optionIds
   voteCounts: Record<string, Record<string, number>>;
@@ -56,8 +60,9 @@ interface TopicsValue {
   setMembers: (topicId: string, topicTitle: string, userIds: string[]) => Promise<void>;
   setTagMembers: (tag: string, userIds: string[]) => Promise<void>;
   setUserCommittee: (userId: string, slug: string, on: boolean) => Promise<void>;
+  selfAssignCommittee: (slug: string) => Promise<boolean>;
   committeesOf: (userId: string) => string[];
-  postItem: (topic: Topic, type: TopicItemType, body: string, options?: string[], title?: string) => Promise<void>;
+  postItem: (topic: Topic, type: TopicItemType, body: string, options?: string[], title?: string, meta?: { role?: string | null; koms?: string[] }) => Promise<void>;
   updateItem: (id: string, patch: Partial<Pick<TopicItem, "done" | "pinned">>) => Promise<void>;
   deleteItem: (id: string) => Promise<void>;
   vote: (itemId: string, optionId: string) => Promise<void>;
@@ -76,6 +81,7 @@ export function TopicsProvider({ children }: { children: ReactNode }) {
   const [topics, setTopics] = useState<Topic[]>([]);
   const [items, setItems] = useState<TopicItem[]>([]);
   const [members, setMembersState] = useState<Record<string, string[]>>({});
+  const [topicTags, setTopicTagsState] = useState<Record<string, string[]>>({});
   const [tagMembers, setTagMembersState] = useState<Record<string, string[]>>({});
   const [myVotes, setMyVotes] = useState<Record<string, string[]>>({});
   const [voteCounts, setVoteCounts] = useState<Record<string, Record<string, number>>>({});
@@ -83,8 +89,8 @@ export function TopicsProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(!hasSupabase);
   const uidRef = useRef("local-user");
   const nameRef = useRef("du");
-  const stateRef = useRef({ topics, items, members, tagMembers, myVotes, reads });
-  stateRef.current = { topics, items, members, tagMembers, myVotes, reads };
+  const stateRef = useRef({ topics, items, members, topicTags, tagMembers, myVotes, reads });
+  stateRef.current = { topics, items, members, topicTags, tagMembers, myVotes, reads };
 
   // ---------- lokal (Testmodus) ----------
   const saveLocal = useCallback(() => {
@@ -99,6 +105,7 @@ export function TopicsProvider({ children }: { children: ReactNode }) {
       setTopics(d.topics || []);
       setItems(d.items || []);
       setMembersState(d.members || {});
+      setTopicTagsState(d.topicTags || {});
       setTagMembersState(d.tagMembers || {});
       setMyVotes(d.myVotes || {});
       setReads(d.reads || {});
@@ -114,14 +121,15 @@ export function TopicsProvider({ children }: { children: ReactNode }) {
       setVoteCounts(counts);
       saveLocal();
     }
-  }, [myVotes, topics, items, members, reads, saveLocal]);
+  }, [myVotes, topics, items, members, topicTags, reads, saveLocal]);
 
   // ---------- Supabase ----------
   const loadAll = useCallback(async () => {
-    const [{ data: t }, { data: it }, { data: m }, { data: g }, { data: v }, { data: r }] = await Promise.all([
+    const [{ data: t }, { data: it }, { data: m }, { data: tt }, { data: g }, { data: v }, { data: r }] = await Promise.all([
       supabase!.from("topics").select("*").order("created_at", { ascending: false }),
       supabase!.from("topic_items").select("*").order("created_at"),
       supabase!.from("topic_members").select("*"),
+      supabase!.from("topic_tags").select("*"),
       supabase!.from("tag_members").select("*"),
       supabase!.from("topic_votes").select("*"),
       supabase!.from("topic_reads").select("*"),
@@ -131,6 +139,9 @@ export function TopicsProvider({ children }: { children: ReactNode }) {
     const mm: Record<string, string[]> = {};
     for (const row of m || []) (mm[row.topic_id] ||= []).push(row.user_id);
     setMembersState(mm);
+    const tg: Record<string, string[]> = {};
+    for (const row of tt || []) (tg[row.topic_id] ||= []).push(row.tag);
+    setTopicTagsState(tg);
     const gg: Record<string, string[]> = {};
     for (const row of g || []) (gg[row.tag] ||= []).push(row.user_id);
     setTagMembersState(gg);
@@ -168,6 +179,7 @@ export function TopicsProvider({ children }: { children: ReactNode }) {
         .on("postgres_changes", { event: "*", schema: "public", table: "topics" }, () => void loadAll())
         .on("postgres_changes", { event: "*", schema: "public", table: "topic_items" }, () => void loadAll())
         .on("postgres_changes", { event: "*", schema: "public", table: "topic_members" }, () => void loadAll())
+        .on("postgres_changes", { event: "*", schema: "public", table: "topic_tags" }, () => void loadAll())
         .on("postgres_changes", { event: "*", schema: "public", table: "tag_members" }, () => void loadAll())
         .on("postgres_changes", { event: "*", schema: "public", table: "topic_votes" }, () => void loadAll())
         .subscribe();
@@ -175,7 +187,7 @@ export function TopicsProvider({ children }: { children: ReactNode }) {
     void start();
     const { data: sub } = supabase!.auth.onAuthStateChange((event) => {
       if (event === "SIGNED_IN" || event === "SIGNED_OUT") {
-        setTopics([]); setItems([]); setMembersState({}); setMyVotes({}); setReads({});
+        setTopics([]); setItems([]); setMembersState({}); setTopicTagsState({}); setMyVotes({}); setReads({});
         if (channel) { supabase!.removeChannel(channel); channel = null; }
         void start();
       }
@@ -196,14 +208,23 @@ export function TopicsProvider({ children }: { children: ReactNode }) {
     if (!hasSupabase) {
       setTopics((p) => [topic, ...p]);
       if (nt.memberIds.length) setMembersState((m) => ({ ...m, [id]: nt.memberIds }));
+      if (nt.komiteeSlugs.length) setTopicTagsState((m) => ({ ...m, [id]: nt.komiteeSlugs }));
       return;
     }
     const { error } = await supabase!.from("topics").insert({
       id, title: topic.title, tag: topic.tag, visibility: nt.visibility, parent_id: topic.parent_id, created_by: uidRef.current,
     });
     if (error) { alert("Ordner anlegen fehlgeschlagen: " + error.message); return; }
-    if (nt.visibility === "personen" && nt.memberIds.length)
+    if (nt.memberIds.length)
       await supabase!.from("topic_members").insert(nt.memberIds.map((user_id) => ({ topic_id: id, user_id })));
+    if (nt.komiteeSlugs.length)
+      await supabase!.from("topic_tags").insert(nt.komiteeSlugs.map((tag) => ({ topic_id: id, tag })));
+    // Betroffene Komitee-Mitglieder benachrichtigen
+    if (nt.komiteeSlugs.length) {
+      const s = stateRef.current;
+      const recip = [...new Set(nt.komiteeSlugs.flatMap((slug) => s.tagMembers[slug] || []))].filter((u) => u !== uidRef.current);
+      if (recip.length) void pushToUsers(recip, "Neuer Ordner für dich", `„${topic.title}" wurde für dein Komitee freigegeben.`);
+    }
     await loadAll();
   }, [loadAll]);
 
@@ -260,27 +281,47 @@ export function TopicsProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  // Selbstzuweisung genau einmal: nur erlaubt, solange man in KEINEM Komitee ist.
+  const selfAssignCommittee: TopicsValue["selfAssignCommittee"] = useCallback(async (slug) => {
+    const uid = uidRef.current;
+    if ((stateRef.current.tagMembers && Object.values(stateRef.current.tagMembers).some((ids) => ids.includes(uid)))) return false;
+    setTagMembersState((p) => {
+      const cur = new Set(p[slug] || []);
+      cur.add(uid);
+      return { ...p, [slug]: [...cur] };
+    });
+    if (hasSupabase) {
+      const { error } = await supabase!.from("tag_members").insert({ tag: slug, user_id: uid });
+      if (error) { alert("Komitee setzen fehlgeschlagen: " + error.message); return false; }
+    }
+    return true;
+  }, []);
+
   const committeesOf = useCallback(
     (userId: string) =>
       Object.entries(stateRef.current.tagMembers).filter(([, ids]) => ids.includes(userId)).map(([slug]) => slug),
     [tagMembers],
   );
 
-  const postItem: TopicsValue["postItem"] = useCallback(async (topic, type, body, options, title = "") => {
+  const postItem: TopicsValue["postItem"] = useCallback(async (topic, type, body, options, title = "", meta) => {
     const item: TopicItem = {
       id: uuid(), topic_id: topic.id, type, title: title.trim(), body: body.trim(),
       options: type === "umfrage" ? (options || []).filter(Boolean).map((label) => ({ id: uuid(), label })) : null,
-      done: false, pinned: false, author: nameRef.current, created_by: uidRef.current, created_at: new Date().toISOString(),
+      done: false, pinned: false, author: nameRef.current,
+      author_role: meta?.role ?? null, author_koms: meta?.koms?.length ? meta.koms : null,
+      created_by: uidRef.current, created_at: new Date().toISOString(),
     };
     if (!hasSupabase) { setItems((p) => [...p, item]); return; }
     const { error } = await supabase!.from("topic_items").insert({
       id: item.id, topic_id: item.topic_id, type: item.type, title: item.title, body: item.body,
-      options: item.options, author: item.author, created_by: uidRef.current,
+      options: item.options, author: item.author, author_role: item.author_role, author_koms: item.author_koms, created_by: uidRef.current,
     });
     if (error) { alert("Senden fehlgeschlagen: " + error.message); return; }
     // Empfänger: Ordner-Mitglieder + Komitee-Mitglieder (Tag), ohne Autor
     const s = stateRef.current;
-    const recipients = [...new Set([...(s.members[topic.id] || []), ...(topic.tag ? s.tagMembers[topic.tag] || [] : [])])]
+    const komSlugs = [...(s.topicTags[topic.id] || []), ...(topic.tag ? [topic.tag] : [])];
+    const komRecipients = komSlugs.flatMap((slug) => s.tagMembers[slug] || []);
+    const recipients = [...new Set([...(s.members[topic.id] || []), ...komRecipients])]
       .filter((u) => u !== uidRef.current);
     void pushToUsers(recipients, `Neues in „${topic.title}"`, (item.title ? item.title + ": " : "") + body.slice(0, 100));
     await loadAll();
@@ -326,8 +367,8 @@ export function TopicsProvider({ children }: { children: ReactNode }) {
   );
 
   const value: TopicsValue = {
-    topics, items, members, tagMembers, myVotes, voteCounts, reads, uid: uidRef.current, ready,
-    createTopic, updateTopic, deleteTopic, setMembers, setTagMembers, setUserCommittee, committeesOf, postItem, updateItem, deleteItem, vote, markRead, unreadCount,
+    topics, items, members, topicTags, tagMembers, myVotes, voteCounts, reads, uid: uidRef.current, ready,
+    createTopic, updateTopic, deleteTopic, setMembers, setTagMembers, setUserCommittee, selfAssignCommittee, committeesOf, postItem, updateItem, deleteItem, vote, markRead, unreadCount,
   };
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

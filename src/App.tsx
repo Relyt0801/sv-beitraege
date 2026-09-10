@@ -19,6 +19,8 @@ import { StudentSheet } from "./components/StudentSheet";
 import { AddSheet } from "./components/AddSheet";
 import { MassBar } from "./components/MassBar";
 import { RolesTab } from "./components/RolesTab";
+import { PermissionsTab } from "./components/PermissionsTab";
+import { MyCommittee } from "./components/MyCommittee";
 import { EventsTab } from "./components/EventsTab";
 import { EventComposer } from "./components/EventComposer";
 
@@ -40,11 +42,11 @@ export default function App() {
   );
 }
 
-type Tab = "kasse" | "events" | "themen" | "rollen";
+type Tab = "kasse" | "events" | "themen" | "rollen" | "rechte";
 
 function Main() {
   const { students, settings, ready, mode, setTerm, setSettings, exportData, importData } = useStore();
-  const { canEditData, canEditBeitrag, canManageRoles, isStaff, loginByStudent } = useRole();
+  const { can, canEditData, canEditBeitrag, canManageRoles, isStaff, loginByStudent } = useRole();
   const { events: allEvents, reads } = useEvents();
   const { topics, unreadCount } = useTopics();
   const { theme, toggle } = useTheme();
@@ -138,6 +140,7 @@ function Main() {
     { key: "events", icon: "📣", label: "Events", badge: unread, show: true },
     { key: "themen", icon: "📋", label: "Übersicht", badge: topicsUnread, show: showTopicsTab },
     { key: "rollen", icon: "👥", label: "Rollen", show: canManageRoles },
+    { key: "rechte", icon: "🛡️", label: "Rechte", show: can("perms.manage") },
   ];
 
   return (
@@ -149,55 +152,59 @@ function Main() {
             <div className="text-[11px] text-slate-400">SV · Beiträge</div>
           </div>
 
-          {tab === "kasse" ? (
-            <div className="flex flex-1 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 shadow-card dark:border-slate-800 dark:bg-slate-900 dark:shadow-cardDark">
-              <span className="text-slate-400">🔍</span>
-              <input
-                className="w-full bg-transparent text-base outline-none placeholder:text-slate-400"
-                placeholder="Name suchen…"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-              />
-            </div>
-          ) : (
-            <div className="flex-1 text-lg font-bold">
-              {tab === "events" ? "Events" : tab === "themen" ? "Übersicht" : "Rollen & Rechte"}
+          {tab !== "kasse" && (
+            <div className="min-w-0 flex-1 truncate text-lg font-bold">
+              {tab === "events" ? "Events" : tab === "themen" ? "Übersicht" : tab === "rechte" ? "Berechtigungen" : "Rollen & Rechte"}
             </div>
           )}
 
-          {tab === "kasse" && (
-            <>
-              <button className={`iconbtn ${showFilter ? "iconbtn-active" : ""}`} onClick={() => setShowFilter((v) => !v)} aria-label="Filter & Einstellungen">
-                ⚙︎
-              </button>
-              {canEditData && (
-                <button
-                  className={`iconbtn ${massMode ? "iconbtn-active" : ""}`}
-                  onClick={() => {
-                    setMassMode((v) => !v);
-                    setSelected(new Set());
-                  }}
-                  aria-label="Mehrere auswählen"
-                >
-                  ☑
+          <div className="ml-auto flex shrink-0 items-center gap-2">
+            {tab === "kasse" && (
+              <>
+                <button className={`iconbtn ${showFilter ? "iconbtn-active" : ""}`} onClick={() => setShowFilter((v) => !v)} aria-label="Filter & Einstellungen">
+                  ⚙︎
                 </button>
-              )}
-            </>
-          )}
-          <button className="iconbtn" onClick={toggle} aria-label="Hell/Dunkel">
-            {theme === "dark" ? "☀" : "☾"}
-          </button>
+                {canEditData && (
+                  <button
+                    className={`iconbtn ${massMode ? "iconbtn-active" : ""}`}
+                    onClick={() => {
+                      setMassMode((v) => !v);
+                      setSelected(new Set());
+                    }}
+                    aria-label="Mehrere auswählen"
+                  >
+                    ☑
+                  </button>
+                )}
+              </>
+            )}
+            <button className="iconbtn" onClick={toggle} aria-label="Hell/Dunkel">
+              {theme === "dark" ? "☀" : "☾"}
+            </button>
+          </div>
         </div>
 
         {tab === "kasse" && (
-          <div className="mx-auto mt-2.5 flex max-w-5xl flex-wrap items-center gap-x-3 gap-y-2">
-            <div className="flex flex-wrap items-center gap-1.5">
+          <div className="mx-auto mt-2.5 flex max-w-5xl items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 shadow-card dark:border-slate-800 dark:bg-slate-900 dark:shadow-cardDark">
+            <span className="text-slate-400">🔍</span>
+            <input
+              className="w-full bg-transparent text-base outline-none placeholder:text-slate-400"
+              placeholder="Name suchen…"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+            />
+          </div>
+        )}
+
+        {tab === "kasse" && (
+          <div className="mx-auto mt-2.5 max-w-5xl space-y-2">
+            <div className="flex gap-1.5">
               {HY.map((h) => (
                 <button
                   key={h}
                   disabled={!canEditData}
                   onClick={() => setSettings({ aktuelles_halbjahr: h })}
-                  className={`rounded-full border px-3 py-1 text-xs font-bold transition disabled:cursor-default ${
+                  className={`flex-1 rounded-full border px-1 py-1.5 text-xs font-bold transition disabled:cursor-default ${
                     h === settings.aktuelles_halbjahr
                       ? "border-brand bg-brand text-white"
                       : "border-slate-200 bg-white text-slate-500 dark:border-slate-700 dark:bg-slate-900"
@@ -208,7 +215,7 @@ function Main() {
               ))}
             </div>
             {isStaff && (
-              <div className="ml-auto rounded-full bg-white px-3.5 py-1.5 text-sm font-semibold shadow-card dark:bg-slate-900 dark:shadow-cardDark">
+              <div className="w-full rounded-full bg-white px-3.5 py-2 text-center text-sm font-semibold shadow-card dark:bg-slate-900 dark:shadow-cardDark">
                 Offen gesamt: <span className="font-extrabold text-amber-500">{totalOffen} €</span>
                 <span className="ml-1 text-slate-400">· {anzahlOffen} offen</span>
               </div>
@@ -289,6 +296,8 @@ function Main() {
                   </>
                 )}
               </div>
+
+              <MyCommittee />
             </div>
           </div>
         )}
@@ -297,6 +306,10 @@ function Main() {
       {tab === "rollen" ? (
         <main className="mt-3">
           <RolesTab />
+        </main>
+      ) : tab === "rechte" ? (
+        <main className="mt-3 pb-4">
+          <PermissionsTab />
         </main>
       ) : tab === "events" ? (
         <main className="mt-3">
