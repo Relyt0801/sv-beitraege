@@ -1,5 +1,5 @@
 import { useProfiles } from "../profiles-store";
-import { farbe as farbeVon, farbKontur, farbwert, initialen as initialenVon, lesbarerName, schriftAuf } from "../lib/profil";
+import { farbe as farbeVon, farbKontur, farbeAusName, farbwert, initialen as initialenVon, lesbarerName, schriftAuf } from "../lib/profil";
 import { personIcon } from "../lib/committees";
 import { useTheme } from "../lib/theme";
 
@@ -23,7 +23,7 @@ export function Avatar({
   const p = userId ? profile[userId] : undefined;
   const anzeige = lesbarerName(p?.anzeigename || name || "");
   const kurz = p?.initialen || initialenVon(anzeige);
-  const f = farbeVon(p?.farbe);
+  const f = farbeVon(p?.farbe || farbeAusName(anzeige || String(userId ?? "")));
 
   const Tag = onClick ? "button" : "div";
   return (
@@ -72,10 +72,11 @@ export function PersonName({
   const dunkel = theme === "dark";
   const p = userId ? profile[userId] : undefined;
   const anzeige = lesbarerName(p?.anzeigename || name || "Unbekannt");
+  const key = p?.farbe || farbeAusName(anzeige);
   return (
     <span
       className={className}
-      style={{ color: farbwert(p?.farbe, dunkel), textShadow: farbKontur(p?.farbe, dunkel) }}
+      style={{ color: farbwert(key, dunkel), textShadow: farbKontur(key, dunkel) }}
     >
       {personIcon(role, koms)} | {anzeige}
     </span>

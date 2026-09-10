@@ -46,6 +46,20 @@ export function farbe(key: string | null | undefined): NamensFarbe {
   return byKey.get(key || "indigo") || NAME_FARBEN[8];
 }
 
+/** Farben, die automatisch vergeben werden dürfen (ohne Sonderfarben). */
+const AUTO_FARBEN = NAME_FARBEN.filter((f) => !f.stufe && f.key !== "weiss");
+
+/**
+ * Wer noch keine Farbe gewählt hat, bekommt eine feste aus dem Namen berechnet –
+ * so bleibt der Kreis nach jedem Neuladen gleich statt immer indigo zu sein.
+ */
+export function farbeAusName(name: string): string {
+  const t = (name || "?").trim().toLowerCase();
+  let h = 0;
+  for (let i = 0; i < t.length; i++) h = (h * 31 + t.charCodeAt(i)) >>> 0;
+  return AUTO_FARBEN[h % AUTO_FARBEN.length].key;
+}
+
 /** Hex-Wert einer Farbe – dunkel = im Dunkelmodus. */
 export function farbwert(key: string | null | undefined, dunkel: boolean): string {
   const f = farbe(key);
@@ -112,6 +126,8 @@ export interface PublicProfile {
   anzeigename: string;
   initialen: string;
   farbe: string;
+  /** Pop-up-Benachrichtigungen für Chat-Nachrichten */
+  push_chats?: boolean;
 }
 
 /** Eigenes Anzeige-Profil anlegen/aktualisieren. */

@@ -2,34 +2,34 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useTopics, type Topic } from "../topics-store";
 import { useRole } from "../auth/RoleProvider";
 import { COMMITTEES, committeeIcon, committeeLabel } from "../lib/committees";
-import { Avatar, PersonName } from "./Avatar";
 import { KomiteePage } from "./KomiteePage";
 import { BannHinweis } from "./BannHinweis";
-import { TopicsTab } from "./TopicsTab";
+import { ChatBlasen, ChatEingabe } from "./ChatBlasen";
+import { Avatar } from "./Avatar";
+import { useProfiles } from "../profiles-store";
 
 const TEAM_CHAT_TITLE = "Stufenteam";
 
 /**
- * Chats: pro Komitee ein Chat (nur Mitglieder sehen ihn) und der Stufenteam-Chat,
- * in dem jede Person eine Frage als Ticket stellen kann. Planungs-Ordner liegen
- * dahinter und stören niemanden, der sie nicht braucht.
+ * Chats: pro Komitee ein Chat und der Stufenteam-Chat.
+ * Für Schüler fühlt sich der Stufenteam-Chat wie ein normaler Chat an –
+ * im Hintergrund entsteht daraus ein Ticket, das das Team beantwortet.
  */
 export function ChatsTab() {
   const { topics, ready, unreadCount, createTopic, committeesOf, uid } = useTopics();
   const { can, isStaff } = useRole();
   const darfVerwalten = can("chats.manage");
   const [openId, setOpenId] = useState<string | null>(null);
-  const [showOrdner, setShowOrdner] = useState(false);
-  const [neueFrage, setNeueFrage] = useState(false);
+  const [teamOffen, setTeamOffen] = useState(false);
   const angelegt = useRef(false);
 
   const chats = topics.filter((t) => t.kind === "chat");
   const teamChat = chats.find((t) => !t.tag) ?? null;
   const meineKoms = committeesOf(uid);
 
-  // Fehlende Chats einmalig anlegen – nur wer Ordner verwalten darf, kann das.
+  // Fehlende Chats einmalig anlegen – nur wer Chats verwalten darf, kann das.
   useEffect(() => {
-    if (!ready || !darfVerwalten || angelegt.current || !hatAlleDaten(topics)) return;
+    if (!ready || !darfVerwalten || angelegt.current) return;
     const fehlend = COMMITTEES.filter((c) => !chats.some((t) => t.tag === c.slug));
     const brauchtTeam = !teamChat;
     if (!fehlend.length && !brauchtTeam) return;
@@ -44,7 +44,7 @@ export function ChatsTab() {
     })();
   }, [ready, darfVerwalten, topics, chats, teamChat, createTopic]);
 
-  const meineTickets = useMemo(
+  const tickets = useMemo(
     () => topics.filter((t) => t.kind === "ticket" && (isStaff || t.created_by === uid)),
     [topics, isStaff, uid],
   );
@@ -57,25 +57,16 @@ export function ChatsTab() {
       </div>
     );
 
-  if (showOrdner)
-    return (
-      <div>
-        <button
-          onClick={() => setShowOrdner(false)}
-          className="mb-3 flex items-center gap-1.5 text-sm font-bold text-brand"
-        >
-          ‹ zurück zu den Chats
-        </button>
-        <TopicsTab />
-      </div>
-    );
+  // Schüler: durchgehender Chat mit dem Stufenteam
+  if (teamOffen && !isStaff)
+    return <TeamChatSchueler tickets={tickets} onBack={() => setTeamOffen(false)} />;
 
   const offen = topics.find((t) => t.id === openId) ?? null;
   if (offen)
     return offen.kind === "chat" && offen.tag ? (
       <KomiteePage topic={offen} onBack={() => setOpenId(null)} />
     ) : (
-      <ChatPage topic={offen} onBack={() => setOpenId(null)} />
+      <TicketChat topic={offen} onBack={() => setOpenId(null)} />
     );
 
   const reihenfolge = new Map(COMMITTEES.map((c, i) => [c.slug, i]));
@@ -87,11 +78,12 @@ export function ChatsTab() {
       if (meinA !== meinB) return meinA - meinB;
       return (reihenfolge.get(a.tag) ?? 99) - (reihenfolge.get(b.tag) ?? 99);
     });
-  const offeneTickets = meineTickets.filter((t) => t.status !== "erledigt");
-  const erledigt = meineTickets.filter((t) => t.status === "erledigt");
+  const offeneTickets = tickets.filter((t) => t.status !== "erledigt");
+  const erledigt = tickets.filter((t) => t.status === "erledigt");
+  const ticketUngelesen = tickets.reduce((n, t) => n + unreadCount(t.id), 0);
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 pb-4">
       <section>
         <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-400">
           {isStaff ? "Alle Komitees" : "Mein Komitee"}
@@ -120,71 +112,44 @@ export function ChatsTab() {
 
       <section>
         <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-400">
-          {isStaff ? "Fragen an euch" : "Frage ans Stufenteam"}
+          {isStaff ? "Fragen an euch" : "Stufenteam"}
         </h3>
 
-        {!isStaff && (
+        {!isStaff ? (
+          <ChatCard
+            titel="Stufenteam"
+            icon="🛡️"
+            unread={ticketUngelesen}
+            mine
+            onOpen={() => setTeamOffen(true)}
+          />
+        ) : (
           <>
-            {neueFrage ? (
-              <TicketForm
-                teamChatId={teamChat?.id ?? null}
-                onDone={(id) => {
-                  setNeueFrage(false);
-                  if (id) setOpenId(id);
-                }}
-                onCancel={() => setNeueFrage(false)}
-              />
-            ) : (
-              <button
-                onClick={() => setNeueFrage(true)}
-                className="w-full rounded-2xl border border-dashed border-brand/50 py-3.5 text-sm font-bold text-brand transition active:scale-[.99]"
-              >
-                ＋ Frage stellen
-              </button>
+            {offeneTickets.length === 0 && (
+              <p className="text-sm text-slate-400">Gerade keine offenen Fragen.</p>
+            )}
+            <div className="grid gap-2.5 lg:grid-cols-2">
+              {offeneTickets.map((t) => (
+                <TicketCard key={t.id} topic={t} unread={unreadCount(t.id)} onOpen={() => setOpenId(t.id)} />
+              ))}
+            </div>
+            {erledigt.length > 0 && (
+              <details className="mt-3">
+                <summary className="cursor-pointer text-xs font-bold uppercase tracking-wide text-slate-400">
+                  Erledigt ({erledigt.length})
+                </summary>
+                <div className="mt-2 grid gap-2.5 lg:grid-cols-2">
+                  {erledigt.map((t) => (
+                    <TicketCard key={t.id} topic={t} unread={0} onOpen={() => setOpenId(t.id)} />
+                  ))}
+                </div>
+              </details>
             )}
           </>
         )}
-
-        {teamChat && isStaff && (
-          <div className="mb-2.5">
-            <ChatCard titel="Stufenteam-Chat" icon="🛡️" unread={unreadCount(teamChat.id)} mine onOpen={() => setOpenId(teamChat.id)} />
-          </div>
-        )}
-
-        <div className="mt-2.5 grid gap-2.5 lg:grid-cols-2">
-          {offeneTickets.map((t) => (
-            <ChatCard key={t.id} titel={t.title} icon="❓" unread={unreadCount(t.id)} mine onOpen={() => setOpenId(t.id)} />
-          ))}
-        </div>
-        {erledigt.length > 0 && (
-          <details className="mt-3">
-            <summary className="cursor-pointer text-xs font-bold uppercase tracking-wide text-slate-400">
-              Erledigt ({erledigt.length})
-            </summary>
-            <div className="mt-2 grid gap-2.5 lg:grid-cols-2">
-              {erledigt.map((t) => (
-                <ChatCard key={t.id} titel={t.title} icon="✓" unread={0} mine={false} onOpen={() => setOpenId(t.id)} />
-              ))}
-            </div>
-          </details>
-        )}
       </section>
-
-      {darfVerwalten && (
-        <button
-          onClick={() => setShowOrdner(true)}
-          className="w-full rounded-2xl border border-slate-200 py-3 text-sm font-semibold text-slate-500 dark:border-slate-700"
-        >
-          📁 Planungs-Ordner öffnen
-        </button>
-      )}
     </div>
   );
-}
-
-/** Erst anlegen, wenn die Ordnerliste wirklich geladen ist (sonst Doppel-Chats). */
-function hatAlleDaten(topics: Topic[]): boolean {
-  return Array.isArray(topics);
 }
 
 function ChatCard({
@@ -207,59 +172,119 @@ function ChatCard({
   );
 }
 
-function TicketForm({
-  teamChatId, onDone, onCancel,
-}: { teamChatId: string | null; onDone: (id: string | null) => void; onCancel: () => void }) {
-  const { createTopic } = useTopics();
-  const [titel, setTitel] = useState("");
+function TicketCard({ topic, unread, onOpen }: { topic: Topic; unread: number; onOpen: () => void }) {
+  const { profile } = useProfiles();
+  const name = topic.created_by ? profile[topic.created_by]?.anzeigename : "";
+  return (
+    <button
+      onClick={onOpen}
+      className="card flex w-full items-center gap-3 p-4 text-left transition active:scale-[.99]"
+    >
+      <Avatar userId={topic.created_by} name={name} size={32} />
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-[15px] font-bold">{name || "Frage"}</span>
+        <span className="block truncate text-[12px] text-slate-400">{topic.title}</span>
+      </span>
+      {unread > 0 && (
+        <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[11px] font-bold text-white">
+          {unread > 9 ? "9+" : unread}
+        </span>
+      )}
+      {topic.status === "erledigt" && <span className="text-emerald-500">✓</span>}
+      <span className="text-slate-300">›</span>
+    </button>
+  );
+}
+
+/**
+ * Schüleransicht: ein einziger Verlauf. Neue Nachrichten landen im offenen
+ * Ticket; gibt es keins, wird im Hintergrund ein neues eröffnet.
+ */
+function TeamChatSchueler({ tickets, onBack }: { tickets: Topic[]; onBack: () => void }) {
+  const { items, postItem, deleteItem, markRead, createTopic, committeesOf, uid } = useTopics();
+  const { role, banned } = useRole();
+  const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
 
+  const meineIds = new Set(tickets.map((t) => t.id));
+  const verlauf = items
+    .filter((i) => meineIds.has(i.topic_id))
+    .sort((a, b) => (a.created_at < b.created_at ? -1 : 1));
+
+  useEffect(() => {
+    for (const t of tickets) markRead(t.id);
+  }, [tickets, verlauf.length, markRead]);
+
   async function senden() {
-    if (!titel.trim()) return;
+    if (!text.trim() || busy) return;
     setBusy(true);
-    await createTopic({
-      title: titel.trim().slice(0, 80),
-      tag: "",
-      visibility: "stufenteam",
-      memberIds: [],
-      komiteeSlugs: [],
-      parentId: teamChatId,
-      kind: "ticket",
-    });
+    const nachricht = text;
+    setText("");
+    const meta = { role, koms: committeesOf(uid) };
+    const offenes = tickets.find((t) => t.status !== "erledigt");
+    if (offenes) {
+      await postItem(offenes, "nachricht", nachricht, undefined, "", meta);
+    } else {
+      const titel = nachricht.trim().slice(0, 60);
+      const id = await createTopic({
+        title: titel,
+        tag: "",
+        visibility: "stufenteam",
+        memberIds: [],
+        komiteeSlugs: [],
+        kind: "ticket",
+      });
+      if (id) {
+        await postItem(
+          { id, title: titel, tag: "", kind: "ticket", status: "offen", pinned: false, admin_only: false, visibility: "stufenteam", parent_id: null, created_by: uid, created_at: new Date().toISOString() },
+          "nachricht",
+          nachricht,
+          undefined,
+          "",
+          meta,
+        );
+      }
+    }
     setBusy(false);
-    onDone(null); // das neue Ticket erscheint gleich in der Liste
   }
 
   return (
-    <div className="rounded-2xl border border-brand/40 bg-brand/5 p-3">
-      <input
-        className="field mb-2"
-        autoFocus
-        placeholder="Worum geht es? z. B. Abrechnung Mottowoche"
-        value={titel}
-        onChange={(e) => setTitel(e.target.value)}
-        onKeyDown={(e) => e.key === "Enter" && senden()}
-      />
-      <div className="flex items-center gap-2">
-        <span className="text-[11px] text-slate-500">Das Stufenteam antwortet dir hier im Chat.</span>
-        <button onClick={onCancel} className="ml-auto rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-500 dark:border-slate-700">
-          Abbrechen
-        </button>
-        <button onClick={senden} disabled={!titel.trim() || busy} className="rounded-lg bg-brand px-4 py-2 text-sm font-bold text-white disabled:opacity-40">
-          {busy ? "…" : "Senden"}
-        </button>
+    <div>
+      <div className="sticky top-[52px] z-10 -mx-3 flex items-center gap-2 border-b border-slate-200 bg-slate-50/95 px-3 py-2 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95 sm:-mx-5 sm:px-5">
+        <button className="iconbtn" onClick={onBack} aria-label="Zurück">‹</button>
+        <span className="text-xl">🛡️</span>
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-[17px] font-bold">Stufenteam</div>
+          <div className="text-[11px] text-slate-400">Frag hier alles – das Team antwortet dir</div>
+        </div>
       </div>
+
+      {banned ? (
+        <div className="mt-3">
+          <BannHinweis />
+        </div>
+      ) : (
+        <>
+          <ChatBlasen
+            liste={verlauf}
+            uid={uid}
+            darfLoeschen={false}
+            onDelete={deleteItem}
+            leerText="Schreib dem Stufenteam – sie melden sich hier zurück."
+          />
+          <ChatEingabe wert={text} setWert={setText} onSenden={senden} />
+        </>
+      )}
     </div>
   );
 }
 
-/** Chat-Ansicht: Nachrichten von unten nach oben, ein Eingabefeld, sonst nichts. */
-function ChatPage({ topic, onBack }: { topic: Topic; onBack: () => void }) {
-  const { items, postItem, deleteItem, markRead, uid, committeesOf, updateTopic } = useTopics();
-  const { role, can, isStaff, profiles, banned } = useRole();
-  const darfLoeschen = can("chats.delete_messages");
+/** Teamansicht: ein Ticket als Chat, mit Erledigt- und Löschen-Knopf. */
+function TicketChat({ topic, onBack }: { topic: Topic; onBack: () => void }) {
+  const { items, postItem, deleteItem, deleteTopic, updateTopic, markRead, committeesOf, uid } = useTopics();
+  const { role, can, isStaff, banned } = useRole();
+  const { profile } = useProfiles();
   const [text, setText] = useState("");
-  const ende = useRef<HTMLDivElement | null>(null);
 
   const liste = items
     .filter((i) => i.topic_id === topic.id)
@@ -267,11 +292,7 @@ function ChatPage({ topic, onBack }: { topic: Topic; onBack: () => void }) {
 
   useEffect(() => {
     markRead(topic.id);
-    ende.current?.scrollIntoView({ block: "end" });
   }, [topic.id, liste.length, markRead]);
-
-  const nameVon = (userId: string | null) =>
-    profiles.find((p) => p.user_id === userId)?.username || "";
 
   async function senden() {
     if (!text.trim()) return;
@@ -280,103 +301,47 @@ function ChatPage({ topic, onBack }: { topic: Topic; onBack: () => void }) {
     await postItem(topic, "nachricht", t, undefined, "", { role, koms: committeesOf(uid) });
   }
 
-  const titel = topic.kind === "ticket" ? topic.title : topic.tag ? committeeLabel(topic.tag) : topic.title;
+  const name = topic.created_by ? profile[topic.created_by]?.anzeigename : "";
 
   return (
-    <div className="flex flex-col" style={{ minHeight: "60vh" }}>
+    <div>
       <div className="sticky top-[52px] z-10 -mx-3 flex items-center gap-2 border-b border-slate-200 bg-slate-50/95 px-3 py-2 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95 sm:-mx-5 sm:px-5">
         <button className="iconbtn" onClick={onBack} aria-label="Zurück">‹</button>
+        <Avatar userId={topic.created_by} name={name} size={28} />
         <div className="min-w-0 flex-1">
-          <div className="truncate text-[17px] font-bold">{titel}</div>
-          <div className="text-[11px] text-slate-400">
-            {topic.kind === "ticket"
-              ? topic.status === "erledigt" ? "erledigt" : "Frage ans Stufenteam"
-              : topic.tag ? "Komitee-Chat" : "Stufenteam"}
+          <div className="truncate text-[16px] font-bold">{name || "Frage"}</div>
+          <div className="truncate text-[11px] text-slate-400">
+            {topic.status === "erledigt" ? "erledigt" : topic.title}
           </div>
         </div>
-        {topic.kind === "ticket" && isStaff && (
-          <button
-            className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-bold dark:border-slate-700"
-            onClick={() => updateTopic(topic.id, { status: topic.status === "erledigt" ? "offen" : "erledigt" })}
-          >
-            {topic.status === "erledigt" ? "wieder öffnen" : "erledigt"}
-          </button>
-        )}
-      </div>
-
-      <div className="flex-1 space-y-2.5 py-3">
-        {liste.length === 0 && (
-          <p className="py-12 text-center text-sm text-slate-400">
-            Noch keine Nachricht. Schreib die erste.
-          </p>
-        )}
-        {liste.map((m) => {
-          const meins = m.created_by === uid;
-          return (
-            <div key={m.id} className={`flex flex-col ${meins ? "items-end" : "items-start"}`}>
-              <div className={`mb-1 flex items-center gap-1.5 ${meins ? "flex-row-reverse" : ""}`}>
-                <Avatar userId={m.created_by} name={m.author} size={20} />
-                <PersonName
-                  userId={m.created_by}
-                  name={m.author || nameVon(m.created_by)}
-                  role={m.author_role}
-                  koms={m.author_koms}
-                  className="text-[11px] font-bold"
-                />
-              </div>
-              <div
-                className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 sm:max-w-[70%] lg:max-w-[55%] ${
-                  meins ? "bg-brand text-white" : "bg-white shadow-card dark:bg-slate-900 dark:shadow-cardDark"
-                }`}
+        {isStaff && (
+          <>
+            <button
+              className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-bold dark:border-slate-700"
+              onClick={() => updateTopic(topic.id, { status: topic.status === "erledigt" ? "offen" : "erledigt" })}
+            >
+              {topic.status === "erledigt" ? "öffnen" : "erledigt"}
+            </button>
+            {can("chats.manage") && (
+              <button
+                className="iconbtn"
+                title="Ticket löschen"
+                onClick={() => {
+                  if (confirm("Diese Frage samt Verlauf löschen?")) {
+                    void deleteTopic(topic.id);
+                    onBack();
+                  }
+                }}
               >
-                <div className="whitespace-pre-wrap break-words text-[15px] leading-snug">{m.body}</div>
-                <div className={`mt-1 text-right text-[10px] ${meins ? "text-white/70" : "text-slate-400"}`}>
-                  {new Date(m.created_at).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })}
-                  {(meins || darfLoeschen) && (
-                    <button
-                      onClick={() => confirm("Nachricht löschen?") && deleteItem(m.id)}
-                      className="ml-2 underline"
-                    >
-                      löschen
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
-          );
-        })}
-        <div ref={ende} />
+                🗑
+              </button>
+            )}
+          </>
+        )}
       </div>
 
-      {banned ? (
-        <div className="sticky bottom-[calc(env(safe-area-inset-bottom)+3.9rem)]">
-          <BannHinweis />
-        </div>
-      ) : (
-        <div className="sticky bottom-[calc(env(safe-area-inset-bottom)+3.9rem)] -mx-3 flex items-end gap-2 border-t border-slate-200 bg-slate-50/95 px-3 py-2 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95 sm:-mx-5 sm:px-5">
-          <textarea
-            rows={1}
-            className="field max-h-28 flex-1 resize-none py-2.5"
-            placeholder="Nachricht…"
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                void senden();
-              }
-            }}
-          />
-          <button
-            onClick={senden}
-            disabled={!text.trim()}
-            className="flex h-11 w-11 items-center justify-center rounded-xl bg-brand text-lg text-white disabled:opacity-40"
-            aria-label="Senden"
-          >
-            ➤
-          </button>
-        </div>
-      )}
+      <ChatBlasen liste={liste} uid={uid} darfLoeschen={can("chats.delete_messages")} onDelete={deleteItem} />
+      {!banned && <ChatEingabe wert={text} setWert={setText} onSenden={senden} platzhalter="Antworten…" />}
     </div>
   );
 }

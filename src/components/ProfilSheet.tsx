@@ -111,6 +111,36 @@ export function ProfilSheet({
         })}
       </div>
 
+      {/* Benachrichtigungen */}
+      <div className="mb-5 rounded-2xl bg-slate-100 p-3 dark:bg-slate-800/70">
+        <button
+          onClick={async () => {
+            const neu = !(mein?.push_chats ?? true);
+            aktualisiere({ push_chats: neu });
+            const r = await speichereProfil({ push_chats: neu });
+            if (!r.ok) setFarbFehler("Einstellung konnte nicht gespeichert werden: " + r.error);
+            else neuLaden();
+          }}
+          className="flex w-full items-center gap-3 text-left"
+        >
+          <span
+            className={`flex h-6 w-11 shrink-0 items-center rounded-full p-0.5 transition ${
+              (mein?.push_chats ?? true) ? "bg-brand" : "bg-slate-300 dark:bg-slate-600"
+            }`}
+          >
+            <span
+              className={`h-5 w-5 rounded-full bg-white transition ${(mein?.push_chats ?? true) ? "translate-x-5" : ""}`}
+            />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-[15px] font-semibold">Benachrichtigungen für Chats</span>
+            <span className="block text-[12px] text-slate-500">
+              Pop-ups bei neuen Chat-Nachrichten. Events und Mitteilungen kommen weiterhin.
+            </span>
+          </span>
+        </button>
+      </div>
+
       {farbFehler && (
         <div className="mb-4 rounded-xl bg-red-500/10 px-3 py-2 text-[13px] font-semibold text-red-500">
           {farbFehler}

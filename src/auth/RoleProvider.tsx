@@ -10,6 +10,7 @@ export interface Profile {
   role: Role;
   student_id: string | null;
   has_logged_in: boolean;
+  must_change_password?: boolean;
   chat_banned_until: string | null;
   chat_ban_permanent?: boolean;
   is_op?: boolean;
@@ -195,8 +196,10 @@ export function RoleProvider({ children }: { children: ReactNode }) {
   const can = useCallback((perm: PermKey) => isAdmin || perms.has(perm), [isAdmin, perms]);
   const banned = bannPerm || (bannedUntil != null && new Date(bannedUntil) > new Date());
   const opUserId = profiles.find((p) => p.is_op)?.user_id ?? (isOp ? (uidRef.current ?? null) : null);
+  // Grüner Punkt = Konto wird wirklich genutzt (Startpasswort wurde geändert)
   const loginByStudent: Record<string, boolean> = {};
-  for (const p of profiles) if (p.student_id) loginByStudent[p.student_id] = p.has_logged_in;
+  for (const p of profiles)
+    if (p.student_id) loginByStudent[p.student_id] = p.must_change_password === false;
 
   const value: RoleCtx = {
     role,

@@ -13,8 +13,11 @@ create table if not exists public.public_profiles (
   anzeigename text not null default '',
   initialen   text not null default '',
   farbe       text not null default 'indigo',
+  push_chats  boolean not null default true,
   updated_at  timestamptz not null default now()
 );
+-- Nachrüsten, falls die Tabelle schon existiert
+alter table public.public_profiles add column if not exists push_chats boolean not null default true;
 alter table public.public_profiles enable row level security;
 
 drop policy if exists "pprofile select" on public.public_profiles;

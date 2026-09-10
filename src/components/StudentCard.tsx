@@ -59,7 +59,7 @@ export function StudentCard({
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
             {loginState != null && (
               <span
-                title={loginState ? "hat sich schon angemeldet" : "noch nie angemeldet"}
+                title={loginState ? "nutzt die App (Passwort geändert)" : "hat das Startpasswort noch nicht geändert"}
                 className={`h-2.5 w-2.5 shrink-0 rounded-full ${
                   loginState ? "bg-emerald-500" : "bg-slate-300 dark:bg-slate-600"
                 }`}

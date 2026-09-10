@@ -71,7 +71,7 @@ interface TopicsValue {
   reads: Record<string, string>; // topicId -> last_read ISO
   uid: string;
   ready: boolean;
-  createTopic: (t: NewTopic) => Promise<void>;
+  createTopic: (t: NewTopic) => Promise<string | null>;
   updateTopic: (id: string, patch: Partial<Pick<Topic, "title" | "tag" | "pinned" | "admin_only" | "visibility" | "status">>) => Promise<void>;
   deleteTopic: (id: string) => Promise<void>;
   setMembers: (topicId: string, topicTitle: string, userIds: string[]) => Promise<void>;
@@ -249,13 +249,13 @@ export function TopicsProvider({ children }: { children: ReactNode }) {
       setTopics((p) => [topic, ...p]);
       if (nt.memberIds.length) setMembersState((m) => ({ ...m, [id]: nt.memberIds }));
       if (nt.komiteeSlugs.length) setTopicTagsState((m) => ({ ...m, [id]: nt.komiteeSlugs }));
-      return;
+      return id;
     }
     const { error } = await supabase!.from("topics").insert({
       id, title: topic.title, tag: topic.tag, kind: topic.kind, visibility: nt.visibility,
       parent_id: topic.parent_id, created_by: uidRef.current,
     });
-    if (error) { alert((topic.kind === "ticket" ? "Frage senden" : "Ordner anlegen") + " fehlgeschlagen: " + error.message); return; }
+    if (error) { alert((topic.kind === "ticket" ? "Frage senden" : "Ordner anlegen") + " fehlgeschlagen: " + error.message); return null; }
     if (nt.memberIds.length)
       await supabase!.from("topic_members").insert(nt.memberIds.map((user_id) => ({ topic_id: id, user_id })));
     if (nt.komiteeSlugs.length)
@@ -267,6 +267,7 @@ export function TopicsProvider({ children }: { children: ReactNode }) {
       if (recip.length) void pushToUsers(recip, "Neuer Ordner für dich", `„${topic.title}" wurde für dein Komitee freigegeben.`);
     }
     await loadAll();
+    return id;
   }, [loadAll]);
 
   const updateTopic: TopicsValue["updateTopic"] = useCallback(async (id, patch) => {
@@ -366,8 +367,21 @@ export function TopicsProvider({ children }: { children: ReactNode }) {
     const s = stateRef.current;
     const komSlugs = [...(s.topicTags[topic.id] || []), ...(topic.tag ? [topic.tag] : [])];
     const komRecipients = komSlugs.flatMap((slug) => s.tagMembers[slug] || []);
-    const recipients = [...new Set([...(s.members[topic.id] || []), ...komRecipients])]
-      .filter((u) => u !== uidRef.current);
+    let recipients = [...new Set([...(s.members[topic.id] || []), ...komRecipients])]
+      .filter((u) => u !== uidRef.current); // nie an sich selbst
+    // Wer Chat-Benachrichtigungen ausgeschaltet hat, bekommt kein Pop-up.
+    if (recipients.length) {
+      const { data: pp } = await supabase!
+        .from("public_profiles")
+        .select("user_id, push_chats")
+        .in("user_id", recipients);
+      const aus = new Set(
+        ((pp as { user_id: string; push_chats: boolean }[]) || [])
+          .filter((x) => x.push_chats === false)
+          .map((x) => x.user_id),
+      );
+      recipients = recipients.filter((u) => !aus.has(u));
+    }
     void pushToUsers(recipients, `Neues in „${topic.title}"`, (item.title ? item.title + ": " : "") + body.slice(0, 100));
     await loadAll();
   }, [loadAll]);

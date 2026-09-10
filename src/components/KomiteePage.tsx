@@ -65,7 +65,7 @@ export function KomiteePage({ topic, onBack }: { topic: Topic; onBack: () => voi
       )}
 
       {tab === "uebersicht" ? (
-        <div className="mt-3 space-y-5 pb-4">
+        <div className="mt-3 space-y-5 pb-28">
           <Abschnitt titel="Angepinnt" icon="📌" leer="Nichts angepinnt.">
             {pins.map((p) => (
               <div key={p.id} className="card flex items-start gap-2 p-3">
@@ -110,16 +110,20 @@ export function KomiteePage({ topic, onBack }: { topic: Topic; onBack: () => voi
             ))}
           </Abschnitt>
 
-          {!banned && (
-            <div className="grid grid-cols-3 gap-2 sm:max-w-md">
-              <NeuKnopf icon="📌" label="Anpinnen" onClick={() => setNeu("pin")} />
-              <NeuKnopf icon="🗳️" label="Abstimmung" onClick={() => setNeu("umfrage")} />
-              <NeuKnopf icon="✅" label="To-do" onClick={() => setNeu("todo")} />
-            </div>
-          )}
+
         </div>
       ) : (
         <ChatBereich topic={topic} liste={chat} banned={banned} darfLoeschen={darfLoeschen} uid={uid} />
+      )}
+
+      {tab === "uebersicht" && !banned && (
+        <div className="fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+3.6rem)] z-30 border-t border-slate-200 bg-slate-50/95 px-3 py-2 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95 sm:px-5">
+          <div className="mx-auto grid max-w-5xl grid-cols-3 gap-2">
+            <NeuKnopf icon="📌" label="Anpinnen" onClick={() => setNeu("pin")} />
+            <NeuKnopf icon="🗳️" label="Abstimmung" onClick={() => setNeu("umfrage")} />
+            <NeuKnopf icon="✅" label="To-do" onClick={() => setNeu("todo")} />
+          </div>
+        </div>
       )}
 
       <NeuSheet
@@ -159,9 +163,9 @@ function NeuKnopf({ icon, label, onClick }: { icon: string; label: string; onCli
   return (
     <button
       onClick={onClick}
-      className="rounded-2xl border border-dashed border-brand/50 py-3 text-center text-[13px] font-bold text-brand transition active:scale-[.98]"
+      className="flex items-center justify-center gap-1.5 rounded-xl border border-dashed border-brand/50 py-2.5 text-center text-[13px] font-bold text-brand transition active:scale-[.98]"
     >
-      <div className="text-lg">{icon}</div>
+      <span className="text-base">{icon}</span>
       {label}
     </button>
   );
@@ -276,24 +280,24 @@ function ChatBereich({
   }
 
   return (
-    <div className="flex flex-col" style={{ minHeight: "55vh" }}>
-      <div className="flex-1 space-y-2.5 py-3">
+    <div className="flex flex-col">
+      <div className="space-y-2.5 py-3 pb-28">
         {liste.length === 0 && <p className="py-12 text-center text-sm text-slate-400">Noch keine Nachricht.</p>}
         {liste.map((m) => {
           const meins = m.created_by === uid;
           return (
-            <div key={m.id} className={`flex flex-col ${meins ? "items-end" : "items-start"}`}>
-              <div className={`mb-1 flex items-center gap-1.5 ${meins ? "flex-row-reverse" : ""}`}>
-                <Avatar userId={m.created_by} name={m.author} size={20} />
-                <PersonName
-                  userId={m.created_by}
-                  name={m.author}
-                  role={m.author_role}
-                  koms={m.author_koms}
-                  className="text-[11px] font-bold"
-                />
-              </div>
-              <div className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 sm:max-w-[70%] lg:max-w-[55%] ${meins ? "bg-brand text-white" : "bg-white shadow-card dark:bg-slate-900 dark:shadow-cardDark"}`}>
+            <div key={m.id} className={`flex items-end gap-2 ${meins ? "justify-end" : "justify-start"}`}>
+              {!meins && <Avatar userId={m.created_by} name={m.author} size={28} />}
+              <div className={`max-w-[80%] rounded-2xl px-3.5 py-2 sm:max-w-[65%] lg:max-w-[50%] ${meins ? "bg-brand text-white" : "bg-white shadow-card dark:bg-slate-900 dark:shadow-cardDark"}`}>
+                {!meins && (
+                  <PersonName
+                    userId={m.created_by}
+                    name={m.author}
+                    role={m.author_role}
+                    koms={m.author_koms}
+                    className="mb-0.5 block text-[12px] font-bold leading-tight"
+                  />
+                )}
                 <div className="whitespace-pre-wrap break-words text-[15px] leading-snug">{m.body}</div>
                 <div className={`mt-1 text-right text-[10px] ${meins ? "text-white/70" : "text-slate-400"}`}>
                   {new Date(m.created_at).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })}
@@ -311,7 +315,7 @@ function ChatBereich({
       </div>
 
       {!banned && (
-        <div className="sticky bottom-[calc(env(safe-area-inset-bottom)+3.9rem)] -mx-3 flex items-end gap-2 border-t border-slate-200 bg-slate-50/95 px-3 py-2 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95 sm:-mx-5 sm:px-5">
+        <div className="fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+3.6rem)] z-30 flex items-end gap-2 border-t border-slate-200 bg-slate-50/95 px-3 py-2 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95 sm:px-5">
           <textarea
             rows={1}
             className="field max-h-28 flex-1 resize-none py-2.5"
