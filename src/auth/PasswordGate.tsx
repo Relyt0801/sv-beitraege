@@ -1,12 +1,16 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { hasSupabase, supabase } from "../lib/supabase";
+import { SELECTABLE_COMMITTEES, committeeLabel } from "../lib/committees";
+
+const SKIP_KEY = "sv:komitee-spaeter";
 
 /**
- * Erzwingt nach dem Login einen Passwortwechsel, wenn das Konto noch das
- * Startpasswort nutzt (profiles.must_change_password = true).
+ * Erzwingt nach dem Login zwei Dinge:
+ * 1. Passwortwechsel, solange noch das Startpasswort läuft
+ * 2. Auswahl des eigenen Komitees (einmalig, danach nur noch über das Stufenteam)
  */
 export function PasswordGate({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<"loading" | "change" | "ok">(hasSupabase ? "loading" : "ok");
+  const [state, setState] = useState<"loading" | "change" | "komitee" | "ok">(hasSupabase ? "loading" : "ok");
 
   useEffect(() => {
     if (!hasSupabase) return;
@@ -23,7 +27,12 @@ export function PasswordGate({ children }: { children: ReactNode }) {
         .select("must_change_password")
         .eq("user_id", uid)
         .maybeSingle();
-      if (alive) setState(data?.must_change_password ? "change" : "ok");
+      if (!alive) return;
+      if (data?.must_change_password) {
+        setState("change");
+        return;
+      }
+      setState((await braucheKomitee(uid)) ? "komitee" : "ok");
     };
     void check();
     const { data: sub } = supabase!.auth.onAuthStateChange((event) => {
@@ -45,8 +54,103 @@ export function PasswordGate({ children }: { children: ReactNode }) {
         <div className="animate-pulse text-lg font-semibold">Stufenkasse …</div>
       </div>
     );
-  if (state === "change") return <ChangeForm onDone={() => setState("ok")} />;
+  if (state === "change")
+    return (
+      <ChangeForm
+        onDone={async () => {
+          const { data: s } = await supabase!.auth.getSession();
+          const uid = s.session?.user.id;
+          setState(uid && (await braucheKomitee(uid)) ? "komitee" : "ok");
+        }}
+      />
+    );
+  if (state === "komitee") return <KomiteeForm onDone={() => setState("ok")} />;
   return <>{children}</>;
+}
+
+/** Ist der Nutzer noch in keinem Komitee und hat es auch nicht vertagt? */
+async function braucheKomitee(uid: string): Promise<boolean> {
+  if (localStorage.getItem(SKIP_KEY) === "1") return false;
+  const { data, error } = await supabase!.from("tag_members").select("tag").eq("user_id", uid).limit(1);
+  if (error) return false; // Tabelle/Recht fehlt -> nicht blockieren
+  return !data || data.length === 0;
+}
+
+function KomiteeForm({ onDone }: { onDone: () => void }) {
+  const [sel, setSel] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+
+  async function speichern() {
+    if (!sel) return;
+    setBusy(true);
+    setErr("");
+    const { data: s } = await supabase!.auth.getSession();
+    const uid = s.session?.user.id;
+    if (!uid) return;
+    const { error } = await supabase!.from("tag_members").insert({ tag: sel, user_id: uid });
+    setBusy(false);
+    if (error) {
+      setErr("Das hat nicht geklappt: " + error.message);
+      return;
+    }
+    onDone();
+  }
+
+  return (
+    <div className="flex min-h-full items-center justify-center p-6">
+      <div className="card w-full max-w-sm p-6">
+        <div className="mb-1 text-center text-2xl font-bold">Dein Komitee</div>
+        <p className="mb-5 text-center text-sm text-slate-500">
+          Wähle aus, wo du mitarbeitest. Du kommst damit automatisch in den passenden Chat.
+        </p>
+
+        <div className="mb-4 grid gap-2">
+          {SELECTABLE_COMMITTEES.map((c) => (
+            <button
+              key={c.slug}
+              onClick={() => setSel(c.slug)}
+              className={`flex items-center gap-3 rounded-xl border px-4 py-3 text-left text-[15px] font-semibold transition ${
+                sel === c.slug
+                  ? "border-brand bg-brand/10 text-brand"
+                  : "border-slate-200 dark:border-slate-700"
+              }`}
+            >
+              <span
+                className={`flex h-5 w-5 items-center justify-center rounded-full border-2 text-[11px] text-white ${
+                  sel === c.slug ? "border-brand bg-brand" : "border-slate-300 dark:border-slate-600"
+                }`}
+              >
+                {sel === c.slug ? "✓" : ""}
+              </span>
+              {c.label}
+            </button>
+          ))}
+        </div>
+
+        {err && <div className="mb-3 text-sm font-medium text-red-500">{err}</div>}
+
+        <button className="btn-primary" disabled={!sel || busy} onClick={speichern}>
+          {busy ? "…" : sel ? `„${committeeLabel(sel)}" übernehmen` : "Komitee wählen"}
+        </button>
+
+        <p className="mt-3 text-center text-[11px] leading-relaxed text-slate-400">
+          Das kannst du später nicht selbst ändern – nur das Stufenteam.
+          <br />
+          Aufsichtsrat wird ausschließlich vom Stufenteam vergeben.
+        </p>
+        <button
+          onClick={() => {
+            localStorage.setItem(SKIP_KEY, "1");
+            onDone();
+          }}
+          className="mt-3 w-full text-center text-sm font-semibold text-slate-400"
+        >
+          Ich weiß es noch nicht
+        </button>
+      </div>
+    </div>
+  );
 }
 
 function ChangeForm({ onDone }: { onDone: () => void }) {

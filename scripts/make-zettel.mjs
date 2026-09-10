@@ -6,6 +6,7 @@
 // Ergebnis: zettel.html  ->  im Browser öffnen  ->  Strg+P  ->  drucken / als PDF.
 
 import { readFileSync, writeFileSync } from "node:fs";
+import { priv, privOut } from "./privat.mjs";
 
 const csvFile = process.argv[2] || "accounts.csv";
 const appUrl = process.argv[3] || "https://sv-beitraege.vercel.app/";
@@ -32,7 +33,7 @@ function parseCSV(text) {
     });
 }
 
-const rows = parseCSV(readFileSync(csvFile, "utf8"));
+const rows = parseCSV(readFileSync(priv(csvFile), "utf8"));
 const data = rows.slice(1); // Kopfzeile weg
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -52,7 +53,7 @@ const cards = data
   .join("\n");
 
 writeFileSync(
-  "zettel.html",
+  privOut("zettel.html"),
   `<!doctype html><html lang="de"><head><meta charset="utf-8"><title>Zugangsdaten Stufenkasse</title>
 <style>
   body{font-family:-apple-system,Segoe UI,Roboto,sans-serif;margin:10mm;font-size:10pt}
@@ -68,4 +69,4 @@ writeFileSync(
 <div class="grid">${cards}</div>
 </body></html>`,
 );
-console.log(`✓ zettel.html erzeugt (${data.length} Kärtchen) – im Browser öffnen und drucken (Strg+P).`);
+console.log(`✓ privat/zettel.html erzeugt (${data.length} Kärtchen) – im Browser öffnen und drucken (Strg+P).`);

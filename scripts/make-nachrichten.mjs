@@ -4,6 +4,7 @@
 //   node scripts/make-nachrichten.mjs accounts.csv https://deine-app.vercel.app
 
 import { readFileSync, writeFileSync } from "node:fs";
+import { priv, privOut } from "./privat.mjs";
 
 const accFile = process.argv[2] || "accounts.csv";
 const appUrl = process.argv[3] || "https://sv-beitraege.vercel.app/";
@@ -39,7 +40,7 @@ Passwort: ${pass}
 LG Stufenteam`;
 }
 
-const rows = parseCSV(readFileSync(accFile, "utf8")).slice(1); // nachname,vorname,nutzername,passwort
+const rows = parseCSV(readFileSync(priv(accFile), "utf8")).slice(1); // nachname,vorname,nutzername,passwort
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
 const items = rows
@@ -55,7 +56,7 @@ const items = rows
   .join("\n");
 
 writeFileSync(
-  "nachrichten.html",
+  privOut("nachrichten.html"),
   `<!doctype html><html lang="de"><head><meta charset="utf-8"><title>Nachrichten-Versand Stufenkasse</title>
 <style>
 body{font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:680px;margin:24px auto;padding:0 16px}
@@ -80,4 +81,4 @@ function copyMsg(i, btn){
 }
 </script></body></html>`,
 );
-console.log(`✓ nachrichten.html erzeugt (${rows.length} Nachrichten). Öffnen -> Kopieren -> einfügen -> abhaken.`);
+console.log(`✓ privat/nachrichten.html erzeugt (${rows.length} Nachrichten). Öffnen -> Kopieren -> einfügen -> abhaken.`);

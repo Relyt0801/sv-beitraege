@@ -56,6 +56,14 @@ Deno.serve(async (req) => {
       body = (ev.body || "").slice(0, 120);
     }
 
+    // Niemand bekommt eine Benachrichtigung über die eigene Nachricht.
+    const jwt = req.headers.get("authorization")?.replace(/^Bearer /i, "");
+    if (jwt) {
+      const { data: me } = await supabase.auth.getUser(jwt);
+      const selbst = me?.user?.id;
+      if (selbst) userIds = userIds.filter((u) => u !== selbst);
+    }
+
     console.log("Empfänger (userIds):", userIds.length);
     if (!userIds.length) return new Response(JSON.stringify({ sent: 0 }), { headers: cors });
 

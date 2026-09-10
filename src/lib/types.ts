@@ -14,7 +14,7 @@ export interface Student {
   vorname: string;
   beigetreten_ab: Halbjahr;
   verlaesst_ab: Halbjahr | null;
-  /** Gesamtzahl der Beteiligungen (zusammengefasst, nicht pro Halbjahr). */
+  /** @deprecated Alte Zählung vor den Beitragspunkten – wird nicht mehr angezeigt. */
   beteiligungen: number;
   terms: Record<Halbjahr, Term>;
   updated_at?: string;
@@ -22,10 +22,21 @@ export interface Student {
 
 export interface Settings {
   aktuelles_halbjahr: Halbjahr;
-  /** Benötigte Beteiligungen bis Q2.2. */
-  benoetigt: number;
-  /** Zusatzbetrag (€), fällig bei Q2.2, wenn Schwelle nicht erreicht. */
+  /** Beitragspunkte, die jede Person bis zum Ende sammeln muss. */
+  ziel_punkte: number;
+  /** Zusatzbetrag (€), fällig am Ende, wenn die Zielpunktzahl nicht erreicht ist. */
   zusatz: number;
+}
+
+/** Ein einzelner Beitrag ("Kuchen gebacken", "Stände aufgebaut") mit Punktwert. */
+export interface Contribution {
+  id: string;
+  student_id: string;
+  titel: string;
+  punkte: number;
+  datum: string; // ISO-Datum (YYYY-MM-DD)
+  created_by?: string | null;
+  created_at?: string;
 }
 
 export const FEE = 25;

@@ -7,7 +7,7 @@ import { normalize, offenGesamt, sortStudents } from "../lib/logic";
 import { TYPE_META, type EventType } from "../lib/events";
 
 export function EventComposer({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { students, settings } = useStore();
+  const { students, settings, punkte } = useStore();
   const { canEditBeitrag } = useRole();
   const { createEvent } = useEvents();
 
@@ -36,7 +36,7 @@ export function EventComposer({ open, onClose }: { open: boolean; onClose: () =>
   }
 
   function selectUnpaid() {
-    const ids = students.filter((s) => offenGesamt(s, settings) > 0).map((s) => s.id);
+    const ids = students.filter((s) => offenGesamt(s, settings, punkte[s.id] || 0) > 0).map((s) => s.id);
     setAudience("selected");
     setTargets(new Set(ids));
   }

@@ -11,6 +11,7 @@
 //   Sarah-Maria Knüsting        -> sarah-maria.knuesting@...
 
 import { readFileSync, writeFileSync } from "node:fs";
+import { priv, privOut } from "./privat.mjs";
 
 const file = process.argv[2] || "stufenkasse-export.json";
 const domain = process.argv[3] || "remigianum.borken.de";
@@ -24,14 +25,14 @@ function clean(s) {
 const vornamePart = (s) => clean(s).split(" ")[0].replace(/^-+|-+$/g, "");
 const nachnamePart = (s) => clean(s).replace(/ /g, "").replace(/^-+|-+$/g, "");
 
-const students = JSON.parse(readFileSync(file, "utf8")).students;
+const students = JSON.parse(readFileSync(priv(file), "utf8")).students;
 const rows = [["nachname", "vorname", "email", "handy"]];
 for (const st of students) {
   const email = `${vornamePart(st.vorname)}.${nachnamePart(st.nachname)}@${domain}`;
   rows.push([st.nachname, st.vorname, email, ""]);
 }
 const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
-writeFileSync("kontakte.csv", csv);
-console.log(`✓ kontakte.csv erzeugt (${rows.length - 1} Schulmails @${domain}).`);
+writeFileSync(privOut("kontakte.csv"), csv);
+console.log(`✓ privat/kontakte.csv erzeugt (${rows.length - 1} Schulmails @${domain}).`);
 console.log("Stichproben:");
 for (const r of rows.slice(1, 4)) console.log("  " + r[2]);

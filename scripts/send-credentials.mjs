@@ -15,6 +15,7 @@
 //   Müller,Jonas,jonas@mail.de,0151 2345678
 
 import { readFileSync, writeFileSync } from "node:fs";
+import { priv, privOut } from "./privat.mjs";
 
 const [accFile = "accounts.csv", kontFile = "kontakte.csv", mode = "whatsapp", appUrl = "https://sv-beitraege.vercel.app/"] =
   process.argv.slice(2);
@@ -72,8 +73,8 @@ Bei Problemen einfach beim Stufenteam melden.`;
 }
 
 // ---------- Daten einlesen & matchen ----------
-const acc = parseCSV(readFileSync(accFile, "utf8")).slice(1);   // nachname,vorname,nutzername,passwort
-const kont = parseCSV(readFileSync(kontFile, "utf8")).slice(1); // nachname,vorname,email,handy
+const acc = parseCSV(readFileSync(priv(accFile), "utf8")).slice(1);   // nachname,vorname,nutzername,passwort
+const kont = parseCSV(readFileSync(priv(kontFile), "utf8")).slice(1); // nachname,vorname,email,handy
 const kontMap = new Map(kont.map((r) => [key(r[0], r[1]), { email: r[2] || "", handy: r[3] || "" }]));
 
 const rows = [];
@@ -105,7 +106,7 @@ if (mode === "whatsapp") {
       <a href="${esc(webLink)}" target="_blank" rel="noopener">Chat öffnen →</a>
       <a class="alt" href="${esc(mobLink)}" target="_blank" rel="noopener">(Handy)</a></li>`;
   }).join("\n");
-  writeFileSync("whatsapp-versand.html", `<!doctype html><html lang="de"><head><meta charset="utf-8">
+  writeFileSync(privOut("whatsapp-versand.html"), `<!doctype html><html lang="de"><head><meta charset="utf-8">
 <title>WhatsApp-Versand Stufenkasse</title>
 <style>body{font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:640px;margin:24px auto;padding:0 16px}
 ul{list-style:none;padding:0}li{display:flex;gap:12px;align-items:center;padding:10px 12px;border-bottom:1px solid #ddd}
@@ -114,7 +115,7 @@ a{font-weight:600;color:#4f46e5;text-decoration:none}a.alt{font-weight:400;font-
 <h2>WhatsApp-Versand (${withPhone.length} Personen)</h2>
 <p><b>Vorher:</b> <a href="https://web.whatsapp.com" target="_blank">web.whatsapp.com</a> in diesem Browser einloggen (QR-Code mit Handy scannen).<br>
 Dann pro Person: <b>Chat öffnen</b> → Nachricht steht schon drin → <b>Senden</b> → hier abhaken.</p><ul>${items}</ul></body></html>`);
-  console.log(`✓ whatsapp-versand.html erzeugt (${withPhone.length} Links). Öffnen, klicken, senden, abhaken.`);
+  console.log(`✓ privat/whatsapp-versand.html erzeugt (${withPhone.length} Links). Öffnen, klicken, senden, abhaken.`);
   process.exit(0);
 }
 

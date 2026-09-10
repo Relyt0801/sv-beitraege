@@ -5,9 +5,15 @@ import { pushToUsers } from "./lib/push";
 export type TopicItemType = "nachricht" | "todo" | "umfrage";
 
 export type Visibility = "privat" | "personen" | "stufenteam" | "komitee" | "custom";
+export type TopicKind = "ordner" | "chat" | "ticket";
+
 export interface Topic {
   id: string;
   title: string;
+  /** "ordner" = Planungs-Ordner (wie bisher), "chat" = Komitee-/Team-Chat, "ticket" = Frage ans Stufenteam */
+  kind: TopicKind;
+  /** nur für Tickets: "offen" | "erledigt" */
+  status: string;
   tag: string; // Komitee-Slug (oder "")
   pinned: boolean;
   admin_only: boolean;
@@ -23,6 +29,7 @@ export interface NewTopic {
   memberIds: string[];
   komiteeSlugs: string[];
   parentId?: string | null;
+  kind?: TopicKind;
 }
 export interface TopicItem {
   id: string;
@@ -41,6 +48,9 @@ export interface TopicItem {
 }
 
 const LS = "sv-beitraege:topics";
+
+/** Alte Zeilen ohne kind/status auffüllen, damit die Anzeige nicht bricht. */
+const normTopic = (t: any): Topic => ({ ...t, kind: (t?.kind as Topic["kind"]) || "ordner", status: t?.status || "offen" });
 const uuid = () => (crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random()));
 
 interface TopicsValue {
@@ -55,7 +65,7 @@ interface TopicsValue {
   uid: string;
   ready: boolean;
   createTopic: (t: NewTopic) => Promise<void>;
-  updateTopic: (id: string, patch: Partial<Pick<Topic, "title" | "tag" | "pinned" | "admin_only" | "visibility">>) => Promise<void>;
+  updateTopic: (id: string, patch: Partial<Pick<Topic, "title" | "tag" | "pinned" | "admin_only" | "visibility" | "status">>) => Promise<void>;
   deleteTopic: (id: string) => Promise<void>;
   setMembers: (topicId: string, topicTitle: string, userIds: string[]) => Promise<void>;
   setTagMembers: (tag: string, userIds: string[]) => Promise<void>;
@@ -102,7 +112,7 @@ export function TopicsProvider({ children }: { children: ReactNode }) {
     if (hasSupabase) return;
     try {
       const d = JSON.parse(localStorage.getItem(LS) || "{}");
-      setTopics(d.topics || []);
+      setTopics((d.topics || []).map(normTopic));
       setItems(d.items || []);
       setMembersState(d.members || {});
       setTopicTagsState(d.topicTags || {});
@@ -134,7 +144,7 @@ export function TopicsProvider({ children }: { children: ReactNode }) {
       supabase!.from("topic_votes").select("*"),
       supabase!.from("topic_reads").select("*"),
     ]);
-    setTopics((t as Topic[]) || []);
+    setTopics(((t as any[]) || []).map(normTopic));
     setItems((it as TopicItem[]) || []);
     const mm: Record<string, string[]> = {};
     for (const row of m || []) (mm[row.topic_id] ||= []).push(row.user_id);
@@ -203,6 +213,7 @@ export function TopicsProvider({ children }: { children: ReactNode }) {
     const id = uuid();
     const topic: Topic = {
       id, title: nt.title.trim(), tag: nt.tag.trim(), pinned: false, admin_only: false,
+      kind: nt.kind ?? "ordner", status: "offen",
       visibility: nt.visibility, parent_id: nt.parentId ?? null, created_by: uidRef.current, created_at: new Date().toISOString(),
     };
     if (!hasSupabase) {
@@ -212,9 +223,10 @@ export function TopicsProvider({ children }: { children: ReactNode }) {
       return;
     }
     const { error } = await supabase!.from("topics").insert({
-      id, title: topic.title, tag: topic.tag, visibility: nt.visibility, parent_id: topic.parent_id, created_by: uidRef.current,
+      id, title: topic.title, tag: topic.tag, kind: topic.kind, visibility: nt.visibility,
+      parent_id: topic.parent_id, created_by: uidRef.current,
     });
-    if (error) { alert("Ordner anlegen fehlgeschlagen: " + error.message); return; }
+    if (error) { alert((topic.kind === "ticket" ? "Frage senden" : "Ordner anlegen") + " fehlgeschlagen: " + error.message); return; }
     if (nt.memberIds.length)
       await supabase!.from("topic_members").insert(nt.memberIds.map((user_id) => ({ topic_id: id, user_id })));
     if (nt.komiteeSlugs.length)

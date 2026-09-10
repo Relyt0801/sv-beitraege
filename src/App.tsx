@@ -1,6 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { HY } from "./lib/types";
 import { normalize, offenGesamt, offenStufe, sortStudents } from "./lib/logic";
+import { MyKasse } from "./components/MyKasse";
+import { PunkteSheet } from "./components/PunkteSheet";
+import { SettingsSheet } from "./components/SettingsSheet";
+import { Tour, tourSteps } from "./components/Tour";
 import { useTheme } from "./lib/theme";
 import { hasSupabase, supabase } from "./lib/supabase";
 import { enablePush, pushConfigured, pushPermission } from "./lib/push";
@@ -13,14 +17,13 @@ import { Sheet } from "./components/Sheet";
 import { TermsText } from "./components/TermsText";
 import { EventsProvider, useEvents } from "./events-store";
 import { TopicsProvider, useTopics } from "./topics-store";
-import { TopicsTab } from "./components/TopicsTab";
+import { ChatsTab } from "./components/ChatsTab";
 import { StudentCard, nextStatus } from "./components/StudentCard";
 import { StudentSheet } from "./components/StudentSheet";
 import { AddSheet } from "./components/AddSheet";
 import { MassBar } from "./components/MassBar";
 import { RolesTab } from "./components/RolesTab";
 import { PermissionsTab } from "./components/PermissionsTab";
-import { MyCommittee } from "./components/MyCommittee";
 import { EventsTab } from "./components/EventsTab";
 import { EventComposer } from "./components/EventComposer";
 
@@ -45,13 +48,13 @@ export default function App() {
 type Tab = "kasse" | "events" | "themen" | "rollen" | "rechte";
 
 function Main() {
-  const { students, settings, ready, mode, setTerm, setSettings, exportData, importData } = useStore();
-  const { can, canEditData, canEditBeitrag, canManageRoles, isStaff, loginByStudent } = useRole();
+  const { students, punkte, settings, ready, mode, reload, setTerm, setSettings, exportData, importData } = useStore();
+  const { can, canEditData, canEditBeitrag, canManageRoles, isStaff, ready: roleReady, role, loginByStudent } = useRole();
   const { events: allEvents, reads } = useEvents();
   const { topics, unreadCount } = useTopics();
   const { theme, toggle } = useTheme();
 
-  const showTopicsTab = isStaff || topics.length > 0;
+  const showTopicsTab = true;
   const topicsUnread = topics.reduce((s, t) => s + unreadCount(t.id), 0);
 
   // Läuft erst NACH Zustimmungs- und Passwort-Gate (Main sitzt dahinter):
@@ -67,6 +70,22 @@ function Main() {
     } else console.log("[push] kein Auto-Abo:", { konfiguriert: pushConfigured(), erlaubnis: pushPermission() });
   }, []);
 
+  // Main läuft erst hinter Zustimmungs- und Passwort-Gate. Vorher liefert die
+  // Datenbank wegen RLS (has_consented) nichts – deshalb hier einmal nachladen.
+  useEffect(() => {
+    if (roleReady) reload();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [roleReady, role]);
+
+  // Einführung beim ersten Start – je Rolle einmal, danach nur noch auf Wunsch.
+  useEffect(() => {
+    if (!roleReady || !ready) return;
+    const key = `sv:tour:${isStaff ? "team" : "schueler"}`;
+    if (localStorage.getItem(key) === "1") return;
+    const t = setTimeout(() => setShowTour(true), 700);
+    return () => clearTimeout(t);
+  }, [roleReady, ready, isStaff]);
+
   const unread = allEvents.filter((e) => !reads.has(e.id)).length;
   const [tab, setTab] = useState<Tab>("kasse");
   const [showComposer, setShowComposer] = useState(false);
@@ -81,6 +100,10 @@ function Main() {
   const [openId, setOpenId] = useState<string | null>(null);
   const [showAdd, setShowAdd] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [showTour, setShowTour] = useState(false);
+  // Listen-, Such- und Filterwerkzeug nur für Leute, die wirklich alle Personen verwalten.
+  const teamView = isStaff;
 
   const filtered = useMemo(() => {
     const q = normalize(query);
@@ -92,16 +115,19 @@ function Main() {
         const b = normalize(`${st.vorname} ${st.nachname}`);
         if (!a.includes(q) && !b.includes(q)) return false;
       }
-      if (mn !== null && st.beteiligungen < mn) return false;
-      if (mx !== null && st.beteiligungen > mx) return false;
-      if (onlyOpen && offenGesamt(st, settings) === 0) return false;
+      const p = punkte[st.id] || 0;
+      if (mn !== null && p < mn) return false;
+      if (mx !== null && p > mx) return false;
+      if (onlyOpen && offenGesamt(st, settings, p) === 0) return false;
       return true;
     });
-  }, [students, query, min, max, onlyOpen, settings]);
+  }, [students, query, min, max, onlyOpen, settings, punkte]);
 
   const openStudent = students.find((s) => s.id === openId) ?? null;
-  const totalOffen = offenStufe(students, settings);
-  const anzahlOffen = students.filter((s) => offenGesamt(s, settings) > 0).length;
+  const totalOffen = offenStufe(students, settings, punkte);
+  const anzahlOffen = students.filter((s) => offenGesamt(s, settings, punkte[s.id] || 0) > 0).length;
+  // Schüler sehen wegen RLS nur die eigene Zeile.
+  const meinEintrag = students[0] ?? null;
 
   function toggleSelect(id: string) {
     setSelected((prev) => {
@@ -138,7 +164,7 @@ function Main() {
   const navItems: { key: Tab; icon: string; label: string; badge?: number; show: boolean }[] = [
     { key: "kasse", icon: "💶", label: "Kasse", show: true },
     { key: "events", icon: "📣", label: "Events", badge: unread, show: true },
-    { key: "themen", icon: "📋", label: "Übersicht", badge: topicsUnread, show: showTopicsTab },
+    { key: "themen", icon: "💬", label: "Chats", badge: topicsUnread, show: showTopicsTab },
     { key: "rollen", icon: "👥", label: "Rollen", show: canManageRoles },
     { key: "rechte", icon: "🛡️", label: "Rechte", show: can("perms.manage") },
   ];
@@ -154,18 +180,24 @@ function Main() {
 
           {tab !== "kasse" && (
             <div className="min-w-0 flex-1 truncate text-lg font-bold">
-              {tab === "events" ? "Events" : tab === "themen" ? "Übersicht" : tab === "rechte" ? "Berechtigungen" : "Rollen & Rechte"}
+              {tab === "events" ? "Events" : tab === "themen" ? "Chats" : tab === "rechte" ? "Berechtigungen" : "Rollen & Rechte"}
             </div>
           )}
 
           <div className="ml-auto flex shrink-0 items-center gap-2">
             {tab === "kasse" && (
               <>
-                <button className={`iconbtn ${showFilter ? "iconbtn-active" : ""}`} onClick={() => setShowFilter((v) => !v)} aria-label="Filter & Einstellungen">
+                <button
+                  data-tour="einstellungen"
+                  className={`iconbtn ${showFilter ? "iconbtn-active" : ""}`}
+                  onClick={() => (teamView ? setShowFilter((v) => !v) : setShowSettings(true))}
+                  aria-label={teamView ? "Filter & Einstellungen" : "Einstellungen"}
+                >
                   ⚙︎
                 </button>
-                {canEditData && (
+                {teamView && canEditData && (
                   <button
+                    data-tour="massen"
                     className={`iconbtn ${massMode ? "iconbtn-active" : ""}`}
                     onClick={() => {
                       setMassMode((v) => !v);
@@ -184,7 +216,7 @@ function Main() {
           </div>
         </div>
 
-        {tab === "kasse" && (
+        {tab === "kasse" && teamView && (
           <div className="mx-auto mt-2.5 flex max-w-5xl items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 shadow-card dark:border-slate-800 dark:bg-slate-900 dark:shadow-cardDark">
             <span className="text-slate-400">🔍</span>
             <input
@@ -196,7 +228,7 @@ function Main() {
           </div>
         )}
 
-        {tab === "kasse" && (
+        {tab === "kasse" && teamView && (
           <div className="mx-auto mt-2.5 max-w-5xl space-y-2">
             <div className="flex gap-1.5">
               {HY.map((h) => (
@@ -223,11 +255,11 @@ function Main() {
           </div>
         )}
 
-        {tab === "kasse" && showFilter && (
+        {tab === "kasse" && teamView && showFilter && (
           <div className="mx-auto mt-3 max-w-5xl">
             <div className="card grid grid-cols-2 gap-x-5 gap-y-4 p-4 sm:grid-cols-4">
               <label className="flex flex-col gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Beteiligungen
+                Beitragspunkte
                 <div className="flex items-center gap-1.5 text-slate-700 dark:text-slate-200">
                   <input type="number" className={numField} placeholder="min" value={min} onChange={(e) => setMin(e.target.value)} />
                   <span className="text-slate-400">–</span>
@@ -250,12 +282,12 @@ function Main() {
               {canEditData && (
                 <>
                   <label className="flex flex-col gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    Benötigt bis Q2.2
+                    Zielpunkte
                     <input
                       type="number"
                       className={numField}
-                      value={settings.benoetigt}
-                      onChange={(e) => setSettings({ benoetigt: Math.max(0, Number(e.target.value) || 0) })}
+                      value={settings.ziel_punkte}
+                      onChange={(e) => setSettings({ ziel_punkte: Math.max(0, Number(e.target.value) || 0) })}
                     />
                   </label>
                   <label className="flex flex-col gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -285,6 +317,9 @@ function Main() {
                 <button onClick={() => setShowTerms(true)} className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-semibold text-slate-500 dark:border-slate-700">
                   Nutzungsbedingungen
                 </button>
+                <button onClick={() => setShowTour(true)} className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-semibold text-slate-500 dark:border-slate-700">
+                  Einführung
+                </button>
                 {hasSupabase && (
                   <>
                     <button onClick={changePassword} className="ml-auto rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-semibold dark:border-slate-700">
@@ -297,7 +332,6 @@ function Main() {
                 )}
               </div>
 
-              <MyCommittee />
             </div>
           </div>
         )}
@@ -317,10 +351,17 @@ function Main() {
         </main>
       ) : tab === "themen" ? (
         <main className="mt-3 pb-4">
-          <TopicsTab />
+          <ChatsTab />
+        </main>
+      ) : !teamView ? (
+        <main className="mt-3">
+          <MyKasse student={meinEintrag} settings={settings} punkte={punkte[meinEintrag?.id ?? ""] || 0} ready={ready} />
+          {mode === "local" && ready && (
+            <p className="pt-3 text-center text-[11px] text-slate-400">Lokaler Modus – Daten nur auf diesem Gerät.</p>
+          )}
         </main>
       ) : (
-        <main className="mt-3 grid gap-3 lg:grid-cols-2">
+        <main className="mt-3 grid gap-3 lg:grid-cols-2" data-tour="liste">
           {!ready && (
             <div className="col-span-full flex flex-col items-center justify-center gap-4 py-24 text-slate-400">
               <div className="h-9 w-9 animate-spin rounded-full border-[3px] border-slate-300 border-t-brand dark:border-slate-700 dark:border-t-brand" />
@@ -343,11 +384,13 @@ function Main() {
               </button>
             </div>
           )}
-          {filtered.map((st) => (
+          {filtered.map((st, idx) => (
             <StudentCard
               key={st.id}
+              anchor={idx === 0 ? "person" : undefined}
               student={st}
               settings={settings}
+              punkte={punkte[st.id] || 0}
               selectable={massMode}
               selected={selected.has(st.id)}
               canToggleBeitrag={canEditBeitrag}
@@ -365,7 +408,7 @@ function Main() {
         </main>
       )}
 
-      {tab === "kasse" && canEditData && !massMode && (
+      {tab === "kasse" && teamView && canEditData && !massMode && (
         <button
           onClick={() => setShowAdd(true)}
           className="fixed bottom-[calc(env(safe-area-inset-bottom)+5rem)] right-4 z-30 flex h-14 w-14 items-center justify-center rounded-2xl bg-brand text-3xl text-white shadow-lg shadow-brand/40 transition active:scale-95 sm:right-6"
@@ -402,6 +445,7 @@ function Main() {
             {navItems.filter((n) => n.show).map((n) => (
               <button
                 key={n.key}
+                data-tour={`tab-${n.key}`}
                 onClick={() => setTab(n.key)}
                 className={`relative flex flex-1 flex-col items-center gap-0.5 py-2 text-[11px] font-semibold transition ${
                   tab === n.key ? "text-brand" : "text-slate-400"
@@ -423,9 +467,33 @@ function Main() {
         </nav>
       )}
 
-      <StudentSheet student={openStudent} onClose={() => setOpenId(null)} />
+      <StudentSheet student={openStudent} punkte={punkte[openStudent?.id ?? ""] || 0} onClose={() => setOpenId(null)} />
       <AddSheet open={showAdd} onClose={() => setShowAdd(false)} />
       <EventComposer open={showComposer} onClose={() => setShowComposer(false)} />
+      <SettingsSheet
+        open={showSettings}
+        onClose={() => setShowSettings(false)}
+        onTerms={() => {
+          setShowSettings(false);
+          setShowTerms(true);
+        }}
+        onTutorial={() => {
+          setShowSettings(false);
+          setShowTour(true);
+        }}
+        onChangePassword={() => {
+          setShowSettings(false);
+          void changePassword();
+        }}
+      />
+      <Tour
+        open={showTour}
+        steps={tourSteps({ staff: isStaff, ziel: settings.ziel_punkte, zusatz: settings.zusatz })}
+        onClose={() => {
+          setShowTour(false);
+          localStorage.setItem(`sv:tour:${isStaff ? "team" : "schueler"}`, "1");
+        }}
+      />
       <Sheet open={showTerms} onClose={() => setShowTerms(false)}>
         <TermsText />
         <button className="btn-primary mt-5" onClick={() => setShowTerms(false)}>

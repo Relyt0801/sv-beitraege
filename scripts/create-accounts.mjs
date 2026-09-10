@@ -12,6 +12,7 @@
 
 import { createClient } from "@supabase/supabase-js";
 import { readFileSync, writeFileSync } from "node:fs";
+import { priv, privOut } from "./privat.mjs";
 
 const URL = process.env.SUPABASE_URL;
 const KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -39,7 +40,7 @@ function makePassword(len = 8) {
 }
 
 const supabase = createClient(URL, KEY, { auth: { autoRefreshToken: false, persistSession: false } });
-const students = JSON.parse(readFileSync(file, "utf8")).students;
+const students = JSON.parse(readFileSync(priv(file), "utf8")).students;
 
 const seen = new Map();
 const rows = [["nachname", "vorname", "nutzername", "passwort"]];
@@ -71,5 +72,5 @@ for (const st of students) {
 }
 
 const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
-writeFileSync("accounts.csv", csv);
-console.log(`\nFertig – ${rows.length - 1} Konten. Zugangsdaten in accounts.csv (sicher aufbewahren!).`);
+writeFileSync(privOut("accounts.csv"), csv);
+console.log(`\nFertig – ${rows.length - 1} Konten. Zugangsdaten in privat/accounts.csv (sicher aufbewahren!).`);

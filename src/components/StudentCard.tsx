@@ -5,6 +5,8 @@ import { TermChip } from "./TermChip";
 export function StudentCard({
   student,
   settings,
+  punkte,
+  anchor,
   selectable,
   selected,
   canToggleBeitrag,
@@ -15,6 +17,9 @@ export function StudentCard({
 }: {
   student: Student;
   settings: Settings;
+  punkte: number;
+  /** optionaler Anker für die Einführung */
+  anchor?: string;
   selectable: boolean;
   selected: boolean;
   canToggleBeitrag: boolean;
@@ -25,11 +30,12 @@ export function StudentCard({
 }) {
   const leaving = student.verlaesst_ab != null;
   const joiningLate = student.beigetreten_ab !== "EF.1";
-  const betrag = offenGesamt(student, settings);
-  const zusatz = zusatzFaellig(student, settings);
+  const betrag = offenGesamt(student, settings, punkte);
+  const zusatz = zusatzFaellig(student, settings, punkte);
 
   return (
     <div
+      data-tour={anchor}
       className={`card p-4 sm:p-5 ${leaving ? "!border-red-300 dark:!border-red-500/40" : ""} ${
         selected ? "ring-2 ring-brand" : ""
       }`}
@@ -73,8 +79,11 @@ export function StudentCard({
               </span>
             )}
           </div>
-          <div className="mt-1 text-[13px] text-slate-500 dark:text-slate-400">
-            {student.beteiligungen} Beteiligung{student.beteiligungen === 1 ? "" : "en"}
+          <div className="mt-1 flex items-center gap-1.5 text-[13px] text-slate-500 dark:text-slate-400">
+            <span className={`font-bold ${punkte >= settings.ziel_punkte ? "text-emerald-500" : "text-brand"}`}>
+              {punkte}
+            </span>
+            <span>/ {settings.ziel_punkte} Beitragspunkte</span>
           </div>
         </button>
 

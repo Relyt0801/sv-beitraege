@@ -1,8 +1,11 @@
+import { useState } from "react";
 import { HY, STATI, type Halbjahr, type Student } from "../lib/types";
 import { isDead, isPreJoin, offenGesamt, zusatzFaellig } from "../lib/logic";
 import { useStore } from "../store";
 import { useRole } from "../auth/RoleProvider";
 import { Sheet } from "./Sheet";
+import { PunkteBar } from "./PunkteBar";
+import { PunkteSheet } from "./PunkteSheet";
 
 const STATUS_LABEL: Record<string, string> = { offen: "offen", bezahlt: "✓ bezahlt", erlassen: "~ erlassen" };
 const STATUS_ON: Record<string, string> = {
@@ -11,9 +14,19 @@ const STATUS_ON: Record<string, string> = {
   erlassen: "bg-blue-500 text-white border-blue-500",
 };
 
-export function StudentSheet({ student, onClose }: { student: Student | null; onClose: () => void }) {
-  const { settings, setTerm, bumpBet, updateStudent, removeStudent } = useStore();
+export function StudentSheet({
+  student,
+  punkte,
+  onClose,
+}: {
+  student: Student | null;
+  punkte: number;
+  onClose: () => void;
+}) {
+  const { settings, setTerm, updateStudent, removeStudent } = useStore();
   const { canEditBeitrag, canEditData } = useRole();
+  const [showPunkte, setShowPunkte] = useState(false);
+  const [showStamm, setShowStamm] = useState(false);
 
   return (
     <Sheet open={student != null} onClose={onClose}>
@@ -28,36 +41,23 @@ export function StudentSheet({ student, onClose }: { student: Student | null; on
             </button>
           </div>
 
-          {/* Zusammenfassung */}
-          <div className="mb-5 flex items-center gap-3 rounded-2xl bg-slate-100 p-4 dark:bg-slate-800/70">
-            <div className="flex-1">
-              <div className="text-xs font-medium uppercase tracking-wide text-slate-500">Offen gesamt</div>
-              <div className="text-2xl font-extrabold">
-                {offenGesamt(student, settings)} €{" "}
-                {zusatzFaellig(student, settings) && (
-                  <span className="align-middle text-sm font-semibold text-red-500">inkl. {settings.zusatz} € Zusatz</span>
-                )}
-              </div>
+          {/* Zusammenfassung: Betrag oben, Punkte darunter */}
+          <div className="mb-5 rounded-2xl bg-slate-100 p-4 dark:bg-slate-800/70">
+            <div className="text-xs font-medium uppercase tracking-wide text-slate-500">Offen gesamt</div>
+            <div className="text-2xl font-extrabold">
+              {offenGesamt(student, settings, punkte)} €{" "}
+              {zusatzFaellig(student, settings, punkte) && (
+                <span className="align-middle text-sm font-semibold text-red-500">inkl. {settings.zusatz} € Zusatz</span>
+              )}
             </div>
-            <div>
-              <div className="text-xs font-medium uppercase tracking-wide text-slate-500">Beteiligungen</div>
-              <div className="mt-1 flex items-center overflow-hidden rounded-xl border border-slate-300 dark:border-slate-600">
-                <button
-                  disabled={!canEditData}
-                  onClick={() => bumpBet(student.id, -1)}
-                  className="h-11 w-11 bg-white text-2xl font-bold disabled:opacity-30 dark:bg-slate-900"
-                >
-                  −
-                </button>
-                <span className="min-w-[48px] text-center text-xl font-extrabold">{student.beteiligungen}</span>
-                <button
-                  disabled={!canEditData}
-                  onClick={() => bumpBet(student.id, 1)}
-                  className="h-11 w-11 bg-white text-2xl font-bold disabled:opacity-30 dark:bg-slate-900"
-                >
-                  ＋
-                </button>
-              </div>
+            <div className="mt-3 border-t border-slate-200 pt-3 dark:border-slate-700">
+              <PunkteBar punkte={punkte} settings={settings} onClick={() => setShowPunkte(true)} compact />
+              <button
+                onClick={() => setShowPunkte(true)}
+                className="mt-2 w-full rounded-xl border border-slate-300 py-2 text-sm font-bold text-slate-600 transition active:scale-[.99] dark:border-slate-600 dark:text-slate-300"
+              >
+                {canEditData ? "Beiträge bearbeiten" : "Beiträge ansehen"}
+              </button>
             </div>
           </div>
 
@@ -101,7 +101,16 @@ export function StudentSheet({ student, onClose }: { student: Student | null; on
             })}
           </div>
 
-          {canEditData && (
+          {canEditData && !showStamm && (
+            <button
+              onClick={() => setShowStamm(true)}
+              className="mt-5 w-full rounded-xl border border-slate-200 py-2.5 text-sm font-semibold text-slate-500 dark:border-slate-700"
+            >
+              Stammdaten & Löschen anzeigen
+            </button>
+          )}
+
+          {canEditData && showStamm && (
           <div className="mt-5 flex flex-wrap items-center gap-3">
             <label className="text-sm text-slate-500">Dabei ab</label>
             <select
@@ -141,6 +150,14 @@ export function StudentSheet({ student, onClose }: { student: Student | null; on
           <button className="btn-primary mt-5" onClick={onClose}>
             Fertig
           </button>
+
+          <PunkteSheet
+            student={student}
+            settings={settings}
+            editable={canEditData}
+            open={showPunkte}
+            onClose={() => setShowPunkte(false)}
+          />
         </>
       )}
     </Sheet>

@@ -30,9 +30,6 @@ export function MassBar({ selected, onDone }: { selected: Set<string>; onDone: (
       <button disabled={disabled} className={btn} onClick={() => massApply(selected, h, "offen")}>
         offen
       </button>
-      <button disabled={disabled} className={btn} onClick={() => massApply(selected, h, "bet")}>
-        +1 Beteiligung
-      </button>
       <button className="rounded-xl bg-brand px-3 py-2 text-sm font-bold text-white" onClick={onDone}>
         Fertig
       </button>
