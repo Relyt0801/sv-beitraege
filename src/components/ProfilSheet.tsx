@@ -7,7 +7,7 @@ import { useTopics } from "../topics-store";
 import { useRole } from "../auth/RoleProvider";
 import { hasSupabase, supabase } from "../lib/supabase";
 import { farbKontur, farbwert, lesbarerName, speichereProfil, waehlbareFarben } from "../lib/profil";
-import { SELECTABLE_COMMITTEES, committeeIcon, committeeLabel } from "../lib/committees";
+import { SELECTABLE_COMMITTEES, committeeIcon, committeeLabel, rolleUndKomitees } from "../lib/committees";
 import { ladeKomiteeAntraege, stelleKomiteeAntrag } from "../lib/komitee-antrag";
 import { useTheme } from "../lib/theme";
 
@@ -71,7 +71,7 @@ export function ProfilSheet({
             {personIcon(role, meine)} | {lesbarerName(mein?.anzeigename || "") || "Dein Name"}
           </div>
           <div className="text-[12px] text-slate-400">
-            {meine.length ? meine.map(committeeLabel).join(", ") : "noch kein Komitee"}
+            {rolleUndKomitees(role, meine) || "noch kein Komitee"}
           </div>
         </div>
       </div>
@@ -135,7 +135,7 @@ export function ProfilSheet({
           <span className="min-w-0 flex-1">
             <span className="block text-[15px] font-semibold">Benachrichtigungen für Chats</span>
             <span className="block text-[12px] text-slate-500">
-              Pop-ups bei neuen Chat-Nachrichten. Events und Mitteilungen kommen weiterhin.
+              Nur für Chats. Mitteilungen des Stufenteams im Events-Reiter kommen immer.
             </span>
           </span>
         </button>

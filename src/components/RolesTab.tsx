@@ -7,10 +7,15 @@ import { COMMITTEES } from "../lib/committees";
 
 const ROLE_LABEL: Record<Role, string> = {
   schueler: "Schüler",
+  sprecher: "Stufensprecher*in",
+  stv_sprecher: "Stv. Schülersprecher*in",
   stufenteam: "Stufenteam",
   kassenwart: "Kassenwart",
   admin: "Admin",
 };
+
+/** Diese beiden Rollen darf nur der Admin vergeben – und je nur einmal. */
+const NUR_ADMIN: Role[] = ["sprecher", "stv_sprecher"];
 
 const isBanned = (p: { chat_banned_until: string | null; chat_ban_permanent?: boolean }) =>
   Boolean(p.chat_ban_permanent) || (!!p.chat_banned_until && new Date(p.chat_banned_until) > new Date());
@@ -22,7 +27,7 @@ const DAUERN: { label: string; ms: number | null }[] = [
 ];
 
 export function RolesTab() {
-  const { profiles, setRole, setBan, can, opUserId } = useRole();
+  const { profiles, setRole, setBan, can, isAdmin, opUserId } = useRole();
   const canAssignKom = can("komitees.assign");
   const canTimeout = can("mod.timeout");
   const { students } = useStore();
@@ -82,14 +87,22 @@ export function RolesTab() {
               <div className="mt-2.5 flex items-stretch gap-2">
                 <select
                   disabled={geschuetzt}
-                  title={geschuetzt ? "Dieses Konto ist geschützt" : undefined}
+                  title={geschuetzt ? "Diese Rolle kann nicht geändert werden" : undefined}
                   className="h-[42px] shrink-0 rounded-xl border border-slate-200 bg-slate-50 px-2.5 font-semibold disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800"
                   value={p.role}
                   onChange={(e) => setRole(p.user_id, e.target.value as Role)}
                 >
-                  {(Object.keys(ROLE_LABEL) as Role[]).map((r) => (
-                    <option key={r} value={r}>{ROLE_LABEL[r]}</option>
-                  ))}
+                  {(Object.keys(ROLE_LABEL) as Role[])
+                    .filter((r) => isAdmin || !NUR_ADMIN.includes(r) || p.role === r)
+                    .map((r) => {
+                      const vergeben = NUR_ADMIN.includes(r) && profiles.some((x) => x.role === r && x.user_id !== p.user_id);
+                      return (
+                        <option key={r} value={r} disabled={vergeben}>
+                          {ROLE_LABEL[r]}
+                          {vergeben ? " (schon vergeben)" : ""}
+                        </option>
+                      );
+                    })}
                 </select>
 
                 {canAssignKom && (
@@ -166,9 +179,14 @@ export function RolesTab() {
                     )}
                   </div>
                 )}
-                {geschuetzt && (
-                  <span className={`shrink-0 rounded-xl bg-amber-500/10 px-2.5 py-2 text-xs font-bold text-amber-600 dark:text-amber-400 ${canAssignKom ? "" : "ml-auto"}`}>
-                    🛡 geschützt
+                {canTimeout && geschuetzt && (
+                  <span
+                    title="Dieses Konto kann nicht gesperrt werden"
+                    className={`flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-xl border border-slate-200 text-lg text-slate-400 opacity-40 dark:border-slate-700 ${
+                      canAssignKom ? "" : "ml-auto"
+                    }`}
+                  >
+                    💬
                   </span>
                 )}
               </div>

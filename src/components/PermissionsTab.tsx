@@ -9,7 +9,14 @@ import { PERM_CATEGORIES, PERM_ROLES, ALL_PERMS, ROLE_DEFAULTS, type PermKey } f
 type Matrix = Record<string, Record<string, boolean>>;
 
 // Kurzlabels für die Rollen-Pills, damit alle 4 auch auf schmalen Handys nebeneinander passen.
-const ROLE_SHORT: Record<string, string> = { schueler: "Schüler", stufenteam: "Team", kassenwart: "Kasse", admin: "Admin" };
+const ROLE_SHORT: Record<string, string> = {
+  schueler: "Schüler",
+  sprecher: "Sprecher",
+  stv_sprecher: "Stv.",
+  stufenteam: "Team",
+  kassenwart: "Kasse",
+  admin: "Admin",
+};
 
 export function PermissionsTab() {
   const { profiles, can, isAdmin, opUserId } = useRole();
@@ -99,7 +106,7 @@ export function PermissionsTab() {
               <div key={perm.key}>
                 <div className="text-[15px] font-semibold">{perm.label}</div>
                 <div className="mb-1.5 text-[11px] leading-snug text-slate-400">{perm.desc}</div>
-                <div className="flex gap-1.5">
+                <div className="grid grid-cols-3 gap-1.5">
                   {PERM_ROLES.map((r) => {
                     const on = !!roleMatrix[r.key]?.[perm.key];
                     const locked = r.key === "admin";
@@ -109,7 +116,7 @@ export function PermissionsTab() {
                         disabled={locked}
                         onClick={() => toggleRole(r.key, perm.key)}
                         aria-label={`${perm.label} für ${r.label}`}
-                        className={`flex min-w-0 flex-1 items-center justify-center gap-1 rounded-lg border px-1 py-1.5 text-center text-[11px] font-bold leading-tight transition ${
+                        className={`flex min-w-0 items-center justify-center gap-1 rounded-lg border px-1 py-2 text-center text-[11px] font-bold leading-tight transition ${
                           on ? "border-brand bg-brand text-white" : "border-slate-200 text-slate-500 dark:border-slate-700"
                         } ${locked ? "opacity-60" : ""}`}
                       >
@@ -141,17 +148,11 @@ export function PermissionsTab() {
                     <div className="truncate font-semibold">{name ?? p.username}</div>
                     <div className="truncate text-[11px] text-slate-400">{p.username} · Rolle: {p.role}</div>
                   </div>
-                  {geschuetzt && <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] font-bold text-amber-600 dark:text-amber-400">🛡</span>}
                   {count > 0 && <span className="rounded-full bg-brand/15 px-2 py-0.5 text-[11px] font-bold text-brand">{count} Ausnahme{count > 1 ? "n" : ""}</span>}
                   <span className="text-slate-400">{openUser === p.user_id ? "▲" : "▼"}</span>
                 </button>
                 {openUser === p.user_id && (
                   <div className="space-y-4 border-t border-slate-100 p-3 dark:border-slate-800">
-                    {geschuetzt && (
-                      <div className="rounded-xl bg-amber-500/10 px-3 py-2 text-[12px] font-semibold text-amber-600 dark:text-amber-400">
-                        🛡 Geschütztes Konto – Rechte können nicht geändert werden.
-                      </div>
-                    )}
                     {kategorien.map((cat) => (
                       <div key={cat.label}>
                         <div className="mb-1.5 text-[11px] font-bold uppercase tracking-wide text-slate-400">

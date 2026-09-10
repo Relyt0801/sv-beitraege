@@ -53,16 +53,24 @@ export const PERM_CATEGORIES: PermCategory[] = [
 
 export const ALL_PERMS: PermKey[] = PERM_CATEGORIES.flatMap((c) => c.perms.map((p) => p.key));
 
-export const PERM_ROLES: { key: "schueler" | "stufenteam" | "kassenwart" | "admin"; label: string }[] = [
+export type RolleKey = "schueler" | "sprecher" | "stv_sprecher" | "stufenteam" | "kassenwart" | "admin";
+
+export const PERM_ROLES: { key: RolleKey; label: string }[] = [
   { key: "schueler", label: "Schüler" },
+  { key: "sprecher", label: "Stufensprecher*in" },
+  { key: "stv_sprecher", label: "Stv. Schülersprecher*in" },
   { key: "stufenteam", label: "Stufenteam" },
   { key: "kassenwart", label: "Kassenwart" },
   { key: "admin", label: "Admin" },
 ];
 
 // Standard-Rechte je Rolle (Fallback im Client, Seeds in permissions.sql identisch)
+const TEAM_STANDARD: PermKey[] = ["chats.view_all", "chats.delete_messages", "chats.manage", "komitees.assign", "data.edit"];
+
 export const ROLE_DEFAULTS: Record<string, PermKey[]> = {
   schueler: [],
+  sprecher: [...TEAM_STANDARD],
+  stv_sprecher: [...TEAM_STANDARD],
   stufenteam: ["chats.view_all", "chats.delete_messages", "chats.manage", "komitees.assign", "data.edit"],
   kassenwart: ["chats.view_all", "chats.delete_messages", "chats.manage", "komitees.assign", "data.edit", "kasse.edit"],
   admin: [...ALL_PERMS],

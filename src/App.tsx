@@ -84,7 +84,7 @@ function Main() {
   // Einführung beim ersten Start – je Rolle einmal, danach nur noch auf Wunsch.
   useEffect(() => {
     if (!roleReady || !ready) return;
-    const key = `sv:tour:${isStaff ? "team" : "schueler"}`;
+    const key = `sv:tour:v2:${isStaff ? "team" : "schueler"}`;
     if (localStorage.getItem(key) === "1") return;
     const t = setTimeout(() => setShowTour(true), 700);
     return () => clearTimeout(t);
@@ -501,7 +501,7 @@ function Main() {
         steps={tourSteps({ staff: isStaff, ziel: settings.ziel_punkte, zusatz: settings.zusatz })}
         onClose={() => {
           setShowTour(false);
-          localStorage.setItem(`sv:tour:${isStaff ? "team" : "schueler"}`, "1");
+          localStorage.setItem(`sv:tour:v2:${isStaff ? "team" : "schueler"}`, "1");
         }}
       />
       <Sheet open={showTerms} onClose={() => setShowTerms(false)}>

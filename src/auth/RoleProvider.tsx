@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState, ty
 import { hasSupabase, supabase } from "../lib/supabase";
 import { ALL_PERMS, ROLE_DEFAULTS, type PermKey } from "../lib/permissions";
 
-export type Role = "schueler" | "stufenteam" | "kassenwart" | "admin";
+export type Role = "schueler" | "stufenteam" | "kassenwart" | "admin" | "sprecher" | "stv_sprecher";
 
 export interface Profile {
   user_id: string;
@@ -46,7 +46,7 @@ export const useRole = () => {
   return v;
 };
 
-const STAFF: Role[] = ["stufenteam", "kassenwart", "admin"];
+const STAFF: Role[] = ["stufenteam", "kassenwart", "admin", "sprecher", "stv_sprecher"];
 
 export function RoleProvider({ children }: { children: ReactNode }) {
   // Lokaler Modus (ohne Supabase): voller Zugriff zum Entwickeln/Testen.
@@ -107,7 +107,6 @@ export function RoleProvider({ children }: { children: ReactNode }) {
             setBannPerm(Boolean(row.chat_ban_permanent));
             setIsOp(Boolean(row.is_op));
             void loadPerms(row.role, uidRef.current);
-            if (STAFF.includes(row.role)) void loadProfiles(true);
           }
           setProfiles((prev) => {
             const i = prev.findIndex((x) => x.user_id === row.user_id);
@@ -172,7 +171,12 @@ export function RoleProvider({ children }: { children: ReactNode }) {
       if (!hasSupabase) return;
       const { error } = await supabase!.from("profiles").update({ role: r }).eq("user_id", userId);
       if (error) {
-        alert("Rolle ändern fehlgeschlagen: " + error.message);
+        const doppelt = /duplicate key|profiles_sprecher_eindeutig|unique/i.test(error.message);
+        alert(
+          doppelt
+            ? "Diese Rolle ist schon vergeben. Nimm sie der anderen Person erst weg."
+            : "Rolle ändern fehlgeschlagen: " + error.message,
+        );
         return;
       }
       setProfiles((prev) => prev.map((p) => (p.user_id === userId ? { ...p, role: r } : p)));

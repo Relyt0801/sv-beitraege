@@ -21,6 +21,8 @@ export const ROLE_ICON: Record<string, string> = {
   admin: "💻",
   kassenwart: "💸",
   stufenteam: "👑",
+  sprecher: "📣",
+  stv_sprecher: "📣",
 };
 
 /** Komitees, die man sich selbst geben darf. */
@@ -35,6 +37,23 @@ export const committeeIcon = (slug: string): string => iconBySlug.get(slug) || "
  * Emoji vor dem Namen: Rolle geht vor Komitee.
  * Beispiel: "👑 | Yula Musterfrau", "⛪ | Jonas Müller"
  */
+/** Rollenname für die Anzeige – steht vor den Komitees. */
+export const ROLE_TITEL: Record<string, string> = {
+  admin: "Admin",
+  kassenwart: "Kassenwart",
+  stufenteam: "Stufenteam",
+  sprecher: "Stufensprecher*in",
+  stv_sprecher: "Stv. Schülersprecher*in",
+};
+
+/** "Stufenteam · Abiball" – Rolle zuerst, Komitees danach. */
+export function rolleUndKomitees(role?: string | null, koms?: string[] | null): string {
+  const teile: string[] = [];
+  if (role && ROLE_TITEL[role]) teile.push(ROLE_TITEL[role]);
+  for (const k of Array.isArray(koms) ? koms : []) teile.push(committeeLabel(k));
+  return teile.join(" · ");
+}
+
 export function personIcon(role?: string | null, koms?: string[] | null): string {
   if (role && ROLE_ICON[role]) return ROLE_ICON[role];
   // koms kann aus der Datenbank auch mal kein Array sein – dann nicht abstürzen.

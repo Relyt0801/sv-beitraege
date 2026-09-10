@@ -289,15 +289,14 @@ function ChatBereich({
             <div key={m.id} className={`flex items-end gap-2 ${meins ? "justify-end" : "justify-start"}`}>
               {!meins && <Avatar userId={m.created_by} name={m.author} size={28} />}
               <div className={`max-w-[80%] rounded-2xl px-3.5 py-2 sm:max-w-[65%] lg:max-w-[50%] ${meins ? "bg-brand text-white" : "bg-white shadow-card dark:bg-slate-900 dark:shadow-cardDark"}`}>
-                {!meins && (
-                  <PersonName
-                    userId={m.created_by}
-                    name={m.author}
-                    role={m.author_role}
-                    koms={m.author_koms}
-                    className="mb-0.5 block text-[12px] font-bold leading-tight"
-                  />
-                )}
+                <PersonName
+                  userId={m.created_by}
+                  name={m.author}
+                  role={m.author_role}
+                  koms={m.author_koms}
+                  className={`mb-0.5 block text-[12px] font-bold leading-tight ${meins ? "text-right" : ""}`}
+                  aufFarbig={meins}
+                />
                 <div className="whitespace-pre-wrap break-words text-[15px] leading-snug">{m.body}</div>
                 <div className={`mt-1 text-right text-[10px] ${meins ? "text-white/70" : "text-slate-400"}`}>
                   {new Date(m.created_at).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })}

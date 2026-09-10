@@ -21,6 +21,7 @@ export function ChatsTab() {
   const darfVerwalten = can("chats.manage");
   const [openId, setOpenId] = useState<string | null>(null);
   const [teamOffen, setTeamOffen] = useState(false);
+  const [ticketListe, setTicketListe] = useState(false);
   const angelegt = useRef(false);
 
   const chats = topics.filter((t) => t.kind === "chat");
@@ -57,16 +58,29 @@ export function ChatsTab() {
       </div>
     );
 
+  if (ticketListe && isStaff)
+    return (
+      <TicketListe
+        offene={tickets.filter((t) => t.status !== "erledigt")}
+        erledigt={tickets.filter((t) => t.status === "erledigt")}
+        onBack={() => setTicketListe(false)}
+        onOpen={(id) => {
+          setTicketListe(false);
+          setOpenId(id);
+        }}
+      />
+    );
+
   // Schüler: durchgehender Chat mit dem Stufenteam
   if (teamOffen && !isStaff)
     return <TeamChatSchueler tickets={tickets} onBack={() => setTeamOffen(false)} />;
 
   const offen = topics.find((t) => t.id === openId) ?? null;
   if (offen)
-    return offen.kind === "chat" && offen.tag ? (
+    return offen.kind === "chat" ? (
       <KomiteePage topic={offen} onBack={() => setOpenId(null)} />
     ) : (
-      <TicketChat topic={offen} onBack={() => setOpenId(null)} />
+      <TicketChat topic={offen} onBack={() => setOpenId(() => (isStaff ? null : null))} />
     );
 
   const reihenfolge = new Map(COMMITTEES.map((c, i) => [c.slug, i]));
@@ -106,6 +120,15 @@ export function ChatsTab() {
                 onOpen={() => setOpenId(t.id)}
               />
             ))}
+            {isStaff && teamChat && (
+              <ChatCard
+                titel="Stufenteam"
+                icon="👑"
+                unread={unreadCount(teamChat.id)}
+                mine
+                onOpen={() => setOpenId(teamChat.id)}
+              />
+            )}
           </div>
         )}
       </section>
@@ -124,28 +147,11 @@ export function ChatsTab() {
             onOpen={() => setTeamOffen(true)}
           />
         ) : (
-          <>
-            {offeneTickets.length === 0 && (
-              <p className="text-sm text-slate-400">Gerade keine offenen Fragen.</p>
-            )}
-            <div className="grid gap-2.5 lg:grid-cols-2">
-              {offeneTickets.map((t) => (
-                <TicketCard key={t.id} topic={t} unread={unreadCount(t.id)} onOpen={() => setOpenId(t.id)} />
-              ))}
-            </div>
-            {erledigt.length > 0 && (
-              <details className="mt-3">
-                <summary className="cursor-pointer text-xs font-bold uppercase tracking-wide text-slate-400">
-                  Erledigt ({erledigt.length})
-                </summary>
-                <div className="mt-2 grid gap-2.5 lg:grid-cols-2">
-                  {erledigt.map((t) => (
-                    <TicketCard key={t.id} topic={t} unread={0} onOpen={() => setOpenId(t.id)} />
-                  ))}
-                </div>
-              </details>
-            )}
-          </>
+          <TicketUebersichtKarte
+            offene={offeneTickets}
+            unread={ticketUngelesen}
+            onOpen={() => setTicketListe(true)}
+          />
         )}
       </section>
     </div>
@@ -342,6 +348,77 @@ function TicketChat({ topic, onBack }: { topic: Topic; onBack: () => void }) {
 
       <ChatBlasen liste={liste} uid={uid} darfLoeschen={can("chats.delete_messages")} onDelete={deleteItem} />
       {!banned && <ChatEingabe wert={text} setWert={setText} onSenden={senden} platzhalter="Antworten…" />}
+    </div>
+  );
+}
+
+
+/** Karte "Stufenteam-Tickets" mit kurzer Statuszeile. */
+function TicketUebersichtKarte({
+  offene, unread, onOpen,
+}: { offene: Topic[]; unread: number; onOpen: () => void }) {
+  const { profile } = useProfiles();
+  const neueste = offene[0];
+  const name = neueste?.created_by ? profile[neueste.created_by]?.anzeigename : "";
+  const text =
+    offene.length === 0
+      ? "gerade keine offenen Fragen"
+      : offene.length === 1
+        ? `Es gibt 1 neue Mitteilung von ${name || "einer Person"}: ${neueste.title}`
+        : `Es gibt ${offene.length} neue Mitteilungen`;
+
+  return (
+    <button onClick={onOpen} className="card flex w-full items-center gap-3 p-4 text-left transition active:scale-[.99]">
+      <span className="text-xl">🛡️</span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-[15px] font-bold">Stufenteam-Tickets</span>
+        <span className="block truncate text-[12px] text-slate-400">{text}</span>
+      </span>
+      {unread > 0 && (
+        <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[11px] font-bold text-white">
+          {unread > 9 ? "9+" : unread}
+        </span>
+      )}
+      <span className="text-slate-300">›</span>
+    </button>
+  );
+}
+
+/** Alle Tickets der Stufe – nur fürs Team. */
+function TicketListe({
+  offene, erledigt, onBack, onOpen,
+}: { offene: Topic[]; erledigt: Topic[]; onBack: () => void; onOpen: (id: string) => void }) {
+  const { unreadCount } = useTopics();
+  return (
+    <div>
+      <div className="sticky top-[52px] z-10 -mx-3 mb-3 flex items-center gap-2 border-b border-slate-200 bg-slate-50/95 px-3 py-2 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95 sm:-mx-5 sm:px-5">
+        <button className="iconbtn" onClick={onBack} aria-label="Zurück">‹</button>
+        <span className="text-xl">🛡️</span>
+        <div className="min-w-0 flex-1 truncate text-[17px] font-bold">Stufenteam-Tickets</div>
+      </div>
+
+      {offene.length === 0 ? (
+        <p className="py-8 text-center text-sm text-slate-400">Gerade keine offenen Fragen.</p>
+      ) : (
+        <div className="grid gap-2.5 lg:grid-cols-2">
+          {offene.map((t) => (
+            <TicketCard key={t.id} topic={t} unread={unreadCount(t.id)} onOpen={() => onOpen(t.id)} />
+          ))}
+        </div>
+      )}
+
+      {erledigt.length > 0 && (
+        <details className="mt-4">
+          <summary className="cursor-pointer text-xs font-bold uppercase tracking-wide text-slate-400">
+            Erledigt ({erledigt.length})
+          </summary>
+          <div className="mt-2 grid gap-2.5 lg:grid-cols-2">
+            {erledigt.map((t) => (
+              <TicketCard key={t.id} topic={t} unread={0} onOpen={() => onOpen(t.id)} />
+            ))}
+          </div>
+        </details>
+      )}
     </div>
   );
 }

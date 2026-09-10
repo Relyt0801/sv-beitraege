@@ -60,12 +60,15 @@ export function PersonName({
   role,
   koms,
   className,
+  aufFarbig,
 }: {
   userId?: string | null;
   name?: string;
   role?: string | null;
   koms?: string[] | null;
   className?: string;
+  /** steht der Name auf der eigenen (farbigen) Blase? Dann hell schreiben. */
+  aufFarbig?: boolean;
 }) {
   const { profile } = useProfiles();
   const { theme } = useTheme();
@@ -76,7 +79,11 @@ export function PersonName({
   return (
     <span
       className={className}
-      style={{ color: farbwert(key, dunkel), textShadow: farbKontur(key, dunkel) }}
+      style={
+        aufFarbig
+          ? { color: "rgba(255,255,255,.85)" }
+          : { color: farbwert(key, dunkel), textShadow: farbKontur(key, dunkel) }
+      }
     >
       {personIcon(role, koms)} | {anzeige}
     </span>
