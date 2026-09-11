@@ -30,6 +30,10 @@ interface RoleCtx {
   banned: boolean;
   bannedUntil: string | null;
   bannPermanent: boolean;
+  /** Eigene Anmelde-Kennung (null im lokalen Modus / vor dem Laden). */
+  uid: string | null;
+  /** Eigene Zeile in der Personenliste – damit "Meine Kasse" nicht die erste fremde Person zeigt. */
+  studentId: string | null;
   /** Geschütztes Konto (OP) – unantastbar für alle anderen. */
   isOp: boolean;
   opUserId: string | null;
@@ -56,6 +60,8 @@ export function RoleProvider({ children }: { children: ReactNode }) {
   const [bannedUntil, setBannedUntil] = useState<string | null>(null);
   const [bannPerm, setBannPerm] = useState(false);
   const [isOp, setIsOp] = useState(false);
+  const [uid, setUid] = useState<string | null>(null);
+  const [studentId, setStudentId] = useState<string | null>(null);
   const [perms, setPerms] = useState<Set<string>>(new Set());
   const roleRef = useRef<Role>(role);
   const uidRef = useRef<string | undefined>(undefined);
@@ -106,6 +112,7 @@ export function RoleProvider({ children }: { children: ReactNode }) {
             setBannedUntil(row.chat_banned_until ?? null); // Sperre live
             setBannPerm(Boolean(row.chat_ban_permanent));
             setIsOp(Boolean(row.is_op));
+            setStudentId(row.student_id ?? null);
             void loadPerms(row.role, uidRef.current);
           }
           setProfiles((prev) => {
@@ -125,13 +132,14 @@ export function RoleProvider({ children }: { children: ReactNode }) {
       const { data: s } = await supabase!.auth.getSession();
       const uid = s.session?.user.id;
       uidRef.current = uid;
+      if (alive) setUid(uid ?? null);
       if (!uid) {
         if (alive) setReady(true);
         return;
       }
       const { data: me } = await supabase!
         .from("profiles")
-        .select("role, chat_banned_until, chat_ban_permanent, is_op")
+        .select("role, student_id, chat_banned_until, chat_ban_permanent, is_op")
         .eq("user_id", uid)
         .maybeSingle();
       const r = (me?.role as Role) || "schueler";
@@ -140,6 +148,7 @@ export function RoleProvider({ children }: { children: ReactNode }) {
       setBannedUntil((me?.chat_banned_until as string | null) ?? null);
       setBannPerm(Boolean((me as { chat_ban_permanent?: boolean } | null)?.chat_ban_permanent));
       setIsOp(Boolean((me as { is_op?: boolean } | null)?.is_op));
+      setStudentId(((me as { student_id?: string | null } | null)?.student_id) ?? null);
       await loadPerms(r, uid);
       setReady(true);
       void supabase!.from("profiles").update({ has_logged_in: true }).eq("user_id", uid);
@@ -152,6 +161,7 @@ export function RoleProvider({ children }: { children: ReactNode }) {
         setReady(false);
         setProfiles([]);
         setPerms(new Set());
+        setStudentId(null);
         if (channel) {
           supabase!.removeChannel(channel);
           channel = null;
@@ -219,6 +229,8 @@ export function RoleProvider({ children }: { children: ReactNode }) {
     banned,
     bannedUntil,
     bannPermanent: bannPerm,
+    uid,
+    studentId,
     isOp,
     opUserId,
     setRole,

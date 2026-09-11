@@ -8,8 +8,10 @@
 // NUR LOKAL AUSFÜHREN (geheimer Key, niemals committen):
 //   $env:SUPABASE_URL="https://xxxx.supabase.co"
 //   $env:SUPABASE_SERVICE_ROLE_KEY="sb_secret_..."
-//   node scripts/reset-alle.mjs            # Probelauf, ändert nichts
-//   node scripts/reset-alle.mjs --wirklich # führt es aus
+//   node scripts/reset-alle.mjs                      # Probelauf über alle
+//   node scripts/reset-alle.mjs --wirklich            # setzt ALLE zurück
+//   node scripts/reset-alle.mjs eichberger.lorenz brinckmann.carlotta --wirklich
+//                                                     # nur diese Konten
 // ============================================================
 import { readFileSync } from "node:fs";
 import { createClient } from "@supabase/supabase-js";
@@ -18,6 +20,8 @@ import { priv } from "./privat.mjs";
 const URL = process.env.SUPABASE_URL;
 const KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const ernst = process.argv.includes("--wirklich");
+// Alles, was kein Schalter ist, gilt als Nutzername-Filter (Teiltreffer erlaubt)
+const filter = process.argv.slice(2).filter((a) => !a.startsWith("--")).map((a) => a.toLowerCase());
 
 if (!URL || !KEY) {
   console.error("Bitte SUPABASE_URL und SUPABASE_SERVICE_ROLE_KEY setzen.");
@@ -31,10 +35,14 @@ function parseCSV(text) {
     .map((z) => z.match(/("([^"]|"")*"|[^,]*)(,|$)/g).slice(0, -1).map((f) => f.replace(/,$/, "").replace(/^"|"$/g, "").replace(/""/g, '"')));
 }
 
-const zeilen = parseCSV(readFileSync(priv("accounts.csv"), "utf8")).slice(1); // nachname,vorname,nutzername,passwort
+let zeilen = parseCSV(readFileSync(priv("accounts.csv"), "utf8")).slice(1); // nachname,vorname,nutzername,passwort
+if (filter.length)
+  zeilen = zeilen.filter(([nachname, vorname, nutzername]) =>
+    filter.some((f) => `${nutzername} ${vorname} ${nachname}`.toLowerCase().includes(f)),
+  );
 const supabase = createClient(URL, KEY, { auth: { autoRefreshToken: false, persistSession: false } });
 
-console.log(`${zeilen.length} Konten in accounts.csv${ernst ? "" : "  (PROBELAUF – nichts wird geändert)"}\n`);
+console.log(`${zeilen.length} Konten${filter.length ? " (gefiltert)" : " in accounts.csv"}${ernst ? "" : "  (PROBELAUF – nichts wird geändert)"}\n`);
 
 let ok = 0;
 let fehler = 0;

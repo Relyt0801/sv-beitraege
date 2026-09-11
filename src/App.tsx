@@ -16,7 +16,7 @@ import { PasswordGate } from "./auth/PasswordGate";
 import { RoleProvider, useRole } from "./auth/RoleProvider";
 import { Sheet } from "./components/Sheet";
 import { TermsText } from "./components/TermsText";
-import { ProfilesProvider } from "./profiles-store";
+import { ProfilesProvider, useProfiles } from "./profiles-store";
 import { EventsProvider, useEvents } from "./events-store";
 import { TopicsProvider, useTopics } from "./topics-store";
 import { ChatsTab } from "./components/ChatsTab";
@@ -53,9 +53,12 @@ type Tab = "kasse" | "events" | "themen" | "rollen" | "rechte";
 
 function Main() {
   const { students, punkte, settings, ready, mode, reload, setTerm, setSettings, exportData, importData } = useStore();
-  const { can, canEditData, canEditBeitrag, canManageRoles, isStaff, ready: roleReady, role, loginByStudent } = useRole();
+  const { can, canEditData, canEditBeitrag, canManageRoles, isStaff, ready: roleReady, role, loginByStudent, studentId } = useRole();
   const { events: allEvents, reads } = useEvents();
-  const { topics, unreadCount, uid } = useTopics();
+  const { topics, unreadCount } = useTopics();
+  // Kennung fürs eigene Namensbild aus dem Profil-Speicher – im Themen-Speicher
+  // liegt sie in einer Referenz und ist beim ersten Zeichnen noch leer.
+  const { uid } = useProfiles();
   const { theme, toggle } = useTheme();
 
   const showTopicsTab = true;
@@ -130,8 +133,13 @@ function Main() {
   const openStudent = students.find((s) => s.id === openId) ?? null;
   const totalOffen = offenStufe(students, settings, punkte);
   const anzahlOffen = students.filter((s) => offenGesamt(s, settings, punkte[s.id] || 0) > 0).length;
-  // Schüler sehen wegen RLS nur die eigene Zeile.
-  const meinEintrag = students[0] ?? null;
+  // Eigene Zeile gezielt über die verknüpfte Personen-Kennung suchen. Für das
+  // Stufenteam wären das sonst alle 130 Personen – und "die erste" wäre fremd.
+  const meinEintrag = studentId
+    ? students.find((s) => s.id === studentId) ?? null
+    : students.length === 1
+      ? students[0]
+      : null;
 
   function toggleSelect(id: string) {
     setSelected((prev) => {
@@ -369,7 +377,12 @@ function Main() {
         </main>
       ) : !teamView ? (
         <main className="mt-3">
-          <MyKasse student={meinEintrag} settings={settings} punkte={punkte[meinEintrag?.id ?? ""] || 0} ready={ready} />
+          <MyKasse
+            student={meinEintrag}
+            settings={settings}
+            punkte={punkte[meinEintrag?.id ?? ""] || 0}
+            ready={ready && roleReady}
+          />
           {mode === "local" && ready && (
             <p className="pt-3 text-center text-[11px] text-slate-400">Lokaler Modus – Daten nur auf diesem Gerät.</p>
           )}

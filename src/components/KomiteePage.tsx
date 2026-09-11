@@ -239,18 +239,35 @@ function UmfrageKarte({
                 <span className="min-w-0 flex-1 truncate text-[14px] font-semibold">{o.label}</span>
                 <span className="shrink-0 text-[12px] text-slate-500">{n}</span>
               </div>
-              {waehler.length > 0 && (
-                <div className="relative mt-1.5 flex items-center pl-6">
-                  {waehler.slice(0, 12).map((u, i) => (
-                    <span key={u} style={{ marginLeft: i === 0 ? -24 : -8 }} className="relative">
-                      <Avatar userId={u} size={22} ring />
-                    </span>
-                  ))}
-                  {waehler.length > 12 && (
-                    <span className="ml-1 text-[11px] font-semibold text-slate-400">+{waehler.length - 12}</span>
+              {zeigeWaehler
+                ? waehler.length > 0 && (
+                    <div className="relative mt-1.5 flex items-center pl-6">
+                      {waehler.slice(0, 12).map((u, i) => (
+                        <span key={u} style={{ marginLeft: i === 0 ? -24 : -8 }} className="relative">
+                          <Avatar userId={u} size={22} ring />
+                        </span>
+                      ))}
+                      {waehler.length > 12 && (
+                        <span className="ml-1 text-[11px] font-semibold text-slate-400">+{waehler.length - 12}</span>
+                      )}
+                    </div>
+                  )
+                : n > 0 && (
+                    // anonym: ein grauer Kreis je Stimme, ohne Initialen
+                    <div className="relative mt-1.5 flex items-center pl-6">
+                      {Array.from({ length: Math.min(n, 12) }).map((_, i) => (
+                        <span key={i} style={{ marginLeft: i === 0 ? -24 : -8 }} className="relative">
+                          <span
+                            style={{ width: 22, height: 22 }}
+                            className="flex items-center justify-center rounded-full bg-slate-300 text-[10px] font-extrabold leading-none text-slate-500 ring-2 ring-white dark:bg-slate-600 dark:text-slate-300 dark:ring-slate-900"
+                          >
+                            ?
+                          </span>
+                        </span>
+                      ))}
+                      {n > 12 && <span className="ml-1 text-[11px] font-semibold text-slate-400">+{n - 12}</span>}
+                    </div>
                   )}
-                </div>
-              )}
             </button>
           );
         })}
