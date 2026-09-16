@@ -74,8 +74,14 @@ export function RolesTab() {
               {/* Zeile 1: Name */}
               <div className="flex items-center gap-3">
                 <span
-                  title={p.has_logged_in ? "hat sich schon angemeldet" : "noch nie angemeldet"}
-                  className={`h-3 w-3 shrink-0 rounded-full ${p.has_logged_in ? "bg-emerald-500" : "bg-slate-300 dark:bg-slate-600"}`}
+                  title={
+                    p.must_change_password === false
+                      ? "hat ein eigenes Passwort gesetzt"
+                      : "nutzt noch das Startpasswort"
+                  }
+                  className={`h-3 w-3 shrink-0 rounded-full ${
+                    p.must_change_password === false ? "bg-emerald-500" : "bg-slate-300 dark:bg-slate-600"
+                  }`}
                 />
                 <div className="min-w-0 flex-1">
                   <div className="truncate font-semibold">{name ?? p.username ?? "—"}</div>

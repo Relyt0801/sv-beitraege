@@ -194,7 +194,21 @@ async function raeumeAuf() {
     process.exit(1);
   }
   const merk = JSON.parse(readFileSync(MERKDATEI, "utf8"));
-  console.log(`${merk.students?.length || 0} Personen und ${merk.users?.length || 0} Konten aus der Demo`);
+  // Zusätzlich alles einsammeln, was zu den Demo-Nutzernamen gehört. Nur so
+  // werden auch Reste aus einem früheren Lauf gefunden.
+  const namen = new Set(personen.map((p) => p.nutzername));
+  const { data: profile } = await db.from("profiles").select("user_id, username, student_id");
+  const extraUser = [];
+  const extraStudents = [];
+  for (const pr of profile || []) {
+    if (!namen.has((pr.username || "").toLowerCase())) continue;
+    if (!merk.users?.includes(pr.user_id)) extraUser.push(pr.user_id);
+    if (pr.student_id && !merk.students?.includes(pr.student_id)) extraStudents.push(pr.student_id);
+  }
+  merk.users = [...new Set([...(merk.users || []), ...extraUser])];
+  merk.students = [...new Set([...(merk.students || []), ...extraStudents])];
+  console.log(`${merk.students.length} Personen und ${merk.users.length} Konten aus der Demo`);
+  if (extraUser.length) console.log(`  davon ${extraUser.length} aus einem früheren Lauf nachträglich gefunden`);
   if (!ernst) {
     console.log("PROBELAUF – nichts wird gelöscht. Mit --wirklich ausführen.");
     return;
@@ -227,8 +241,20 @@ async function anlegen() {
     .insert(VORLAGEN.map((v, i) => ({ titel: v.titel, punkte: v.punkte, sort: i + 1 })));
   console.log(`\n${VORLAGEN.length} Vorlagen angelegt.`);
 
-  // 2) Personen + Konten
+  // 2) Schon vorhandene Demo-Konten erkennen, damit nichts doppelt entsteht
+  const { data: schonDa } = await db.from("profiles").select("username");
+  const vorhanden = new Set((schonDa || []).map((x) => (x.username || "").toLowerCase()));
+  const doppelt = personen.filter((p) => vorhanden.has(p.nutzername));
+  if (doppelt.length) {
+    console.log(
+      `\n${doppelt.length} der Personen gibt es schon (${doppelt.slice(0, 3).map((p) => p.nutzername).join(", ")}` +
+        `${doppelt.length > 3 ? ", …" : ""}). Die werden übersprungen.`,
+    );
+  }
+
+  // 3) Personen + Konten
   for (const p of personen) {
+    if (vorhanden.has(p.nutzername)) continue; // niemals doppelt anlegen
     const { data: st, error: stErr } = await db
       .from("students")
       .insert({
@@ -287,7 +313,8 @@ async function anlegen() {
   }
 
   writeFileSync(MERKDATEI, JSON.stringify(merk, null, 2));
-  console.log(`\nFertig. ${merk.students.length} Personen, ${merk.users.length} Konten.`);
+  console.log(`\nFertig. ${merk.students.length} Personen neu angelegt, ${merk.users.length} Konten.`);
+  if (!merk.students.length) console.log("Es war also schon alles da. Nichts wurde doppelt angelegt.");
   console.log(`Kennungen gemerkt in ${MERKDATEI} – Entfernen mit: node scripts/demo-daten.mjs --entfernen --wirklich`);
 }
 
