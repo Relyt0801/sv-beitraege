@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTopics, type Topic } from "../topics-store";
 import { useRole } from "../auth/RoleProvider";
+import { UnbanRequests } from "./UnbanRequests";
+import { KomiteeRequests } from "./KomiteeRequests";
 import { COMMITTEES, committeeIcon, committeeLabel } from "../lib/committees";
 import { KomiteePage } from "./KomiteePage";
 import { BannHinweis } from "./BannHinweis";
@@ -106,7 +108,7 @@ export function ChatsTab() {
           <div className="rounded-2xl border border-dashed border-slate-300 py-8 text-center text-sm text-slate-400 dark:border-slate-700">
             {meineKoms.length
               ? "Der Chat wird gerade eingerichtet."
-              : "Du bist noch keinem Komitee zugeordnet – das Stufenteam kann dich eintragen."}
+              : "Du bist noch in keinem Komitee. Das Stufenteam kann dich eintragen."}
           </div>
         ) : (
           <div className="grid gap-2.5 lg:grid-cols-2">
@@ -137,6 +139,14 @@ export function ChatsTab() {
         <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-400">
           {isStaff ? "Fragen an euch" : "Stufenteam"}
         </h3>
+
+        {/* Bitten aus der Stufe: Komitee wechseln, Sperre aufheben */}
+        {isStaff && (
+          <>
+            <KomiteeRequests />
+            <UnbanRequests />
+          </>
+        )}
 
         {!isStaff ? (
           <ChatCard
@@ -261,7 +271,7 @@ function TeamChatSchueler({ tickets, onBack }: { tickets: Topic[]; onBack: () =>
         <span className="text-xl">🛡️</span>
         <div className="min-w-0 flex-1">
           <div className="truncate text-[17px] font-bold">Stufenteam</div>
-          <div className="text-[11px] text-slate-400">Frag hier alles – das Team antwortet dir</div>
+          <div className="text-[11px] text-slate-400">Frag hier alles, das Team antwortet dir</div>
         </div>
       </div>
 
@@ -276,7 +286,7 @@ function TeamChatSchueler({ tickets, onBack }: { tickets: Topic[]; onBack: () =>
             uid={uid}
             darfLoeschen={false}
             onDelete={deleteItem}
-            leerText="Schreib dem Stufenteam – sie melden sich hier zurück."
+            leerText="Schreib dem Stufenteam, sie melden sich hier zurück."
           />
           <ChatEingabe wert={text} setWert={setText} onSenden={senden} />
         </>

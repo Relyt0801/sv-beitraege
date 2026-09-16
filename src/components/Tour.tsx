@@ -123,14 +123,14 @@ export function tourSteps(opts: { staff: boolean; staffel: { ab: number; betrag:
     ];
 
   return [
-    { anchor: "person", title: "Eine Person", text: "Betrag, Halbjahre und Beitragspunkte auf einen Blick. Antippen öffnet die Person – dort trägst du ihre Beiträge ein." },
+    { anchor: "person", title: "Eine Person", text: "Betrag, Halbjahre und Prozent auf einen Blick. Tipp auf jemanden, dann trägst du dort ein, wobei die Person geholfen hat." },
     { anchor: "person", title: "Beiträge eintragen", text: "In der Person auf „Beiträge bearbeiten\": oben stehen Vorlagen wie „Kuchen gebacken +5\" – antippen, fertig. Die Vorlagen kannst du dort auch ändern." },
     { anchor: "massen", title: "Mehrere gleichzeitig", text: "Personen auswählen und mit „＋ Beitragspunkte\" allen dieselbe Hilfe gutschreiben." },
     { anchor: "einstellungen", title: "Filter & Einstellungen", text: `Suche eingrenzen, die Abiball-Staffel setzen (${kette}), Import/Export.` },
     { anchor: "profil", title: "Dein Profil", text: "Profilbild, Namensfarbe, Passwort und diese Einführung." },
-    { anchor: "tab-events", title: "Events", text: "Nur euer Team postet hier – und legt fest, wer die Mitteilung bekommt." },
+    { anchor: "tab-events", title: "Events", text: "Nur euer Team schreibt hier und legt fest, wer die Mitteilung bekommt." },
     { anchor: "tab-themen", title: "Chats & Tickets", text: "Alle Komitee-Chats seht ihr. Fragen der Stufe landen als Ticket im Stufenteam-Chat." },
     { anchor: "tab-rollen", title: "Rollen", text: "Wer ist Schüler, Stufenteam, Kassenwart oder Admin." },
-    { anchor: "tab-rechte", title: "Berechtigungen", text: "Feinsteuerung, wer was darf – nur nötig, wenn ihr vom Standard abweichen wollt." },
+    { anchor: "tab-rechte", title: "Berechtigungen", text: "Hier stellst du genau ein, wer was darf. Brauchst du nur, wenn ihr vom Standard abweichen wollt." },
   ];
 }

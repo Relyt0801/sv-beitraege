@@ -78,15 +78,45 @@ function reportErr(msg?: string) {
   if (!msg) return;
   console.error("[Supabase]", msg);
   const now = Date.now();
-  if (now - lastAlert > 4000) {
-    lastAlert = now;
+  if (now - lastAlert < 4000) return;
+  lastAlert = now;
+  // Fehlende Spalte: das passiert, wenn ein SQL-Update noch nicht gelaufen ist.
+  const spalte = /Could not find the '([^']+)' column of '([^']+)'/.exec(msg);
+  if (spalte) {
     alert(
-      "Speichern/Laden fehlgeschlagen:\n" +
-        msg +
-        "\n\nMeist fehlt eine Datenbank-Spalte – bitte das SQL-Update in Supabase ausführen.",
+      `In der Datenbank fehlt noch die Spalte "${spalte[1]}" in der Tabelle "${spalte[2]}".\n\n` +
+        "Das ist kein Fehler in der App. In Supabase muss noch das passende SQL aus dem Ordner " +
+        "supabase/ ausgeführt werden, dann läuft alles wieder.",
     );
+    return;
   }
+  alert("Das Speichern hat nicht geklappt.\n\n" + msg);
 }
+/**
+ * Einstellungen speichern. Fehlt in einer alten Datenbank noch eine der neuen
+ * Spalten, wird ohne sie erneut gespeichert – der Rest geht dann trotzdem durch.
+ */
+async function speichereEinstellungen(next: Settings) {
+  const voll = {
+    id: 1,
+    aktuelles_halbjahr: next.aktuelles_halbjahr,
+    ziel_punkte: next.ziel_punkte,
+    zusatzbetrag: next.zusatz,
+    staffel: next.staffel,
+    ticket_preis: next.ticket_preis,
+  };
+  const { error } = await supabase!.from("app_settings").upsert(voll);
+  if (!error) return;
+  if (!/Could not find the '(staffel|ticket_preis)' column/.test(error.message)) {
+    reportErr(error.message);
+    return;
+  }
+  const { staffel: _s, ticket_preis: _t, ...schlank } = voll;
+  const zweiter = await supabase!.from("app_settings").upsert(schlank);
+  if (zweiter.error) reportErr(zweiter.error.message);
+  else reportErr(error.message); // trotzdem sagen, dass das SQL noch fehlt
+}
+
 /** Ergebnis eines Supabase-Aufrufs prüfen und Fehler melden. */
 function run(p: PromiseLike<{ error: { message: string } | null }>) {
   return Promise.resolve(p).then((r) => {
@@ -433,17 +463,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     (patch) => {
       setSettingsState((prev) => {
         const next = { ...prev, ...patch };
-        if (mode === "supabase")
-          void run(
-            supabase!.from("app_settings").upsert({
-              id: 1,
-              aktuelles_halbjahr: next.aktuelles_halbjahr,
-              ziel_punkte: next.ziel_punkte,
-              zusatzbetrag: next.zusatz,
-              staffel: next.staffel,
-              ticket_preis: next.ticket_preis,
-            }),
-          );
+        if (mode === "supabase") void speichereEinstellungen(next);
         return next;
       });
     },

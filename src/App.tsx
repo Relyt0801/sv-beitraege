@@ -54,7 +54,7 @@ type Tab = "kasse" | "events" | "themen" | "beitraege" | "rollen" | "rechte";
 
 function Main() {
   const { students, punkte, settings, ready, mode, reload, setTerm, setSettings, exportData, importData } = useStore();
-  const { can, canEditData, canEditBeitrag, canManageRoles, isStaff, ready: roleReady, role, loginByStudent, studentId } = useRole();
+  const { can, canEditData, canEditBeitrag, canManageRoles, isStaff, ready: roleReady, role, loginByStudent, studentId, tourResetAt } = useRole();
   const { events: allEvents, reads } = useEvents();
   const { topics, unreadCount } = useTopics();
   // Kennung fürs eigene Namensbild aus dem Profil-Speicher – im Themen-Speicher
@@ -85,14 +85,17 @@ function Main() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roleReady, role]);
 
-  // Einführung beim ersten Start – je Rolle einmal, danach nur noch auf Wunsch.
+  // Einführung beim ersten Start, je Rolle einmal. Setzt das Stufenteam die
+  // Einführung zurück, wird sie beim nächsten Öffnen wieder gezeigt.
   useEffect(() => {
     if (!roleReady || !ready) return;
     const key = `sv:tour:v2:${isStaff ? "team" : "schueler"}`;
-    if (localStorage.getItem(key) === "1") return;
+    const gesehen = localStorage.getItem(key);
+    const wiederZeigen = tourResetAt && (!gesehen || gesehen === "1" || gesehen < tourResetAt);
+    if (gesehen && !wiederZeigen) return;
     const t = setTimeout(() => setShowTour(true), 700);
     return () => clearTimeout(t);
-  }, [roleReady, ready, isStaff]);
+  }, [roleReady, ready, isStaff, tourResetAt]);
 
   const unread = allEvents.filter((e) => !reads.has(e.id)).length;
   const [tab, setTab] = useState<Tab>("kasse");
@@ -376,7 +379,7 @@ function Main() {
             ready={ready && roleReady}
           />
           {mode === "local" && ready && (
-            <p className="pt-3 text-center text-[11px] text-slate-400">Lokaler Modus – Daten nur auf diesem Gerät.</p>
+            <p className="pt-3 text-center text-[11px] text-slate-400">Testbetrieb. Die Daten liegen nur auf diesem Gerät.</p>
           )}
         </main>
       ) : (
@@ -421,7 +424,7 @@ function Main() {
           ))}
           {mode === "local" && ready && (
             <p className="col-span-full pt-2 text-center text-[11px] text-slate-400">
-              Lokaler Modus – Daten nur auf diesem Gerät.
+              Testbetrieb. Die Daten liegen nur auf diesem Gerät.
             </p>
           )}
         </main>
@@ -506,7 +509,8 @@ function Main() {
         steps={tourSteps({ staff: isStaff, staffel: staffelVon(settings) })}
         onClose={() => {
           setShowTour(false);
-          localStorage.setItem(`sv:tour:v2:${isStaff ? "team" : "schueler"}`, "1");
+          // Zeitpunkt merken, damit ein späteres Zurücksetzen erkannt wird
+          localStorage.setItem(`sv:tour:v2:${isStaff ? "team" : "schueler"}`, new Date().toISOString());
         }}
       />
       <Sheet open={showTerms} onClose={() => setShowTerms(false)}>

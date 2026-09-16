@@ -1,23 +1,23 @@
 -- ============================================================================
--- STUFENKASSE – KOMPLETT-AUFBAU FÜR EIN FRISCHES SUPABASE-PROJEKT
+-- STUFENKASSE: KOMPLETT-AUFBAU FÜR EIN FRISCHES SUPABASE-PROJEKT
 --
 -- Fasst alle Einzeldateien aus supabase/ in der richtigen Reihenfolge zusammen.
--- Gedacht für ein NEUES, LEERES Projekt (z. B. das Demo-Projekt).
+-- Gedacht für ein NEUES, LEERES Projekt, zum Beispiel das Demo-Projekt.
 --
--- So geht's:
---   1. Supabase-Dashboard -> neues Projekt -> SQL Editor -> New query
---   2. Diese Datei komplett hineinkopieren -> Run
---   3. Dauert etwa eine halbe Minute. "Success. No rows returned" = fertig.
+-- So geht es:
+--   1. Supabase-Dashboard, neues Projekt, SQL Editor, New query
+--   2. Diese Datei komplett hineinkopieren und auf Run drücken
+--   3. Dauert etwa eine halbe Minute. "Success. No rows returned" heißt fertig.
 --
--- Auf einem Projekt, in dem schon Daten liegen, NICHT ausführen: einige
+-- Auf einem Projekt, in dem schon Daten liegen, bitte NICHT ausführen. Einige
 -- Abschnitte legen Regeln ohne vorheriges Löschen an und brechen dann ab.
--- Für bestehende Projekte weiter die Einzeldateien benutzen.
+-- Für bestehende Projekte weiterhin die Einzeldateien benutzen.
 -- ============================================================================
 
 
 
 -- ==========================================================================
--- SCHRITT 01 von 21: Grundgerüst: Personen + Einstellungen
+-- SCHRITT 01 von 23: Grundgerüst: Personen und Einstellungen
 -- Quelle: supabase/schema.sql
 -- ==========================================================================
 
@@ -74,7 +74,7 @@ create policy "auth write settings"  on public.app_settings for all    to authen
 
 
 -- ==========================================================================
--- SCHRITT 02 von 21: Rollen & Konten
+-- SCHRITT 02 von 23: Rollen und Konten
 -- Quelle: supabase/roles.sql
 -- ==========================================================================
 
@@ -201,7 +201,7 @@ where user_id in (select id from auth.users where email = 'adams.tyler@sv-beitra
 
 
 -- ==========================================================================
--- SCHRITT 03 von 21: Events: Infos, Abstimmungen, Nachrichten
+-- SCHRITT 03 von 23: Events: Infos, Abstimmungen, Nachrichten
 -- Quelle: supabase/events.sql
 -- ==========================================================================
 
@@ -345,7 +345,7 @@ create policy "reads own" on public.event_reads for all to authenticated
 
 
 -- ==========================================================================
--- SCHRITT 04 von 21: Ordner & Chats
+-- SCHRITT 04 von 23: Ordner und Chats
 -- Quelle: supabase/topics.sql
 -- ==========================================================================
 
@@ -454,7 +454,7 @@ create policy "treads own" on public.topic_reads for all to authenticated
 
 
 -- ==========================================================================
--- SCHRITT 05 von 21: Push-Abos
+-- SCHRITT 05 von 23: Benachrichtigungen
 -- Quelle: supabase/push.sql
 -- ==========================================================================
 
@@ -480,7 +480,7 @@ create policy "push own" on public.push_subscriptions for all to authenticated
 
 
 -- ==========================================================================
--- SCHRITT 06 von 21: Konten mit Personen verknüpfen
+-- SCHRITT 06 von 23: Konten mit Personen verknüpfen
 -- Quelle: supabase/link-accounts.sql
 -- ==========================================================================
 
@@ -563,7 +563,7 @@ from public.profiles;
 
 
 -- ==========================================================================
--- SCHRITT 07 von 21: Nutzungsbedingungen erzwingen
+-- SCHRITT 07 von 23: Nutzungsbedingungen erzwingen
 -- Quelle: supabase/consent.sql
 -- ==========================================================================
 
@@ -628,7 +628,7 @@ create policy "profiles read" on public.profiles for select to authenticated
 
 
 -- ==========================================================================
--- SCHRITT 08 von 21: Komitees & Unterordner
+-- SCHRITT 08 von 23: Komitees und Unterordner
 -- Quelle: supabase/komitees.sql
 -- ==========================================================================
 
@@ -676,7 +676,7 @@ $$;
 
 
 -- ==========================================================================
--- SCHRITT 09 von 21: Nur-Admin-Ordner
+-- SCHRITT 09 von 23: Nur-Admin-Ordner
 -- Quelle: supabase/admin-only.sql
 -- ==========================================================================
 
@@ -730,7 +730,7 @@ create policy "titems delete" on public.topic_items for delete to authenticated
 
 
 -- ==========================================================================
--- SCHRITT 10 von 21: Sichtbarkeit von Ordnern
+-- SCHRITT 10 von 23: Sichtbarkeit von Ordnern
 -- Quelle: supabase/visibility.sql
 -- ==========================================================================
 
@@ -788,7 +788,7 @@ create policy "topics delete" on public.topics for delete to authenticated
 
 
 -- ==========================================================================
--- SCHRITT 11 von 21: Team sieht alles, Admin kann sperren
+-- SCHRITT 11 von 23: Team sieht alles, Admin kann sperren
 -- Quelle: supabase/governance.sql
 -- ==========================================================================
 
@@ -854,7 +854,7 @@ end $$;
 
 
 -- ==========================================================================
--- SCHRITT 12 von 21: Mehrere Sichtbarkeits-Ziele je Ordner
+-- SCHRITT 12 von 23: Mehrere Sichtbarkeits-Ziele je Ordner
 -- Quelle: supabase/multi-visibility.sql
 -- ==========================================================================
 
@@ -907,7 +907,7 @@ $$;
 
 
 -- ==========================================================================
--- SCHRITT 13 von 21: Autoren-Markierung an Nachrichten
+-- SCHRITT 13 von 23: Autoren-Markierung an Nachrichten
 -- Quelle: supabase/author-badges.sql
 -- ==========================================================================
 
@@ -923,7 +923,7 @@ alter table public.topic_items add column if not exists author_koms text[];
 
 
 -- ==========================================================================
--- SCHRITT 14 von 21: Konfigurierbare Berechtigungen
+-- SCHRITT 14 von 23: Konfigurierbare Berechtigungen
 -- Quelle: supabase/permissions.sql
 -- ==========================================================================
 
@@ -1073,7 +1073,7 @@ create policy "profiles moderate" on public.profiles for update to authenticated
 
 
 -- ==========================================================================
--- SCHRITT 15 von 21: Beitragspunkte + Tickets
+-- SCHRITT 15 von 23: Beiträge und Tickets
 -- Quelle: supabase/punkte-und-chats.sql
 -- ==========================================================================
 
@@ -1156,7 +1156,7 @@ exception when duplicate_object then null; end $$;
 
 
 -- ==========================================================================
--- SCHRITT 16 von 21: OP-Schutz, Sperren, Vorlagen, Fremdzugriff
+-- SCHRITT 16 von 23: OP-Schutz, Sperren, Vorlagen, Fremdzugriff
 -- Quelle: supabase/erweiterungen.sql
 -- ==========================================================================
 
@@ -1459,7 +1459,7 @@ exception when duplicate_object then null; end $$;
 
 
 -- ==========================================================================
--- SCHRITT 17 von 21: Anzeigename, Initialen, Namensfarbe
+-- SCHRITT 17 von 23: Anzeigename, Initialen, Namensfarbe
 -- Quelle: supabase/profile.sql
 -- ==========================================================================
 
@@ -1535,7 +1535,7 @@ exception when duplicate_object then null; end $$;
 
 
 -- ==========================================================================
--- SCHRITT 18 von 21: Rollen Stufensprecher*in und Stv.
+-- SCHRITT 18 von 23: Rollen Stufensprecher*in und Stv.
 -- Quelle: supabase/sprecher.sql
 -- ==========================================================================
 
@@ -1663,7 +1663,7 @@ create trigger guard_role before update on public.profiles
 
 
 -- ==========================================================================
--- SCHRITT 19 von 21: Sprecher-Rechte zusammenlegen
+-- SCHRITT 19 von 23: Sprecher-Rechte zusammenlegen
 -- Quelle: supabase/sprecher-rechte.sql
 -- ==========================================================================
 
@@ -1701,7 +1701,7 @@ create trigger trg_sync_sprecher_rechte
 
 
 -- ==========================================================================
--- SCHRITT 20 von 21: Anonyme Abstimmungen im Events-Reiter
+-- SCHRITT 20 von 23: Anonyme Abstimmungen im Events-Reiter
 -- Quelle: supabase/events-anonym.sql
 -- ==========================================================================
 
@@ -1725,7 +1725,7 @@ create policy "votes select" on public.poll_votes for select to authenticated
 
 
 -- ==========================================================================
--- SCHRITT 21 von 21: Prozent-Konzept + Abiball-Staffel
+-- SCHRITT 21 von 23: Prozent-Konzept und Abiball-Staffel
 -- Quelle: supabase/prozent-staffel.sql
 -- ==========================================================================
 
@@ -1775,10 +1775,60 @@ insert into public.contribution_templates (titel, punkte, sort) values
 
 
 -- ==========================================================================
+-- SCHRITT 22 von 23: Reiter Beiträge und Ticket-Grundpreis
+-- Quelle: supabase/beitraege-reiter.sql
+-- ==========================================================================
+
+-- ============================================================
+-- Stufenkasse – Reiter "Beiträge", Ticket-Grundpreis, anpassbare Vorlagen
+-- Ausführen NACH prozent-staffel.sql. Mehrfach ausführbar.
+-- ============================================================
+
+-- 1) Grundpreis eines Abiballtickets (0 = steht noch nicht fest)
+alter table public.app_settings
+  add column if not exists ticket_preis integer not null default 0;
+
+-- 2) Vorlagen: Wert beim Eintragen anpassbar (für "je nach Aufwand 3–10 %")
+alter table public.contribution_templates
+  add column if not exists variabel boolean not null default false;
+
+update public.contribution_templates
+   set variabel = true
+ where titel = 'Eingebrachte Aktion, die umgesetzt wurde';
+
+-- 3) Neues Recht "beitraege.manage": standardmäßig nur der Admin.
+--    Der Admin hat ohnehin alles; die anderen Rollen bekommen es ausdrücklich nicht.
+insert into public.role_permissions (role, perm, allowed) values
+  ('schueler',     'beitraege.manage', false),
+  ('sprecher',     'beitraege.manage', false),
+  ('stv_sprecher', 'beitraege.manage', false),
+  ('stufenteam',   'beitraege.manage', false),
+  ('kassenwart',   'beitraege.manage', false),
+  ('admin',        'beitraege.manage', true)
+on conflict (role, perm) do nothing;
+
+
+-- ==========================================================================
+-- SCHRITT 23 von 23: Einführung erneut zeigen können
+-- Quelle: supabase/erklaerungen-reset.sql
+-- ==========================================================================
+
+-- ============================================================
+-- Stufenkasse – Einführung erneut zeigen können
+-- Ausführen im Supabase SQL-Editor. Mehrfach ausführbar.
+-- ============================================================
+
+-- Zeitpunkt, ab dem die kurze Einführung wieder erscheinen soll.
+-- Das Skript scripts/reset-erklaerungen.mjs setzt ihn auf jetzt.
+alter table public.profiles
+  add column if not exists tour_reset_at timestamptz;
+
+
+-- ==========================================================================
 -- FERTIG. Nächste Schritte:
---   1. Project Settings -> API: Project URL und anon key in die .env
---      des Projekts eintragen (bzw. .env.local fürs Demo-Projekt).
---   2. Erstes Konto anlegen und in der Tabelle profiles auf
---      role = 'admin' setzen – sonst kommt niemand an die Verwaltung.
---   3. Optional: node scripts/demo-daten.mjs --wirklich
+--   1. Project Settings, API: Project URL und anon key in die .env eintragen
+--      (bzw. in die .env.local, wenn es das Demo-Projekt ist).
+--   2. Erstes Konto anlegen und in der Tabelle profiles auf role = 'admin'
+--      setzen, sonst kommt niemand an die Verwaltung.
+--   3. Wenn gewünscht: node scripts/demo-daten.mjs --wirklich
 -- ==========================================================================

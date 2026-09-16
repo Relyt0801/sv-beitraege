@@ -37,7 +37,7 @@ export function MyKasse({
       <div className="card mx-auto max-w-2xl p-6 text-center text-sm text-slate-500">
         Zu deinem Konto ist noch keine Person zugeordnet.
         <br />
-        Melde dich beim Stufenteam, dann wird das freigeschaltet.
+        Sag dem Stufenteam Bescheid, dann schalten sie dich frei.
       </div>
     );
 
@@ -57,7 +57,7 @@ export function MyKasse({
         <section className="card p-5 lg:col-span-2">
           <div className="flex flex-wrap items-end gap-x-4 gap-y-2">
             <div className="min-w-0">
-              <div className="text-sm text-slate-500">Stufenkasse · {student.vorname} {student.nachname}</div>
+              <div className="text-sm text-slate-500">{student.vorname} {student.nachname}</div>
               <div
                 className={`mt-0.5 text-4xl font-extrabold leading-none ${
                   offen > 0 ? "text-amber-500" : "text-emerald-500"
@@ -66,7 +66,7 @@ export function MyKasse({
                 {offen} €
               </div>
               <div className="mt-1 text-[13px] text-slate-500">
-                {offen > 0 ? "noch offen · 25 € pro Halbjahr" : "alles bezahlt ✓"}
+                {offen > 0 ? "noch offen. 25 € pro Halbjahr" : "alles bezahlt ✓"}
               </div>
             </div>
           </div>
@@ -80,25 +80,25 @@ export function MyKasse({
             <span>✓ bezahlt</span>
             <span>€ offen</span>
             <span>/ erlassen</span>
-            <span>– noch nicht dabei</span>
+            <span>noch nicht dabei</span>
           </div>
         </section>
 
         {/* ------------------------------------------------ Prozentstand */}
         <section className="card p-5" data-tour="meine-punkte">
-          <div className="text-sm text-slate-500">Deine Mithilfe</div>
+          <div className="text-sm text-slate-500">Wobei du geholfen hast</div>
 
           <div className="mt-2 flex items-center gap-4">
             <Ring pct={pct} />
             <div className="min-w-0 flex-1">
               <div className="text-[13px] font-semibold leading-snug text-slate-600 dark:text-slate-300">
                 {pct >= 100
-                  ? "Voll! Dein erstes Abiballticket kostet nichts extra."
+                  ? "Geschafft. Auf dein erstes Abiballticket kommt nichts mehr drauf."
                   : "Je mehr Prozent du sammelst, desto günstiger wird dein erstes Abiballticket."}
               </div>
               {next && (
                 <div className="mt-1.5 rounded-lg bg-brand/10 px-2.5 py-1.5 text-[12px] font-semibold text-brand">
-                  Noch {next.fehlt} % bis {next.ab} % → {next.spart} € sparen
+                  Noch {next.fehlt} % bis zur nächsten Stufe, das spart dir {next.spart} €
                 </div>
               )}
             </div>
@@ -147,21 +147,21 @@ export function MyKasse({
           </div>
           {grund > 0 ? (
             <div className="mt-1 text-[12px] text-slate-400">
-              {grund} € Grundpreis {zusatz > 0 ? `+ ${zusatz} € Zusatzbeitrag` : "· kein Zusatzbeitrag"}
+              {grund} € für das Ticket {zusatz > 0 ? `und ${zusatz} € Zusatzbeitrag` : "und nichts extra"}
             </div>
           ) : (
             <div className="mt-1 text-[12px] text-slate-400">
-              Zusatzbeitrag bei {pct} % · Grundpreis steht noch nicht fest
+              So viel kommt bei {pct} % dazu. Was das Ticket selbst kostet, steht noch nicht fest
             </div>
           )}
 
           <div className="mt-3 rounded-xl bg-amber-50 p-3 text-[12px] leading-relaxed text-amber-900 dark:bg-amber-500/10 dark:text-amber-200">
-            <b>Nur das erste Ticket</b> wird teurer. Jedes weitere Ticket – für Eltern, Gäste –
-            kostet {grund > 0 ? `${grund} €` : "den normalen Preis"}, unabhängig von deinen Prozent.
+            <b>Nur dein erstes Ticket</b> wird teurer. Tickets für Eltern oder Gäste kosten
+            {grund > 0 ? ` ${grund} €` : " den normalen Preis"}, egal wie viele Prozent du hast.
           </div>
 
           <div className="mt-3 text-[12px] text-slate-400">
-            Der Ticketpreis zählt nicht zum offenen Betrag oben – das sind zwei getrennte Sachen.
+            Der Ticketpreis hat mit dem offenen Betrag oben nichts zu tun. Das sind zwei getrennte Sachen.
           </div>
         </section>
       </div>

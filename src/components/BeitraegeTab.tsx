@@ -30,8 +30,8 @@ export function BeitraegeTab() {
       <section className="card p-4 sm:p-5">
         <h2 className="text-lg font-bold">Wofür gibt es Prozent?</h2>
         <p className="mt-0.5 text-[13px] leading-relaxed text-slate-500 dark:text-slate-400">
-          Diese Liste erscheint beim Eintragen bei einer Person. Setze einen Haken bei
-          „anpassbar", wenn der Wert von Fall zu Fall schwankt (z. B. 3–10 %).
+          Diese Liste siehst du später, wenn du bei jemandem etwas einträgst. Setz einen Haken bei
+          „anpassbar", wenn der Wert je nach Aufwand schwankt.
         </p>
 
         <ul className="mt-4 grid gap-2">
@@ -85,7 +85,7 @@ export function BeitraegeTab() {
           <div className="flex items-center gap-2">
             <input
               className="min-w-0 flex-1 rounded-lg bg-slate-100 px-2.5 py-2 text-[15px] dark:bg-slate-800"
-              placeholder="Neue Möglichkeit, z. B. Fotobox betreut"
+              placeholder="Noch etwas, zum Beispiel Fotobox betreut"
               value={titel}
               onChange={(e) => setTitel(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && anlegen()}
@@ -118,7 +118,7 @@ export function BeitraegeTab() {
         <h2 className="text-lg font-bold">Abiballticket</h2>
         <p className="mt-0.5 text-[13px] leading-relaxed text-slate-500 dark:text-slate-400">
           Der Zusatzbeitrag gilt <b>nur fürs erste Ticket</b>. Jedes weitere kostet den
-          Grundpreis. Es zählt die höchste erreichte Stufe – 60 % zählt als 50 %.
+          Grundpreis. Es zählt immer die höchste erreichte Stufe, 60 Prozent zählen also als 50.
         </p>
 
         <label className="mt-4 flex items-center gap-3 rounded-2xl bg-slate-100 p-3 dark:bg-slate-800/70">
@@ -135,7 +135,7 @@ export function BeitraegeTab() {
         </label>
         {grund === 0 && (
           <p className="mt-1.5 text-[12px] text-slate-400">
-            0 € = Grundpreis steht noch nicht fest. Dann wird nur der Zusatzbeitrag angezeigt.
+            Steht 0 drin, ist der Preis noch offen. Dann sehen alle nur den Zusatzbeitrag.
           </p>
         )}
 

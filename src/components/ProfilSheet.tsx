@@ -10,6 +10,7 @@ import { farbKontur, farbwert, lesbarerName, speichereProfil, waehlbareFarben } 
 import { SELECTABLE_COMMITTEES, committeeIcon, committeeLabel, rolleUndKomitees } from "../lib/committees";
 import { ladeKomiteeAntraege, stelleKomiteeAntrag } from "../lib/komitee-antrag";
 import { useTheme } from "../lib/theme";
+import { enablePush, pushConfigured, pushPermission } from "../lib/push";
 
 /** Das eigene Profil: Bild, Namensfarbe, Passwort, Komitee-Wechsel, Hilfe. */
 export function ProfilSheet({
@@ -32,6 +33,14 @@ export function ProfilSheet({
   const [antragOffen, setAntragOffen] = useState(false);
   const [farbFehler, setFarbFehler] = useState("");
   const [hatAntrag, setHatAntrag] = useState(false);
+  // Passwort ändern direkt im Sheet – prompt() blockieren manche Browser
+  const [pwOffen, setPwOffen] = useState(false);
+  const [pw1, setPw1] = useState("");
+  const [pw2, setPw2] = useState("");
+  const [pwInfo, setPwInfo] = useState("");
+  const [pwBusy, setPwBusy] = useState(false);
+  const [perm, setPerm] = useState(pushPermission());
+  const [pushBusy, setPushBusy] = useState(false);
 
   const meine = committeesOf(uid);
 
@@ -39,15 +48,27 @@ export function ProfilSheet({
     if (open) void ladeKomiteeAntraege().then((r) => setHatAntrag(r.some((x) => x.user_id === uid)));
   }, [open, uid]);
 
-  async function passwortAendern() {
-    const pw = prompt("Neues Passwort (mindestens 6 Zeichen):");
-    if (!pw) return;
-    if (pw.length < 6) {
-      alert("Mindestens 6 Zeichen.");
+  async function passwortSpeichern() {
+    setPwInfo("");
+    if (pw1.length < 6) {
+      setPwInfo("Dein Passwort braucht mindestens 6 Zeichen.");
       return;
     }
-    const { error } = await supabase!.auth.updateUser({ password: pw });
-    alert(error ? "Fehler: " + error.message : "Passwort geändert ✓");
+    if (pw1 !== pw2) {
+      setPwInfo("Die beiden Eingaben sind nicht gleich.");
+      return;
+    }
+    setPwBusy(true);
+    const { error } = await supabase!.auth.updateUser({ password: pw1 });
+    setPwBusy(false);
+    if (error) {
+      setPwInfo("Hat nicht geklappt: " + error.message);
+      return;
+    }
+    setPw1("");
+    setPw2("");
+    setPwOffen(false);
+    setPwInfo("Passwort geändert.");
   }
 
   const row =
@@ -92,7 +113,7 @@ export function ProfilSheet({
                 if (!r.ok) {
                   setFarbFehler(
                     /public_profiles|does not exist|schema cache/i.test(r.error || "")
-                      ? "Farbe konnte nicht gespeichert werden – in der Datenbank fehlt noch profile.sql."
+                      ? "Die Farbe ließ sich nicht speichern. In der Datenbank fehlt noch profile.sql."
                       : "Farbe konnte nicht gespeichert werden: " + r.error,
                   );
                   return;
@@ -152,7 +173,7 @@ export function ProfilSheet({
         <div className="mb-5 rounded-2xl bg-slate-100 p-3 dark:bg-slate-800/70">
           <div className="mb-1 text-sm font-bold">Komitee wechseln</div>
           {hatAntrag ? (
-            <p className="text-[13px] text-slate-500">Dein Antrag liegt beim Stufenteam.</p>
+            <p className="text-[13px] text-slate-500">Dein Wunsch liegt beim Stufenteam. Sie melden sich.</p>
           ) : antragOffen ? (
             <>
               <select
@@ -169,7 +190,7 @@ export function ProfilSheet({
                 rows={2}
                 maxLength={300}
                 className="field mb-2 resize-none"
-                placeholder="Warum? (kurz)"
+                placeholder="Warum? Ein Satz reicht"
                 value={grund}
                 onChange={(e) => setGrund(e.target.value)}
               />
@@ -195,7 +216,7 @@ export function ProfilSheet({
           ) : (
             <>
               <p className="mb-2 text-[13px] text-slate-500">
-                Das Stufenteam entscheidet darüber.
+                Das Stufenteam schaut sich deinen Wunsch an.
               </p>
               <button onClick={() => setAntragOffen(true)} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-bold text-brand dark:border-slate-600">
                 Wechsel beantragen
@@ -205,9 +226,92 @@ export function ProfilSheet({
         </div>
       )}
 
+      {/* Benachrichtigungen */}
+      {hasSupabase && (
+        <div className="mb-3 rounded-2xl bg-slate-100 p-3 dark:bg-slate-800/70">
+          <div className="text-sm font-bold">Benachrichtigungen aufs Gerät</div>
+          {!pushConfigured() ? (
+            <p className="mt-1 text-[13px] text-slate-500">
+              Auf diesem Gerät noch nicht eingerichtet. Melde dich beim Stufenteam.
+            </p>
+          ) : perm === "granted" ? (
+            <p className="mt-1 text-[13px] font-semibold text-emerald-600 dark:text-emerald-400">
+              Sind an. Du bekommst Bescheid, wenn es etwas Neues gibt.
+            </p>
+          ) : perm === "denied" ? (
+            <p className="mt-1 text-[13px] text-slate-500">
+              Dein Browser blockiert sie gerade. Du kannst das in den Einstellungen deines
+              Browsers wieder erlauben, dann klappt es hier sofort.
+            </p>
+          ) : (
+            <>
+              <p className="mt-1 text-[13px] text-slate-500">
+                Noch aus. Einmal antippen und du verpasst nichts mehr.
+              </p>
+              <button
+                disabled={pushBusy}
+                onClick={async () => {
+                  setPushBusy(true);
+                  const r = await enablePush();
+                  setPushBusy(false);
+                  setPerm(pushPermission());
+                  if (!r.ok && r.error) alert("Hat nicht geklappt: " + r.error);
+                }}
+                className="mt-2 rounded-lg bg-brand px-3.5 py-2 text-sm font-bold text-white disabled:opacity-40"
+              >
+                {pushBusy ? "…" : "Benachrichtigungen anschalten"}
+              </button>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Passwort */}
+      {hasSupabase && pwOffen && (
+        <div className="mb-3 rounded-2xl border border-brand/40 bg-brand/5 p-3">
+          <div className="mb-2 text-sm font-bold">Neues Passwort</div>
+          <input
+            type="password"
+            autoComplete="new-password"
+            className="field mb-2"
+            placeholder="Neues Passwort"
+            value={pw1}
+            onChange={(e) => setPw1(e.target.value)}
+          />
+          <input
+            type="password"
+            autoComplete="new-password"
+            className="field mb-2"
+            placeholder="Noch einmal zur Sicherheit"
+            value={pw2}
+            onChange={(e) => setPw2(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && void passwortSpeichern()}
+          />
+          {pwInfo && <div className="mb-2 text-[13px] font-medium text-red-500">{pwInfo}</div>}
+          <div className="flex gap-2">
+            <button
+              onClick={() => {
+                setPwOffen(false);
+                setPwInfo("");
+              }}
+              className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-500 dark:border-slate-600"
+            >
+              Abbrechen
+            </button>
+            <button
+              disabled={pwBusy}
+              onClick={passwortSpeichern}
+              className="ml-auto rounded-lg bg-brand px-4 py-2 text-sm font-bold text-white disabled:opacity-40"
+            >
+              {pwBusy ? "…" : "Speichern"}
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="grid gap-2">
-        {hasSupabase && (
-          <button className={row} onClick={passwortAendern}>
+        {hasSupabase && !pwOffen && (
+          <button className={row} onClick={() => { setPwOffen(true); setPwInfo(""); }}>
             <span>🔑</span> Passwort ändern
           </button>
         )}

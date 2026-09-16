@@ -39,7 +39,7 @@ export function PunkteBar({
           {pct} %
         </span>
         <span className={`${compact ? "text-[13px]" : "text-sm"} text-slate-500 dark:text-slate-400`}>
-          · 1. Ticket {betrag} €
+          dein erstes Ticket kostet {betrag} €
         </span>
         {onClick && <span className="ml-auto text-sm text-slate-400">ansehen ›</span>}
       </div>
@@ -72,13 +72,13 @@ export function StufenHinweis({ pct, settings }: { pct: number; settings: Settin
   if (!next)
     return (
       <div className="mt-1.5 text-[12px] font-semibold text-emerald-600 dark:text-emerald-400">
-        100 % erreicht – aufs erste Abiballticket kommt nichts drauf. 🎉
+        Volle 100 Prozent. Auf dein erstes Abiballticket kommt nichts mehr drauf.
       </div>
     );
   return (
     <div className="mt-1.5 text-[12px] text-slate-500 dark:text-slate-400">
-      Noch <b className="text-slate-700 dark:text-slate-200">{next.fehlt} %</b> bis {next.ab} % – dann
-      kostet das erste Ticket nur noch {grund + next.betrag} € ({next.spart} € weniger).
+      Noch <b className="text-slate-700 dark:text-slate-200">{next.fehlt} %</b> bis {next.ab} Prozent. Dann
+      kostet das erste Ticket nur noch {grund + next.betrag} €, also {next.spart} € weniger.
     </div>
   );
 }

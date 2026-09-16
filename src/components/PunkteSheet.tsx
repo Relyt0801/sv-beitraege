@@ -83,9 +83,9 @@ export function PunkteSheet({
 
       {list.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-slate-300 py-10 text-center text-sm text-slate-400 dark:border-slate-700">
-          Noch nichts eingetragen.
+          Hier steht noch nichts.
           <br />
-          Hilf bei einer Aktion mit – dann erscheint sie hier.
+          Sobald du bei etwas mithilfst, taucht es hier auf.
         </div>
       ) : (
         <ul className="divide-y divide-slate-200 overflow-hidden rounded-2xl border border-slate-200 dark:divide-slate-700 dark:border-slate-700">
@@ -112,7 +112,7 @@ export function PunkteSheet({
               </div>
               {templates.length === 0 ? (
                 <p className="rounded-xl bg-white p-3 text-[13px] text-slate-500 dark:bg-slate-900">
-                  Es sind noch keine Möglichkeiten hinterlegt. Das Stufenteam legt sie im Reiter
+                  Es steht noch nichts zur Auswahl. Das Stufenteam legt die Möglichkeiten im Reiter
                   „Beiträge" an.
                 </p>
               ) : (

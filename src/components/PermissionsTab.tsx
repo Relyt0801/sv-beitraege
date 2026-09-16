@@ -100,7 +100,7 @@ export function PermissionsTab() {
 
   return (
     <div className="space-y-5">
-      <p className="text-sm text-slate-400">Rechte gelten pro Rolle. Für einzelne Personen kannst du unten Ausnahmen setzen – die überschreiben die Rolle. Der Admin hat immer alle Rechte.</p>
+      <p className="text-sm text-slate-400">Rechte gelten pro Rolle. Für einzelne Personen kannst du unten Ausnahmen setzen, die gehen dann vor. Der Admin hat immer alle Rechte.</p>
 
       {kategorien.map((cat) => (
         <section key={cat.label} className="card p-4">

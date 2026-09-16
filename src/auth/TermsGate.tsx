@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { hasSupabase, supabase } from "../lib/supabase";
-import { enablePush } from "../lib/push";
+import { enablePush, pushConfigured, pushPermission } from "../lib/push";
 import { TermsText } from "../components/TermsText";
 
 /**
@@ -53,8 +53,12 @@ export function TermsGate({ children }: { children: ReactNode }) {
 
 function AcceptScreen({ onDone }: { onDone: () => void }) {
   const [checked, setChecked] = useState(false);
+  // Benachrichtigungen gleich mit erledigen – der Klick auf "Zustimmen" ist die
+  // Nutzergeste, die der Browser für die Nachfrage braucht.
+  const [pushAn, setPushAn] = useState(true);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+  const pushMoeglich = pushConfigured() && pushPermission() === "default";
 
   async function accept() {
     setBusy(true);
@@ -70,13 +74,11 @@ function AcceptScreen({ onDone }: { onDone: () => void }) {
       setErr("Speichern fehlgeschlagen: " + error.message);
       return;
     }
-    // Erst JETZT (nach der Einwilligung) das beim Login gewünschte Push-Abo anlegen –
-    // der Klick auf "Zustimmen" liefert zugleich die nötige Nutzergeste für den Browser.
-    if (localStorage.getItem("sv:push-optin") === "1") {
-      localStorage.removeItem("sv:push-optin");
-      void enablePush().then((r) => {
-        if (!r.ok) console.warn("[push] Aktivierung nach Zustimmung fehlgeschlagen:", r.error);
-      });
+    localStorage.removeItem("sv:push-optin");
+    if (pushAn && pushMoeglich) {
+      // Direkt hier fragen, solange der Klick noch als Nutzergeste zählt
+      const r = await enablePush();
+      if (!r.ok) console.warn("[push] Aktivierung nach Zustimmung fehlgeschlagen:", r.error);
     }
     onDone();
   }
@@ -96,21 +98,40 @@ function AcceptScreen({ onDone }: { onDone: () => void }) {
             onChange={(e) => setChecked(e.target.checked)}
           />
           <span className="text-sm text-slate-600 dark:text-slate-300">
-            Ich habe die Nutzungsbedingungen &amp; Datenschutzhinweise gelesen und bin mit der
-            beschriebenen Verarbeitung meiner Daten einverstanden.
+            Ich habe gelesen, was mit meinen Daten passiert, und bin damit einverstanden.
           </span>
         </label>
+
+        {pushMoeglich && (
+          <label className="mt-3 flex cursor-pointer items-start gap-3">
+            <input
+              type="checkbox"
+              className="mt-0.5 h-5 w-5 accent-brand"
+              checked={pushAn}
+              onChange={(e) => setPushAn(e.target.checked)}
+            />
+            <span className="text-sm text-slate-600 dark:text-slate-300">
+              Schick mir eine Nachricht aufs Gerät, wenn es etwas Neues gibt. Dein Browser fragt
+              gleich noch einmal nach. Du kannst das später jederzeit im Profil ändern.
+            </span>
+          </label>
+        )}
+
+        <p className="mt-3 rounded-xl bg-slate-100 p-3 text-[13px] text-slate-600 dark:bg-slate-800/70 dark:text-slate-300">
+          Gleich danach suchst du dir ein eigenes Passwort aus. Das Startpasswort kennen noch andere,
+          deshalb ist der Schritt nicht überspringbar.
+        </p>
 
         {err && <div className="mt-3 text-sm font-medium text-red-500">{err}</div>}
 
         <button className="btn-primary mt-4" disabled={!checked || busy} onClick={accept}>
-          {busy ? "…" : "Zustimmen & weiter"}
+          {busy ? "…" : "Passt, weiter"}
         </button>
         <button
           className="mt-3 w-full text-center text-sm font-semibold text-slate-400"
           onClick={() => supabase!.auth.signOut()}
         >
-          Ablehnen &amp; abmelden
+          Nein, lieber abmelden
         </button>
       </div>
     </div>

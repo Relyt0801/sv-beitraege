@@ -199,7 +199,7 @@ function CreateFolderSheet({ init, onClose }: { init: { parentId: string | null;
       <p className="mb-3 text-xs text-slate-400">
         {mode === "privat" && "Nur du siehst diesen Ordner."}
         {mode === "stufenteam" && "Das ganze Stufenteam sieht & schreibt hier."}
-        {mode === "custom" && "Wähle beliebig viele Personen und/oder Komitees – alle können sehen & schreiben."}
+        {mode === "custom" && "Wähle so viele Personen und Komitees, wie du willst. Alle dürfen dann lesen und schreiben."}
       </p>
 
       {mode === "custom" && showPersons && (
@@ -381,7 +381,7 @@ function FolderPage({
       {/* Stream */}
       <div className="space-y-2">
         {stream.length === 0 && pinnedItems.length === 0 && children.length === 0 && (
-          <div className="py-8 text-center text-sm text-slate-400">Noch nichts hier – schreib den ersten Beitrag oder leg einen Unterordner an.</div>
+          <div className="py-8 text-center text-sm text-slate-400">Noch nichts hier. Schreib den ersten Beitrag oder leg einen Unterordner an.</div>
         )}
         {stream.map((i) => <ItemRow key={i.id} i={i} uid={uid} canEditData={canEditData} canDelete={canDelete} myVotes={myVotes} voteCounts={voteCounts} onVote={vote} onUpdate={updateItem} onDelete={deleteItem} />)}
       </div>

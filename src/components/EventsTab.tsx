@@ -3,8 +3,6 @@ import { useEvents } from "../events-store";
 import { useRole } from "../auth/RoleProvider";
 import { Avatar } from "./Avatar";
 import { committeeLabel } from "../lib/committees";
-import { UnbanRequests } from "./UnbanRequests";
-import { KomiteeRequests } from "./KomiteeRequests";
 import { TYPE_META, type EventItem } from "../lib/events";
 import { enablePush, pushConfigured, pushPermission } from "../lib/push";
 
@@ -14,10 +12,8 @@ function PushBanner() {
   if (!pushConfigured() || perm === "granted" || perm === "denied" || perm === "unsupported") return null;
   return (
     <div className="mb-3 flex flex-wrap items-center gap-3 rounded-2xl border border-brand/30 bg-brand/5 p-3.5">
-      <UnbanRequests />
-      <KomiteeRequests />
       <span className="text-sm font-medium text-slate-600 dark:text-slate-300">
-        🔔 Benachrichtigungen bei neuen Events aufs Gerät bekommen?
+        🔔 Willst du eine Nachricht aufs Handy bekommen, wenn es etwas Neues gibt?
       </span>
       <button
         disabled={busy}
@@ -26,11 +22,11 @@ function PushBanner() {
           const r = await enablePush();
           setBusy(false);
           setPerm(pushPermission());
-          if (!r.ok && r.error) alert("Konnte nicht aktivieren: " + r.error);
+          if (!r.ok && r.error) alert("Hat nicht geklappt: " + r.error);
         }}
         className="ml-auto rounded-lg bg-brand px-3 py-1.5 text-sm font-semibold text-white"
       >
-        {busy ? "…" : "Aktivieren"}
+        {busy ? "…" : "Ja, gerne"}
       </button>
     </div>
   );
