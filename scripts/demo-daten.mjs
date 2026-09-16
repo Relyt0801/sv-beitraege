@@ -231,6 +231,9 @@ async function anlegen() {
           student_id: st.id,
           must_change_password: false,
           has_logged_in: true,
+          // Nutzungsbedingungen vorab bestätigt – sonst käme bei jedem
+          // Demo-Login zuerst der Zustimmungsbildschirm
+          terms_accepted_at: new Date().toISOString(),
         },
         { onConflict: "user_id" },
       );
