@@ -36,6 +36,8 @@ export function EventsProvider({ children }: { children: ReactNode }) {
   const [reads, setReads] = useState<Set<string>>(new Set());
   const [ready, setReady] = useState(!hasSupabase);
   const uidRef = useRef<string>(LOCAL_UID);
+  // Realtime feuert bei jeder Stimme – Nachladen bündeln statt sechs Abfragen je Klick
+  const nachladeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ---------- LOCAL MODE ----------
   const saveLocal = useCallback(
@@ -108,6 +110,15 @@ export function EventsProvider({ children }: { children: ReactNode }) {
     setReady(true);
   }, []);
 
+  /** Nachladen anstoßen – mehrere Anstöße innerhalb 300 ms werden zu einem. */
+  const planeNachladen = useCallback(() => {
+    if (nachladeTimer.current) clearTimeout(nachladeTimer.current);
+    nachladeTimer.current = setTimeout(() => {
+      nachladeTimer.current = null;
+      void loadAll();
+    }, 300);
+  }, [loadAll]);
+
   useEffect(() => {
     if (!hasSupabase) return;
     let alive = true;
@@ -123,8 +134,8 @@ export function EventsProvider({ children }: { children: ReactNode }) {
       if (channel) return;
       channel = supabase!
         .channel("sv-events")
-        .on("postgres_changes", { event: "*", schema: "public", table: "events" }, () => void loadAll())
-        .on("postgres_changes", { event: "*", schema: "public", table: "poll_votes" }, () => void loadAll())
+        .on("postgres_changes", { event: "*", schema: "public", table: "events" }, planeNachladen)
+        .on("postgres_changes", { event: "*", schema: "public", table: "poll_votes" }, planeNachladen)
         .subscribe();
     };
     void start();
@@ -143,9 +154,10 @@ export function EventsProvider({ children }: { children: ReactNode }) {
     return () => {
       alive = false;
       sub.subscription.unsubscribe();
+      if (nachladeTimer.current) clearTimeout(nachladeTimer.current);
       if (channel) supabase!.removeChannel(channel);
     };
-  }, [loadAll]);
+  }, [loadAll, planeNachladen]);
 
   // ---------- actions ----------
   const createEvent = useCallback(
@@ -253,6 +265,20 @@ export function EventsProvider({ children }: { children: ReactNode }) {
         return;
       }
       const uid = uidRef.current;
+      // sofort anzeigen, damit der Knopf nicht erst nach dem Server reagiert
+      const vorher = myVotes[eventId] || [];
+      const nachher = has ? vorher.filter((o) => o !== optionId) : multiple ? [...vorher, optionId] : [optionId];
+      setMyVotes((p) => ({ ...p, [eventId]: nachher }));
+      setVoteCounts((c) => {
+        const n = { ...(c[eventId] || {}) };
+        for (const opt of vorher) n[opt] = Math.max(0, (n[opt] || 0) - 1);
+        for (const opt of nachher) n[opt] = (n[opt] || 0) + 1;
+        return { ...c, [eventId]: n };
+      });
+      setVoters((v) => {
+        const ohneMich = (v[eventId] || []).filter((x) => x.user_id !== uid);
+        return { ...v, [eventId]: [...ohneMich, ...nachher.map((option_id) => ({ option_id, user_id: uid }))] };
+      });
       if (has) {
         await supabase!.from("poll_votes").delete().eq("event_id", eventId).eq("option_id", optionId).eq("user_id", uid);
       } else {
@@ -260,9 +286,9 @@ export function EventsProvider({ children }: { children: ReactNode }) {
           await supabase!.from("poll_votes").delete().eq("event_id", eventId).eq("user_id", uid);
         await supabase!.from("poll_votes").insert({ event_id: eventId, option_id: optionId, user_id: uid });
       }
-      await loadAll();
+      planeNachladen();
     },
-    [events, loadAll, myVotes, reads, saveLocal],
+    [events, myVotes, planeNachladen, reads, saveLocal],
   );
 
   const markRead = useCallback(

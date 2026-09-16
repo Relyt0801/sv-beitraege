@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { hasSupabase, supabase } from "../lib/supabase";
-import { ALL_PERMS, ROLE_DEFAULTS, type PermKey } from "../lib/permissions";
+import { ALL_PERMS, ROLE_DEFAULTS, rechteRolle, type PermKey } from "../lib/permissions";
 
 export type Role = "schueler" | "stufenteam" | "kassenwart" | "admin" | "sprecher" | "stv_sprecher";
 
@@ -77,7 +77,11 @@ export function RoleProvider({ children }: { children: ReactNode }) {
   const loadPerms = useCallback(async (r: Role, id: string | undefined) => {
     if (!hasSupabase) return;
     if (r === "admin") { setPerms(new Set(ALL_PERMS)); return; }
-    const { data: rp, error } = await supabase!.from("role_permissions").select("perm, allowed").eq("role", r);
+    // Stv. Schülersprecher*in teilt sich die Rechte mit Stufensprecher*in
+    const { data: rp, error } = await supabase!
+      .from("role_permissions")
+      .select("perm, allowed")
+      .eq("role", rechteRolle(r));
     const base: Record<string, boolean> = {};
     if (error || !rp) for (const p of ROLE_DEFAULTS[r] || []) base[p] = true; // Fallback vor Migration
     else for (const row of rp as { perm: string; allowed: boolean }[]) base[row.perm] = row.allowed;

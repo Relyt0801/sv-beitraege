@@ -109,6 +109,9 @@ export function TopicsProvider({ children }: { children: ReactNode }) {
   const nameRef = useRef("du");
   const stateRef = useRef({ topics, items, members, topicTags, tagMembers, myVotes, reads });
   stateRef.current = { topics, items, members, topicTags, tagMembers, myVotes, reads };
+  // Realtime feuert oft mehrfach hintereinander – Nachladen bündeln statt
+  // für jedes Ereignis sieben Abfragen zu starten.
+  const nachladeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ---------- lokal (Testmodus) ----------
   const saveLocal = useCallback(() => {
@@ -186,6 +189,15 @@ export function TopicsProvider({ children }: { children: ReactNode }) {
     setReady(true);
   }, []);
 
+  /** Nachladen anstoßen – mehrere Anstöße innerhalb 300 ms werden zu einem. */
+  const planeNachladen = useCallback(() => {
+    if (nachladeTimer.current) clearTimeout(nachladeTimer.current);
+    nachladeTimer.current = setTimeout(() => {
+      nachladeTimer.current = null;
+      void loadAll();
+    }, 300);
+  }, [loadAll]);
+
   useEffect(() => {
     if (!hasSupabase) return;
     let channel: ReturnType<NonNullable<typeof supabase>["channel"]> | null = null;
@@ -215,12 +227,29 @@ export function TopicsProvider({ children }: { children: ReactNode }) {
       if (channel) return;
       channel = supabase!
         .channel("sv-topics")
-        .on("postgres_changes", { event: "*", schema: "public", table: "topics" }, () => void loadAll())
-        .on("postgres_changes", { event: "*", schema: "public", table: "topic_items" }, () => void loadAll())
-        .on("postgres_changes", { event: "*", schema: "public", table: "topic_members" }, () => void loadAll())
-        .on("postgres_changes", { event: "*", schema: "public", table: "topic_tags" }, () => void loadAll())
-        .on("postgres_changes", { event: "*", schema: "public", table: "tag_members" }, () => void loadAll())
-        .on("postgres_changes", { event: "*", schema: "public", table: "topic_votes" }, () => void loadAll())
+        .on("postgres_changes", { event: "*", schema: "public", table: "topics" }, planeNachladen)
+        // Chat-Nachrichten kommen einzeln an und werden einzeln eingefügt –
+        // das ist der Unterschied zwischen "sofort da" und "lädt kurz".
+        .on("postgres_changes", { event: "*", schema: "public", table: "topic_items" }, (p) => {
+          if (p.eventType === "DELETE") {
+            const alt = p.old as { id?: string };
+            if (alt?.id) setItems((prev) => prev.filter((i) => i.id !== alt.id));
+            return;
+          }
+          const row = p.new as TopicItem;
+          if (!row?.id) return;
+          setItems((prev) => {
+            const i = prev.findIndex((x) => x.id === row.id);
+            if (i === -1) return [...prev, row];
+            const next = [...prev];
+            next[i] = { ...next[i], ...row };
+            return next;
+          });
+        })
+        .on("postgres_changes", { event: "*", schema: "public", table: "topic_members" }, planeNachladen)
+        .on("postgres_changes", { event: "*", schema: "public", table: "topic_tags" }, planeNachladen)
+        .on("postgres_changes", { event: "*", schema: "public", table: "tag_members" }, planeNachladen)
+        .on("postgres_changes", { event: "*", schema: "public", table: "topic_votes" }, planeNachladen)
         .subscribe();
     };
     void start();
@@ -233,9 +262,10 @@ export function TopicsProvider({ children }: { children: ReactNode }) {
     });
     return () => {
       sub.subscription.unsubscribe();
+      if (nachladeTimer.current) clearTimeout(nachladeTimer.current);
       if (channel) supabase!.removeChannel(channel);
     };
-  }, [loadAll]);
+  }, [loadAll, planeNachladen]);
 
   // ---------- Aktionen ----------
   const createTopic: TopicsValue["createTopic"] = useCallback(async (nt) => {
@@ -355,36 +385,44 @@ export function TopicsProvider({ children }: { children: ReactNode }) {
       author_role: meta?.role ?? null, author_koms: meta?.koms?.length ? meta.koms : null,
       created_by: uidRef.current, created_at: new Date().toISOString(),
     };
-    if (!hasSupabase) { setItems((p) => [...p, item]); return; }
+    // Sofort anzeigen – die Nachricht steht da, bevor der Server geantwortet hat.
+    setItems((p) => [...p, item]);
+    if (!hasSupabase) return;
     const { error } = await supabase!.from("topic_items").insert({
       id: item.id, topic_id: item.topic_id, type: item.type, title: item.title, body: item.body,
       options: item.options, pinned: item.pinned, author: item.author,
       poll_multi: item.poll_multi, poll_anon: item.poll_anon, poll_deadline: item.poll_deadline,
       author_role: item.author_role, author_koms: item.author_koms, created_by: uidRef.current,
     });
-    if (error) { alert("Senden fehlgeschlagen: " + error.message); return; }
+    if (error) {
+      setItems((p) => p.filter((i) => i.id !== item.id)); // wieder entfernen
+      alert("Senden fehlgeschlagen: " + error.message);
+      return;
+    }
     // Empfänger: Ordner-Mitglieder + Komitee-Mitglieder (Tag), ohne Autor
     const s = stateRef.current;
     const komSlugs = [...(s.topicTags[topic.id] || []), ...(topic.tag ? [topic.tag] : [])];
     const komRecipients = komSlugs.flatMap((slug) => s.tagMembers[slug] || []);
     let recipients = [...new Set([...(s.members[topic.id] || []), ...komRecipients])]
       .filter((u) => u !== uidRef.current); // nie an sich selbst
-    // Wer Chat-Benachrichtigungen ausgeschaltet hat, bekommt kein Pop-up.
-    if (recipients.length) {
-      const { data: pp } = await supabase!
-        .from("public_profiles")
-        .select("user_id, push_chats")
-        .in("user_id", recipients);
-      const aus = new Set(
-        ((pp as { user_id: string; push_chats: boolean }[]) || [])
-          .filter((x) => x.push_chats === false)
-          .map((x) => x.user_id),
-      );
-      recipients = recipients.filter((u) => !aus.has(u));
-    }
-    void pushToUsers(recipients, `Neues in „${topic.title}"`, (item.title ? item.title + ": " : "") + body.slice(0, 100));
-    await loadAll();
-  }, [loadAll]);
+    // Benachrichtigungen im Hintergrund – das Senden wartet nicht darauf.
+    void (async () => {
+      // Wer Chat-Benachrichtigungen ausgeschaltet hat, bekommt kein Pop-up.
+      if (recipients.length) {
+        const { data: pp } = await supabase!
+          .from("public_profiles")
+          .select("user_id, push_chats")
+          .in("user_id", recipients);
+        const aus = new Set(
+          ((pp as { user_id: string; push_chats: boolean }[]) || [])
+            .filter((x) => x.push_chats === false)
+            .map((x) => x.user_id),
+        );
+        recipients = recipients.filter((u) => !aus.has(u));
+      }
+      await pushToUsers(recipients, `Neues in „${topic.title}"`, (item.title ? item.title + ": " : "") + body.slice(0, 100));
+    })();
+  }, []);
 
   const updateItem: TopicsValue["updateItem"] = useCallback(async (id, patch) => {
     setItems((p) => p.map((i) => (i.id === id ? { ...i, ...patch } : i)));
@@ -408,6 +446,21 @@ export function TopicsProvider({ children }: { children: ReactNode }) {
       }));
       return;
     }
+    // Kreuz sofort setzen, damit der Knopf nicht erst nach dem Server reagiert
+    const neueWahl = multi
+      ? had ? bisher.filter((x) => x !== optionId) : [...bisher, optionId]
+      : had ? [] : [optionId];
+    setMyVotes((p) => ({ ...p, [itemId]: neueWahl }));
+    setVoteCounts((c) => {
+      const alt2 = { ...(c[itemId] || {}) };
+      for (const o of bisher) alt2[o] = Math.max(0, (alt2[o] || 0) - 1);
+      for (const o of neueWahl) alt2[o] = (alt2[o] || 0) + 1;
+      return { ...c, [itemId]: alt2 };
+    });
+    setVoters((v) => {
+      const ohneMich = (v[itemId] || []).filter((x) => x.user_id !== uidRef.current);
+      return { ...v, [itemId]: [...ohneMich, ...neueWahl.map((option_id) => ({ user_id: uidRef.current, option_id }))] };
+    });
     if (multi) {
       // Mehrfachwahl: nur diese eine Option umschalten
       if (had)
@@ -420,8 +473,8 @@ export function TopicsProvider({ children }: { children: ReactNode }) {
       await supabase!.from("topic_votes").delete().eq("item_id", itemId).eq("user_id", uidRef.current);
       if (!had) await supabase!.from("topic_votes").insert({ item_id: itemId, option_id: optionId, user_id: uidRef.current });
     }
-    await loadAll();
-  }, [loadAll]);
+    planeNachladen();
+  }, [planeNachladen]);
 
   const markRead: TopicsValue["markRead"] = useCallback((topicId) => {
     const now = new Date().toISOString();

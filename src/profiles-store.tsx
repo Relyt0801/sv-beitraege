@@ -24,6 +24,9 @@ export function ProfilesProvider({ children }: { children: ReactNode }) {
   const { students } = useStore();
   const [profile, setProfile] = useState<Record<string, PublicProfile>>({});
   const [uid, setUid] = useState("local-user");
+  // erst nach dem ersten vollständigen Laden darf ein Profil angelegt werden –
+  // sonst sieht der Anlege-Schritt eine noch leere Liste und überschreibt die Farbe
+  const [geladen, setGeladen] = useState(false);
   const angelegt = useRef(false);
 
   // Lokaler Testmodus: Profil im Browser halten, damit Farben/Bild trotzdem funktionieren.
@@ -44,6 +47,7 @@ export function ProfilesProvider({ children }: { children: ReactNode }) {
     const m: Record<string, PublicProfile> = {};
     for (const p of (data as PublicProfile[]) || []) m[p.user_id] = p;
     setProfile(m);
+    setGeladen(true);
   }, []);
 
   useEffect(() => {
@@ -66,10 +70,12 @@ export function ProfilesProvider({ children }: { children: ReactNode }) {
   }, [laden]);
 
   // Eigenes Profil einmalig anlegen, sobald der eigene Name bekannt ist.
+  // Wichtig: erst wenn die Liste geladen ist – sonst wird eine schon gewählte
+  // Farbe mit dem Standardwert überschrieben (Farbe "springt" nach dem Neuladen).
   useEffect(() => {
-    if (!hasSupabase || angelegt.current || uid === "local-user") return;
-    const vorhanden = profile[uid];
-    if (vorhanden?.anzeigename) return;
+    if (!hasSupabase || angelegt.current || uid === "local-user" || !geladen) return;
+    if (profile[uid]?.anzeigename) return;
+    angelegt.current = true;
     void (async () => {
       const { data: prof } = await supabase!
         .from("profiles")
@@ -81,21 +87,34 @@ export function ProfilesProvider({ children }: { children: ReactNode }) {
       const sid = prof?.student_id as string | undefined;
       const st = sid ? students.find((x) => x.id === sid) : null;
       if (st) name = `${st.vorname} ${st.nachname}`.trim();
-      if (!name) return;
-      angelegt.current = true;
-      const istOp = Boolean((prof as { is_op?: boolean } | null)?.is_op);
-      await supabase!.from("public_profiles").upsert(
-        {
+      if (!name) {
+        angelegt.current = false;
+        return;
+      }
+      // Sicherheitsnetz: direkt in der Datenbank nachsehen, ob es die Zeile gibt.
+      const { data: schon } = await supabase!
+        .from("public_profiles")
+        .select("user_id, farbe")
+        .eq("user_id", uid)
+        .maybeSingle();
+      if (schon) {
+        // Zeile existiert – nur den Namen auffrischen, die Farbe bleibt unberührt.
+        await supabase!
+          .from("public_profiles")
+          .update({ anzeigename: name, initialen: initialenVon(name) })
+          .eq("user_id", uid);
+      } else {
+        const istOp = Boolean((prof as { is_op?: boolean } | null)?.is_op);
+        await supabase!.from("public_profiles").insert({
           user_id: uid,
           anzeigename: name,
           initialen: initialenVon(name),
-          farbe: vorhanden?.farbe || (istOp ? "magenta" : "indigo"),
-        },
-        { onConflict: "user_id" },
-      );
+          farbe: istOp ? "magenta" : "indigo",
+        });
+      }
       void laden();
     })();
-  }, [uid, profile, students, laden]);
+  }, [uid, profile, students, laden, geladen]);
 
   const aktualisiere = useCallback(
     (patch: Partial<Omit<PublicProfile, "user_id">>) => {

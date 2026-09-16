@@ -4,7 +4,7 @@ import { useRole } from "../auth/RoleProvider";
 import { useStore } from "../store";
 import { normalize } from "../lib/logic";
 import { KomiteeZugriff } from "./KomiteeZugriff";
-import { PERM_CATEGORIES, PERM_ROLES, ALL_PERMS, ROLE_DEFAULTS, type PermKey } from "../lib/permissions";
+import { PERM_CATEGORIES, PERM_ROLES, ALL_PERMS, ROLE_DEFAULTS, rechteRolle, rollenDerZeile, type PermKey } from "../lib/permissions";
 
 type Matrix = Record<string, Record<string, boolean>>;
 
@@ -12,7 +12,6 @@ type Matrix = Record<string, Record<string, boolean>>;
 const ROLE_SHORT: Record<string, string> = {
   schueler: "Schüler",
   sprecher: "Sprecher",
-  stv_sprecher: "Stv.",
   stufenteam: "Team",
   kassenwart: "Kasse",
   admin: "Admin",
@@ -36,7 +35,10 @@ export function PermissionsTab() {
         setRoleMatrix(rm); setOverrides({}); setLoaded(true); return;
       }
       const { data: rp } = await supabase!.from("role_permissions").select("*");
-      for (const row of (rp as { role: string; perm: string; allowed: boolean }[]) || []) if (rm[row.role]) rm[row.role][row.perm] = row.allowed;
+      for (const row of (rp as { role: string; perm: string; allowed: boolean }[]) || []) {
+        const zeile = rechteRolle(row.role); // Stv. fällt mit Sprecher zusammen
+        if (rm[zeile]) rm[zeile][row.perm] = row.allowed;
+      }
       for (const p of ALL_PERMS) rm["admin"][p] = true; // Admin immer alles
       const { data: up } = await supabase!.from("user_permissions").select("*");
       const uo: Record<string, Record<string, boolean>> = {};
@@ -60,7 +62,9 @@ export function PermissionsTab() {
     const next = !roleMatrix[roleKey]?.[perm];
     setRoleMatrix((m) => ({ ...m, [roleKey]: { ...m[roleKey], [perm]: next } }));
     if (hasSupabase) {
-      const { error } = await supabase!.from("role_permissions").upsert({ role: roleKey, perm, allowed: next });
+      const { error } = await supabase!
+        .from("role_permissions")
+        .upsert(rollenDerZeile(roleKey).map((role) => ({ role, perm, allowed: next })));
       if (error) alert("Speichern fehlgeschlagen: " + error.message);
     }
   }
@@ -106,7 +110,7 @@ export function PermissionsTab() {
               <div key={perm.key}>
                 <div className="text-[15px] font-semibold">{perm.label}</div>
                 <div className="mb-1.5 text-[11px] leading-snug text-slate-400">{perm.desc}</div>
-                <div className="grid grid-cols-3 gap-1.5">
+                <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-5">
                   {PERM_ROLES.map((r) => {
                     const on = !!roleMatrix[r.key]?.[perm.key];
                     const locked = r.key === "admin";

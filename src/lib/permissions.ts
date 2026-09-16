@@ -55,14 +55,28 @@ export const ALL_PERMS: PermKey[] = PERM_CATEGORIES.flatMap((c) => c.perms.map((
 
 export type RolleKey = "schueler" | "sprecher" | "stv_sprecher" | "stufenteam" | "kassenwart" | "admin";
 
+/**
+ * Für Rechte zählen Stufensprecher*in und Stv. als EINE Rolle: beide bekommen
+ * immer dieselben Rechte. Deshalb gibt es im Rechte-Reiter nur eine Spalte
+ * "Sprecher", und jede Änderung wird auf beide Rollen geschrieben.
+ */
 export const PERM_ROLES: { key: RolleKey; label: string }[] = [
   { key: "schueler", label: "Schüler" },
-  { key: "sprecher", label: "Stufensprecher*in" },
-  { key: "stv_sprecher", label: "Stv. Schülersprecher*in" },
+  { key: "sprecher", label: "Sprecher*innen" },
   { key: "stufenteam", label: "Stufenteam" },
   { key: "kassenwart", label: "Kassenwart" },
   { key: "admin", label: "Admin" },
 ];
+
+/** Welche Rolle bestimmt die Rechte? Stv. hängt an der Sprecher-Zeile. */
+export function rechteRolle(role: string): string {
+  return role === "stv_sprecher" ? "sprecher" : role;
+}
+
+/** Alle Rollen, die zu einer Rechte-Zeile gehören (zum Speichern). */
+export function rollenDerZeile(key: string): string[] {
+  return key === "sprecher" ? ["sprecher", "stv_sprecher"] : [key];
+}
 
 // Standard-Rechte je Rolle (Fallback im Client, Seeds in permissions.sql identisch)
 const TEAM_STANDARD: PermKey[] = ["chats.view_all", "chats.delete_messages", "chats.manage", "komitees.assign", "data.edit"];
