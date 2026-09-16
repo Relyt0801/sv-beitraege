@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
-import { HY, type ContribTemplate, type Contribution, type Halbjahr, type Settings, type Status, type Student, newStudent } from "./lib/types";
+import { HY, type ContribTemplate, type Contribution, type Halbjahr, type Settings, type Status, type Student, newStudent, STAFFEL_STANDARD } from "./lib/types";
 import { hasSupabase, supabase } from "./lib/supabase";
 
 const LS_STUDENTS = "sv-beitraege:students";
@@ -7,7 +7,13 @@ const LS_SETTINGS = "sv-beitraege:settings";
 const LS_CONTRIB = "sv-beitraege:contributions";
 const LS_TPL = "sv-beitraege:templates";
 
-const DEFAULT_SETTINGS: Settings = { aktuelles_halbjahr: "EF.1", ziel_punkte: 30, zusatz: 25 };
+const DEFAULT_SETTINGS: Settings = {
+  aktuelles_halbjahr: "EF.1",
+  ziel_punkte: 100, // 100 % = voll
+  zusatz: 0, // altes Konzept, von der Staffel abgelöst
+  staffel: STAFFEL_STANDARD,
+  ticket_preis: 0,
+};
 
 /** Alte Daten (Beteiligungen pro Halbjahr) auf das neue Modell (Gesamtzahl) migrieren. */
 function migrate(s: any): Student {
@@ -48,7 +54,7 @@ interface StoreValue {
   /** Denselben Beitrag mehreren Personen gutschreiben. */
   addContributionMany: (studentIds: string[], titel: string, punkte: number) => void;
   addTemplate: (titel: string, punkte: number) => void;
-  updateTemplate: (id: string, patch: Partial<Pick<ContribTemplate, "titel" | "punkte">>) => void;
+  updateTemplate: (id: string, patch: Partial<Pick<ContribTemplate, "titel" | "punkte" | "sort" | "variabel">>) => void;
   removeTemplate: (id: string) => void;
   updateContribution: (id: string, patch: Partial<Pick<Contribution, "titel" | "punkte" | "datum">>) => void;
   removeContribution: (id: string) => void;
@@ -188,8 +194,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           if (row)
             setSettingsState({
               aktuelles_halbjahr: row.aktuelles_halbjahr,
-              ziel_punkte: row.ziel_punkte ?? 30,
-              zusatz: row.zusatzbetrag ?? 25,
+              ziel_punkte: row.ziel_punkte ?? 100,
+              zusatz: row.zusatzbetrag ?? 0,
+              staffel: Array.isArray(row.staffel) && row.staffel.length ? row.staffel : STAFFEL_STANDARD,
+              ticket_preis: row.ticket_preis ?? 0,
             });
         })
         .subscribe();
@@ -211,8 +219,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       if (cfg)
         setSettingsState({
           aktuelles_halbjahr: cfg.aktuelles_halbjahr,
-          ziel_punkte: cfg.ziel_punkte ?? 30,
-          zusatz: cfg.zusatzbetrag ?? 25,
+          ziel_punkte: cfg.ziel_punkte ?? 100,
+          zusatz: cfg.zusatzbetrag ?? 0,
+          staffel:
+            Array.isArray((cfg as { staffel?: unknown }).staffel) && (cfg as { staffel: [] }).staffel.length
+              ? ((cfg as { staffel: Settings["staffel"] }).staffel)
+              : STAFFEL_STANDARD,
+          ticket_preis: (cfg as { ticket_preis?: number }).ticket_preis ?? 0,
         });
       setReady(true);
       subscribeRealtime();
@@ -373,6 +386,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         titel: titel.trim(),
         punkte: Math.max(0, Math.round(punkte) || 0),
         sort: 100,
+        variabel: false,
       };
       if (!t.titel) return;
       setTemplates((prev) => [...prev, t]);
@@ -426,6 +440,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
               aktuelles_halbjahr: next.aktuelles_halbjahr,
               ziel_punkte: next.ziel_punkte,
               zusatzbetrag: next.zusatz,
+              staffel: next.staffel,
+              ticket_preis: next.ticket_preis,
             }),
           );
         return next;
@@ -479,6 +495,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
               aktuelles_halbjahr: cfg.aktuelles_halbjahr,
               ziel_punkte: cfg.ziel_punkte,
               zusatzbetrag: cfg.zusatz,
+              staffel: cfg.staffel,
+              ticket_preis: cfg.ticket_preis,
             }),
           );
         }

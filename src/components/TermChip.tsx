@@ -6,7 +6,8 @@ const STATUS_CLASS: Record<string, string> = {
   bezahlt: "bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:border-emerald-500/25",
   erlassen: "bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-500/15 dark:text-blue-300 dark:border-blue-500/25",
 };
-const GLYPH: Record<string, string> = { offen: "€", bezahlt: "✓", erlassen: "~" };
+// erlassen = Schrägstrich: "zählt nicht", klar unterscheidbar von € und ✓
+const GLYPH: Record<string, string> = { offen: "€", bezahlt: "✓", erlassen: "/" };
 
 export function TermChip({
   student,
@@ -55,14 +56,10 @@ export function TermChip({
       }}
       className={`flex flex-1 basis-0 flex-col items-center justify-center gap-0.5 rounded-xl border font-bold leading-none transition ${size} ${cls} ${ring} ${
         clickable ? "cursor-pointer active:scale-95" : "cursor-default"
-      } ${erlassenLine(t.status, inactive)}`}
+      }`}
     >
       <span className="text-[10px] font-semibold opacity-70">{h}</span>
-      <span className="text-base">{glyph}</span>
+      <span className={`text-base ${t.status === "erlassen" && !inactive ? "text-lg font-black" : ""}`}>{glyph}</span>
     </button>
   );
-}
-
-function erlassenLine(status: string, inactive: boolean) {
-  return status === "erlassen" && !inactive ? "[&>span:last-child]:line-through" : "";
 }

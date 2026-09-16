@@ -4,8 +4,8 @@
 //   - zufällige Schüler mit Konto (Passwort für ALLE: 123456)
 //   - gemischte Beiträge: bezahlt, offen, erlassen, "bis Q1.1 bezahlt"
 //   - eine Person hat die Schule verlassen
-//   - Beitragspunkte aus vier Vorlagen (Kuchenverkauf 1, Girolauf 5,
-//     Waffelstand 1, Kuchen gebacken 1)
+//   - gesammelte Prozent aus dem Vorlagen-Katalog (5 / 10 / 20 %); die
+//     Staffelstufen 0/25/50/75/100 % sind alle mindestens einmal vertreten
 //   - Rollen-Demo: Kassenwart Karlo, Stufensprecherin Sarah, Admin Andreas
 //
 // ACHTUNG: schreibt in die Datenbank, auf die SUPABASE_URL zeigt.
@@ -17,7 +17,12 @@
 //   node scripts/demo-daten.mjs                 # Probelauf, zeigt nur an
 //   node scripts/demo-daten.mjs --wirklich      # legt die Daten an
 //   node scripts/demo-daten.mjs --anzahl 40 --wirklich
+//   node scripts/demo-daten.mjs --fertig --wirklich      # ohne Erstanmeldung
 //   node scripts/demo-daten.mjs --entfernen --wirklich   # räumt sie wieder weg
+//
+// Standard: die Konten durchlaufen beim ersten Login den echten Ablauf –
+// Nutzungsbedingungen, Passwort ändern, Komitee wählen. Mit --fertig sind sie
+// sofort einsatzbereit (grüner Punkt, kein Zwischenschritt).
 //
 // Angelegte Kennungen landen in privat/demo-ids.json – nur darüber wird
 // beim Entfernen gelöscht, echte Daten bleiben unangetastet.
@@ -30,6 +35,8 @@ const URL = process.env.SUPABASE_URL;
 const KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const ernst = process.argv.includes("--wirklich");
 const entfernen = process.argv.includes("--entfernen");
+// --fertig: Konten überspringen Zustimmung + Passwortwechsel
+const fertig = process.argv.includes("--fertig");
 const anzahlArg = process.argv.indexOf("--anzahl");
 const ANZAHL = anzahlArg > -1 ? Math.max(3, Number(process.argv[anzahlArg + 1]) || 30) : 30;
 const PASSWORT = "123456";
@@ -55,12 +62,20 @@ const NACHNAMEN = [
   "Holtkamp", "Rickert", "Nuszkowski", "Feldmann", "Averbeck", "Dirksen", "Lohmann",
 ];
 const HY = ["EF.1", "EF.2", "Q1.1", "Q1.2", "Q2.1", "Q2.2"];
+// Vorlagen-Katalog in Prozent – identisch zu supabase/prozent-staffel.sql
 const VORLAGEN = [
-  { titel: "Kuchenverkauf", punkte: 1 },
-  { titel: "Girolauf", punkte: 5 },
-  { titel: "Waffelstand", punkte: 1 },
-  { titel: "Kuchen gebacken", punkte: 1 },
+  { titel: "Waffelverkauf in der Pause", punkte: 5 },
+  { titel: "Waffeln oder Kuchen gebacken", punkte: 5 },
+  { titel: "Kleinere Aufgabe / Hilfe (Einkauf o. Ä.)", punkte: 5 },
+  { titel: "Waffel-/Kuchenverkauf außerhalb der Schulzeit", punkte: 10 },
+  { titel: "Aufgabe mittleren Aufwands (z. B. 1 Tag Stand)", punkte: 10 },
+  { titel: "Außerschulische Aktion über 2 Std.", punkte: 10 },
+  { titel: "Girolauf (beide Tage)", punkte: 20 },
+  { titel: "Größere profitable Aktion ermöglicht", punkte: 20 },
+  { titel: "Eingebrachte Aktion, die umgesetzt wurde", punkte: 5 },
 ];
+// Zielprozente der Demo-Personen: jede Staffelstufe kommt vor, dazwischen bunt
+const ZIELE = [0, 25, 50, 75, 100, 5, 30, 45, 60, 80, 95, 10, 35, 55, 70, 85];
 
 let seed = 20260916;
 /** Reproduzierbarer Zufall – gleicher Aufruf, gleiche Demo-Stufe. */
@@ -122,28 +137,50 @@ personen.forEach((p, i) => {
   p.beigetreten_ab = i % 11 === 7 ? "EF.2" : "EF.1";
   // genau eine Person verlässt die Schule
   p.verlaesst_ab = i === Math.min(9, personen.length - 1) ? "Q1.2" : null;
-  // Punkte: rund zwei Drittel haben welche, der Rest steht bei null
+  // Prozent: Zielwert vorgeben und mit echten Vorlagen auffüllen, damit die
+  // Einzelbeiträge stimmig sind (20 + 10 + 5 = 35 %).
   p.beitraege = [];
-  if (i % 3 !== 1) {
-    const wie_viele = zahl(1, 3);
-    for (let k = 0; k < wie_viele; k++) {
-      const v = wahl(VORLAGEN);
-      p.beitraege.push({
-        titel: v.titel,
-        punkte: v.punkte,
-        datum: `2026-${String(zahl(1, 9)).padStart(2, "0")}-${String(zahl(1, 28)).padStart(2, "0")}`,
-      });
-    }
+  let rest = ZIELE[i % ZIELE.length];
+  p.ziel = rest;
+  const datum = () => `2026-${String(zahl(1, 9)).padStart(2, "0")}-${String(zahl(1, 28)).padStart(2, "0")}`;
+  while (rest > 0) {
+    const passend = VORLAGEN.filter((v) => v.punkte <= rest);
+    if (!passend.length) break;
+    const v = wahl(passend);
+    p.beitraege.push({ titel: v.titel, punkte: v.punkte, datum: datum() });
+    rest -= v.punkte;
   }
+  // Krümel (z. B. 3 %) als "je nach Aufwand" nachtragen
+  if (rest > 0) p.beitraege.push({ titel: "Eingebrachte Aktion, die umgesetzt wurde", punkte: rest, datum: datum() });
 });
 
 // ------------------------------------------------------------------- Ausgabe
 function uebersicht() {
   const zaehl = (s) => personen.filter((p) => Object.values(p.terms).every((t) => t.status === s)).length;
-  console.log(`${personen.length} Personen, Passwort für alle: ${PASSWORT}`);
+  console.log(`${personen.length} Personen, Startpasswort für alle: ${PASSWORT}`);
+  console.log(
+    fertig
+      ? "  Erstanmeldung: übersprungen (sofort einsatzbereit, grüner Punkt)"
+      : "  Erstanmeldung: Nutzungsbedingungen -> Passwort ändern -> Komitee wählen",
+  );
   console.log(`  vollständig bezahlt: ${zaehl("bezahlt")}   gar nichts bezahlt: ${zaehl("offen")}`);
   console.log(`  verlässt die Schule: ${personen.filter((p) => p.verlaesst_ab).map((p) => `${p.vorname} ${p.nachname} (ab ${p.verlaesst_ab})`).join(", ") || "–"}`);
-  console.log(`  Punkte vergeben an: ${personen.filter((p) => p.beitraege.length).length} Personen`);
+  const staffel = [
+    { ab: 100, betrag: 0 }, { ab: 75, betrag: 10 }, { ab: 50, betrag: 25 },
+    { ab: 25, betrag: 40 }, { ab: 0, betrag: 50 },
+  ];
+  const ticket = (pct) => staffel.find((x) => pct >= x.ab).betrag;
+  const verteilung = {};
+  for (const p of personen) {
+    const pct = p.beitraege.reduce((n, b) => n + b.punkte, 0);
+    const stufe = staffel.find((x) => pct >= x.ab).ab;
+    verteilung[stufe] = (verteilung[stufe] || 0) + 1;
+  }
+  console.log(`  Prozent gesammelt: ${personen.filter((p) => p.beitraege.length).length} von ${personen.length} Personen`);
+  console.log(
+    "  Abiballticket:   " +
+      [0, 25, 50, 75, 100].map((ab) => `${ab}%→${ticket(ab)}€: ${verteilung[ab] || 0}`).join("   "),
+  );
   for (const f of FEST) {
     const p = personen.find((x) => x.vorname === f.vorname);
     console.log(`  ${f.rolle.padEnd(11)} ${p.vorname} ${p.nachname}  ->  ${p.nutzername}`);
@@ -183,12 +220,12 @@ async function anlegen() {
   }
   const merk = { students: [], users: [] };
 
-  // 1) Beitrags-Vorlagen
-  for (const [i, v] of VORLAGEN.entries()) {
-    const { data: da } = await db.from("contribution_templates").select("id").eq("titel", v.titel).maybeSingle();
-    if (!da) await db.from("contribution_templates").insert({ titel: v.titel, punkte: v.punkte, sort: i });
-  }
-  console.log("\nVorlagen angelegt.");
+  // 1) Beitrags-Vorlagen (Katalog frisch setzen)
+  await db.from("contribution_templates").delete().neq("titel", "");
+  await db
+    .from("contribution_templates")
+    .insert(VORLAGEN.map((v, i) => ({ titel: v.titel, punkte: v.punkte, sort: i + 1 })));
+  console.log(`\n${VORLAGEN.length} Vorlagen angelegt.`);
 
   // 2) Personen + Konten
   for (const p of personen) {
@@ -229,11 +266,11 @@ async function anlegen() {
           username: p.nutzername,
           role: p.rolle,
           student_id: st.id,
-          must_change_password: false,
-          has_logged_in: true,
-          // Nutzungsbedingungen vorab bestätigt – sonst käme bei jedem
-          // Demo-Login zuerst der Zustimmungsbildschirm
-          terms_accepted_at: new Date().toISOString(),
+          // Standard: Erstanmeldung wie bei echten Konten (Zustimmung,
+          // Passwort ändern, Komitee wählen). --fertig überspringt das.
+          must_change_password: !fertig,
+          has_logged_in: fertig,
+          terms_accepted_at: fertig ? new Date().toISOString() : null,
         },
         { onConflict: "user_id" },
       );

@@ -1,5 +1,5 @@
 import { HY, STATI, type Settings, type Student } from "../lib/types";
-import { offenGesamt, zusatzFaellig } from "../lib/logic";
+import { offenGesamt, prozentVon, ticketBetrag } from "../lib/logic";
 import { TermChip } from "./TermChip";
 
 export function StudentCard({
@@ -30,8 +30,9 @@ export function StudentCard({
 }) {
   const leaving = student.verlaesst_ab != null;
   const joiningLate = student.beigetreten_ab !== "EF.1";
-  const betrag = offenGesamt(student, settings, punkte);
-  const zusatz = zusatzFaellig(student, settings, punkte);
+  const betrag = offenGesamt(student, settings);
+  const prozent = prozentVon(punkte, settings);
+  const ticket = (settings.ticket_preis || 0) + ticketBetrag(prozent, settings);
 
   return (
     <div
@@ -80,10 +81,10 @@ export function StudentCard({
             )}
           </div>
           <div className="mt-1 flex items-center gap-1.5 text-[13px] text-slate-500 dark:text-slate-400">
-            <span className={`font-bold ${punkte >= settings.ziel_punkte ? "text-emerald-500" : "text-brand"}`}>
-              {punkte}
+            <span className={`font-bold ${prozent >= 100 ? "text-emerald-500" : "text-brand"}`}>
+              {prozent} %
             </span>
-            <span>/ {settings.ziel_punkte} Beitragspunkte</span>
+            <span>· 1. Ticket {ticket} €</span>
           </div>
         </button>
 
@@ -92,7 +93,7 @@ export function StudentCard({
             {betrag > 0 ? `${betrag} €` : "✓"}
           </div>
           <div className="text-[11px] text-slate-400">
-            {betrag > 0 ? (zusatz ? "offen +Zusatz" : "offen") : "bezahlt"}
+            {betrag > 0 ? "offen" : "bezahlt"}
           </div>
         </div>
       </div>

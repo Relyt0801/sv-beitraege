@@ -8,6 +8,7 @@ export type PermKey =
   | "mod.timeout"
   | "kasse.edit"
   | "data.edit"
+  | "beitraege.manage"
   | "roles.manage"
   | "perms.manage";
 
@@ -41,6 +42,7 @@ export const PERM_CATEGORIES: PermCategory[] = [
   {
     label: "Daten", icon: "🗂️", perms: [
       { key: "data.edit", label: "Daten bearbeiten", desc: "Namen, Beteiligungen, Personen, Halbjahr, Import/Export." },
+      { key: "beitraege.manage", label: "Beiträge-Reiter", desc: "Möglichkeiten zum Prozentsammeln und die Abiball-Staffel festlegen." },
     ],
   },
   {

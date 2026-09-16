@@ -1,4 +1,4 @@
-import { HY, FEE, type Contribution, type Halbjahr, type Settings, type Student } from "./types";
+import { HY, FEE, STAFFEL_STANDARD, type Contribution, type Halbjahr, type Settings, type Staffel, type Student } from "./types";
 
 /** Diakritika/Umlaute/Groß-Klein/Whitespace-tolerante Normalisierung für Suche. */
 export function normalize(s: string): string {
@@ -52,17 +52,69 @@ export function punkteIndex(contributions: Contribution[]): Record<string, numbe
   return m;
 }
 
-/**
- * Zusatzbetrag fällig? Nur wenn Q2.2 aktiv ist, die Person am Ende noch dabei ist
- * und sie die Zielpunktzahl nicht erreicht hat.
- */
-export function zusatzFaellig(st: Student, s: Settings, punkte: number): boolean {
-  return s.aktuelles_halbjahr === "Q2.2" && isActive(st, idx("Q2.2")) && punkte < s.ziel_punkte;
+/** Staffel aus den Einstellungen, sortiert – mit Rückfall auf den Standard. */
+export function staffelVon(s: Settings): Staffel[] {
+  const roh = Array.isArray(s.staffel) && s.staffel.length ? s.staffel : STAFFEL_STANDARD;
+  return [...roh].sort((a, b) => a.ab - b.ab);
 }
 
-/** Gesamter offener Betrag inkl. evtl. Zusatzbetrag. */
-export function offenGesamt(st: Student, s: Settings, punkte: number): number {
-  return basisOffen(st, s.aktuelles_halbjahr) + (zusatzFaellig(st, s, punkte) ? s.zusatz : 0);
+/** Gesammelte Prozent, gedeckelt bei 100 (mehr bringt nichts mehr). */
+export function prozentVon(punkte: number, s: Settings): number {
+  const ziel = Math.max(1, s.ziel_punkte);
+  return Math.max(0, Math.min(100, Math.round((punkte / ziel) * 100)));
+}
+
+/**
+ * Zusatzbeitrag zum Abiballticket bei diesem Prozentstand.
+ * Es gilt die höchste Stufe, die erreicht ist: 60 % fällt in die 50-%-Stufe.
+ */
+export function ticketBetrag(prozent: number, s: Settings): number {
+  const staffel = staffelVon(s);
+  let betrag = staffel[0]?.betrag ?? 0;
+  for (const stufe of staffel) if (prozent >= stufe.ab) betrag = stufe.betrag;
+  return betrag;
+}
+
+/** Nächste Stufe: wie viel Prozent fehlen und was spart das? null = schon oben. */
+export function naechsteStufe(
+  prozent: number,
+  s: Settings,
+): { ab: number; betrag: number; fehlt: number; spart: number } | null {
+  const staffel = staffelVon(s);
+  const naechste = staffel.find((x) => x.ab > prozent);
+  if (!naechste) return null;
+  return {
+    ab: naechste.ab,
+    betrag: naechste.betrag,
+    fehlt: naechste.ab - prozent,
+    spart: ticketBetrag(prozent, s) - naechste.betrag,
+  };
+}
+
+/**
+ * Zusatzbeitrag zum ersten Abiballticket in €.
+ * Steht getrennt von den Halbjahresbeiträgen und wird NICHT dazugerechnet.
+ */
+export function zusatzBetrag(_st: Student, s: Settings, punkte: number): number {
+  return ticketBetrag(prozentVon(punkte, s), s);
+}
+
+/** Kostet das erste Ticket mehr als die weiteren? */
+export function zusatzFaellig(st: Student, s: Settings, punkte: number): boolean {
+  return zusatzBetrag(st, s, punkte) > 0;
+}
+
+/** Preis des ERSTEN Tickets: Grundpreis + Zusatzbeitrag. */
+export function ersteTicket(st: Student, s: Settings, punkte: number): number {
+  return (s.ticket_preis || 0) + zusatzBetrag(st, s, punkte);
+}
+
+/**
+ * Offener Betrag der Stufenkasse – nur die Halbjahresbeiträge.
+ * Das Abiballticket läuft getrennt und wird bewusst nicht addiert.
+ */
+export function offenGesamt(st: Student, s: Settings, _punkte?: number): number {
+  return basisOffen(st, s.aktuelles_halbjahr);
 }
 
 /** Summe aller offenen Beträge über die ganze Stufe. */

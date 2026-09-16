@@ -20,15 +20,42 @@ export interface Student {
   updated_at?: string;
 }
 
-export interface Settings {
-  aktuelles_halbjahr: Halbjahr;
-  /** Beitragspunkte, die jede Person bis zum Ende sammeln muss. */
-  ziel_punkte: number;
-  /** Zusatzbetrag (€), fällig am Ende, wenn die Zielpunktzahl nicht erreicht ist. */
-  zusatz: number;
+/** Eine Stufe der Abiball-Staffel: ab X % kostet das Ticket Y €. */
+export interface Staffel {
+  /** ab wie viel Prozent diese Stufe gilt */
+  ab: number;
+  /** Zusatzbeitrag zum Abiballticket in € */
+  betrag: number;
 }
 
-/** Ein einzelner Beitrag ("Kuchen gebacken", "Stände aufgebaut") mit Punktwert. */
+/**
+ * Standard-Staffel: alle 25 % sinkt der Zusatzbeitrag zum Abiballticket.
+ *   0 % = 50 €, 25 % = 40 €, 50 % = 25 €, 75 % = 10 €, 100 % = 0 €
+ */
+export const STAFFEL_STANDARD: Staffel[] = [
+  { ab: 0, betrag: 50 },
+  { ab: 25, betrag: 40 },
+  { ab: 50, betrag: 25 },
+  { ab: 75, betrag: 10 },
+  { ab: 100, betrag: 0 },
+];
+
+export interface Settings {
+  aktuelles_halbjahr: Halbjahr;
+  /** Prozent, die als "voll" gelten – normalerweise 100. */
+  ziel_punkte: number;
+  /**
+   * @deprecated Fester Zusatzbetrag aus dem alten Konzept. Die Staffel hat ihn
+   * abgelöst; der Wert bleibt nur, damit alte Datenbankzeilen nicht stören.
+   */
+  zusatz: number;
+  /** Abiball-Staffel, aufsteigend nach "ab". */
+  staffel: Staffel[];
+  /** Grundpreis eines Abiballtickets in €. 0 = steht noch nicht fest. */
+  ticket_preis: number;
+}
+
+/** Ein einzelner Beitrag ("Kuchen gebacken", "Girolauf") mit Prozentwert. */
 export interface Contribution {
   id: string;
   student_id: string;
@@ -39,12 +66,14 @@ export interface Contribution {
   created_at?: string;
 }
 
-/** Vorlage für typische Beiträge ("Kuchen gebacken", 5 Punkte). */
+/** Vorlage für typische Beiträge ("Kuchen gebacken", 5 %). */
 export interface ContribTemplate {
   id: string;
   titel: string;
   punkte: number;
   sort: number;
+  /** Wert beim Eintragen anpassbar (z. B. "je nach Aufwand 3–10 %"). */
+  variabel?: boolean;
 }
 
 export const FEE = 25;

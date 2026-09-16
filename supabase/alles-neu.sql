@@ -12,14 +12,12 @@
 -- Auf einem Projekt, in dem schon Daten liegen, NICHT ausführen: einige
 -- Abschnitte legen Regeln ohne vorheriges Löschen an und brechen dann ab.
 -- Für bestehende Projekte weiter die Einzeldateien benutzen.
---
--- Erzeugt mit scripts/ – Stand: Reihenfolge wie in den Kopfzeilen der Dateien.
 -- ============================================================================
 
 
 
 -- ==========================================================================
--- SCHRITT 01 von 20: Grundgerüst: Personen + Einstellungen
+-- SCHRITT 01 von 21: Grundgerüst: Personen + Einstellungen
 -- Quelle: supabase/schema.sql
 -- ==========================================================================
 
@@ -76,7 +74,7 @@ create policy "auth write settings"  on public.app_settings for all    to authen
 
 
 -- ==========================================================================
--- SCHRITT 02 von 20: Rollen & Konten
+-- SCHRITT 02 von 21: Rollen & Konten
 -- Quelle: supabase/roles.sql
 -- ==========================================================================
 
@@ -203,7 +201,7 @@ where user_id in (select id from auth.users where email = 'adams.tyler@sv-beitra
 
 
 -- ==========================================================================
--- SCHRITT 03 von 20: Events: Infos, Abstimmungen, Nachrichten
+-- SCHRITT 03 von 21: Events: Infos, Abstimmungen, Nachrichten
 -- Quelle: supabase/events.sql
 -- ==========================================================================
 
@@ -347,7 +345,7 @@ create policy "reads own" on public.event_reads for all to authenticated
 
 
 -- ==========================================================================
--- SCHRITT 04 von 20: Ordner & Chats
+-- SCHRITT 04 von 21: Ordner & Chats
 -- Quelle: supabase/topics.sql
 -- ==========================================================================
 
@@ -456,7 +454,7 @@ create policy "treads own" on public.topic_reads for all to authenticated
 
 
 -- ==========================================================================
--- SCHRITT 05 von 20: Push-Abos
+-- SCHRITT 05 von 21: Push-Abos
 -- Quelle: supabase/push.sql
 -- ==========================================================================
 
@@ -482,7 +480,7 @@ create policy "push own" on public.push_subscriptions for all to authenticated
 
 
 -- ==========================================================================
--- SCHRITT 06 von 20: Konten mit Personen verknüpfen
+-- SCHRITT 06 von 21: Konten mit Personen verknüpfen
 -- Quelle: supabase/link-accounts.sql
 -- ==========================================================================
 
@@ -565,7 +563,7 @@ from public.profiles;
 
 
 -- ==========================================================================
--- SCHRITT 07 von 20: Nutzungsbedingungen erzwingen
+-- SCHRITT 07 von 21: Nutzungsbedingungen erzwingen
 -- Quelle: supabase/consent.sql
 -- ==========================================================================
 
@@ -630,7 +628,7 @@ create policy "profiles read" on public.profiles for select to authenticated
 
 
 -- ==========================================================================
--- SCHRITT 08 von 20: Komitees & Unterordner
+-- SCHRITT 08 von 21: Komitees & Unterordner
 -- Quelle: supabase/komitees.sql
 -- ==========================================================================
 
@@ -678,7 +676,7 @@ $$;
 
 
 -- ==========================================================================
--- SCHRITT 09 von 20: Nur-Admin-Ordner
+-- SCHRITT 09 von 21: Nur-Admin-Ordner
 -- Quelle: supabase/admin-only.sql
 -- ==========================================================================
 
@@ -732,7 +730,7 @@ create policy "titems delete" on public.topic_items for delete to authenticated
 
 
 -- ==========================================================================
--- SCHRITT 10 von 20: Sichtbarkeit von Ordnern
+-- SCHRITT 10 von 21: Sichtbarkeit von Ordnern
 -- Quelle: supabase/visibility.sql
 -- ==========================================================================
 
@@ -790,7 +788,7 @@ create policy "topics delete" on public.topics for delete to authenticated
 
 
 -- ==========================================================================
--- SCHRITT 11 von 20: Team sieht alles, Admin kann sperren
+-- SCHRITT 11 von 21: Team sieht alles, Admin kann sperren
 -- Quelle: supabase/governance.sql
 -- ==========================================================================
 
@@ -856,7 +854,7 @@ end $$;
 
 
 -- ==========================================================================
--- SCHRITT 12 von 20: Mehrere Sichtbarkeits-Ziele je Ordner
+-- SCHRITT 12 von 21: Mehrere Sichtbarkeits-Ziele je Ordner
 -- Quelle: supabase/multi-visibility.sql
 -- ==========================================================================
 
@@ -909,7 +907,7 @@ $$;
 
 
 -- ==========================================================================
--- SCHRITT 13 von 20: Autoren-Markierung an Nachrichten
+-- SCHRITT 13 von 21: Autoren-Markierung an Nachrichten
 -- Quelle: supabase/author-badges.sql
 -- ==========================================================================
 
@@ -925,7 +923,7 @@ alter table public.topic_items add column if not exists author_koms text[];
 
 
 -- ==========================================================================
--- SCHRITT 14 von 20: Konfigurierbare Berechtigungen
+-- SCHRITT 14 von 21: Konfigurierbare Berechtigungen
 -- Quelle: supabase/permissions.sql
 -- ==========================================================================
 
@@ -1075,7 +1073,7 @@ create policy "profiles moderate" on public.profiles for update to authenticated
 
 
 -- ==========================================================================
--- SCHRITT 15 von 20: Beitragspunkte + Tickets
+-- SCHRITT 15 von 21: Beitragspunkte + Tickets
 -- Quelle: supabase/punkte-und-chats.sql
 -- ==========================================================================
 
@@ -1158,7 +1156,7 @@ exception when duplicate_object then null; end $$;
 
 
 -- ==========================================================================
--- SCHRITT 16 von 20: OP-Schutz, Sperren, Vorlagen, Fremdzugriff
+-- SCHRITT 16 von 21: OP-Schutz, Sperren, Vorlagen, Fremdzugriff
 -- Quelle: supabase/erweiterungen.sql
 -- ==========================================================================
 
@@ -1461,7 +1459,7 @@ exception when duplicate_object then null; end $$;
 
 
 -- ==========================================================================
--- SCHRITT 17 von 20: Anzeigename, Initialen, Namensfarbe
+-- SCHRITT 17 von 21: Anzeigename, Initialen, Namensfarbe
 -- Quelle: supabase/profile.sql
 -- ==========================================================================
 
@@ -1537,7 +1535,7 @@ exception when duplicate_object then null; end $$;
 
 
 -- ==========================================================================
--- SCHRITT 18 von 20: Rollen Stufensprecher*in und Stv.
+-- SCHRITT 18 von 21: Rollen Stufensprecher*in und Stv.
 -- Quelle: supabase/sprecher.sql
 -- ==========================================================================
 
@@ -1665,7 +1663,7 @@ create trigger guard_role before update on public.profiles
 
 
 -- ==========================================================================
--- SCHRITT 19 von 20: Sprecher-Rechte zusammenlegen
+-- SCHRITT 19 von 21: Sprecher-Rechte zusammenlegen
 -- Quelle: supabase/sprecher-rechte.sql
 -- ==========================================================================
 
@@ -1703,7 +1701,7 @@ create trigger trg_sync_sprecher_rechte
 
 
 -- ==========================================================================
--- SCHRITT 20 von 20: Anonyme Abstimmungen im Events-Reiter
+-- SCHRITT 20 von 21: Anonyme Abstimmungen im Events-Reiter
 -- Quelle: supabase/events-anonym.sql
 -- ==========================================================================
 
@@ -1724,6 +1722,56 @@ create policy "votes select" on public.poll_votes for select to authenticated
     or public.my_role() in ('stufenteam','kassenwart','admin','sprecher','stv_sprecher')
     or exists (select 1 from public.events e where e.id = event_id and e.poll_show_results)
   );
+
+
+-- ==========================================================================
+-- SCHRITT 21 von 21: Prozent-Konzept + Abiball-Staffel
+-- Quelle: supabase/prozent-staffel.sql
+-- ==========================================================================
+
+-- ============================================================
+-- Stufenkasse – Beitragskonzept auf Prozent umgestellt
+-- Ausführen im Supabase SQL-Editor. Mehrfach ausführbar.
+--
+-- Neu: man sammelt Prozent (0–100). Der Zusatzbeitrag zum Abiballticket
+-- sinkt alle 25 %:  0 % = 50 €, 25 % = 40 €, 50 % = 25 €, 75 % = 10 €, 100 % = 0 €
+-- Es gilt immer die höchste erreichte Stufe – 60 % zählt als 50 %.
+-- ============================================================
+
+-- 1) Staffel in den Einstellungen
+alter table public.app_settings
+  add column if not exists staffel jsonb not null default
+    '[{"ab":0,"betrag":50},{"ab":25,"betrag":40},{"ab":50,"betrag":25},{"ab":75,"betrag":10},{"ab":100,"betrag":0}]'::jsonb;
+
+-- 2) Ziel ist jetzt 100 % statt einer Punktzahl; fester Zusatzbetrag entfällt
+update public.app_settings
+   set ziel_punkte = 100,
+       zusatzbetrag = 0,
+       staffel = coalesce(
+         nullif(staffel, '[]'::jsonb),
+         '[{"ab":0,"betrag":50},{"ab":25,"betrag":40},{"ab":50,"betrag":25},{"ab":75,"betrag":10},{"ab":100,"betrag":0}]'::jsonb)
+ where id = 1;
+
+-- 3) Vorlagen: neuer Katalog in Prozent
+delete from public.contribution_templates;
+insert into public.contribution_templates (titel, punkte, sort) values
+  -- 5 %
+  ('Waffelverkauf in der Pause',                     5,  1),
+  ('Waffeln oder Kuchen gebacken',                   5,  2),
+  ('Kleinere Aufgabe / Hilfe (Einkauf o. Ä.)',       5,  3),
+  -- 10 %
+  ('Waffel-/Kuchenverkauf außerhalb der Schulzeit', 10,  4),
+  ('Aufgabe mittleren Aufwands (z. B. 1 Tag Stand)',10,  5),
+  ('Außerschulische Aktion über 2 Std.',            10,  6),
+  -- 20 %
+  ('Girolauf (beide Tage)',                         20,  7),
+  ('Größere profitable Aktion ermöglicht',          20,  8),
+  -- je nach Aufwand und Ertrag: 3–10 %
+  ('Eingebrachte Aktion, die umgesetzt wurde',       5,  9);
+
+-- HINWEIS: Bereits eingetragene Beiträge behalten ihre alte Zahl. Aus "1 Punkt"
+-- wird damit "1 %". Falls schon nennenswert viel eingetragen war, die Werte in
+-- der Tabelle contributions einmal von Hand nachziehen.
 
 
 -- ==========================================================================

@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { hasSupabase, supabase } from "./lib/supabase";
-import { initialen as initialenVon, lesbarerName, type PublicProfile } from "./lib/profil";
+import { initialen as initialenVon, lesbarerName, zufallsFarbe, type PublicProfile } from "./lib/profil";
 import { useStore } from "./store";
 
 interface ProfilesValue {
@@ -36,7 +36,7 @@ export function ProfilesProvider({ children }: { children: ReactNode }) {
       const roh = localStorage.getItem("sv-beitraege:mein-profil");
       const p: PublicProfile = roh
         ? JSON.parse(roh)
-        : { user_id: "local-user", anzeigename: "Test Nutzer", initialen: "TN", farbe: "indigo" };
+        : { user_id: "local-user", anzeigename: "Test Nutzer", initialen: "TN", farbe: zufallsFarbe() };
       setProfile({ "local-user": p });
     } catch { /* ignore */ }
   }, []);
@@ -109,7 +109,7 @@ export function ProfilesProvider({ children }: { children: ReactNode }) {
           user_id: uid,
           anzeigename: name,
           initialen: initialenVon(name),
-          farbe: istOp ? "magenta" : "indigo",
+          farbe: istOp ? "magenta" : zufallsFarbe(),
         });
       }
       void laden();

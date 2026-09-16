@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { HY } from "./lib/types";
-import { normalize, offenGesamt, offenStufe, sortStudents } from "./lib/logic";
+import { normalize, offenGesamt, offenStufe, sortStudents, staffelVon } from "./lib/logic";
 import { MyKasse } from "./components/MyKasse";
 import { PunkteSheet } from "./components/PunkteSheet";
 import { ProfilSheet } from "./components/ProfilSheet";
@@ -27,6 +27,7 @@ import { MassBar } from "./components/MassBar";
 import { RolesTab } from "./components/RolesTab";
 import { PermissionsTab } from "./components/PermissionsTab";
 import { EventsTab } from "./components/EventsTab";
+import { BeitraegeTab } from "./components/BeitraegeTab";
 import { EventComposer } from "./components/EventComposer";
 
 export default function App() {
@@ -49,7 +50,7 @@ export default function App() {
   );
 }
 
-type Tab = "kasse" | "events" | "themen" | "rollen" | "rechte";
+type Tab = "kasse" | "events" | "themen" | "beitraege" | "rollen" | "rechte";
 
 function Main() {
   const { students, punkte, settings, ready, mode, reload, setTerm, setSettings, exportData, importData } = useStore();
@@ -177,6 +178,7 @@ function Main() {
     { key: "kasse", icon: "💶", label: "Kasse", show: true },
     { key: "events", icon: "📣", label: "Events", badge: unread, show: true },
     { key: "themen", icon: "💬", label: "Chats", badge: topicsUnread, show: showTopicsTab },
+    { key: "beitraege", icon: "🎟️", label: "Beiträge", show: can("beitraege.manage") },
     { key: "rollen", icon: "👥", label: "Rollen", show: canManageRoles },
     { key: "rechte", icon: "🛡️", label: "Rechte", show: can("perms.manage") },
   ];
@@ -192,7 +194,7 @@ function Main() {
 
           {tab !== "kasse" && (
             <div className="min-w-0 flex-1 truncate text-lg font-bold">
-              {tab === "events" ? "Events" : tab === "themen" ? "Chats" : tab === "rechte" ? "Berechtigungen" : "Rollen & Rechte"}
+              {tab === "events" ? "Events" : tab === "themen" ? "Chats" : tab === "beitraege" ? "Beiträge & Abiball" : tab === "rechte" ? "Berechtigungen" : "Rollen & Rechte"}
             </div>
           )}
 
@@ -281,7 +283,7 @@ function Main() {
           <div className="mx-auto mt-3 max-w-5xl">
             <div className="card grid grid-cols-2 gap-x-5 gap-y-4 p-4 sm:grid-cols-4">
               <label className="flex flex-col gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Beitragspunkte
+                Prozent
                 <div className="flex items-center gap-1.5 text-slate-700 dark:text-slate-200">
                   <input type="number" className={numField} placeholder="min" value={min} onChange={(e) => setMin(e.target.value)} />
                   <span className="text-slate-400">–</span>
@@ -301,27 +303,13 @@ function Main() {
                 </button>
               </div>
 
-              {canEditData && (
-                <>
-                  <label className="flex flex-col gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    Zielpunkte
-                    <input
-                      type="number"
-                      className={numField}
-                      value={settings.ziel_punkte}
-                      onChange={(e) => setSettings({ ziel_punkte: Math.max(0, Number(e.target.value) || 0) })}
-                    />
-                  </label>
-                  <label className="flex flex-col gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    Zusatzbetrag €
-                    <input
-                      type="number"
-                      className={numField}
-                      value={settings.zusatz}
-                      onChange={(e) => setSettings({ zusatz: Math.max(0, Number(e.target.value) || 0) })}
-                    />
-                  </label>
-                </>
+              {can("beitraege.manage") && (
+                <div className="col-span-2 flex items-center gap-2 text-[12px] text-slate-400 sm:col-span-4">
+                  🎟️ Abiball-Staffel und Prozent-Möglichkeiten stehen jetzt im Reiter{" "}
+                  <button onClick={() => setTab("beitraege")} className="font-bold text-brand underline">
+                    Beiträge
+                  </button>
+                </div>
               )}
 
               <div className="col-span-2 flex flex-wrap items-center gap-2 border-t border-slate-200 pt-3 dark:border-slate-700 sm:col-span-4">
@@ -374,6 +362,10 @@ function Main() {
       ) : tab === "themen" ? (
         <main className="mt-3 pb-4">
           <ChatsTab />
+        </main>
+      ) : tab === "beitraege" ? (
+        <main className="mt-3 pb-4">
+          <BeitraegeTab />
         </main>
       ) : !teamView ? (
         <main className="mt-3">
@@ -511,7 +503,7 @@ function Main() {
       />
       <Tour
         open={showTour}
-        steps={tourSteps({ staff: isStaff, ziel: settings.ziel_punkte, zusatz: settings.zusatz })}
+        steps={tourSteps({ staff: isStaff, staffel: staffelVon(settings) })}
         onClose={() => {
           setShowTour(false);
           localStorage.setItem(`sv:tour:v2:${isStaff ? "team" : "schueler"}`, "1");

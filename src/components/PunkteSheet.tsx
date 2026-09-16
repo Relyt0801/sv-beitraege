@@ -2,7 +2,8 @@ import { useState } from "react";
 import type { Contribution, Settings, Student } from "../lib/types";
 import { useStore } from "../store";
 import { Sheet } from "./Sheet";
-import { PunkteBar } from "./PunkteBar";
+import { PunkteBar, StaffelTabelle } from "./PunkteBar";
+import { prozentVon, ticketBetrag } from "../lib/logic";
 
 /**
  * Liste der gesammelten Beiträge einer Person.
@@ -22,24 +23,34 @@ export function PunkteSheet({
   open: boolean;
   onClose: () => void;
 }) {
-  const { contributions, templates, addContribution, updateContribution, removeContribution, addTemplate, updateTemplate, removeTemplate } = useStore();
+  const { contributions, templates, addContribution, updateContribution, removeContribution } = useStore();
   const [addOpen, setAddOpen] = useState(false);
-  const [titel, setTitel] = useState("");
-  const [punkte, setPunkte] = useState("5");
-  const [tplOpen, setTplOpen] = useState(false);
+  // gewählte Vorlage + ggf. angepasster Wert + Datum der Hilfe
+  const [gewaehlt, setGewaehlt] = useState<string | null>(null);
+  const [wert, setWert] = useState("5");
+  const [datum, setDatum] = useState(() => new Date().toISOString().slice(0, 10));
 
   if (!student) return null;
   const list = contributions
     .filter((c) => c.student_id === student.id)
     .sort((a, b) => (a.datum < b.datum ? 1 : a.datum > b.datum ? -1 : 0));
   const summe = list.reduce((n, c) => n + c.punkte, 0);
-  const fehlt = Math.max(0, settings.ziel_punkte - summe);
+  const pct = prozentVon(summe, settings);
+
+  const vorlage = templates.find((t) => t.id === gewaehlt) ?? null;
+
+  function waehle(id: string) {
+    const t = templates.find((x) => x.id === id);
+    setGewaehlt(id);
+    setWert(String(t?.punkte ?? 0)); // Prozentwert der Vorlage übernehmen
+  }
 
   function speichern() {
-    if (!titel.trim()) return;
-    addContribution(student!.id, titel, Number(punkte) || 0);
-    setTitel("");
-    setPunkte("5");
+    if (!vorlage) return;
+    const p = vorlage.variabel ? Math.max(0, Math.min(100, Number(wert) || 0)) : vorlage.punkte;
+    addContribution(student!.id, vorlage.titel, p, datum);
+    setGewaehlt(null);
+    setDatum(new Date().toISOString().slice(0, 10));
     setAddOpen(false);
   }
 
@@ -47,7 +58,7 @@ export function PunkteSheet({
     <Sheet open={open} onClose={onClose}>
       <div className="mb-4 flex items-start gap-3">
         <div className="flex-1">
-          <div className="text-xl font-bold leading-tight">Beitragspunkte</div>
+          <div className="text-xl font-bold leading-tight">Gesammelte Prozent</div>
           <div className="text-sm text-slate-500">
             {student.vorname} {student.nachname}
           </div>
@@ -59,15 +70,14 @@ export function PunkteSheet({
 
       <div className="mb-4 rounded-2xl bg-slate-100 p-4 dark:bg-slate-800/70">
         <PunkteBar punkte={summe} settings={settings} />
-        <p className="mt-3 text-[13px] leading-relaxed text-slate-600 dark:text-slate-300">
-          {fehlt > 0 ? (
-            <>
-              Es fehlen noch <b>{fehlt} Punkte</b>. Wer die {settings.ziel_punkte} Punkte bis zum Ende
-              nicht erreicht, zahlt einmalig <b>{settings.zusatz} € Zusatzbeitrag</b>.
-            </>
-          ) : (
-            <>Ziel erreicht — es fällt <b>kein Zusatzbeitrag</b> an. 🎉</>
-          )}
+        <div className="mt-3">
+          <StaffelTabelle settings={settings} pct={pct} />
+        </div>
+        <p className="mt-2.5 text-[13px] leading-relaxed text-slate-600 dark:text-slate-300">
+          Das <b>erste</b> Abiballticket kostet bei diesem Stand{" "}
+          <b>{(settings.ticket_preis || 0) + ticketBetrag(pct, settings)} €</b>
+          {settings.ticket_preis ? ` (${settings.ticket_preis} € Grundpreis + ${ticketBetrag(pct, settings)} €)` : ""}.
+          Weitere Tickets sind davon nicht betroffen.
         </p>
       </div>
 
@@ -97,58 +107,84 @@ export function PunkteSheet({
         <div className="mt-4">
           {addOpen ? (
             <div className="rounded-2xl border border-brand/40 bg-brand/5 p-3">
-              {/* Vorlagen: ein Tipp genügt für die typischen Sachen */}
-              {templates.length > 0 && (
-                <div className="mb-2.5">
-                  <div className="mb-1.5 text-[11px] font-bold uppercase tracking-wide text-slate-400">Vorlagen</div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {templates.map((t) => (
-                      <button
-                        key={t.id}
-                        onClick={() => {
-                          setTitel(t.titel);
-                          setPunkte(String(t.punkte));
-                        }}
-                        className="rounded-full border border-brand/40 bg-white px-2.5 py-1 text-[13px] font-semibold text-brand dark:bg-slate-900"
-                      >
-                        {t.titel} <span className="opacity-60">+{t.punkte}</span>
-                      </button>
-                    ))}
-                    <button
-                      onClick={() => setTplOpen(true)}
-                      className="rounded-full border border-dashed border-slate-300 px-2.5 py-1 text-[13px] font-semibold text-slate-400 dark:border-slate-600"
-                    >
-                      ✎ Vorlagen bearbeiten
-                    </button>
-                  </div>
+              <div className="mb-1.5 text-[11px] font-bold uppercase tracking-wide text-slate-400">
+                Wofür?
+              </div>
+              {templates.length === 0 ? (
+                <p className="rounded-xl bg-white p-3 text-[13px] text-slate-500 dark:bg-slate-900">
+                  Es sind noch keine Möglichkeiten hinterlegt. Das Stufenteam legt sie im Reiter
+                  „Beiträge" an.
+                </p>
+              ) : (
+                <div className="flex flex-wrap gap-1.5">
+                  {[...templates]
+                    .sort((a, b) => a.sort - b.sort || a.punkte - b.punkte)
+                    .map((t) => {
+                      const aktiv = t.id === gewaehlt;
+                      return (
+                        <button
+                          key={t.id}
+                          onClick={() => waehle(t.id)}
+                          className={`rounded-full border px-2.5 py-1.5 text-[13px] font-semibold transition ${
+                            aktiv
+                              ? "border-brand bg-brand text-white"
+                              : "border-brand/40 bg-white text-brand dark:bg-slate-900"
+                          }`}
+                        >
+                          {t.titel} <span className="opacity-70">+{t.punkte} %</span>
+                        </button>
+                      );
+                    })}
                 </div>
               )}
-              <input
-                className="field mb-2"
-                autoFocus
-                placeholder="Wofür? z. B. Kuchen gebacken"
-                value={titel}
-                onChange={(e) => setTitel(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && speichern()}
-              />
-              <div className="flex items-center gap-2">
-                <label className="text-sm text-slate-500">Punkte</label>
-                <input
-                  type="number"
-                  min={0}
-                  className="w-20 rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-center dark:border-slate-700 dark:bg-slate-800"
-                  value={punkte}
-                  onChange={(e) => setPunkte(e.target.value)}
-                />
+
+              {vorlage && (
+                <div className="mt-3 grid gap-2">
+                  <label className="flex items-center gap-2.5">
+                    <span className="w-16 shrink-0 text-[13px] font-semibold text-slate-500">Datum</span>
+                    <input
+                      type="date"
+                      className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-[15px] dark:border-slate-700 dark:bg-slate-800"
+                      value={datum}
+                      onChange={(e) => setDatum(e.target.value)}
+                    />
+                  </label>
+                  <label className="flex items-center gap-2.5">
+                    <span className="w-16 shrink-0 text-[13px] font-semibold text-slate-500">Wert</span>
+                    {vorlage.variabel ? (
+                      <span className="flex items-center gap-1.5">
+                        <input
+                          type="number"
+                          min={0}
+                          max={100}
+                          inputMode="numeric"
+                          className="w-20 rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-center text-[15px] font-bold text-brand dark:border-slate-700 dark:bg-slate-800"
+                          value={wert}
+                          onChange={(e) => setWert(e.target.value)}
+                        />
+                        <span className="text-[13px] font-bold text-brand">%</span>
+                        <span className="text-[12px] text-slate-400">je nach Aufwand anpassbar</span>
+                      </span>
+                    ) : (
+                      <span className="text-[15px] font-bold text-brand">{vorlage.punkte} %</span>
+                    )}
+                  </label>
+                </div>
+              )}
+
+              <div className="mt-3 flex items-center gap-2">
                 <button
-                  onClick={() => setAddOpen(false)}
+                  onClick={() => {
+                    setAddOpen(false);
+                    setGewaehlt(null);
+                  }}
                   className="ml-auto rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-500 dark:border-slate-700"
                 >
                   Abbrechen
                 </button>
                 <button
                   onClick={speichern}
-                  disabled={!titel.trim()}
+                  disabled={!vorlage}
                   className="rounded-lg bg-brand px-4 py-2 text-sm font-bold text-white disabled:opacity-40"
                 >
                   Eintragen
@@ -170,43 +206,6 @@ export function PunkteSheet({
         Fertig
       </button>
 
-      {tplOpen && (
-        <div className="mt-4 rounded-2xl border border-slate-200 p-3 dark:border-slate-700">
-          <div className="mb-2 flex items-center gap-2">
-            <span className="flex-1 text-sm font-bold">Vorlagen verwalten</span>
-            <button onClick={() => setTplOpen(false)} className="text-sm font-semibold text-slate-400">
-              fertig
-            </button>
-          </div>
-          <div className="grid gap-1.5">
-            {templates.map((t) => (
-              <div key={t.id} className="flex items-center gap-2">
-                <input
-                  className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-800"
-                  value={t.titel}
-                  onChange={(e) => updateTemplate(t.id, { titel: e.target.value })}
-                />
-                <input
-                  type="number"
-                  min={0}
-                  className="w-16 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-center text-sm dark:border-slate-700 dark:bg-slate-800"
-                  value={t.punkte}
-                  onChange={(e) => updateTemplate(t.id, { punkte: Number(e.target.value) || 0 })}
-                />
-                <button onClick={() => confirm(`Vorlage „${t.titel}" löschen?`) && removeTemplate(t.id)} className="text-slate-400">
-                  🗑
-                </button>
-              </div>
-            ))}
-          </div>
-          <button
-            onClick={() => addTemplate("Neue Vorlage", 5)}
-            className="mt-2 w-full rounded-xl border border-dashed border-brand/50 py-2 text-sm font-bold text-brand"
-          >
-            ＋ Vorlage
-          </button>
-        </div>
-      )}
     </Sheet>
   );
 }

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { HY, STATI, type Halbjahr, type Student } from "../lib/types";
-import { isDead, isPreJoin, offenGesamt, zusatzFaellig } from "../lib/logic";
+import { isDead, isPreJoin, offenGesamt, prozentVon, ticketBetrag } from "../lib/logic";
 import { useStore } from "../store";
 import { useRole } from "../auth/RoleProvider";
 import { Sheet } from "./Sheet";
@@ -45,10 +45,10 @@ export function StudentSheet({
           <div className="mb-5 rounded-2xl bg-slate-100 p-4 dark:bg-slate-800/70">
             <div className="text-xs font-medium uppercase tracking-wide text-slate-500">Offen gesamt</div>
             <div className="text-2xl font-extrabold">
-              {offenGesamt(student, settings, punkte)} €{" "}
-              {zusatzFaellig(student, settings, punkte) && (
-                <span className="align-middle text-sm font-semibold text-red-500">inkl. {settings.zusatz} € Zusatz</span>
-              )}
+              {offenGesamt(student, settings)} €{" "}
+              <span className="align-middle text-sm font-semibold text-slate-400">
+                · 1. Abiballticket {(settings.ticket_preis || 0) + ticketBetrag(prozentVon(punkte, settings), settings)} € (getrennt)
+              </span>
             </div>
             <div className="mt-3 border-t border-slate-200 pt-3 dark:border-slate-700">
               <PunkteBar punkte={punkte} settings={settings} onClick={() => setShowPunkte(true)} compact />

@@ -49,6 +49,11 @@ export function farbe(key: string | null | undefined): NamensFarbe {
 /** Farben, die automatisch vergeben werden dürfen (ohne Sonderfarben). */
 const AUTO_FARBEN = NAME_FARBEN.filter((f) => !f.stufe && f.key !== "weiss");
 
+/** Zufällige Startfarbe – wird nur einmal beim Anlegen des Profils vergeben. */
+export function zufallsFarbe(): string {
+  return AUTO_FARBEN[Math.floor(Math.random() * AUTO_FARBEN.length)].key;
+}
+
 /**
  * Wer noch keine Farbe gewählt hat, bekommt eine feste aus dem Namen berechnet –
  * so bleibt der Kreis nach jedem Neuladen gleich statt immer indigo zu sein.
