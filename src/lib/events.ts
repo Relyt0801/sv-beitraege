@@ -15,6 +15,8 @@ export interface EventItem {
   poll_multiple: boolean;
   poll_min_one: boolean;
   poll_show_results: boolean;
+  /** anonym = nur das Stufenteam sieht, wer wie gestimmt hat */
+  poll_anon: boolean;
   created_by: string | null;
   created_at: string;
   options: PollOption[];
@@ -34,6 +36,7 @@ export interface NewEvent {
   poll_multiple: boolean;
   poll_min_one: boolean;
   poll_show_results: boolean;
+  poll_anon: boolean;
   options: string[]; // Antwort-Labels
 }
 

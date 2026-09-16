@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useEvents } from "../events-store";
 import { useRole } from "../auth/RoleProvider";
+import { Avatar } from "./Avatar";
 import { committeeLabel } from "../lib/committees";
 import { UnbanRequests } from "./UnbanRequests";
 import { KomiteeRequests } from "./KomiteeRequests";
@@ -36,8 +37,8 @@ function PushBanner() {
 }
 
 export function EventsTab() {
-  const { events, ready, myVotes, voteCounts, reads, vote, deleteEvent, markRead } = useEvents();
-  const { canEditData } = useRole();
+  const { events, ready, myVotes, voteCounts, voters, reads, vote, deleteEvent, markRead } = useEvents();
+  const { canEditData, isStaff } = useRole();
 
   // Beim Ansehen als gelesen markieren
   useEffect(() => {
@@ -70,7 +71,9 @@ export function EventsTab() {
           e={e}
           mine={myVotes[e.id] || []}
           counts={voteCounts[e.id] || {}}
+          stimmen={voters[e.id] || []}
           canSeeResults={e.poll_show_results || canEditData}
+          zeigeWaehler={!e.poll_anon || isStaff}
           canDelete={canEditData}
           onVote={(optId) => vote(e.id, optId, e.poll_multiple)}
           onDelete={() => {
@@ -87,7 +90,9 @@ function EventCard({
   e,
   mine,
   counts,
+  stimmen,
   canSeeResults,
+  zeigeWaehler,
   canDelete,
   onVote,
   onDelete,
@@ -95,7 +100,10 @@ function EventCard({
   e: EventItem;
   mine: string[];
   counts: Record<string, number>;
+  stimmen: { option_id: string; user_id: string }[];
   canSeeResults: boolean;
+  /** darf man sehen, WER gestimmt hat? sonst graue Kreise */
+  zeigeWaehler: boolean;
   canDelete: boolean;
   onVote: (optionId: string) => void;
   onDelete: () => void;
@@ -149,6 +157,30 @@ function EventCard({
                   <span className="flex-1">{o.label}</span>
                   {canSeeResults && <span className="text-xs text-slate-400">{c} · {pct}%</span>}
                 </span>
+                {canSeeResults && c > 0 && (
+                  <span className="relative mt-1.5 flex items-center pl-7">
+                    {zeigeWaehler
+                      ? stimmen
+                          .filter((v) => v.option_id === o.id)
+                          .slice(0, 12)
+                          .map((v, i) => (
+                            <span key={v.user_id} style={{ marginLeft: i === 0 ? -28 : -8 }} className="relative">
+                              <Avatar userId={v.user_id} size={22} ring />
+                            </span>
+                          ))
+                      : Array.from({ length: Math.min(c, 12) }).map((_, i) => (
+                          <span key={i} style={{ marginLeft: i === 0 ? -28 : -8 }} className="relative">
+                            <span
+                              style={{ width: 22, height: 22 }}
+                              className="flex items-center justify-center rounded-full bg-slate-300 text-[10px] font-extrabold leading-none text-slate-500 ring-2 ring-white dark:bg-slate-600 dark:text-slate-300 dark:ring-slate-900"
+                            >
+                              ?
+                            </span>
+                          </span>
+                        ))}
+                    {c > 12 && <span className="ml-1 text-[11px] font-semibold text-slate-400">+{c - 12}</span>}
+                  </span>
+                )}
               </button>
             );
           })}

@@ -10,6 +10,8 @@ interface EventsValue {
   ready: boolean;
   myVotes: Record<string, string[]>; // eventId -> optionIds
   voteCounts: Record<string, Record<string, number>>; // eventId -> optionId -> count
+  /** eventId -> Stimmen mit Person, für die Initialen-Kreise */
+  voters: Record<string, { option_id: string; user_id: string }[]>;
   reads: Set<string>;
   createEvent: (e: NewEvent) => Promise<void>;
   deleteEvent: (id: string) => Promise<void>;
@@ -30,6 +32,7 @@ export function EventsProvider({ children }: { children: ReactNode }) {
   const [events, setEvents] = useState<EventItem[]>([]);
   const [myVotes, setMyVotes] = useState<Record<string, string[]>>({});
   const [voteCounts, setVoteCounts] = useState<Record<string, Record<string, number>>>({});
+  const [voters, setVoters] = useState<Record<string, { option_id: string; user_id: string }[]>>({});
   const [reads, setReads] = useState<Set<string>>(new Set());
   const [ready, setReady] = useState(!hasSupabase);
   const uidRef = useRef<string>(LOCAL_UID);
@@ -55,6 +58,10 @@ export function EventsProvider({ children }: { children: ReactNode }) {
         for (const o of opts) counts[eid][o] = (counts[eid][o] || 0) + 1;
       }
       setVoteCounts(counts);
+      const vs: Record<string, { option_id: string; user_id: string }[]> = {};
+      for (const [eid, opts] of Object.entries((d.votes || {}) as Record<string, string[]>))
+        vs[eid] = opts.map((option_id) => ({ option_id, user_id: LOCAL_UID }));
+      setVoters(vs);
     } catch {
       /* ignore */
     }
@@ -87,13 +94,16 @@ export function EventsProvider({ children }: { children: ReactNode }) {
     );
     const mine: Record<string, string[]> = {};
     const counts: Record<string, Record<string, number>> = {};
+    const vs: Record<string, { option_id: string; user_id: string }[]> = {};
     for (const v of votes || []) {
       counts[v.event_id] ||= {};
       counts[v.event_id][v.option_id] = (counts[v.event_id][v.option_id] || 0) + 1;
+      (vs[v.event_id] ||= []).push({ option_id: v.option_id, user_id: v.user_id });
       if (v.user_id === uid) (mine[v.event_id] ||= []).push(v.option_id);
     }
     setMyVotes(mine);
     setVoteCounts(counts);
+    setVoters(vs);
     setReads(new Set((rd || []).map((r: any) => r.event_id)));
     setReady(true);
   }, []);
@@ -151,6 +161,7 @@ export function EventsProvider({ children }: { children: ReactNode }) {
           poll_multiple: e.poll_multiple,
           poll_min_one: e.poll_min_one,
           poll_show_results: e.poll_show_results,
+          poll_anon: e.poll_anon,
           created_by: LOCAL_UID,
           created_at: new Date().toISOString(),
           options: e.options.filter(Boolean).map((label) => ({ id: uuid(), label })),
@@ -175,6 +186,7 @@ export function EventsProvider({ children }: { children: ReactNode }) {
           poll_multiple: e.poll_multiple,
           poll_min_one: e.poll_min_one,
           poll_show_results: e.poll_show_results,
+          poll_anon: e.poll_anon,
           created_by: uidRef.current,
         })
         .select()
@@ -234,6 +246,7 @@ export function EventsProvider({ children }: { children: ReactNode }) {
             for (const o of cur) c[o] = (c[o] || 0) + 1;
             return { ...vc, [eventId]: c };
           });
+          setVoters((vv) => ({ ...vv, [eventId]: cur.map((option_id) => ({ option_id, user_id: LOCAL_UID })) }));
           saveLocal(events, next, reads);
           return next;
         });
@@ -265,6 +278,6 @@ export function EventsProvider({ children }: { children: ReactNode }) {
     [events, myVotes, reads, saveLocal],
   );
 
-  const value: EventsValue = { events, ready, myVotes, voteCounts, reads, createEvent, deleteEvent, vote, markRead };
+  const value: EventsValue = { events, ready, myVotes, voteCounts, voters, reads, createEvent, deleteEvent, vote, markRead };
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

@@ -24,6 +24,7 @@ export function EventComposer({ open, onClose }: { open: boolean; onClose: () =>
   const [multiple, setMultiple] = useState(false);
   const [minOne, setMinOne] = useState(true);
   const [showResults, setShowResults] = useState(true);
+  const [anon, setAnon] = useState(true);
   const [busy, setBusy] = useState(false);
 
   const list = useMemo(() => {
@@ -34,7 +35,7 @@ export function EventComposer({ open, onClose }: { open: boolean; onClose: () =>
   function reset() {
     setType("info"); setTitle(""); setBody(""); setIsWarning(false);
     setAudience("all"); setTargets(new Set()); setTags(new Set()); setQ("");
-    setOptions(["", ""]); setMultiple(false); setMinOne(true); setShowResults(true);
+    setOptions(["", ""]); setMultiple(false); setMinOne(true); setShowResults(true); setAnon(true);
   }
 
   function selectUnpaid() {
@@ -57,6 +58,7 @@ export function EventComposer({ open, onClose }: { open: boolean; onClose: () =>
       poll_multiple: multiple,
       poll_min_one: minOne,
       poll_show_results: showResults,
+      poll_anon: anon,
       options: type === "umfrage" ? options.map((o) => o.trim()).filter(Boolean) : [],
     });
     setBusy(false);
@@ -123,6 +125,10 @@ export function EventComposer({ open, onClose }: { open: boolean; onClose: () =>
             <Toggle label="Mehrere Antworten erlaubt" on={multiple} set={setMultiple} />
             <Toggle label="Antwort ist Pflicht" on={minOne} set={setMinOne} />
             <Toggle label="Schüler sehen Ergebnisse" on={showResults} set={setShowResults} />
+            <Toggle label="Anonym abstimmen" on={anon} set={setAnon} />
+            <p className="text-[11px] leading-snug text-slate-400">
+              Anonym: unter den Antworten stehen graue Kreise statt der Initialen. Wer wie gestimmt hat, sieht nur das Stufenteam.
+            </p>
           </div>
         </div>
       )}
