@@ -2,20 +2,15 @@ import { useEffect, useMemo, useState } from "react";
 import { hasSupabase, supabase } from "../lib/supabase";
 import { useRole } from "../auth/RoleProvider";
 import { useStore } from "../store";
+import { KontoZeile, Suchfeld } from "./KontoZeile";
 import { normalize } from "../lib/logic";
 import { KomiteeZugriff } from "./KomiteeZugriff";
-import { PERM_CATEGORIES, PERM_ROLES, ALL_PERMS, ROLE_DEFAULTS, rechteRolle, rollenDerZeile, type PermKey } from "../lib/permissions";
+import { PERM_CATEGORIES, PERM_ROLES, ALL_PERMS, ROLE_DEFAULTS, ROLLE_KURZ, rechteRolle, rollenDerZeile, type PermKey } from "../lib/permissions";
 
 type Matrix = Record<string, Record<string, boolean>>;
 
 // Kurzlabels für die Rollen-Pills, damit alle 4 auch auf schmalen Handys nebeneinander passen.
-const ROLE_SHORT: Record<string, string> = {
-  schueler: "Schüler",
-  sprecher: "Sprecher",
-  stufenteam: "Team",
-  kassenwart: "Kasse",
-  admin: "Admin",
-};
+
 
 export function PermissionsTab() {
   const { profiles, can, isAdmin, opUserId } = useRole();
@@ -84,6 +79,8 @@ export function PermissionsTab() {
   const rows = useMemo(() => {
     const norm = normalize(q);
     return [...profiles]
+      // Elternzugaenge haben keine Befugnisse und stehen deshalb auch nicht hier.
+      .filter((p) => p.role !== "eltern")
       .map((p) => ({ p, name: nameFor(p.student_id) }))
       .filter(({ p, name }) => !norm || normalize(`${p.username} ${name ?? ""}`).includes(norm))
       .sort((a, b) => (a.name ?? a.p.username ?? "").localeCompare(b.name ?? b.p.username ?? "", "de"));
@@ -124,7 +121,7 @@ export function PermissionsTab() {
                           on ? "border-brand bg-brand text-white" : "border-slate-200 text-slate-500 dark:border-slate-700"
                         } ${locked ? "opacity-60" : ""}`}
                       >
-                        <span className="truncate">{ROLE_SHORT[r.key]}</span>
+                        <span className="truncate">{ROLLE_KURZ[r.key] ?? r.label}</span>
                         {on && <span aria-hidden>✓</span>}
                       </button>
                     );
@@ -139,21 +136,29 @@ export function PermissionsTab() {
       <section className="card p-4">
         <h3 className="font-bold">Einzelne Personen</h3>
         <p className="mb-3 text-[11px] text-slate-400">Ausnahmen für eine Person. Ohne Auswahl gilt, was die Rolle erlaubt.</p>
-        <input className="field mb-3" placeholder="Person suchen…" value={q} onChange={(e) => setQ(e.target.value)} />
+        <Suchfeld wert={q} onChange={setQ} platzhalter="Person oder Konto suchen …" />
         <div className="space-y-2">
-          {rows.map(({ p, name }) => {
+          {rows.map(({ p }) => {
             const ov = overrides[p.user_id] || {};
             const count = Object.keys(ov).length;
             const geschuetzt = Boolean(p.is_op) || p.user_id === opUserId;
             return (
               <div key={p.user_id} className="rounded-xl border border-slate-200 dark:border-slate-700">
-                <button onClick={() => setOpenUser(openUser === p.user_id ? null : p.user_id)} className="flex w-full items-center gap-2 p-3 text-left">
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate font-semibold">{name ?? p.username}</div>
-                    <div className="truncate text-[11px] text-slate-400">{p.username} · Rolle: {p.role}</div>
-                  </div>
-                  {count > 0 && <span className="rounded-full bg-brand/15 px-2 py-0.5 text-[11px] font-bold text-brand">{count} Ausnahme{count > 1 ? "n" : ""}</span>}
-                  <span className="text-slate-400">{openUser === p.user_id ? "▲" : "▼"}</span>
+                <button onClick={() => setOpenUser(openUser === p.user_id ? null : p.user_id)} className="w-full p-3 text-left">
+                  <KontoZeile
+                    profil={p}
+                    student={p.student_id ? students.find((x) => x.id === p.student_id) : null}
+                    rechts={
+                      <span className="flex shrink-0 items-center gap-2">
+                        {count > 0 && (
+                          <span className="rounded-full bg-brand/15 px-2 py-0.5 text-[11px] font-bold text-brand">
+                            {count} Ausnahme{count > 1 ? "n" : ""}
+                          </span>
+                        )}
+                        <span className="text-slate-400">{openUser === p.user_id ? "▴" : "▾"}</span>
+                      </span>
+                    }
+                  />
                 </button>
                 {openUser === p.user_id && (
                   <div className="space-y-4 border-t border-slate-100 p-3 dark:border-slate-800">

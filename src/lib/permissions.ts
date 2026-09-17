@@ -58,6 +58,36 @@ export const ALL_PERMS: PermKey[] = PERM_CATEGORIES.flatMap((c) => c.perms.map((
 export type RolleKey = "schueler" | "sprecher" | "stv_sprecher" | "stufenteam" | "kassenwart" | "admin" | "eltern";
 
 /**
+ * Wie eine Rolle heisst – einmal ausgeschrieben, einmal kurz.
+ * Steht hier zentral, damit Rollen-Reiter und Rechte-Reiter dieselben
+ * Bezeichnungen benutzen und nirgends der rohe Schluessel durchrutscht.
+ */
+export const ROLLE_LANG: Record<string, string> = {
+  schueler: "Schüler",
+  sprecher: "Stufensprecher*in",
+  stv_sprecher: "Stv. Schülersprecher*in",
+  stufenteam: "Stufenteam",
+  kassenwart: "Kassenwart",
+  admin: "Admin",
+  eltern: "Eltern",
+};
+
+export const ROLLE_KURZ: Record<string, string> = {
+  schueler: "Schüler",
+  sprecher: "Sprecher",
+  stv_sprecher: "Sprecher",
+  stufenteam: "Team",
+  kassenwart: "Kasse",
+  admin: "Admin",
+  eltern: "Eltern",
+};
+
+/** Rollenname zum Anzeigen. Unbekannte Rollen fallen auf den Schluessel zurueck. */
+export function rolleName(role: string): string {
+  return ROLLE_LANG[role] ?? role;
+}
+
+/**
  * Für Rechte zählen Stufensprecher*in und Stv. als EINE Rolle: beide bekommen
  * immer dieselben Rechte. Deshalb gibt es im Rechte-Reiter nur eine Spalte
  * "Sprecher", und jede Änderung wird auf beide Rollen geschrieben.

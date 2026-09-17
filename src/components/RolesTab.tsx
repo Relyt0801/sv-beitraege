@@ -4,16 +4,11 @@ import { useStore } from "../store";
 import { useRole, type Role } from "../auth/RoleProvider";
 import { useTopics } from "../topics-store";
 import { COMMITTEES } from "../lib/committees";
+import { rolleName } from "../lib/permissions";
+import { KontoZeile, Suchfeld } from "./KontoZeile";
 
-const ROLE_LABEL: Record<Role, string> = {
-  schueler: "Schüler",
-  sprecher: "Stufensprecher*in",
-  stv_sprecher: "Stv. Schülersprecher*in",
-  stufenteam: "Stufenteam",
-  kassenwart: "Kassenwart",
-  admin: "Admin",
-  eltern: "Eltern",
-};
+/** Reihenfolge im Auswahlfeld. Die Namen kommen zentral aus permissions.ts. */
+const ROLLEN_AUSWAHL: Role[] = ["schueler", "sprecher", "stv_sprecher", "stufenteam", "kassenwart", "admin", "eltern"];
 
 /** Elternzugaenge stehen nicht in der Rollenliste – sie gehoeren nicht zur Stufe. */
 const VERSTECKT: Role[] = ["eltern"];
@@ -59,40 +54,21 @@ export function RolesTab() {
 
   return (
     <div>
-      <div className="mb-3 flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 shadow-card dark:border-slate-800 dark:bg-slate-900 dark:shadow-cardDark">
-        <span className="text-slate-400">🔍</span>
-        <input
-          className="w-full bg-transparent text-base outline-none placeholder:text-slate-400"
-          placeholder="Nutzer oder Name suchen…"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-        />
-      </div>
+      <Suchfeld wert={q} onChange={setQ} />
 
       <div className="grid gap-2.5">
-        {rows.map(({ p, name }) => {
+        {rows.map(({ p }) => {
           const koms = committeesOf(p.user_id);
           const banned = isBanned(p);
           const geschuetzt = p.is_op || p.user_id === opUserId;
           return (
             <div key={p.user_id} className="card p-4">
-              {/* Zeile 1: Name */}
-              <div className="flex items-center gap-3">
-                <span
-                  title={
-                    p.must_change_password === false
-                      ? "hat ein eigenes Passwort gesetzt"
-                      : "nutzt noch das Startpasswort"
-                  }
-                  className={`h-3 w-3 shrink-0 rounded-full ${
-                    p.must_change_password === false ? "bg-emerald-500" : "bg-slate-300 dark:bg-slate-600"
-                  }`}
-                />
-                <div className="min-w-0 flex-1">
-                  <div className="truncate font-semibold">{name ?? p.username ?? "—"}</div>
-                  <div className="truncate text-[13px] text-slate-400">{p.username}</div>
-                </div>
-              </div>
+              {/* Zeile 1: Person */}
+              <KontoZeile
+                profil={p}
+                student={p.student_id ? students.find((x) => x.id === p.student_id) : null}
+                punkt={p.must_change_password === false}
+              />
 
               {/* Zeile 2: Rolle + Komitees + Chat-Sperre nebeneinander */}
               <div className="mt-2.5 flex items-stretch gap-2">
@@ -103,13 +79,13 @@ export function RolesTab() {
                   value={p.role}
                   onChange={(e) => setRole(p.user_id, e.target.value as Role)}
                 >
-                  {(Object.keys(ROLE_LABEL) as Role[])
+                  {ROLLEN_AUSWAHL
                     .filter((r) => isAdmin || !NUR_ADMIN.includes(r) || p.role === r)
                     .map((r) => {
                       const vergeben = NUR_ADMIN.includes(r) && profiles.some((x) => x.role === r && x.user_id !== p.user_id);
                       return (
                         <option key={r} value={r} disabled={vergeben}>
-                          {ROLE_LABEL[r]}
+                          {rolleName(r)}
                           {vergeben ? " (schon vergeben)" : ""}
                         </option>
                       );
