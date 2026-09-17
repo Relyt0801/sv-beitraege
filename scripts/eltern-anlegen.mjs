@@ -5,8 +5,11 @@
 // "liv.icking". So ist sofort klar, zu wem ein Zugang gehört, und gleiche
 // Nachnamen können nicht durcheinandergeraten.
 //
-// Ausnahme sind Geschwister, die sich einen Zugang teilen sollen. Die stehen
-// unten in ZUSAMMEN und bekommen genau ein Konto für beide Kinder.
+// Geschwister bekommen trotzdem je einen eigenen Nutzernamen. Sie stehen unten
+// in ZUSAMMEN und bekommen dann zwei Dinge gemeinsam: jedes ihrer Konten sieht
+// ALLE Kinder der Familie, und beide Konten haben dasselbe Startpasswort. Die
+// Eltern koennen sich also mit jedem der Namen anmelden und muessen sich nur ein
+// Passwort merken.
 //
 // Der Zugang sieht ausschliesslich die eigenen Kinder. Dafür sorgt nicht nur
 // die Oberfläche, sondern die Datenbank selbst (parent_children + RLS).
@@ -43,14 +46,16 @@ const db = createClient(URL, KEY, { auth: { autoRefreshToken: false, persistSess
 const email = (nutzername) => `${nutzername}@sv-beitraege.local`;
 
 /**
- * Geschwister, die sich EINEN Zugang teilen.
- * Je Eintrag: Nachname und die Vornamen der Kinder. Das Konto laeuft auf den
- * alphabetisch ersten Vornamen, sieht aber alle genannten Kinder.
+ * Geschwister, die zusammengehoeren.
+ * Je Eintrag: Nachname und die Vornamen der Kinder. Jedes Kind behaelt seinen
+ * eigenen Nutzernamen, aber alle Konten der Familie sehen alle Kinder und
+ * teilen sich ein Passwort.
  *
+ * Die Schreibweise muss genau so wie in der Personenliste sein.
  * Weitere Faelle einfach hier ergaenzen.
  */
 const ZUSAMMEN = [
-  { nachname: "Icking", vornamen: ["Liv", "Enni"] },
+  { nachname: "Iking", vornamen: ["Liv", "Enni"] },
 ];
 
 /** Umlaute und Sonderzeichen raus, damit der Nutzername überall funktioniert. */
@@ -90,22 +95,29 @@ for (const s of alleSchueler || []) {
   if (!s.vorname || !s.nachname) continue;
   if (NUR && schlicht(s.nachname) !== schlicht(NUR)) continue;
 
-  // Gehoert das Kind zu einem gemeinsamen Zugang?
+  // Jedes Kind bekommt seinen eigenen Nutzernamen.
+  const key = `${schlicht(s.vorname)}.${schlicht(s.nachname)}`;
+  if (!key || key === ".") continue;
+
+  // Gehoert das Kind zu einer Geschwistergruppe? Dann merken wir uns die Gruppe,
+  // damit alle ihre Konten spaeter alle Kinder sehen und dasselbe Passwort haben.
   const paar = ZUSAMMEN.find(
     (z) =>
       schlicht(z.nachname) === schlicht(s.nachname) &&
       z.vornamen.some((v) => schlicht(v) === schlicht(s.vorname)),
   );
+  const gruppe = paar ? schlicht(paar.nachname) : null;
 
-  // Schluessel: bei Geschwistern der alphabetisch erste Vorname, sonst das Kind selbst.
-  const leitVorname = paar
-    ? [...paar.vornamen].sort((a, b) => a.localeCompare(b, "de"))[0]
-    : s.vorname;
-  const key = `${schlicht(leitVorname)}.${schlicht(s.nachname)}`;
-  if (!key || key === ".") continue;
+  familien.set(key, { nachname: s.nachname, vorname: s.vorname, kinder: [s], gruppe });
+}
 
-  if (!familien.has(key)) familien.set(key, { nachname: s.nachname, vorname: leitVorname, kinder: [] });
-  familien.get(key).kinder.push(s);
+// Geschwister: jedes Konto der Gruppe sieht alle Kinder der Gruppe.
+for (const [, fam] of familien) {
+  if (!fam.gruppe) continue;
+  const alleDerGruppe = [...familien.values()].filter((f) => f.gruppe === fam.gruppe);
+  fam.kinder = alleDerGruppe.flatMap((f) => f.kinder.filter((k) => k.id));
+  // Doppelte entfernen, falls ein Kind zweimal auftaucht.
+  fam.kinder = fam.kinder.filter((k, i, a) => a.findIndex((x) => x.id === k.id) === i);
 }
 
 // ------------------------------------------------------------ Entfernen
@@ -146,6 +158,7 @@ for (const [key, fam] of familien) {
     nachname: fam.nachname,
     vorname: fam.vorname,
     kinder: fam.kinder,
+    gruppe: fam.gruppe,
     schonDa: belegtVonEltern.has(key),
     kollision: belegt.has(key) && !belegtVonEltern.has(key),
   });
@@ -163,9 +176,9 @@ console.log(`  neu anzulegen: ${neu.length}`);
 console.log(`  schon vorhanden: ${geplant.filter((g) => g.schonDa).length}`);
 
 if (mehrfach.length) {
-  console.log(`\nGeschwister mit gemeinsamem Zugang:`);
+  console.log(`\nGeschwister – eigener Nutzername, aber gleiches Passwort und beide Kinder:`);
   for (const g of mehrfach)
-    console.log(`  ${g.nutzername}  ->  ${g.kinder.map((k) => k.vorname).join(" und ")} ${g.nachname}`);
+    console.log(`  ${g.nutzername}  sieht  ${g.kinder.map((k) => k.vorname).join(" und ")} ${g.nachname}`);
 }
 
 if (kollidiert.length) {
@@ -184,8 +197,17 @@ const zugaenge = [];
 let ok = 0;
 let fehler = 0;
 
+// Geschwister teilen sich ein Passwort – einmal je Gruppe erzeugt.
+const gruppenPasswort = new Map();
+
 for (const g of neu) {
-  const pw = passwort();
+  let pw;
+  if (g.gruppe) {
+    if (!gruppenPasswort.has(g.gruppe)) gruppenPasswort.set(g.gruppe, passwort());
+    pw = gruppenPasswort.get(g.gruppe);
+  } else {
+    pw = passwort();
+  }
   const { data: u, error: uErr } = await db.auth.admin.createUser({
     email: email(g.nutzername),
     password: pw,
