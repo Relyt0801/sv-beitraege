@@ -3,6 +3,7 @@ import { useTopics, type Topic } from "../topics-store";
 import { useRole } from "../auth/RoleProvider";
 import { UnbanRequests } from "./UnbanRequests";
 import { KomiteeRequests } from "./KomiteeRequests";
+import { ElternTeamTab } from "./ElternTeamTab";
 import { COMMITTEES, committeeIcon, committeeLabel } from "../lib/committees";
 import { KomiteePage } from "./KomiteePage";
 import { BannHinweis } from "./BannHinweis";
@@ -145,6 +146,7 @@ export function ChatsTab() {
           <>
             <KomiteeRequests />
             <UnbanRequests />
+            <ElternTeamTab />
           </>
         )}
 

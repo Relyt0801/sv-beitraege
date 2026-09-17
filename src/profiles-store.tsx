@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { hasSupabase, supabase } from "./lib/supabase";
-import { initialen as initialenVon, lesbarerName, zufallsFarbe, type PublicProfile } from "./lib/profil";
+import { elternNachname, familienKuerzel, initialen as initialenVon, lesbarerName, zufallsFarbe, type PublicProfile } from "./lib/profil";
 import { useStore } from "./store";
 
 interface ProfilesValue {
@@ -79,7 +79,7 @@ export function ProfilesProvider({ children }: { children: ReactNode }) {
     void (async () => {
       const { data: prof } = await supabase!
         .from("profiles")
-        .select("student_id, username, is_op")
+        .select("student_id, username, is_op, role")
         .eq("user_id", uid)
         .maybeSingle();
       // Nutzernamen wie "adams.tyler" umdrehen, sonst stünde dort "AT" statt "TA"
@@ -87,6 +87,15 @@ export function ProfilesProvider({ children }: { children: ReactNode }) {
       const sid = prof?.student_id as string | undefined;
       const st = sid ? students.find((x) => x.id === sid) : null;
       if (st) name = `${st.vorname} ${st.nachname}`.trim();
+
+      // Elternzugaenge heissen immer "Familie <Nachname>". Die Kuerzel sind die
+      // ersten beiden Buchstaben des Nachnamens, also IC fuer Familie Icking.
+      const istEltern = (prof as { role?: string } | null)?.role === "eltern";
+      if (istEltern) {
+        const nachname = elternNachname((prof?.username as string) || "");
+        if (nachname) name = `Familie ${nachname}`;
+      }
+      const kuerzel = istEltern ? familienKuerzel(name) : initialenVon(name);
       if (!name) {
         angelegt.current = false;
         return;
@@ -101,14 +110,14 @@ export function ProfilesProvider({ children }: { children: ReactNode }) {
         // Zeile existiert – nur den Namen auffrischen, die Farbe bleibt unberührt.
         await supabase!
           .from("public_profiles")
-          .update({ anzeigename: name, initialen: initialenVon(name) })
+          .update({ anzeigename: name, initialen: kuerzel })
           .eq("user_id", uid);
       } else {
         const istOp = Boolean((prof as { is_op?: boolean } | null)?.is_op);
         await supabase!.from("public_profiles").insert({
           user_id: uid,
           anzeigename: name,
-          initialen: initialenVon(name),
+          initialen: kuerzel,
           farbe: istOp ? "magenta" : zufallsFarbe(),
         });
       }

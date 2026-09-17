@@ -115,7 +115,7 @@ export function tourSteps(opts: { staff: boolean; staffel: { ab: number; betrag:
   if (!opts.staff)
     return [
       { anchor: "meine-karte", title: "Deine Kasse", text: "Hier steht, wie viel du der Stufenkasse noch schuldest." },
-      { anchor: "meine-halbjahre", title: "Die sechs Halbjahre", text: "25 € pro Halbjahr. Grün = bezahlt, blau = erlassen, grau = noch offen." },
+      { anchor: "meine-halbjahre", title: "Die sechs Halbjahre", text: "Unter jedem Halbjahr steht, was es kostet. Grün = bezahlt, blau = erlassen, gelb = noch offen." },
       { anchor: "meine-punkte", title: "Prozent sammeln", text: `Fürs Mithelfen sammelst du Prozent – sie machen dein Abiballticket günstiger: ${kette}. Ohne Mithilfe zahlst du ${voll} € extra. Tippe drauf: dort steht jede Aktion einzeln.` },
       { anchor: "tab-events", title: "Events", text: "Mitteilungen und Abstimmungen vom Stufenteam. Die rote Zahl heißt: ungelesen." },
       { anchor: "tab-themen", title: "Chats", text: "Dein Komitee: oben Angepinntes, Abstimmungen und To-dos, darunter der Chat. Hier stellst du auch Fragen ans Stufenteam." },

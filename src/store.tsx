@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
-import { HY, type ContribTemplate, type Contribution, type Halbjahr, type Settings, type Status, type Student, newStudent, STAFFEL_STANDARD } from "./lib/types";
+import { HY, type ContribTemplate, type Contribution, type Halbjahr, type Settings, type Status, type Student, type Beitraege, newStudent, STAFFEL_STANDARD, BEITRAEGE_STANDARD } from "./lib/types";
 import { hasSupabase, supabase } from "./lib/supabase";
 import { istEigenesEcho, merkeEigeneAenderung } from "./lib/echo";
 
@@ -14,7 +14,23 @@ const DEFAULT_SETTINGS: Settings = {
   zusatz: 0, // altes Konzept, von der Staffel abgelöst
   staffel: STAFFEL_STANDARD,
   ticket_preis: 0,
+  beitraege: BEITRAEGE_STANDARD,
 };
+
+/**
+ * Beitraege aus der Datenbank pruefen. Fehlt ein Halbjahr oder steht Unsinn
+ * drin, greift der Standardwert – so kostet nie versehentlich etwas 0 Euro.
+ */
+function gueltigeBeitraege(roh: unknown): Beitraege {
+  const aus = { ...BEITRAEGE_STANDARD };
+  if (roh && typeof roh === "object") {
+    for (const h of HY) {
+      const wert = (roh as Record<string, unknown>)[h];
+      if (typeof wert === "number" && isFinite(wert) && wert >= 0) aus[h] = Math.round(wert);
+    }
+  }
+  return aus;
+}
 
 /** Alte Daten (Beteiligungen pro Halbjahr) auf das neue Modell (Gesamtzahl) migrieren. */
 function migrate(s: any): Student {
@@ -105,14 +121,15 @@ async function speichereEinstellungen(next: Settings) {
     zusatzbetrag: next.zusatz,
     staffel: next.staffel,
     ticket_preis: next.ticket_preis,
+    beitraege: next.beitraege,
   };
   const { error } = await supabase!.from("app_settings").upsert(voll);
   if (!error) return;
-  if (!/Could not find the '(staffel|ticket_preis)' column/.test(error.message)) {
+  if (!/Could not find the '(staffel|ticket_preis|beitraege)' column/.test(error.message)) {
     reportErr(error.message);
     return;
   }
-  const { staffel: _s, ticket_preis: _t, ...schlank } = voll;
+  const { staffel: _s, ticket_preis: _t, beitraege: _b, ...schlank } = voll;
   const zweiter = await supabase!.from("app_settings").upsert(schlank);
   if (zweiter.error) reportErr(zweiter.error.message);
   else reportErr(error.message); // trotzdem sagen, dass das SQL noch fehlt
@@ -244,6 +261,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
               zusatz: row.zusatzbetrag ?? 0,
               staffel: Array.isArray(row.staffel) && row.staffel.length ? row.staffel : STAFFEL_STANDARD,
               ticket_preis: row.ticket_preis ?? 0,
+              beitraege: gueltigeBeitraege(row.beitraege),
             });
         })
         .subscribe();
@@ -272,6 +290,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
               ? ((cfg as { staffel: Settings["staffel"] }).staffel)
               : STAFFEL_STANDARD,
           ticket_preis: (cfg as { ticket_preis?: number }).ticket_preis ?? 0,
+          beitraege: gueltigeBeitraege((cfg as { beitraege?: unknown }).beitraege),
         });
       setReady(true);
       subscribeRealtime();

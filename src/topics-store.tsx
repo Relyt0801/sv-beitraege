@@ -88,6 +88,13 @@ interface TopicsValue {
 }
 
 const Ctx = createContext<TopicsValue | null>(null);
+/**
+ * Wie useTopics, gibt aber null zurueck statt zu meckern, wenn es den
+ * Speicher gar nicht gibt. Die Elternansicht laedt keine Chats, deshalb
+ * braucht es diesen Weg fuer Bauteile, die beide Ansichten teilen.
+ */
+export const useTopicsOptional = () => useContext(Ctx);
+
 export const useTopics = () => {
   const v = useContext(Ctx);
   if (!v) throw new Error("useTopics outside provider");

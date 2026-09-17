@@ -53,6 +53,17 @@ export interface Settings {
   staffel: Staffel[];
   /** Grundpreis eines Abiballtickets in €. 0 = steht noch nicht fest. */
   ticket_preis: number;
+  /** Was jedes Halbjahr kostet. */
+  beitraege: Beitraege;
+}
+
+/** Kontodaten der Stufenkasse. Stehen nur in der Datenbank, nie im Quellcode. */
+export interface BankKonto {
+  inhaber: string;
+  iban: string;
+  bic: string;
+  bank: string;
+  hinweis: string;
 }
 
 /** Ein einzelner Beitrag ("Kuchen gebacken", "Girolauf") mit Prozentwert. */
@@ -76,7 +87,25 @@ export interface ContribTemplate {
   variabel?: boolean;
 }
 
+/**
+ * @deprecated Fruher waren 25 Euro pro Halbjahr fest verdrahtet. Was ein
+ * Halbjahr kostet, steht jetzt in den Einstellungen (Settings.beitraege) und
+ * laesst sich von Admin und Kassenwart aendern. Dieser Wert dient nur noch als
+ * Rueckfall, solange die Einstellungen nicht geladen sind.
+ */
 export const FEE = 25;
+
+/** Was ein Halbjahr kostet. EF guenstiger, ab Q1 das Doppelte. */
+export type Beitraege = Record<Halbjahr, number>;
+
+export const BEITRAEGE_STANDARD: Beitraege = {
+  "EF.1": 25,
+  "EF.2": 25,
+  "Q1.1": 50,
+  "Q1.2": 50,
+  "Q2.1": 50,
+  "Q2.2": 50,
+};
 
 export function emptyTerms(): Record<Halbjahr, Term> {
   const t = {} as Record<Halbjahr, Term>;

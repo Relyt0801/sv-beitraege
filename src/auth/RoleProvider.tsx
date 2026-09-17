@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState, ty
 import { hasSupabase, supabase } from "../lib/supabase";
 import { ALL_PERMS, ROLE_DEFAULTS, rechteRolle, type PermKey } from "../lib/permissions";
 
-export type Role = "schueler" | "stufenteam" | "kassenwart" | "admin" | "sprecher" | "stv_sprecher";
+export type Role = "schueler" | "stufenteam" | "kassenwart" | "admin" | "sprecher" | "stv_sprecher" | "eltern";
 
 export interface Profile {
   user_id: string;
@@ -23,6 +23,8 @@ interface RoleCtx {
   ready: boolean;
   isAdmin: boolean;
   isStaff: boolean; // sieht alle Daten (stufenteam/kassenwart/admin)
+  /** Elternzugang: sieht nur die eigenen Kinder, keine Chats, keine Events. */
+  isEltern: boolean;
   can: (perm: PermKey) => boolean;
   canEditData: boolean; // Namen/Beteiligungen/Personen
   canEditBeitrag: boolean; // bezahlt/offen/erlassen
@@ -218,6 +220,7 @@ export function RoleProvider({ children }: { children: ReactNode }) {
 
   const isAdmin = role === "admin";
   const isStaff = STAFF.includes(role);
+  const isEltern = role === "eltern";
   const can = useCallback((perm: PermKey) => isAdmin || perms.has(perm), [isAdmin, perms]);
   const banned = bannPerm || (bannedUntil != null && new Date(bannedUntil) > new Date());
   const opUserId = profiles.find((p) => p.is_op)?.user_id ?? (isOp ? (uidRef.current ?? null) : null);
@@ -231,6 +234,7 @@ export function RoleProvider({ children }: { children: ReactNode }) {
     ready,
     isAdmin,
     isStaff,
+    isEltern,
     can,
     canEditData: can("data.edit"),
     canEditBeitrag: can("kasse.edit"),

@@ -42,7 +42,7 @@ export const PERM_CATEGORIES: PermCategory[] = [
   {
     label: "Daten", icon: "🗂️", perms: [
       { key: "data.edit", label: "Daten bearbeiten", desc: "Namen, Beteiligungen, Personen, Halbjahr, Import/Export." },
-      { key: "beitraege.manage", label: "Beiträge-Reiter", desc: "Möglichkeiten zum Prozentsammeln und die Abiball-Staffel festlegen." },
+      { key: "beitraege.manage", label: "Beiträge-Reiter", desc: "Halbjahresbeiträge, Möglichkeiten zum Prozentsammeln und die Abiball-Staffel festlegen." },
     ],
   },
   {
@@ -55,7 +55,7 @@ export const PERM_CATEGORIES: PermCategory[] = [
 
 export const ALL_PERMS: PermKey[] = PERM_CATEGORIES.flatMap((c) => c.perms.map((p) => p.key));
 
-export type RolleKey = "schueler" | "sprecher" | "stv_sprecher" | "stufenteam" | "kassenwart" | "admin";
+export type RolleKey = "schueler" | "sprecher" | "stv_sprecher" | "stufenteam" | "kassenwart" | "admin" | "eltern";
 
 /**
  * Für Rechte zählen Stufensprecher*in und Stv. als EINE Rolle: beide bekommen
@@ -85,9 +85,10 @@ const TEAM_STANDARD: PermKey[] = ["chats.view_all", "chats.delete_messages", "ch
 
 export const ROLE_DEFAULTS: Record<string, PermKey[]> = {
   schueler: [],
+  eltern: [], // Elternzugang bekommt keine der Befugnisse
   sprecher: [...TEAM_STANDARD],
   stv_sprecher: [...TEAM_STANDARD],
   stufenteam: ["chats.view_all", "chats.delete_messages", "chats.manage", "komitees.assign", "data.edit"],
-  kassenwart: ["chats.view_all", "chats.delete_messages", "chats.manage", "komitees.assign", "data.edit", "kasse.edit"],
+  kassenwart: ["chats.view_all", "chats.delete_messages", "chats.manage", "komitees.assign", "data.edit", "kasse.edit", "beitraege.manage"],
   admin: [...ALL_PERMS],
 };

@@ -1,4 +1,4 @@
-import { HY, FEE, STAFFEL_STANDARD, type Contribution, type Halbjahr, type Settings, type Staffel, type Student } from "./types";
+import { HY, FEE, BEITRAEGE_STANDARD, STAFFEL_STANDARD, type Beitraege, type Contribution, type Halbjahr, type Settings, type Staffel, type Student } from "./types";
 
 /** Diakritika/Umlaute/Groß-Klein/Whitespace-tolerante Normalisierung für Suche. */
 export function normalize(s: string): string {
@@ -30,14 +30,43 @@ export function isActive(st: Student, i: number): boolean {
   return !isPreJoin(st, i) && !isDead(st, i);
 }
 
-/** Offener Basisbetrag: aktive, noch offene Halbjahre bis inkl. aktuellem HJ × 25 €. */
-export function basisOffen(st: Student, aktuell: Halbjahr): number {
+/** Was die Halbjahre kosten – mit Rueckfall, falls die Einstellungen fehlen. */
+export function beitraegeVon(s: Settings): Beitraege {
+  const roh = s.beitraege;
+  if (!roh) return BEITRAEGE_STANDARD;
+  const aus = { ...BEITRAEGE_STANDARD };
+  for (const h of HY) if (typeof roh[h] === "number") aus[h] = roh[h];
+  return aus;
+}
+
+/** Was ein einzelnes Halbjahr kostet. */
+export function beitragFuer(h: Halbjahr, s: Settings): number {
+  return beitraegeVon(s)[h] ?? FEE;
+}
+
+/**
+ * Offener Betrag: alle Halbjahre bis einschliesslich dem aktuellen, in denen
+ * die Person dabei ist und noch nicht bezahlt hat. Jedes Halbjahr zaehlt mit
+ * seinem eigenen Preis – die EF ist guenstiger als die Q-Phase.
+ */
+export function basisOffen(st: Student, aktuell: Halbjahr, s?: Settings): number {
+  const preise = s ? beitraegeVon(s) : BEITRAEGE_STANDARD;
   const c = idx(aktuell);
-  let n = 0;
+  let summe = 0;
   HY.forEach((h, i) => {
-    if (i <= c && isActive(st, i) && st.terms[h].status === "offen") n++;
+    if (i <= c && isActive(st, i) && st.terms[h].status === "offen") summe += preise[h] ?? FEE;
   });
-  return n * FEE;
+  return summe;
+}
+
+/** Was insgesamt zu zahlen ist, wenn man alle Halbjahre mitmacht. */
+export function beitragGesamt(st: Student, s: Settings): number {
+  const preise = beitraegeVon(s);
+  let summe = 0;
+  HY.forEach((h, i) => {
+    if (isActive(st, i)) summe += preise[h] ?? FEE;
+  });
+  return summe;
 }
 
 /** Gesammelte Beitragspunkte einer Person. */
@@ -114,7 +143,7 @@ export function ersteTicket(st: Student, s: Settings, punkte: number): number {
  * Das Abiballticket läuft getrennt und wird bewusst nicht addiert.
  */
 export function offenGesamt(st: Student, s: Settings, _punkte?: number): number {
-  return basisOffen(st, s.aktuelles_halbjahr);
+  return basisOffen(st, s.aktuelles_halbjahr, s);
 }
 
 /** Summe aller offenen Beträge über die ganze Stufe. */

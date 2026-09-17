@@ -3,7 +3,7 @@ import { Sheet } from "./Sheet";
 import { Avatar } from "./Avatar";
 import { personIcon } from "../lib/committees";
 import { useProfiles } from "../profiles-store";
-import { useTopics } from "../topics-store";
+import { useTopicsOptional } from "../topics-store";
 import { useRole } from "../auth/RoleProvider";
 import { hasSupabase, supabase } from "../lib/supabase";
 import { farbKontur, farbwert, lesbarerName, speichereProfil, waehlbareFarben } from "../lib/profil";
@@ -16,17 +16,19 @@ import { enablePush, pushConfigured, pushPermission } from "../lib/push";
 export function ProfilSheet({
   open,
   onClose,
-  onTerms,
   onTutorial,
 }: {
   open: boolean;
   onClose: () => void;
-  onTerms: () => void;
-  onTutorial: () => void;
+  /** Fehlt in der Elternansicht – dort gibt es keine Einführung. */
+  onTutorial?: () => void;
 }) {
   const { mein, uid, aktualisiere, neuLaden } = useProfiles();
-  const { committeesOf } = useTopics();
   const { isStaff, isOp, role } = useRole();
+  const istEltern = role === "eltern";
+  // In der Elternansicht laeuft kein Chat-Speicher – dann bleibt die Komiteeliste leer.
+  const topics = useTopicsOptional();
+  const committeesOf = topics?.committeesOf ?? (() => [] as string[]);
   const { theme } = useTheme();
   const [wunsch, setWunsch] = useState("");
   const [grund, setGrund] = useState("");
@@ -81,23 +83,31 @@ export function ProfilSheet({
         <button className="iconbtn" onClick={onClose} aria-label="Schließen">✕</button>
       </div>
 
-      {/* Kopf: Namenskreis + Name */}
+      {/* Kopf: Namenskreis + Name. Elternzugaenge tragen kein Bild. */}
       <div className="mb-5 flex items-center gap-4">
-        <Avatar userId={uid} size={64} />
+        {!istEltern && <Avatar userId={uid} size={64} />}
         <div className="min-w-0 flex-1">
           <div
             className="truncate text-lg font-bold"
-            style={{ color: farbwert(mein?.farbe, theme === "dark"), textShadow: farbKontur(mein?.farbe, theme === "dark") }}
+            style={
+              istEltern
+                ? undefined
+                : { color: farbwert(mein?.farbe, theme === "dark"), textShadow: farbKontur(mein?.farbe, theme === "dark") }
+            }
           >
-            {personIcon(role, meine)} | {lesbarerName(mein?.anzeigename || "") || "Dein Name"}
+            {istEltern
+              ? mein?.anzeigename || "Ihr Zugang"
+              : `${personIcon(role, meine)} | ${lesbarerName(mein?.anzeigename || "") || "Dein Name"}`}
           </div>
           <div className="text-[12px] text-slate-400">
-            {rolleUndKomitees(role, meine) || "noch kein Komitee"}
+            {istEltern ? "Elternzugang" : rolleUndKomitees(role, meine) || "noch kein Komitee"}
           </div>
         </div>
       </div>
 
-      {/* Farbe */}
+      {/* Farbe – bei Elternzugaengen gibt es keine, die Namen stehen neutral da. */}
+      {!istEltern && (
+      <>
       <div className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-400">Farbe deines Namens</div>
       <div className="mb-5 grid max-w-sm grid-cols-8 gap-2 sm:gap-2.5">
         {waehlbareFarben({ staff: isStaff, op: isOp }).map((f) => {
@@ -131,6 +141,8 @@ export function ProfilSheet({
           );
         })}
       </div>
+      </>
+      )}
 
       {/* Benachrichtigungen */}
       <div className="mb-5 rounded-2xl bg-slate-100 p-3 dark:bg-slate-800/70">
@@ -168,8 +180,8 @@ export function ProfilSheet({
         </div>
       )}
 
-      {/* Komitee-Wechsel */}
-      {!isStaff && (
+      {/* Komitee-Wechsel – Eltern gehoeren in kein Komitee */}
+      {!isStaff && !istEltern && (
         <div className="mb-5 rounded-2xl bg-slate-100 p-3 dark:bg-slate-800/70">
           <div className="mb-1 text-sm font-bold">Komitee wechseln</div>
           {hatAntrag ? (
@@ -317,12 +329,11 @@ export function ProfilSheet({
             <span>🔑</span> Passwort ändern
           </button>
         )}
-        <button className={row} onClick={onTutorial}>
-          <span>🧭</span> Einführung noch mal ansehen
-        </button>
-        <button className={row} onClick={onTerms}>
-          <span>📄</span> Nutzungsbedingungen
-        </button>
+        {onTutorial && (
+          <button className={row} onClick={onTutorial}>
+            <span>🧭</span> Einführung noch mal ansehen
+          </button>
+        )}
         {hasSupabase && (
           <button
             className={`${row} text-red-500`}

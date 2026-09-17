@@ -24,15 +24,17 @@ export function PasswordGate({ children }: { children: ReactNode }) {
       }
       const { data } = await supabase!
         .from("profiles")
-        .select("must_change_password")
+        .select("must_change_password, role")
         .eq("user_id", uid)
         .maybeSingle();
       if (!alive) return;
+      // Elternzugaenge gehoeren in kein Komitee – die Frage waere fuer sie sinnlos.
+      const eltern = (data as { role?: string } | null)?.role === "eltern";
       if (data?.must_change_password) {
         setState("change");
         return;
       }
-      setState((await braucheKomitee(uid)) ? "komitee" : "ok");
+      setState(!eltern && (await braucheKomitee(uid)) ? "komitee" : "ok");
     };
     void check();
     const { data: sub } = supabase!.auth.onAuthStateChange((event) => {
@@ -60,7 +62,13 @@ export function PasswordGate({ children }: { children: ReactNode }) {
         onDone={async () => {
           const { data: s } = await supabase!.auth.getSession();
           const uid = s.session?.user.id;
-          setState(uid && (await braucheKomitee(uid)) ? "komitee" : "ok");
+          if (!uid) {
+            setState("ok");
+            return;
+          }
+          const { data: p } = await supabase!.from("profiles").select("role").eq("user_id", uid).maybeSingle();
+          const eltern = (p as { role?: string } | null)?.role === "eltern";
+          setState(!eltern && (await braucheKomitee(uid)) ? "komitee" : "ok");
         }}
       />
     );

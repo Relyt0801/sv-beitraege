@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { useStore } from "../store";
-import { staffelVon } from "../lib/logic";
+import { beitraegeVon, staffelVon } from "../lib/logic";
 import { useEntwurf } from "../lib/entwurf";
-import type { ContribTemplate, Staffel } from "../lib/types";
+import { HY, type ContribTemplate, type Halbjahr, type Staffel } from "../lib/types";
 
 /**
  * Reiter "Beiträge": hier wird festgelegt, wofür es wie viel Prozent gibt und
@@ -18,6 +18,8 @@ export function BeitraegeTab() {
   const staffel = staffelVon(settings);
   const grund = settings.ticket_preis || 0;
   const preis = useEntwurf(grund, (wert) => setSettings({ ticket_preis: wert }));
+  const preise = beitraegeVon(settings);
+  const gesamt = HY.reduce((n, h) => n + (preise[h] || 0), 0);
 
   function anlegen() {
     const t = titel.trim();
@@ -77,6 +79,32 @@ export function BeitraegeTab() {
               ＋
             </button>
           </div>
+        </div>
+      </section>
+
+      {/* ---------------- Beitrag je Halbjahr ---------------- */}
+      <section className="card h-fit p-4 sm:p-5">
+        <h2 className="text-lg font-bold">Was kostet ein Halbjahr?</h2>
+        <p className="mt-0.5 text-[13px] leading-relaxed text-slate-500 dark:text-slate-400">
+          Der Betrag gilt für jede Person, die in dem Halbjahr dabei ist. Änderst du einen Wert,
+          rechnen sich alle offenen Beträge sofort neu aus.
+        </p>
+
+        <ul className="mt-4 grid gap-2">
+          {HY.map((h) => (
+            <HalbjahrZeile
+              key={h}
+              halbjahr={h}
+              betrag={preise[h]}
+              aktuell={h === settings.aktuelles_halbjahr}
+              onBetrag={(wert) => setSettings({ beitraege: { ...preise, [h]: wert } })}
+            />
+          ))}
+        </ul>
+
+        <div className="mt-3 flex items-center justify-between rounded-2xl bg-slate-100 px-3 py-2.5 dark:bg-slate-800/70">
+          <span className="text-[13px] font-semibold text-slate-500">Alle sechs Halbjahre zusammen</span>
+          <span className="text-[15px] font-extrabold">{gesamt} €</span>
         </div>
       </section>
 
@@ -215,6 +243,46 @@ function StufenZeile({
           value={betrag.wert}
           onChange={(e) => betrag.aendern(Math.max(0, Number(e.target.value) || 0))}
           onBlur={betrag.jetztSpeichern}
+        />
+        <span className="text-[15px] font-bold text-slate-500">€</span>
+      </div>
+    </li>
+  );
+}
+
+/** Ein Halbjahr mit seinem Preis. Speichert erst nach kurzer Pause. */
+function HalbjahrZeile({
+  halbjahr,
+  betrag,
+  aktuell,
+  onBetrag,
+}: {
+  halbjahr: Halbjahr;
+  betrag: number;
+  aktuell: boolean;
+  onBetrag: (wert: number) => void;
+}) {
+  const wert = useEntwurf(betrag, onBetrag);
+
+  return (
+    <li
+      className={`flex items-center gap-3 rounded-2xl border px-3 py-2 ${
+        aktuell ? "border-brand bg-brand/5" : "border-slate-200 dark:border-slate-700"
+      }`}
+    >
+      <span className="w-14 shrink-0 text-[15px] font-bold">{halbjahr}</span>
+      <span className="min-w-0 flex-1 truncate text-[12px] text-slate-400">
+        {aktuell ? "läuft gerade" : ""}
+      </span>
+      <div className="flex shrink-0 items-center gap-1 rounded-lg bg-slate-100 px-2 py-1 dark:bg-slate-800">
+        <input
+          type="number"
+          min={0}
+          inputMode="numeric"
+          className="w-14 bg-transparent text-right text-[15px] font-bold outline-none"
+          value={wert.wert}
+          onChange={(e) => wert.aendern(Math.max(0, Number(e.target.value) || 0))}
+          onBlur={wert.jetztSpeichern}
         />
         <span className="text-[15px] font-bold text-slate-500">€</span>
       </div>

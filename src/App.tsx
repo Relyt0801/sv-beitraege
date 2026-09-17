@@ -11,11 +11,9 @@ import { hasSupabase, supabase } from "./lib/supabase";
 import { enablePush, pushConfigured, pushPermission } from "./lib/push";
 import { useStore } from "./store";
 import { AuthGate } from "./auth/AuthGate";
-import { TermsGate } from "./auth/TermsGate";
 import { PasswordGate } from "./auth/PasswordGate";
 import { RoleProvider, useRole } from "./auth/RoleProvider";
 import { Sheet } from "./components/Sheet";
-import { TermsText } from "./components/TermsText";
 import { ProfilesProvider, useProfiles } from "./profiles-store";
 import { EventsProvider, useEvents } from "./events-store";
 import { TopicsProvider, useTopics } from "./topics-store";
@@ -29,24 +27,55 @@ import { PermissionsTab } from "./components/PermissionsTab";
 import { EventsTab } from "./components/EventsTab";
 import { BeitraegeTab } from "./components/BeitraegeTab";
 import { EventComposer } from "./components/EventComposer";
+import { ElternProvider } from "./eltern-store";
+import { ElternApp } from "./components/ElternApp";
 
 export default function App() {
   return (
     <AuthGate>
-      <TermsGate>
-        <PasswordGate>
-          <RoleProvider>
-            <ProfilesProvider>
-            <EventsProvider>
-              <TopicsProvider>
-                <Main />
-              </TopicsProvider>
-            </EventsProvider>
-            </ProfilesProvider>
-          </RoleProvider>
-        </PasswordGate>
-      </TermsGate>
+      <PasswordGate>
+        <RoleProvider>
+          <NachRolle />
+        </RoleProvider>
+      </PasswordGate>
     </AuthGate>
+  );
+}
+
+/**
+ * Eltern bekommen eine eigene, deutlich kleinere App: drei Reiter, keine
+ * Chats, keine Events, keine Personenliste. Deshalb wird hier verzweigt,
+ * bevor die grossen Datenspeicher ueberhaupt starten.
+ */
+function NachRolle() {
+  const { ready, isEltern } = useRole();
+
+  if (!ready)
+    return (
+      <div className="flex min-h-dvh items-center justify-center">
+        <div className="h-9 w-9 animate-spin rounded-full border-[3px] border-slate-300 border-t-brand dark:border-slate-700 dark:border-t-brand" />
+      </div>
+    );
+
+  if (isEltern)
+    return (
+      <ProfilesProvider>
+        <ElternProvider>
+          <ElternApp />
+        </ElternProvider>
+      </ProfilesProvider>
+    );
+
+  return (
+    <ProfilesProvider>
+      <EventsProvider>
+        <TopicsProvider>
+          <ElternProvider>
+            <Main />
+          </ElternProvider>
+        </TopicsProvider>
+      </EventsProvider>
+    </ProfilesProvider>
   );
 }
 
@@ -110,7 +139,6 @@ function Main() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [openId, setOpenId] = useState<string | null>(null);
   const [showAdd, setShowAdd] = useState(false);
-  const [showTerms, setShowTerms] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showTour, setShowTour] = useState(false);
   // Listen-, Such- und Filterwerkzeug nur für Leute, die wirklich alle Personen verwalten.
@@ -327,9 +355,6 @@ function Main() {
                     </button>
                   </>
                 )}
-                <button onClick={() => setShowTerms(true)} className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-semibold text-slate-500 dark:border-slate-700">
-                  Nutzungsbedingungen
-                </button>
                 <button onClick={() => setShowTour(true)} className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-semibold text-slate-500 dark:border-slate-700">
                   Einführung
                 </button>
@@ -495,10 +520,6 @@ function Main() {
       <ProfilSheet
         open={showSettings}
         onClose={() => setShowSettings(false)}
-        onTerms={() => {
-          setShowSettings(false);
-          setShowTerms(true);
-        }}
         onTutorial={() => {
           setShowSettings(false);
           setShowTour(true);
@@ -513,12 +534,6 @@ function Main() {
           localStorage.setItem(`sv:tour:v2:${isStaff ? "team" : "schueler"}`, new Date().toISOString());
         }}
       />
-      <Sheet open={showTerms} onClose={() => setShowTerms(false)}>
-        <TermsText />
-        <button className="btn-primary mt-5" onClick={() => setShowTerms(false)}>
-          Schließen
-        </button>
-      </Sheet>
     </div>
   );
 }

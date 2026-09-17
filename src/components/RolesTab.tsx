@@ -12,7 +12,11 @@ const ROLE_LABEL: Record<Role, string> = {
   stufenteam: "Stufenteam",
   kassenwart: "Kassenwart",
   admin: "Admin",
+  eltern: "Eltern",
 };
+
+/** Elternzugaenge stehen nicht in der Rollenliste – sie gehoeren nicht zur Stufe. */
+const VERSTECKT: Role[] = ["eltern"];
 
 /** Diese beiden Rollen darf nur der Admin vergeben – und je nur einmal. */
 const NUR_ADMIN: Role[] = ["sprecher", "stv_sprecher"];
@@ -44,6 +48,7 @@ export function RolesTab() {
   const rows = useMemo(() => {
     const norm = normalize(q);
     return [...profiles]
+      .filter((p) => !VERSTECKT.includes(p.role))
       .map((p) => ({ p, name: nameFor(p.student_id) }))
       .filter(({ p, name }) => !norm || normalize(`${p.username} ${name ?? ""}`).includes(norm))
       .sort((a, b) =>

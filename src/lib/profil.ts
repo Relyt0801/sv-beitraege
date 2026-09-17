@@ -117,6 +117,26 @@ export function initialen(name: string): string {
   return (a + b).toUpperCase();
 }
 
+/**
+ * Aus dem Nutzernamen eines Elternzugangs den Nachnamen holen.
+ * Die Konten heissen "eltern.icking", daraus wird "Icking".
+ */
+export function elternNachname(username: string): string {
+  const roh = (username || "").trim().replace(/^eltern[._-]/i, "").split(/[._-]/)[0] || "";
+  if (!roh) return "";
+  return roh.charAt(0).toUpperCase() + roh.slice(1);
+}
+
+/**
+ * Kuerzel eines Elternzugangs: die ersten beiden Buchstaben des Nachnamens.
+ * Aus "Familie Icking" wird also IC, nicht FI.
+ */
+export function familienKuerzel(anzeigename: string): string {
+  const nachname = (anzeigename || "").replace(/^Familie\s+/i, "").trim();
+  if (!nachname) return "?";
+  return nachname.slice(0, 2).toUpperCase();
+}
+
 /** "adams.tyler" -> "Tyler Adams". Alles andere bleibt, wie es ist. */
 export function lesbarerName(name: string): string {
   const n = (name || "").trim();
