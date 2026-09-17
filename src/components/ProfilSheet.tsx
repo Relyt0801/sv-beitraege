@@ -232,7 +232,9 @@ export function ProfilSheet({
           <div className="text-sm font-bold">Benachrichtigungen aufs Gerät</div>
           {!pushConfigured() ? (
             <p className="mt-1 text-[13px] text-slate-500">
-              Auf diesem Gerät noch nicht eingerichtet. Melde dich beim Stufenteam.
+              {isStaff
+                ? "Für diese Seite ist noch kein Schlüssel hinterlegt. In der Anleitung PUSH-SETUP.md steht, wie das geht."
+                : "Hier noch nicht eingerichtet. Sag dem Stufenteam Bescheid."}
             </p>
           ) : perm === "granted" ? (
             <p className="mt-1 text-[13px] font-semibold text-emerald-600 dark:text-emerald-400">
