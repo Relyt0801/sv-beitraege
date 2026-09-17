@@ -249,7 +249,14 @@ export function TopicsProvider({ children }: { children: ReactNode }) {
         .on("postgres_changes", { event: "*", schema: "public", table: "topic_members" }, planeNachladen)
         .on("postgres_changes", { event: "*", schema: "public", table: "topic_tags" }, planeNachladen)
         .on("postgres_changes", { event: "*", schema: "public", table: "tag_members" }, planeNachladen)
-        .on("postgres_changes", { event: "*", schema: "public", table: "topic_votes" }, planeNachladen)
+        // Die eigene Stimme ist im Bildschirm schon gesetzt, bevor sie beim Server
+        // ankommt. Wuerde man auf das eigene Echo hin alles neu laden, ruckelt die
+        // ganze Seite bei jedem Kreuz. Fremde Stimmen laden weiterhin nach.
+        .on("postgres_changes", { event: "*", schema: "public", table: "topic_votes" }, (p) => {
+          const wer = ((p.eventType === "DELETE" ? p.old : p.new) as { user_id?: string })?.user_id;
+          if (wer && wer === uidRef.current) return;
+          planeNachladen();
+        })
         .subscribe();
     };
     void start();
@@ -461,19 +468,31 @@ export function TopicsProvider({ children }: { children: ReactNode }) {
       const ohneMich = (v[itemId] || []).filter((x) => x.user_id !== uidRef.current);
       return { ...v, [itemId]: [...ohneMich, ...neueWahl.map((option_id) => ({ user_id: uidRef.current, option_id }))] };
     });
+    let schiefgegangen: string | null = null;
     if (multi) {
       // Mehrfachwahl: nur diese eine Option umschalten
-      if (had)
-        await supabase!.from("topic_votes").delete()
-          .eq("item_id", itemId).eq("user_id", uidRef.current).eq("option_id", optionId);
-      else
-        await supabase!.from("topic_votes")
-          .insert({ item_id: itemId, option_id: optionId, user_id: uidRef.current });
+      const { error } = had
+        ? await supabase!.from("topic_votes").delete()
+            .eq("item_id", itemId).eq("user_id", uidRef.current).eq("option_id", optionId)
+        : await supabase!.from("topic_votes")
+            .insert({ item_id: itemId, option_id: optionId, user_id: uidRef.current });
+      if (error) schiefgegangen = error.message;
     } else {
-      await supabase!.from("topic_votes").delete().eq("item_id", itemId).eq("user_id", uidRef.current);
-      if (!had) await supabase!.from("topic_votes").insert({ item_id: itemId, option_id: optionId, user_id: uidRef.current });
+      const weg = await supabase!.from("topic_votes").delete().eq("item_id", itemId).eq("user_id", uidRef.current);
+      if (weg.error) schiefgegangen = weg.error.message;
+      if (!had && !schiefgegangen) {
+        const neu2 = await supabase!.from("topic_votes")
+          .insert({ item_id: itemId, option_id: optionId, user_id: uidRef.current });
+        if (neu2.error) schiefgegangen = neu2.error.message;
+      }
     }
-    planeNachladen();
+    // Der Bildschirm zeigt das Ergebnis schon. Nur wenn beim Server etwas
+    // schieflief, holen wir den echten Stand zurueck – sonst wuerde jedes Kreuz
+    // die ganze Seite neu laden lassen.
+    if (schiefgegangen) {
+      console.error("[Abstimmung]", schiefgegangen);
+      planeNachladen();
+    }
   }, [planeNachladen]);
 
   const markRead: TopicsValue["markRead"] = useCallback((topicId) => {

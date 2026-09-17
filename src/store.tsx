@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { HY, type ContribTemplate, type Contribution, type Halbjahr, type Settings, type Status, type Student, newStudent, STAFFEL_STANDARD } from "./lib/types";
 import { hasSupabase, supabase } from "./lib/supabase";
+import { istEigenesEcho, merkeEigeneAenderung } from "./lib/echo";
 
 const LS_STUDENTS = "sv-beitraege:students";
 const LS_SETTINGS = "sv-beitraege:settings";
@@ -154,6 +155,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
   const studentsRef = useRef<Student[]>([]);
   studentsRef.current = students;
+  const settingsRef = useRef<Settings>(settings);
+  settingsRef.current = settings;
   const reloadRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
@@ -191,6 +194,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       channel = supabase!
         .channel("sv-realtime")
         .on("postgres_changes", { event: "*", schema: "public", table: "students" }, (p) => {
+          const wenId = ((p.eventType === "DELETE" ? p.old : p.new) as { id?: string })?.id;
+          if (wenId && istEigenesEcho(`student:${wenId}`)) return;
           setStudents((prev) => {
             if (p.eventType === "DELETE") return prev.filter((x) => x.id !== (p.old as Student).id);
             const row = migrate(p.new);
@@ -202,6 +207,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           });
         })
         .on("postgres_changes", { event: "*", schema: "public", table: "contributions" }, (p) => {
+          const wenId = ((p.eventType === "DELETE" ? p.old : p.new) as { id?: string })?.id;
+          if (wenId && istEigenesEcho(`beitrag:${wenId}`)) return;
           setContributions((prev) => {
             if (p.eventType === "DELETE") return prev.filter((c) => c.id !== (p.old as Contribution).id);
             const row = p.new as Contribution;
@@ -212,14 +219,23 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             return next;
           });
         })
-        .on("postgres_changes", { event: "*", schema: "public", table: "contribution_templates" }, () => {
-          void supabase!
-            .from("contribution_templates")
-            .select("*")
-            .order("sort")
-            .then(({ data }) => setTemplates(((data as ContribTemplate[]) || [])));
+        .on("postgres_changes", { event: "*", schema: "public", table: "contribution_templates" }, (p) => {
+          // Nur die eine geänderte Zeile einpflegen. Früher wurde hier die ganze
+          // Liste neu geladen – bei jedem getippten Buchstaben einmal.
+          const wenId = ((p.eventType === "DELETE" ? p.old : p.new) as { id?: string })?.id;
+          if (wenId && istEigenesEcho(`vorlage:${wenId}`)) return;
+          setTemplates((prev) => {
+            if (p.eventType === "DELETE") return prev.filter((t) => t.id !== wenId);
+            const row = p.new as ContribTemplate;
+            const i = prev.findIndex((t) => t.id === row.id);
+            if (i === -1) return [...prev, row].sort((a, b) => a.sort - b.sort || a.punkte - b.punkte);
+            const next = [...prev];
+            next[i] = row;
+            return next;
+          });
         })
         .on("postgres_changes", { event: "*", schema: "public", table: "app_settings" }, (p) => {
+          if (istEigenesEcho("einstellungen")) return;
           const row = p.new as any;
           if (row)
             setSettingsState({
@@ -330,6 +346,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       if (!cur) return;
       const changed = fn(cur);
       setStudents((prev) => prev.map((s) => (s.id === id ? changed : s)));
+      merkeEigeneAenderung(`student:${id}`);
       patchCols(id, cols(changed));
     },
     [patchCols],
@@ -352,7 +369,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const removeStudent: StoreValue["removeStudent"] = useCallback(
     (id) => {
       setStudents((prev) => prev.filter((s) => s.id !== id));
-      if (mode === "supabase") void run(supabase!.from("students").delete().eq("id", id));
+      if (mode === "supabase") {
+        merkeEigeneAenderung(`student:${id}`);
+        void run(supabase!.from("students").delete().eq("id", id));
+      }
     },
     [mode],
   );
@@ -428,7 +448,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const updateTemplate: StoreValue["updateTemplate"] = useCallback(
     (id, patch) => {
       setTemplates((prev) => prev.map((t) => (t.id === id ? { ...t, ...patch } : t)));
-      if (mode === "supabase") void run(supabase!.from("contribution_templates").update(patch).eq("id", id));
+      if (mode === "supabase") {
+        merkeEigeneAenderung(`vorlage:${id}`);
+        void run(supabase!.from("contribution_templates").update(patch).eq("id", id));
+      }
     },
     [mode],
   );
@@ -436,7 +459,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const removeTemplate: StoreValue["removeTemplate"] = useCallback(
     (id) => {
       setTemplates((prev) => prev.filter((t) => t.id !== id));
-      if (mode === "supabase") void run(supabase!.from("contribution_templates").delete().eq("id", id));
+      if (mode === "supabase") {
+        merkeEigeneAenderung(`vorlage:${id}`);
+        void run(supabase!.from("contribution_templates").delete().eq("id", id));
+      }
     },
     [mode],
   );
@@ -446,7 +472,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const clean = { ...patch };
       if (clean.punkte != null) clean.punkte = Math.max(0, Math.round(clean.punkte) || 0);
       setContributions((prev) => prev.map((c) => (c.id === id ? { ...c, ...clean } : c)));
-      if (mode === "supabase") void run(supabase!.from("contributions").update(clean).eq("id", id));
+      if (mode === "supabase") {
+        merkeEigeneAenderung(`beitrag:${id}`);
+        void run(supabase!.from("contributions").update(clean).eq("id", id));
+      }
     },
     [mode],
   );
@@ -454,18 +483,26 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const removeContribution: StoreValue["removeContribution"] = useCallback(
     (id) => {
       setContributions((prev) => prev.filter((c) => c.id !== id));
-      if (mode === "supabase") void run(supabase!.from("contributions").delete().eq("id", id));
+      if (mode === "supabase") {
+        merkeEigeneAenderung(`beitrag:${id}`);
+        void run(supabase!.from("contributions").delete().eq("id", id));
+      }
     },
     [mode],
   );
 
   const setSettings: StoreValue["setSettings"] = useCallback(
     (patch) => {
-      setSettingsState((prev) => {
-        const next = { ...prev, ...patch };
-        if (mode === "supabase") void speichereEinstellungen(next);
-        return next;
-      });
+      // Gespeichert wird ausserhalb des State-Updaters. Stand der Dinge kommt aus
+      // settingsRef, damit mehrere Aenderungen kurz hintereinander nicht
+      // gegeneinander laufen.
+      const next = { ...settingsRef.current, ...patch };
+      settingsRef.current = next;
+      setSettingsState(next);
+      if (mode === "supabase") {
+        merkeEigeneAenderung("einstellungen");
+        void speichereEinstellungen(next);
+      }
     },
     [mode],
   );

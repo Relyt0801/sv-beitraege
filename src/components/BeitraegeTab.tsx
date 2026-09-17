@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { useStore } from "../store";
 import { staffelVon } from "../lib/logic";
+import { useEntwurf } from "../lib/entwurf";
+import type { ContribTemplate, Staffel } from "../lib/types";
 
 /**
  * Reiter "Beiträge": hier wird festgelegt, wofür es wie viel Prozent gibt und
@@ -15,6 +17,7 @@ export function BeitraegeTab() {
   const sortiert = [...templates].sort((a, b) => a.sort - b.sort || a.punkte - b.punkte);
   const staffel = staffelVon(settings);
   const grund = settings.ticket_preis || 0;
+  const preis = useEntwurf(grund, (wert) => setSettings({ ticket_preis: wert }));
 
   function anlegen() {
     const t = titel.trim();
@@ -36,48 +39,12 @@ export function BeitraegeTab() {
 
         <ul className="mt-4 grid gap-2">
           {sortiert.map((t) => (
-            <li
+            <VorlagenZeile
               key={t.id}
-              className="rounded-2xl border border-slate-200 p-2.5 dark:border-slate-700"
-            >
-              <div className="flex items-center gap-2">
-                <input
-                  className="min-w-0 flex-1 rounded-lg bg-slate-100 px-2.5 py-2 text-[15px] font-semibold dark:bg-slate-800"
-                  value={t.titel}
-                  onChange={(e) => updateTemplate(t.id, { titel: e.target.value })}
-                />
-                <div className="flex shrink-0 items-center gap-1 rounded-lg bg-slate-100 px-2 py-1 dark:bg-slate-800">
-                  <input
-                    type="number"
-                    min={0}
-                    max={100}
-                    inputMode="numeric"
-                    className="w-12 bg-transparent text-right text-[15px] font-bold text-brand outline-none"
-                    value={t.punkte}
-                    onChange={(e) =>
-                      updateTemplate(t.id, { punkte: Math.max(0, Math.min(100, Number(e.target.value) || 0)) })
-                    }
-                  />
-                  <span className="text-[15px] font-bold text-brand">%</span>
-                </div>
-                <button
-                  onClick={() => confirm(`„${t.titel}" wirklich löschen?`) && removeTemplate(t.id)}
-                  className="shrink-0 rounded-lg px-2 py-2 text-slate-400 transition active:scale-90"
-                  aria-label="Löschen"
-                >
-                  🗑
-                </button>
-              </div>
-              <label className="mt-1.5 flex cursor-pointer items-center gap-2 pl-1 text-[12px] text-slate-500 dark:text-slate-400">
-                <input
-                  type="checkbox"
-                  className="h-4 w-4 accent-brand"
-                  checked={Boolean(t.variabel)}
-                  onChange={(e) => updateTemplate(t.id, { variabel: e.target.checked })}
-                />
-                Wert beim Eintragen anpassbar
-              </label>
-            </li>
+              vorlage={t}
+              onAendern={(patch) => updateTemplate(t.id, patch)}
+              onLoeschen={() => removeTemplate(t.id)}
+            />
           ))}
         </ul>
 
@@ -128,8 +95,9 @@ export function BeitraegeTab() {
             min={0}
             inputMode="numeric"
             className="w-20 rounded-lg bg-white px-2.5 py-2 text-right text-[15px] font-bold dark:bg-slate-900"
-            value={grund}
-            onChange={(e) => setSettings({ ticket_preis: Math.max(0, Number(e.target.value) || 0) })}
+            value={preis.wert}
+            onChange={(e) => preis.aendern(Math.max(0, Number(e.target.value) || 0))}
+            onBlur={preis.jetztSpeichern}
           />
           <span className="text-[15px] font-bold text-slate-500">€</span>
         </label>
@@ -144,36 +112,112 @@ export function BeitraegeTab() {
         </div>
         <ul className="mt-2 grid gap-2">
           {staffel.map((stufe, i) => (
-            <li
+            <StufenZeile
               key={stufe.ab}
-              className="flex items-center gap-3 rounded-2xl border border-slate-200 px-3 py-2 dark:border-slate-700"
-            >
-              <span className="w-[4.5rem] shrink-0 whitespace-nowrap text-[15px] font-bold text-brand">ab {stufe.ab} %</span>
-              <span className="min-w-0 flex-1 truncate text-[13px] text-slate-500 dark:text-slate-400">
-                1. Ticket {grund + stufe.betrag} €
-                {grund > 0 && stufe.betrag > 0 ? ` (${grund} + ${stufe.betrag})` : ""}
-              </span>
-              <div className="flex shrink-0 items-center gap-1 rounded-lg bg-slate-100 px-2 py-1 dark:bg-slate-800">
-                <span className="text-[13px] font-semibold text-slate-400">+</span>
-                <input
-                  type="number"
-                  min={0}
-                  inputMode="numeric"
-                  className="w-12 bg-transparent text-right text-[15px] font-bold outline-none"
-                  value={stufe.betrag}
-                  onChange={(e) => {
-                    const wert = Math.max(0, Number(e.target.value) || 0);
-                    setSettings({
-                      staffel: staffel.map((x, j) => (j === i ? { ...x, betrag: wert } : x)),
-                    });
-                  }}
-                />
-                <span className="text-[15px] font-bold text-slate-500">€</span>
-              </div>
-            </li>
+              stufe={stufe}
+              grund={grund}
+              onBetrag={(wert) =>
+                setSettings({ staffel: staffel.map((x, j) => (j === i ? { ...x, betrag: wert } : x)) })
+              }
+            />
           ))}
         </ul>
       </section>
     </div>
+  );
+}
+
+/**
+ * Eine Zeile der Vorlagen-Liste. Titel und Prozentwert werden erst gespeichert,
+ * wenn man kurz aufhoert zu tippen oder das Feld verlaesst.
+ */
+function VorlagenZeile({
+  vorlage,
+  onAendern,
+  onLoeschen,
+}: {
+  vorlage: ContribTemplate;
+  onAendern: (patch: Partial<Pick<ContribTemplate, "titel" | "punkte" | "variabel">>) => void;
+  onLoeschen: () => void;
+}) {
+  const titel = useEntwurf(vorlage.titel, (wert) => onAendern({ titel: wert }));
+  const punkte = useEntwurf(vorlage.punkte, (wert) => onAendern({ punkte: wert }));
+
+  return (
+    <li className="rounded-2xl border border-slate-200 p-2.5 dark:border-slate-700">
+      <div className="flex items-center gap-2">
+        <input
+          className="min-w-0 flex-1 rounded-lg bg-slate-100 px-2.5 py-2 text-[15px] font-semibold dark:bg-slate-800"
+          value={titel.wert}
+          onChange={(e) => titel.aendern(e.target.value)}
+          onBlur={titel.jetztSpeichern}
+        />
+        <div className="flex shrink-0 items-center gap-1 rounded-lg bg-slate-100 px-2 py-1 dark:bg-slate-800">
+          <input
+            type="number"
+            min={0}
+            max={100}
+            inputMode="numeric"
+            className="w-12 bg-transparent text-right text-[15px] font-bold text-brand outline-none"
+            value={punkte.wert}
+            onChange={(e) => punkte.aendern(Math.max(0, Math.min(100, Number(e.target.value) || 0)))}
+            onBlur={punkte.jetztSpeichern}
+          />
+          <span className="text-[15px] font-bold text-brand">%</span>
+        </div>
+        <button
+          onClick={() => confirm(`„${vorlage.titel}" wirklich löschen?`) && onLoeschen()}
+          className="shrink-0 rounded-lg px-2 py-2 text-slate-400 transition active:scale-90"
+          aria-label="Löschen"
+        >
+          🗑
+        </button>
+      </div>
+      <label className="mt-1.5 flex cursor-pointer items-center gap-2 pl-1 text-[12px] text-slate-500 dark:text-slate-400">
+        <input
+          type="checkbox"
+          className="h-4 w-4 accent-brand"
+          checked={Boolean(vorlage.variabel)}
+          onChange={(e) => onAendern({ variabel: e.target.checked })}
+        />
+        Wert beim Eintragen anpassbar
+      </label>
+    </li>
+  );
+}
+
+/** Eine Stufe der Abiball-Staffel. Speichert ebenfalls erst nach kurzer Pause. */
+function StufenZeile({
+  stufe,
+  grund,
+  onBetrag,
+}: {
+  stufe: Staffel;
+  grund: number;
+  onBetrag: (wert: number) => void;
+}) {
+  const betrag = useEntwurf(stufe.betrag, onBetrag);
+
+  return (
+    <li className="flex items-center gap-3 rounded-2xl border border-slate-200 px-3 py-2 dark:border-slate-700">
+      <span className="w-[4.5rem] shrink-0 whitespace-nowrap text-[15px] font-bold text-brand">ab {stufe.ab} %</span>
+      <span className="min-w-0 flex-1 truncate text-[13px] text-slate-500 dark:text-slate-400">
+        1. Ticket {grund + betrag.wert} €
+        {grund > 0 && betrag.wert > 0 ? ` (${grund} + ${betrag.wert})` : ""}
+      </span>
+      <div className="flex shrink-0 items-center gap-1 rounded-lg bg-slate-100 px-2 py-1 dark:bg-slate-800">
+        <span className="text-[13px] font-semibold text-slate-400">+</span>
+        <input
+          type="number"
+          min={0}
+          inputMode="numeric"
+          className="w-12 bg-transparent text-right text-[15px] font-bold outline-none"
+          value={betrag.wert}
+          onChange={(e) => betrag.aendern(Math.max(0, Number(e.target.value) || 0))}
+          onBlur={betrag.jetztSpeichern}
+        />
+        <span className="text-[15px] font-bold text-slate-500">€</span>
+      </div>
+    </li>
   );
 }
