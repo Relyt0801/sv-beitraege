@@ -1,11 +1,53 @@
 import { hasSupabase, supabase } from "./supabase";
 
-const VAPID = (import.meta.env.VITE_VAPID_PUBLIC_KEY as string | undefined) || "";
+/** Notnagel aus der Build-Umgebung. Wird nur genutzt, wenn der Server schweigt. */
+const VAPID_AUS_ENV = (import.meta.env.VITE_VAPID_PUBLIC_KEY as string | undefined) || "";
+
+/**
+ * Den öffentlichen Schlüssel holen wir uns vom Server.
+ *
+ * Grund: In der App und auf dem Server muss derselbe Schlüssel stecken, sonst
+ * nimmt kein Handy die Benachrichtigung an. Solange die App ihren Schlüssel aus
+ * einer Einstellung bei Vercel bezieht, können die beiden auseinanderlaufen –
+ * und man merkt es erst, wenn nichts mehr ankommt. Fragt die App direkt beim
+ * Server nach, kann das nicht mehr passieren.
+ *
+ * Der öffentliche Schlüssel ist kein Geheimnis, er steht ohnehin in der
+ * ausgelieferten App. Der private bleibt auf dem Server.
+ */
+let serverSchluessel: string | null | undefined = undefined; // undefined = noch nicht gefragt
+let abfrage: Promise<string> | null = null;
+
+async function schluessel(): Promise<string> {
+  if (!hasSupabase) return VAPID_AUS_ENV;
+  if (serverSchluessel !== undefined) return serverSchluessel || VAPID_AUS_ENV;
+  if (!abfrage) {
+    abfrage = (async () => {
+      try {
+        const { data } = await supabase!.functions.invoke("vapid-info");
+        const k = (data as { public_key?: string } | null)?.public_key;
+        serverSchluessel = typeof k === "string" && k.length > 20 ? k : null;
+      } catch {
+        serverSchluessel = null;
+      }
+      if (serverSchluessel && VAPID_AUS_ENV && serverSchluessel !== VAPID_AUS_ENV) {
+        console.log("[push] Server hat einen anderen Schlüssel als die App – der vom Server gilt");
+      }
+      return serverSchluessel || VAPID_AUS_ENV;
+    })();
+  }
+  return abfrage;
+}
 
 export const pushSupported =
   typeof navigator !== "undefined" && "serviceWorker" in navigator && typeof window !== "undefined" && "PushManager" in window;
 
-export const pushConfigured = () => Boolean(VAPID) && hasSupabase;
+/**
+ * Sind Benachrichtigungen auf dieser Seite überhaupt eingerichtet?
+ * Solange wir den Server noch nicht gefragt haben, gehen wir von ja aus –
+ * wenn doch nichts hinterlegt ist, sagt enablePush() es deutlich.
+ */
+export const pushConfigured = () => hasSupabase && (Boolean(VAPID_AUS_ENV) || serverSchluessel !== null);
 
 export function pushPermission(): NotificationPermission | "unsupported" {
   if (!pushSupported || typeof Notification === "undefined") return "unsupported";
@@ -33,7 +75,9 @@ export async function pushToUsers(user_ids: string[], title: string, body: strin
 
 /** Benachrichtigungen aktivieren: Erlaubnis holen, Abo anlegen, in Supabase speichern. */
 export async function enablePush(): Promise<{ ok: boolean; error?: string }> {
-  if (!pushSupported || !VAPID) return { ok: false, error: "nicht unterstützt/konfiguriert" };
+  if (!pushSupported) return { ok: false, error: "Dein Gerät kann keine Benachrichtigungen" };
+  const VAPID = await schluessel();
+  if (!VAPID) return { ok: false, error: "Für diese Seite ist noch kein Schlüssel hinterlegt" };
   try {
     const perm = await Notification.requestPermission();
     if (perm !== "granted") return { ok: false, error: "keine Erlaubnis" };

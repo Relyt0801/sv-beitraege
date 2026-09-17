@@ -12,15 +12,48 @@ const cors = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+const json = (daten: unknown, status = 200) =>
+  new Response(JSON.stringify(daten), { status, headers: { ...cors, "content-type": "application/json" } });
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   try {
-    const { event_id, user_ids, title: directTitle, body: directBody } = await req.json();
+    // ---- Schlüssel prüfen, bevor irgendetwas anderes passiert -------------
+    const oeffentlich = Deno.env.get("VAPID_PUBLIC_KEY");
+    const privat = Deno.env.get("VAPID_PRIVATE_KEY");
+    if (!oeffentlich || !privat) {
+      const fehlt = [!oeffentlich && "VAPID_PUBLIC_KEY", !privat && "VAPID_PRIVATE_KEY"].filter(Boolean).join(" und ");
+      console.log("Schlüssel fehlen:", fehlt);
+      return json(
+        {
+          sent: 0,
+          error: `Auf dem Server fehlt ${fehlt}. Einmal setzen mit: supabase secrets set VAPID_PUBLIC_KEY=... VAPID_PRIVATE_KEY=...`,
+        },
+        503,
+      );
+    }
+
+    const koerper = (await req.json().catch(() => ({}))) as Record<string, unknown>;
+
+    // Kleiner Selbsttest: passt der Schlüssel der App zu dem auf dem Server?
+    // Gibt nur ja oder nein zurück, niemals den Schlüssel selbst.
+    if (typeof koerper.pruefe_schluessel === "string") {
+      const passt = koerper.pruefe_schluessel === oeffentlich;
+      console.log("Selbsttest Schlüssel:", passt ? "passt" : "passt nicht");
+      return json({ passt });
+    }
+
+    const { event_id, user_ids, title: directTitle, body: directBody } = koerper as {
+      event_id?: string;
+      user_ids?: string[];
+      title?: string;
+      body?: string;
+    };
     const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
     webpush.setVapidDetails(
       Deno.env.get("VAPID_SUBJECT") || "mailto:kasse@sv-beitraege.local",
-      Deno.env.get("VAPID_PUBLIC_KEY")!,
-      Deno.env.get("VAPID_PRIVATE_KEY")!,
+      oeffentlich,
+      privat,
     );
 
     console.log("send-push aufgerufen, event_id:", event_id, "| direkt an:", user_ids?.length || 0);
@@ -38,7 +71,7 @@ Deno.serve(async (req) => {
       const { data: ev, error: evErr } = await supabase.from("events").select("*").eq("id", event_id).single();
       if (!ev) {
         console.log("Event nicht gefunden:", evErr?.message);
-        return new Response(JSON.stringify({ error: "event not found" }), { status: 404, headers: cors });
+        return json({ error: "event not found" }, 404);
       }
       console.log("Event:", ev.title, "| audience:", ev.audience);
       if (ev.audience === "all") {
@@ -73,7 +106,7 @@ Deno.serve(async (req) => {
     }
 
     console.log("Empfänger (userIds):", userIds.length);
-    if (!userIds.length) return new Response(JSON.stringify({ sent: 0 }), { headers: cors });
+    if (!userIds.length) return json({ sent: 0 });
 
     const { data: subs, error: subErr } = await supabase.from("push_subscriptions").select("*").in("user_id", userIds);
     console.log("Push-Abos gefunden:", subs?.length || 0, subErr ? "Fehler: " + subErr.message : "");
@@ -86,6 +119,7 @@ Deno.serve(async (req) => {
     });
 
     let sent = 0;
+    let entfernt = 0;
     await Promise.all(
       (subs || []).map(async (s: { endpoint: string; subscription: unknown }) => {
         try {
@@ -94,14 +128,21 @@ Deno.serve(async (req) => {
         } catch (err) {
           const code = (err as { statusCode?: number })?.statusCode;
           console.log("Versand-Fehler:", code, (err as Error)?.message, "endpoint:", s.endpoint.slice(0, 60));
-          if (code === 404 || code === 410) await supabase.from("push_subscriptions").delete().eq("endpoint", s.endpoint);
+          // 404/410: Gerät hat das Abo weggeworfen.
+          // 403: Abo gehört zu einem alten Schlüsselpaar und ist damit tot.
+          // In beiden Fällen wegräumen, dann meldet sich das Gerät beim nächsten
+          // Öffnen von selbst neu an.
+          if (code === 403 || code === 404 || code === 410) {
+            await supabase.from("push_subscriptions").delete().eq("endpoint", s.endpoint);
+            entfernt++;
+          }
         }
       }),
     );
-    console.log("Gesendet:", sent);
-    return new Response(JSON.stringify({ sent }), { headers: { ...cors, "content-type": "application/json" } });
+    console.log("Gesendet:", sent, "| veraltete Abos entfernt:", entfernt);
+    return json({ sent, entfernt });
   } catch (e) {
     console.log("FEHLER:", String(e));
-    return new Response(JSON.stringify({ error: String(e) }), { status: 500, headers: cors });
+    return json({ error: String(e) }, 500);
   }
 });
