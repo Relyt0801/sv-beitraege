@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useRole } from "../auth/RoleProvider";
 import { useStore } from "../store";
 import { entscheide, ladeAnfragen, type UnbanRequest } from "../lib/unban";
+import { meldeFehler } from "../lib/melder";
 
 /** Entbannungsanfragen – erscheinen für die Moderation oben in den Events. */
 export function UnbanRequests() {
@@ -46,7 +47,7 @@ export function UnbanRequests() {
                 setBusy(r.id);
                 const res = await entscheide(r, false);
                 setBusy(null);
-                if (!res.ok) alert("Fehler: " + res.error);
+                if (!res.ok) meldeFehler("Fehler: " + res.error);
                 laden();
               }}
               className="flex-1 rounded-xl border border-papier-linie py-2 text-sm font-bold text-tinte-matt dark:border-slate-700"
@@ -59,7 +60,7 @@ export function UnbanRequests() {
                 setBusy(r.id);
                 const res = await entscheide(r, true);
                 setBusy(null);
-                if (!res.ok) alert("Fehler: " + res.error);
+                if (!res.ok) meldeFehler("Fehler: " + res.error);
                 laden();
               }}
               className="flex-1 rounded-xl bg-emerald-500 py-2 text-sm font-bold text-white"

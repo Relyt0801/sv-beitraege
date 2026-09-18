@@ -140,6 +140,40 @@ Außerdem: die Komitee-Seite hatte eine **wortgleiche Kopie** des ganzen Chats.
 Jeder Layout-Fehler musste zweimal behoben werden – beim Scroll-Fehler ist
 genau das passiert. Jetzt sind es dieselben Bausteine.
 
+### Meldungen und Rückfragen kommen wieder an
+
+Die App hat für alles die eingebauten Fenster des Browsers benutzt: **43 Mal**
+`alert()` und `confirm()`. Das hat einen Haken, den man leicht übersieht.
+
+Nach ein paar solchen Fenstern bietet der Browser an, **„weitere Dialoge dieser
+Seite zu verhindern"**. Wer das einmal anklickt, bekommt für den Rest der
+Sitzung **gar nichts** mehr zu sehen – und `confirm()` antwortet dann stumm mit
+„nein". Ab dem Moment passiert beim Löschen einfach nichts, und jede
+Fehlermeldung fällt ins Leere. In einer installierten App sind diese Fenster
+ohnehin unzuverlässig; für `prompt()` stand das schon länger im Code.
+
+Die App zeichnet die Meldungen jetzt selbst: kurze Hinweise oben am Bildschirm
+(Fehler bleiben länger stehen), Rückfragen als Fenster in der Mitte mit rotem
+Knopf, wenn etwas endgültig gelöscht wird. Escape bricht ab, Enter bestätigt –
+wie vorher auch. Alle 43 Stellen sind umgestellt.
+
+### Nachrichten verschwinden nicht mehr kommentarlos
+
+Wenn das Speichern einer Chatnachricht fehlschlug, hat die App sie **wieder
+entfernt** und den Grund per `alert()` gemeldet. Kam der Hinweis nicht durch
+(siehe oben), war die Nachricht spurlos weg. Genau das ist mit „Nachrichten
+tauchen nicht mehr auf" gemeint.
+
+Jetzt bleibt sie stehen und trägt den Vermerk **„⚠ Nicht gesendet – nochmal
+abschicken"**. Man sieht also, dass etwas geschrieben wurde und dass es nicht
+angekommen ist.
+
+### Drei Dateien gelöscht, die niemand mehr benutzt hat
+
+`MyCommittee.tsx`, `SettingsSheet.tsx` und `TopicsTab.tsx` waren nirgends mehr
+eingebunden. `SettingsSheet` hing sogar noch am längst entfernten
+Zustimmungs-Bildschirm.
+
 ### SQL-Dateien brechen nicht mehr beim zweiten Ausführen ab
 
 `supabase/termine.sql` und `supabase/schema.sql` haben Tabellen ohne Schutz zur

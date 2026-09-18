@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState, ty
 import { HY, type ContribTemplate, type Contribution, type Halbjahr, type Settings, type Status, type Student, type Beitraege, newStudent, STAFFEL_STANDARD, BEITRAEGE_STANDARD } from "./lib/types";
 import { hasSupabase, supabase } from "./lib/supabase";
 import { istEigenesEcho, merkeEigeneAenderung } from "./lib/echo";
+import { meldeFehler } from "./lib/melder";
 
 const LS_STUDENTS = "sv-beitraege:students";
 const LS_SETTINGS = "sv-beitraege:settings";
@@ -100,14 +101,14 @@ function reportErr(msg?: string) {
   // Fehlende Spalte: das passiert, wenn ein SQL-Update noch nicht gelaufen ist.
   const spalte = /Could not find the '([^']+)' column of '([^']+)'/.exec(msg);
   if (spalte) {
-    alert(
+    meldeFehler(
       `In der Datenbank fehlt noch die Spalte "${spalte[1]}" in der Tabelle "${spalte[2]}".\n\n` +
         "Das ist kein Fehler in der App. In Supabase muss noch das passende SQL aus dem Ordner " +
         "supabase/ ausgeführt werden, dann läuft alles wieder.",
     );
     return;
   }
-  alert("Das Speichern hat nicht geklappt.\n\n" + msg);
+  meldeFehler("Das Speichern hat nicht geklappt.\n\n" + msg);
 }
 /**
  * Einstellungen speichern. Fehlt in einer alten Datenbank noch eine der neuen

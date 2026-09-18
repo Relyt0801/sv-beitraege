@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { hasSupabase, supabase } from "../lib/supabase";
 import { ALL_PERMS, ROLE_DEFAULTS, rechteRolle, type PermKey } from "../lib/permissions";
+import { meldeFehler } from "../lib/melder";
 
 export type Role = "schueler" | "stufenteam" | "kassenwart" | "admin" | "sprecher" | "stv_sprecher" | "eltern";
 
@@ -198,7 +199,7 @@ export function RoleProvider({ children }: { children: ReactNode }) {
       const { error } = await supabase!.from("profiles").update({ role: r }).eq("user_id", userId);
       if (error) {
         const doppelt = /duplicate key|profiles_sprecher_eindeutig|unique/i.test(error.message);
-        alert(
+        meldeFehler(
           doppelt
             ? "Diese Rolle ist schon vergeben. Nimm sie der anderen Person erst weg."
             : "Rolle ändern fehlgeschlagen: " + error.message,
@@ -215,7 +216,7 @@ export function RoleProvider({ children }: { children: ReactNode }) {
     const patch = { chat_banned_until: permanent ? null : until, chat_ban_permanent: permanent };
     const { error } = await supabase!.from("profiles").update(patch).eq("user_id", userId);
     if (error) {
-      alert("Sperre setzen fehlgeschlagen: " + error.message);
+      meldeFehler("Sperre setzen fehlgeschlagen: " + error.message);
       return;
     }
     setProfiles((prev) => prev.map((p) => (p.user_id === userId ? { ...p, ...patch } : p)));

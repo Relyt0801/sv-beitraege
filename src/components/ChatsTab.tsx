@@ -10,6 +10,7 @@ import { BannHinweis } from "./BannHinweis";
 import { ChatBlasen, ChatEingabe } from "./ChatBlasen";
 import { Avatar } from "./Avatar";
 import { useProfiles } from "../profiles-store";
+import { frage } from "../lib/melder";
 
 const TEAM_CHAT_TITLE = "Stufenteam";
 
@@ -363,10 +364,11 @@ function TicketChat({ topic, onBack }: { topic: Topic; onBack: () => void }) {
                 className="iconbtn"
                 title="Ticket löschen"
                 onClick={() => {
-                  if (confirm("Diese Frage samt Verlauf löschen?")) {
+                  void frage("Diese Frage samt Verlauf löschen?", "Löschen", true).then((ok) => {
+                    if (!ok) return;
                     void deleteTopic(topic.id);
                     onBack();
-                  }
+                  });
                 }}
               >
                 🗑
@@ -420,8 +422,11 @@ function TicketListe({
 }: { offene: Topic[]; erledigt: Topic[]; onBack: () => void; onOpen: (id: string) => void }) {
   const { unreadCount, deleteTopic } = useTopics();
   const loeschen = (t: Topic) => () => {
-    if (confirm(`Das Ticket „${t.title}" endgültig löschen?\n\nAlle Nachrichten darin verschwinden.`))
-      void deleteTopic(t.id);
+    void frage(
+      `Das Ticket „${t.title}" endgültig löschen?\n\nAlle Nachrichten darin verschwinden.`,
+      "Löschen",
+      true,
+    ).then((ok) => ok && void deleteTopic(t.id));
   };
   return (
     <div>

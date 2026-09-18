@@ -3,6 +3,7 @@ import ReactDOM from "react-dom/client";
 import App from "./App";
 import { StoreProvider } from "./store";
 import { Fehlerfang } from "./components/Fehlerfang";
+import { MelderProvider } from "./components/Melder";
 import "./index.css";
 
 /**
@@ -22,9 +23,12 @@ if ("serviceWorker" in navigator) {
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <Fehlerfang>
-      <StoreProvider>
-        <App />
-      </StoreProvider>
+      {/* Ganz aussen, damit auch die Datenspeicher Meldungen zeigen koennen. */}
+      <MelderProvider>
+        <StoreProvider>
+          <App />
+        </StoreProvider>
+      </MelderProvider>
     </Fehlerfang>
   </React.StrictMode>,
 );

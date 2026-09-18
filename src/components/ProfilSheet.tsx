@@ -12,6 +12,7 @@ import { SELECTABLE_COMMITTEES, committeeIcon, committeeLabel, rolleUndKomitees 
 import { ladeKomiteeAntraege, stelleKomiteeAntrag } from "../lib/komitee-antrag";
 import { useTheme } from "../lib/theme";
 import { enablePush, pushConfigured, pushPermission } from "../lib/push";
+import { frage, meldeFehler } from "../lib/melder";
 
 /** Das eigene Profil: Bild, Namensfarbe, Passwort, Komitee-Wechsel, Hilfe. */
 export function ProfilSheet({
@@ -219,7 +220,7 @@ export function ProfilSheet({
                     if (r.ok) {
                       setHatAntrag(true);
                       setAntragOffen(false);
-                    } else alert(r.error);
+                    } else meldeFehler(r.error || "Hat nicht geklappt.");
                   }}
                   className="ml-auto rounded-lg bg-brand px-4 py-2 text-sm font-bold text-white disabled:opacity-40"
                 >
@@ -271,7 +272,7 @@ export function ProfilSheet({
                   const r = await enablePush();
                   setPushBusy(false);
                   setPerm(pushPermission());
-                  if (!r.ok && r.error) alert("Hat nicht geklappt: " + r.error);
+                  if (!r.ok && r.error) meldeFehler("Hat nicht geklappt: " + r.error);
                 }}
                 className="mt-2 rounded-lg bg-brand px-3.5 py-2 text-sm font-bold text-white disabled:opacity-40"
               >
@@ -339,7 +340,9 @@ export function ProfilSheet({
         {hasSupabase && (
           <button
             className={`${row} text-red-500`}
-            onClick={() => confirm("Wirklich abmelden?") && void supabase!.auth.signOut()}
+            onClick={() =>
+              void frage("Wirklich abmelden?", "Abmelden").then((ok) => ok && void supabase!.auth.signOut())
+            }
           >
             <span>↩</span> Abmelden
           </button>

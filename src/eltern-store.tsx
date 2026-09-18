@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState, ty
 import { hasSupabase, supabase } from "./lib/supabase";
 import type { BankKonto } from "./lib/types";
 import { pushToUsers } from "./lib/push";
+import { meldeFehler } from "./lib/melder";
 
 export interface ElternInfo {
   id: string;
@@ -233,7 +234,7 @@ export function ElternProvider({ children }: { children: ReactNode }) {
       .insert({ id: neueId, ticket_id: ticketId, user_id: uid.current, text: text.trim() });
     if (error) {
       setNachrichten((prev) => prev.filter((x) => x.id !== neueId));
-      alert("Die Nachricht ging nicht raus: " + error.message);
+      meldeFehler("Die Nachricht ging nicht raus: " + error.message);
       return;
     }
     void supabase!.from("eltern_tickets").update({ updated_at: new Date().toISOString() }).eq("id", ticketId);
@@ -300,7 +301,7 @@ export function ElternProvider({ children }: { children: ReactNode }) {
     if (error) {
       setTickets(vorher);
       void laden();
-      alert("Das Gespräch konnte nicht gelöscht werden: " + error.message);
+      meldeFehler("Das Gespräch konnte nicht gelöscht werden: " + error.message);
     }
   }, [tickets, laden]);
 
@@ -309,7 +310,7 @@ export function ElternProvider({ children }: { children: ReactNode }) {
     const { error } = await supabase!
       .from("eltern_infos")
       .insert({ titel: titel.trim(), text: text.trim(), angeheftet, autor: uid.current });
-    if (error) alert("Die Info konnte nicht gespeichert werden: " + error.message);
+    if (error) meldeFehler("Die Info konnte nicht gespeichert werden: " + error.message);
     else void laden();
   }, [laden]);
 

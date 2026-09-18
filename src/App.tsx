@@ -33,6 +33,7 @@ import { EventComposer } from "./components/EventComposer";
 import { ElternProvider } from "./eltern-store";
 import { ElternApp } from "./components/ElternApp";
 import { Icon, type IconName } from "./components/Icon";
+import { melde, meldeFehler } from "./lib/melder";
 
 export default function App() {
   return (
@@ -280,7 +281,10 @@ function Main() {
     inp.accept = "application/json";
     inp.onchange = () => {
       const f = inp.files?.[0];
-      if (f) f.text().then((t) => alert(importData(t) ? "Import erfolgreich." : "Ungültige Datei."));
+      if (f)
+        void f.text().then((t) =>
+          importData(t) ? melde("Import erfolgreich.", "erfolg") : meldeFehler("Ungültige Datei."),
+        );
     };
     inp.click();
   }

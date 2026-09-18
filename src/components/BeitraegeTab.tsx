@@ -3,6 +3,7 @@ import { useStore } from "../store";
 import { beitraegeVon, staffelVon } from "../lib/logic";
 import { useEntwurf } from "../lib/entwurf";
 import { HY, type ContribTemplate, type Halbjahr, type Staffel } from "../lib/types";
+import { frage } from "../lib/melder";
 
 /**
  * Reiter "Beiträge": hier wird festgelegt, wofür es wie viel Prozent gibt und
@@ -194,7 +195,9 @@ function VorlagenZeile({
           <span className="text-[15px] font-bold text-brand">%</span>
         </div>
         <button
-          onClick={() => confirm(`„${vorlage.titel}" wirklich löschen?`) && onLoeschen()}
+          onClick={() =>
+            void frage(`„${vorlage.titel}" wirklich löschen?`, "Löschen", true).then((ok) => ok && onLoeschen())
+          }
           className="shrink-0 rounded-lg px-2 py-2 text-tinte-leise transition active:scale-90"
           aria-label="Löschen"
         >

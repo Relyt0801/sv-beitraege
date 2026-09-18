@@ -3,6 +3,7 @@ import {
 } from "react";
 import { hasSupabase, supabase } from "./lib/supabase";
 import type { NeuerTermin, Termin } from "./lib/termine";
+import { meldeFehler } from "./lib/melder";
 
 const LS = "sv-beitraege:termine";
 const LOCAL_UID = "local-user";
@@ -240,7 +241,7 @@ export function TermineProvider({ children }: { children: ReactNode }) {
       const { error } = await supabase!.from("termine").delete().eq("id", id);
       if (error) {
         setTermine(vorher);
-        alert("Der Termin konnte nicht gelöscht werden: " + error.message);
+        meldeFehler("Der Termin konnte nicht gelöscht werden: " + error.message);
       }
     },
     [termine, lokalSpeichern],

@@ -8,6 +8,7 @@ import { KontoZeile, Suchfeld } from "./KontoZeile";
 import { normalize } from "../lib/logic";
 import { KomiteeZugriff } from "./KomiteeZugriff";
 import { PERM_CATEGORIES, PERM_ROLES, ALL_PERMS, ROLE_DEFAULTS, ROLLE_KURZ, rechteRolle, rollenDerZeile, type PermKey } from "../lib/permissions";
+import { meldeFehler } from "../lib/melder";
 
 type Matrix = Record<string, Record<string, boolean>>;
 
@@ -65,7 +66,7 @@ export function PermissionsTab() {
       const { error } = await supabase!
         .from("role_permissions")
         .upsert(rollenDerZeile(roleKey).map((role) => ({ role, perm, allowed: next })));
-      if (error) alert("Speichern fehlgeschlagen: " + error.message);
+      if (error) meldeFehler("Speichern fehlgeschlagen: " + error.message);
     }
   }
 

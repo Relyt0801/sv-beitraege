@@ -7,6 +7,7 @@ import { Avatar, PersonName } from "./Avatar";
 import { ChatBlasen, ChatEingabe } from "./ChatBlasen";
 import { BannHinweis } from "./BannHinweis";
 import { Sheet } from "./Sheet";
+import { frage } from "../lib/melder";
 
 type Neu = "pin" | "umfrage" | "todo" | null;
 
@@ -75,7 +76,14 @@ export function KomiteePage({ topic, onBack }: { topic: Topic; onBack: () => voi
                   <PersonName userId={p.created_by} name={p.author} role={p.author_role} koms={p.author_koms} className="text-[11px] font-semibold" />
                 </div>
                 {(p.created_by === uid || darfLoeschen) && (
-                  <button onClick={() => confirm("Loslösen?") && updateItem(p.id, { pinned: false })} className="text-tinte-leise">
+                  <button
+                    onClick={() =>
+                      void frage("Loslösen?", "Loslösen").then((ok) => {
+                        if (ok) void updateItem(p.id, { pinned: false });
+                      })
+                    }
+                    className="text-tinte-leise"
+                  >
                     ✕
                   </button>
                 )}
@@ -209,7 +217,10 @@ function UmfrageKarte({
           <PersonName userId={item.created_by} name={item.author} role={item.author_role} koms={item.author_koms} className="font-semibold" />
         </span>
         {kannLoeschen && (
-          <button onClick={() => confirm("Abstimmung löschen?") && onDelete()} className="shrink-0 text-tinte-leise">
+          <button
+            onClick={() => void frage("Abstimmung löschen?", "Löschen", true).then((ok) => ok && onDelete())}
+            className="shrink-0 text-tinte-leise"
+          >
             🗑
           </button>
         )}

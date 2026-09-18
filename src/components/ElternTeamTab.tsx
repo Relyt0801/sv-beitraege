@@ -5,6 +5,7 @@ import { useProfiles } from "../profiles-store";
 import { useStore } from "../store";
 import { normalize } from "../lib/logic";
 import { datumLang } from "./BeitragsListe";
+import { frage } from "../lib/melder";
 
 /**
  * Was das Stufenteam mit den Eltern zu tun hat: Infos anheften und die
@@ -122,7 +123,11 @@ export function ElternTeamTab() {
                   <span className="text-[11px] text-tinte-leise">{datumLang(i.created_at.slice(0, 10))}</span>
                 </div>
                 <button
-                  onClick={() => confirm(`„${i.titel}" wirklich löschen?`) && infoLoeschen(i.id)}
+                  onClick={() =>
+                    void frage(`„${i.titel}" wirklich löschen?`, "Löschen", true).then(
+                      (ok) => ok && void infoLoeschen(i.id),
+                    )
+                  }
                   className="shrink-0 rounded-lg px-2 py-1.5 text-tinte-leise transition active:scale-90"
                   aria-label="Löschen"
                 >
@@ -189,9 +194,11 @@ export function ElternTeamTab() {
                         fuer die Eltern. Deshalb die Rueckfrage. */}
                     <button
                       onClick={() =>
-                        confirm(
+                        void frage(
                           `Das Gespräch „${t.betreff}" endgültig löschen?\n\nAlle Nachrichten darin verschwinden – auch für die Eltern.`,
-                        ) && ticketLoeschen(t.id)
+                          "Löschen",
+                          true,
+                        ).then((ok) => ok && void ticketLoeschen(t.id))
                       }
                       className="mr-2 shrink-0 rounded-lg px-2 py-2 text-tinte-leise transition hover:text-red-500 active:scale-90"
                       aria-label="Gespräch löschen"
@@ -226,9 +233,11 @@ export function ElternTeamTab() {
                         </button>
                         <button
                           onClick={() =>
-                            confirm(
+                            void frage(
                               `Das Gespräch „${t.betreff}" endgültig löschen?\n\nAlle Nachrichten darin verschwinden – auch für die Eltern.`,
-                            ) && ticketLoeschen(t.id)
+                              "Löschen",
+                              true,
+                            ).then((ok) => ok && void ticketLoeschen(t.id))
                           }
                           className="shrink-0 rounded-xl border border-red-300 px-3 py-2 text-[13px] font-bold text-red-500 dark:border-red-500/40"
                         >

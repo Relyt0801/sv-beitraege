@@ -4,6 +4,7 @@ import { useProfiles } from "../profiles-store";
 import { Avatar } from "./Avatar";
 import { committeeIcon, committeeLabel } from "../lib/committees";
 import { entscheideKomitee, ladeKomiteeAntraege, type KomiteeRequest } from "../lib/komitee-antrag";
+import { meldeFehler } from "../lib/melder";
 
 /** Anträge auf Komitee-Wechsel – wie die Entbannungsanfragen oben in den Events. */
 export function KomiteeRequests() {
@@ -45,7 +46,7 @@ export function KomiteeRequests() {
                 setBusy(r.id);
                 const res = await entscheideKomitee(r, false);
                 setBusy(null);
-                if (!res.ok) alert("Fehler: " + res.error);
+                if (!res.ok) meldeFehler("Fehler: " + res.error);
                 laden();
               }}
               className="flex-1 rounded-xl border border-papier-linie py-2 text-sm font-bold text-tinte-matt dark:border-slate-700"
@@ -58,7 +59,7 @@ export function KomiteeRequests() {
                 setBusy(r.id);
                 const res = await entscheideKomitee(r, true);
                 setBusy(null);
-                if (!res.ok) alert("Fehler: " + res.error);
+                if (!res.ok) meldeFehler("Fehler: " + res.error);
                 laden();
               }}
               className="flex-1 rounded-xl bg-brand py-2 text-sm font-bold text-white"

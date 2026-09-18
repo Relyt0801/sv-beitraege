@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { hasSupabase, supabase } from "./lib/supabase";
 import type { EventItem, NewEvent } from "./lib/events";
+import { meldeFehler } from "./lib/melder";
 
 const LS = "sv-beitraege:events";
 const LOCAL_UID = "local-user";
@@ -204,7 +205,7 @@ export function EventsProvider({ children }: { children: ReactNode }) {
         .select()
         .single();
       if (error || !ev) {
-        alert("Event anlegen fehlgeschlagen: " + (error?.message || ""));
+        meldeFehler("Event anlegen fehlgeschlagen: " + (error?.message || ""));
         return;
       }
       if (e.options.filter(Boolean).length)
@@ -237,7 +238,7 @@ export function EventsProvider({ children }: { children: ReactNode }) {
         return;
       }
       const { error } = await supabase!.from("events").delete().eq("id", id);
-      if (error) alert("Löschen fehlgeschlagen: " + error.message);
+      if (error) meldeFehler("Löschen fehlgeschlagen: " + error.message);
       await loadAll();
     },
     [loadAll, myVotes, reads, saveLocal],
