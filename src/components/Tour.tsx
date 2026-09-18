@@ -80,17 +80,17 @@ export function Tour({ steps, open, onClose }: { steps: TourStep[]; open: boolea
           </span>
           <span className="text-[15px] font-bold">{step.title}</span>
         </div>
-        <p className="text-[14px] leading-relaxed text-slate-600 dark:text-slate-300">{step.text}</p>
+        <p className="text-[14px] leading-relaxed text-tinte-matt dark:text-slate-300">{step.text}</p>
 
         <div className="mt-4 flex items-center gap-2">
-          <button onClick={onClose} className="text-sm font-semibold text-slate-400">
+          <button onClick={onClose} className="text-sm font-semibold text-tinte-leise">
             Überspringen
           </button>
           <div className="ml-auto flex gap-2">
             {i > 0 && (
               <button
                 onClick={() => setI((v) => v - 1)}
-                className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-bold dark:border-slate-700"
+                className="rounded-xl border border-papier-linie px-4 py-2 text-sm font-bold dark:border-slate-700"
               >
                 Zurück
               </button>

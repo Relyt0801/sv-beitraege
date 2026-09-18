@@ -43,7 +43,7 @@ export function AddSheet({ open, onClose }: { open: boolean; onClose: () => void
         onKeyDown={(e) => e.key === "Enter" && submit()}
       />
 
-      <label className="mb-2 block text-sm font-medium text-slate-500">Dabei ab welchem Halbjahr?</label>
+      <label className="mb-2 block text-sm font-medium text-tinte-matt">Dabei ab welchem Halbjahr?</label>
       <div className="mb-2 grid grid-cols-3 gap-2">
         {HY.map((h) => (
           <button
@@ -52,14 +52,14 @@ export function AddSheet({ open, onClose }: { open: boolean; onClose: () => void
             className={`rounded-xl border py-2.5 text-sm font-bold transition ${
               ab === h
                 ? "border-brand bg-brand text-white"
-                : "border-slate-200 bg-slate-50 text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                : "border-papier-linie bg-papier-matt text-tinte-matt dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
             }`}
           >
             {h}
           </button>
         ))}
       </div>
-      <p className="mb-4 text-xs text-slate-400">
+      <p className="mb-4 text-xs text-tinte-leise">
         Halbjahre vor dem Beitritt bleiben grau und zählen nicht zum Beitrag.
       </p>
 

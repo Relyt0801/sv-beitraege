@@ -76,12 +76,12 @@ export function EventComposer({ open, onClose }: { open: boolean; onClose: () =>
       </div>
 
       {/* Typ */}
-      <div className="mb-4 flex gap-1.5 rounded-xl bg-slate-100 p-1 dark:bg-slate-800">
+      <div className="mb-4 flex gap-1.5 rounded-xl bg-papier-matt p-1 dark:bg-slate-800">
         {(Object.keys(TYPE_META) as EventType[]).map((t) => (
           <button
             key={t}
             onClick={() => setType(t)}
-            className={`${seg} ${type === t ? "bg-brand text-white" : "text-slate-500"}`}
+            className={`${seg} ${type === t ? "bg-brand text-white" : "text-tinte-matt"}`}
           >
             {TYPE_META[t].icon} {TYPE_META[t].label}
           </button>
@@ -98,8 +98,8 @@ export function EventComposer({ open, onClose }: { open: boolean; onClose: () =>
 
       {/* Abstimmung */}
       {type === "umfrage" && (
-        <div className="mb-4 rounded-2xl border border-slate-200 p-3 dark:border-slate-700">
-          <div className="mb-2 text-sm font-semibold text-slate-500">Antwortoptionen</div>
+        <div className="mb-4 rounded-2xl border border-papier-linie p-3 dark:border-slate-700">
+          <div className="mb-2 text-sm font-semibold text-tinte-matt">Antwortoptionen</div>
           {options.map((o, i) => (
             <div key={i} className="mb-2 flex gap-2">
               <input
@@ -111,7 +111,7 @@ export function EventComposer({ open, onClose }: { open: boolean; onClose: () =>
               {options.length > 2 && (
                 <button
                   onClick={() => setOptions((prev) => prev.filter((_, j) => j !== i))}
-                  className="rounded-lg border border-slate-200 px-3 dark:border-slate-700"
+                  className="rounded-lg border border-papier-linie px-3 dark:border-slate-700"
                 >
                   −
                 </button>
@@ -126,7 +126,7 @@ export function EventComposer({ open, onClose }: { open: boolean; onClose: () =>
             <Toggle label="Antwort ist Pflicht" on={minOne} set={setMinOne} />
             <Toggle label="Schüler sehen Ergebnisse" on={showResults} set={setShowResults} />
             <Toggle label="Anonym abstimmen" on={anon} set={setAnon} />
-            <p className="text-[11px] leading-snug text-slate-400">
+            <p className="text-[11px] leading-snug text-tinte-leise">
               Anonym: unter den Antworten stehen graue Kreise statt der Initialen. Wer wie gestimmt hat, sieht nur das Stufenteam.
             </p>
           </div>
@@ -141,21 +141,21 @@ export function EventComposer({ open, onClose }: { open: boolean; onClose: () =>
       )}
 
       {/* Empfänger */}
-      <div className="mb-2 text-sm font-semibold text-slate-500">Empfänger</div>
-      <div className="mb-2 flex gap-1.5 rounded-xl bg-slate-100 p-1 dark:bg-slate-800">
-        <button onClick={() => setAudience("all")} className={`${seg} ${audience === "all" ? "bg-brand text-white" : "text-slate-500"}`}>
+      <div className="mb-2 text-sm font-semibold text-tinte-matt">Empfänger</div>
+      <div className="mb-2 flex gap-1.5 rounded-xl bg-papier-matt p-1 dark:bg-slate-800">
+        <button onClick={() => setAudience("all")} className={`${seg} ${audience === "all" ? "bg-brand text-white" : "text-tinte-matt"}`}>
           Alle
         </button>
-        <button onClick={() => setAudience("komitee")} className={`${seg} ${audience === "komitee" ? "bg-brand text-white" : "text-slate-500"}`}>
+        <button onClick={() => setAudience("komitee")} className={`${seg} ${audience === "komitee" ? "bg-brand text-white" : "text-tinte-matt"}`}>
           Komitees
         </button>
-        <button onClick={() => setAudience("selected")} className={`${seg} ${audience === "selected" ? "bg-brand text-white" : "text-slate-500"}`}>
+        <button onClick={() => setAudience("selected")} className={`${seg} ${audience === "selected" ? "bg-brand text-white" : "text-tinte-matt"}`}>
           Personen
         </button>
       </div>
 
       {audience === "komitee" && (
-        <div className="mb-3 grid gap-1.5 rounded-2xl border border-slate-200 p-2 dark:border-slate-700 sm:grid-cols-2">
+        <div className="mb-3 grid gap-1.5 rounded-2xl border border-papier-linie p-2 dark:border-slate-700 sm:grid-cols-2">
           {COMMITTEES.map((c) => {
             const on = tags.has(c.slug);
             return (
@@ -169,10 +169,10 @@ export function EventComposer({ open, onClose }: { open: boolean; onClose: () =>
                   })
                 }
                 className={`flex items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm font-semibold transition ${
-                  on ? "bg-brand/10 text-brand" : "hover:bg-slate-100 dark:hover:bg-slate-800"
+                  on ? "bg-brand/10 text-brand" : "hover:bg-papier-matt dark:hover:bg-slate-800"
                 }`}
               >
-                <span className={`flex h-5 w-5 items-center justify-center rounded border text-xs text-white ${on ? "border-brand bg-brand" : "border-slate-300 dark:border-slate-600"}`}>
+                <span className={`flex h-5 w-5 items-center justify-center rounded border text-xs text-white ${on ? "border-brand bg-brand" : "border-papier-linie dark:border-slate-600"}`}>
                   {on ? "✓" : ""}
                 </span>
                 <span>{committeeIcon(c.slug)}</span>
@@ -180,7 +180,7 @@ export function EventComposer({ open, onClose }: { open: boolean; onClose: () =>
               </button>
             );
           })}
-          <div className="px-2 pt-1 text-xs text-slate-400 sm:col-span-2">
+          <div className="px-2 pt-1 text-xs text-tinte-leise sm:col-span-2">
             {tags.size === 0 ? "Noch kein Komitee gewählt" : `${tags.size} Komitee(s) – alle Mitglieder sehen den Beitrag`}
           </div>
         </div>
@@ -191,7 +191,7 @@ export function EventComposer({ open, onClose }: { open: boolean; onClose: () =>
         </button>
       )}
       {audience === "selected" && (
-        <div className="mb-3 rounded-2xl border border-slate-200 p-2 dark:border-slate-700">
+        <div className="mb-3 rounded-2xl border border-papier-linie p-2 dark:border-slate-700">
           <input className="field mb-2" placeholder="Person suchen…" value={q} onChange={(e) => setQ(e.target.value)} />
           <div className="max-h-48 overflow-y-auto">
             {list.map((s) => {
@@ -206,9 +206,9 @@ export function EventComposer({ open, onClose }: { open: boolean; onClose: () =>
                       return n;
                     })
                   }
-                  className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm hover:bg-slate-100 dark:hover:bg-slate-800"
+                  className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm hover:bg-papier-matt dark:hover:bg-slate-800"
                 >
-                  <span className={`flex h-5 w-5 items-center justify-center rounded border text-xs text-white ${on ? "border-brand bg-brand" : "border-slate-300 dark:border-slate-600"}`}>
+                  <span className={`flex h-5 w-5 items-center justify-center rounded border text-xs text-white ${on ? "border-brand bg-brand" : "border-papier-linie dark:border-slate-600"}`}>
                     {on ? "✓" : ""}
                   </span>
                   {s.nachname}, {s.vorname}
@@ -216,7 +216,7 @@ export function EventComposer({ open, onClose }: { open: boolean; onClose: () =>
               );
             })}
           </div>
-          <div className="px-2 pt-1 text-xs text-slate-400">{targets.size} ausgewählt</div>
+          <div className="px-2 pt-1 text-xs text-tinte-leise">{targets.size} ausgewählt</div>
         </div>
       )}
 
@@ -230,7 +230,7 @@ export function EventComposer({ open, onClose }: { open: boolean; onClose: () =>
 function Toggle({ label, on, set }: { label: string; on: boolean; set: (v: boolean) => void }) {
   return (
     <button onClick={() => set(!on)} className="flex items-center justify-between gap-3 text-sm">
-      <span className="text-slate-600 dark:text-slate-300">{label}</span>
+      <span className="text-tinte-matt dark:text-slate-300">{label}</span>
       <span className={`relative h-6 w-11 rounded-full transition ${on ? "bg-brand" : "bg-slate-300 dark:bg-slate-600"}`}>
         <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-all ${on ? "left-[22px]" : "left-0.5"}`} />
       </span>

@@ -42,7 +42,7 @@ export function KontoZeile({
         <div className="truncate text-[15px] font-semibold leading-tight">
           {name ?? profil.username ?? "Unbekannt"}
         </div>
-        <div className="truncate text-[12px] leading-tight text-slate-400">
+        <div className="truncate text-[12px] leading-tight text-tinte-leise">
           {name ? `${profil.username} · ${rolleName(profil.role)}` : `${rolleName(profil.role)} · keiner Person zugeordnet`}
         </div>
       </div>
@@ -62,10 +62,10 @@ export function Suchfeld({
   platzhalter?: string;
 }) {
   return (
-    <div className="mb-3 flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 shadow-card dark:border-slate-800 dark:bg-slate-900 dark:shadow-cardDark">
-      <span className="text-slate-400">🔍</span>
+    <div className="mb-3 flex items-center gap-2 rounded-xl border border-papier-linie bg-white px-3.5 py-2.5 shadow-card dark:border-slate-800 dark:bg-slate-900 dark:shadow-cardDark">
+      <span className="text-tinte-leise">🔍</span>
       <input
-        className="w-full bg-transparent text-base outline-none placeholder:text-slate-400"
+        className="w-full bg-transparent text-base outline-none placeholder:text-tinte-leise"
         placeholder={platzhalter}
         value={wert}
         onChange={(e) => onChange(e.target.value)}

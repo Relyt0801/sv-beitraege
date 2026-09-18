@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { hasSupabase, supabase } from "./lib/supabase";
 import type { BankKonto } from "./lib/types";
+import { pushToUsers } from "./lib/push";
 
 export interface ElternInfo {
   id: string;
@@ -18,6 +19,20 @@ export interface ElternTicket {
   erledigt: boolean;
   created_at: string;
   updated_at: string;
+  /** Wann die Eltern zuletzt reingeschaut haben. */
+  gelesen_eltern: string | null;
+  /** Wann das Stufenteam zuletzt reingeschaut hat. */
+  gelesen_team: string | null;
+  /** true = das Stufenteam hat das Gespräch begonnen. */
+  von_team: boolean;
+}
+
+/** Ein Elternkonto, wie das Stufenteam es zum Anschreiben braucht. */
+export interface Elternkonto {
+  user_id: string;
+  username: string;
+  anzeigename: string;
+  kinder: string[];
 }
 
 export interface TicketNachricht {
@@ -36,6 +51,10 @@ interface ElternCtx {
   nachrichten: TicketNachricht[];
   /** Kennungen der eigenen Kinder (nur bei einem Eltern-Konto gefüllt). */
   kinder: string[];
+  /** Alle Elternkonten – nur fürs Stufenteam gefüllt, zum Anschreiben. */
+  konten: Elternkonto[];
+  /** Wie viele Gespräche ungelesene Nachrichten haben. */
+  ungelesen: number;
   /**
    * Welches Elternkonto gehoert zu welchen Kindern. Fuer das Stufenteam
    * gefuellt, damit zwei Zugaenge mit gleichem Nachnamen auseinanderzuhalten
@@ -43,6 +62,10 @@ interface ElternCtx {
    */
   zuordnung: Record<string, string[]>;
   neuesTicket: (betreff: string, text: string) => Promise<string | null>;
+  /** Das Stufenteam schreibt ein bestimmtes Elternhaus an. */
+  anEltern: (userId: string, betreff: string, text: string) => Promise<string | null>;
+  /** Merken, dass dieses Gespräch gelesen wurde. */
+  alsGelesen: (ticketId: string) => void;
   antworten: (ticketId: string, text: string) => Promise<void>;
   ticketSchliessen: (ticketId: string, erledigt: boolean) => Promise<void>;
   infoAnlegen: (titel: string, text: string, angeheftet: boolean) => Promise<void>;
@@ -75,6 +98,10 @@ export function ElternProvider({ children }: { children: ReactNode }) {
   const [nachrichten, setNachrichten] = useState<TicketNachricht[]>([]);
   const [kinder, setKinder] = useState<string[]>([]);
   const [zuordnung, setZuordnung] = useState<Record<string, string[]>>({});
+  const [konten, setKonten] = useState<Elternkonto[]>([]);
+  const istTeam = useRef(false);
+  /** Kennungen des Stufenteams – damit Antworten der Eltern dort ankommen. */
+  const teamIds = useRef<string[]>([]);
   const uid = useRef<string | null>(null);
 
   const laden = useCallback(async () => {
@@ -103,6 +130,43 @@ export function ElternProvider({ children }: { children: ReactNode }) {
     for (const r of paare) (karte[r.user_id] ||= []).push(r.student_id);
     setZuordnung(karte);
     setKinder(karte[uid.current] || []);
+
+    // Nur das Stufenteam sieht fremde Profile – die Datenbank laesst nichts
+    // anderes zu. Daraus bauen wir die Liste zum Anschreiben.
+    const { data: meins } = await supabase!
+      .from("profiles").select("role").eq("user_id", uid.current).maybeSingle();
+    istTeam.current = ["stufenteam", "kassenwart", "admin", "sprecher", "stv_sprecher"]
+      .includes(((meins as { role?: string } | null)?.role) || "");
+
+    // Wer gehoert zum Stufenteam? Eltern duerfen das nicht sehen, deshalb
+    // bleibt die Liste bei ihnen leer und der Server verteilt selbst.
+    const { data: team } = await supabase!
+      .from("profiles").select("user_id")
+      .in("role", ["stufenteam", "kassenwart", "admin", "sprecher", "stv_sprecher"]);
+    teamIds.current = ((team as { user_id: string }[]) || []).map((r) => r.user_id);
+
+    if (istTeam.current) {
+      const { data: alle } = await supabase!
+        .from("profiles").select("user_id, username").eq("role", "eltern");
+      const ids = ((alle as { user_id: string }[]) || []).map((r) => r.user_id);
+      const { data: namen } = ids.length
+        ? await supabase!.from("public_profiles").select("user_id, anzeigename").in("user_id", ids)
+        : { data: [] as { user_id: string; anzeigename: string }[] };
+      const nameVon: Record<string, string> = {};
+      for (const r of (namen as { user_id: string; anzeigename: string }[]) || [])
+        nameVon[r.user_id] = r.anzeigename;
+      setKonten(
+        ((alle as { user_id: string; username: string }[]) || [])
+          .map((r) => ({
+            user_id: r.user_id,
+            username: r.username,
+            anzeigename: nameVon[r.user_id] || r.username,
+            kinder: karte[r.user_id] || [],
+          }))
+          .sort((a, b) => a.anzeigename.localeCompare(b.anzeigename, "de")),
+      );
+    }
+
     setBereit(true);
   }, []);
 
@@ -151,23 +215,68 @@ export function ElternProvider({ children }: { children: ReactNode }) {
 
   const antworten = useCallback<ElternCtx["antworten"]>(async (ticketId, text) => {
     if (!hasSupabase || !uid.current || !text.trim()) return;
+    // Die Kennung wird hier erzeugt und beim Speichern mitgegeben. Sonst kommt
+    // dieselbe Nachricht ueber die Live-Verbindung mit einer anderen Kennung
+    // zurueck und stuende zweimal im Verlauf.
+    const neueId = crypto.randomUUID();
     const vorlaeufig: TicketNachricht = {
-      id: crypto.randomUUID(),
+      id: neueId,
       ticket_id: ticketId,
       user_id: uid.current,
       text: text.trim(),
       created_at: new Date().toISOString(),
     };
-    setNachrichten((prev) => [...prev, vorlaeufig]);
+    setNachrichten((prev) => (prev.some((x) => x.id === neueId) ? prev : [...prev, vorlaeufig]));
     const { error } = await supabase!
       .from("eltern_ticket_nachrichten")
-      .insert({ ticket_id: ticketId, user_id: uid.current, text: text.trim() });
+      .insert({ id: neueId, ticket_id: ticketId, user_id: uid.current, text: text.trim() });
     if (error) {
-      setNachrichten((prev) => prev.filter((x) => x.id !== vorlaeufig.id));
+      setNachrichten((prev) => prev.filter((x) => x.id !== neueId));
       alert("Die Nachricht ging nicht raus: " + error.message);
       return;
     }
     void supabase!.from("eltern_tickets").update({ updated_at: new Date().toISOString() }).eq("id", ticketId);
+
+    // Die Gegenseite benachrichtigen.
+    const t = tickets.find((x) => x.id === ticketId);
+    if (t) {
+      const anTeam = t.user_id === uid.current;
+      const ziel = anTeam ? teamIds.current : [t.user_id];
+      void pushToUsers(
+        ziel.filter((z) => z !== uid.current),
+        anTeam ? "Neue Frage von Eltern" : "Antwort vom Stufenteam",
+        `${t.betreff}: ${text.trim().slice(0, 80)}`,
+      );
+    }
+  }, [tickets]);
+
+  /** Das Stufenteam schreibt ein bestimmtes Elternhaus an. */
+  const anEltern = useCallback<ElternCtx["anEltern"]>(async (userId, betreff, text) => {
+    if (!hasSupabase || !uid.current) return "Du bist nicht angemeldet.";
+    if (!betreff.trim() || !text.trim()) return "Betreff und Text dürfen nicht leer sein.";
+    const { data, error } = await supabase!
+      .from("eltern_tickets")
+      .insert({ user_id: userId, betreff: betreff.trim(), von_team: true })
+      .select()
+      .single();
+    if (error || !data) return error?.message || "Die Nachricht konnte nicht angelegt werden.";
+    const ticket = data as ElternTicket;
+    const { error: e2 } = await supabase!
+      .from("eltern_ticket_nachrichten")
+      .insert({ ticket_id: ticket.id, user_id: uid.current, text: text.trim() });
+    if (e2) return e2.message;
+    void pushToUsers([userId], "Nachricht vom Stufenteam", `${betreff.trim()}: ${text.trim().slice(0, 80)}`);
+    void laden();
+    return null;
+  }, [laden]);
+
+  /** Gespraech als gelesen markieren – je nachdem, wer gerade schaut. */
+  const alsGelesen = useCallback<ElternCtx["alsGelesen"]>((ticketId) => {
+    if (!hasSupabase || !uid.current) return;
+    const jetzt = new Date().toISOString();
+    const feld = istTeam.current ? "gelesen_team" : "gelesen_eltern";
+    setTickets((prev) => prev.map((t) => (t.id === ticketId ? { ...t, [feld]: jetzt } : t)));
+    void supabase!.from("eltern_tickets").update({ [feld]: jetzt }).eq("id", ticketId);
   }, []);
 
   const ticketSchliessen = useCallback<ElternCtx["ticketSchliessen"]>(async (ticketId, erledigt) => {
@@ -204,6 +313,20 @@ export function ElternProvider({ children }: { children: ReactNode }) {
       : error.message;
   }, [konto]);
 
+  /**
+   * Wie viele Gespraeche haben etwas Neues?
+   * Neu heisst: die letzte Nachricht kommt nicht von mir und ist juenger als
+   * der Zeitpunkt, an dem ich zuletzt reingeschaut habe.
+   */
+  const ungelesen = tickets.filter((t) => {
+    const meine = nachrichten.filter((n) => n.ticket_id === t.id);
+    const fremd = meine.filter((n) => n.user_id !== uid.current);
+    if (!fremd.length) return false;
+    const letzte = fremd[fremd.length - 1].created_at;
+    const gesehen = istTeam.current ? t.gelesen_team : t.gelesen_eltern;
+    return !gesehen || letzte > gesehen;
+  }).length;
+
   return (
     <Ctx.Provider
       value={{
@@ -214,7 +337,11 @@ export function ElternProvider({ children }: { children: ReactNode }) {
         nachrichten,
         kinder,
         zuordnung,
+        konten,
+        ungelesen,
         neuesTicket,
+        anEltern,
+        alsGelesen,
         antworten,
         ticketSchliessen,
         infoAnlegen,

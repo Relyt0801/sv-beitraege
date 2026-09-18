@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { hasSupabase, supabase } from "../lib/supabase";
 import { SELECTABLE_COMMITTEES, committeeLabel } from "../lib/committees";
+import { passwortProblem, passwortStaerke } from "../lib/passwort";
 
 const SKIP_KEY = "sv:komitee-spaeter";
 
@@ -52,7 +53,7 @@ export function PasswordGate({ children }: { children: ReactNode }) {
 
   if (state === "loading")
     return (
-      <div className="flex h-full items-center justify-center text-slate-400">
+      <div className="flex h-full items-center justify-center text-tinte-leise">
         <div className="animate-pulse text-lg font-semibold">Stufenkasse …</div>
       </div>
     );
@@ -109,7 +110,7 @@ function KomiteeForm({ onDone }: { onDone: () => void }) {
     <div className="flex min-h-full items-center justify-center p-6">
       <div className="card w-full max-w-sm p-6">
         <div className="mb-1 text-center text-2xl font-bold">Dein Komitee</div>
-        <p className="mb-5 text-center text-sm text-slate-500">
+        <p className="mb-5 text-center text-sm text-tinte-matt">
           Wähle aus, wo du mitarbeitest. Du kommst damit automatisch in den passenden Chat.
         </p>
 
@@ -121,12 +122,12 @@ function KomiteeForm({ onDone }: { onDone: () => void }) {
               className={`flex items-center gap-3 rounded-xl border px-4 py-3 text-left text-[15px] font-semibold transition ${
                 sel === c.slug
                   ? "border-brand bg-brand/10 text-brand"
-                  : "border-slate-200 dark:border-slate-700"
+                  : "border-papier-linie dark:border-slate-700"
               }`}
             >
               <span
                 className={`flex h-5 w-5 items-center justify-center rounded-full border-2 text-[11px] text-white ${
-                  sel === c.slug ? "border-brand bg-brand" : "border-slate-300 dark:border-slate-600"
+                  sel === c.slug ? "border-brand bg-brand" : "border-papier-linie dark:border-slate-600"
                 }`}
               >
                 {sel === c.slug ? "✓" : ""}
@@ -142,7 +143,7 @@ function KomiteeForm({ onDone }: { onDone: () => void }) {
           {busy ? "…" : sel ? `„${committeeLabel(sel)}" übernehmen` : "Komitee wählen"}
         </button>
 
-        <p className="mt-3 text-center text-[11px] leading-relaxed text-slate-400">
+        <p className="mt-3 text-center text-[11px] leading-relaxed text-tinte-leise">
           Das kannst du später nicht selbst ändern – nur das Stufenteam.
           <br />
           Aufsichtsrat wird ausschließlich vom Stufenteam vergeben.
@@ -152,7 +153,7 @@ function KomiteeForm({ onDone }: { onDone: () => void }) {
             localStorage.setItem(SKIP_KEY, "1");
             onDone();
           }}
-          className="mt-3 w-full text-center text-sm font-semibold text-slate-400"
+          className="mt-3 w-full text-center text-sm font-semibold text-tinte-leise"
         >
           Ich weiß es noch nicht
         </button>
@@ -166,11 +167,27 @@ function ChangeForm({ onDone }: { onDone: () => void }) {
   const [pw2, setPw2] = useState("");
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
+  const [nutzer, setNutzer] = useState("");
+
+  // Den eigenen Nutzernamen holen, damit er nicht als Passwort durchgeht.
+  useEffect(() => {
+    if (!hasSupabase) return;
+    void (async () => {
+      const { data: s } = await supabase!.auth.getSession();
+      const uid = s.session?.user.id;
+      if (!uid) return;
+      const { data } = await supabase!.from("profiles").select("username").eq("user_id", uid).maybeSingle();
+      setNutzer(((data as { username?: string } | null)?.username) || "");
+    })();
+  }, []);
+
+  const staerke = passwortStaerke(pw1);
 
   async function submit() {
     setErr("");
-    if (pw1.length < 6) {
-      setErr("Mindestens 6 Zeichen.");
+    const problem = passwortProblem(pw1, nutzer);
+    if (problem) {
+      setErr(problem);
       return;
     }
     if (pw1 !== pw2) {
@@ -198,21 +215,45 @@ function ChangeForm({ onDone }: { onDone: () => void }) {
     <div className="flex min-h-full items-center justify-center p-6">
       <div className="card w-full max-w-sm p-6">
         <div className="mb-1 text-center text-2xl font-bold">Neues Passwort</div>
-        <p className="mb-6 text-center text-sm text-slate-500">
-          Du nutzt noch dein Startpasswort. Bitte lege jetzt ein eigenes fest – danach geht's in die App.
+        <p className="mb-5 text-center text-sm text-tinte-matt">
+          Du nutzt noch dein Startpasswort. Bitte lege jetzt ein eigenes fest – danach geht es weiter.
         </p>
         <input
-          className="field mb-3"
+          className="field mb-1.5"
           type="password"
           placeholder="Neues Passwort"
+          autoComplete="new-password"
           autoFocus
           value={pw1}
           onChange={(e) => setPw1(e.target.value)}
         />
+        {/* Kleine Rückmeldung, solange getippt wird */}
+        {pw1.length > 0 && (
+          <div className="mb-3 flex items-center gap-2">
+            <div className="flex h-1.5 flex-1 gap-1">
+              {[1, 2, 3].map((n) => (
+                <div
+                  key={n}
+                  className={`h-full flex-1 rounded-full ${
+                    staerke.stufe >= n
+                      ? staerke.stufe === 1
+                        ? "bg-amber-400"
+                        : staerke.stufe === 2
+                          ? "bg-lime-500"
+                          : "bg-emerald-500"
+                      : "bg-slate-200 dark:bg-slate-700"
+                  }`}
+                />
+              ))}
+            </div>
+            <span className="shrink-0 text-[11px] font-semibold text-tinte-leise">{staerke.text}</span>
+          </div>
+        )}
         <input
           className="field mb-3"
           type="password"
           placeholder="Passwort bestätigen"
+          autoComplete="new-password"
           value={pw2}
           onChange={(e) => setPw2(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && submit()}
@@ -221,6 +262,9 @@ function ChangeForm({ onDone }: { onDone: () => void }) {
         <button className="btn-primary" disabled={busy} onClick={submit}>
           {busy ? "…" : "Passwort speichern"}
         </button>
+        <p className="mt-3 text-center text-[11px] leading-relaxed text-tinte-leise">
+          Mindestens 8 Zeichen. Nimm nichts, was du anderswo schon benutzt.
+        </p>
       </div>
     </div>
   );

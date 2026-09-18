@@ -27,7 +27,7 @@ export function BeitragsListe({
 
   if (!eintraege.length)
     return (
-      <div className="mt-3 rounded-2xl border border-dashed border-slate-200 p-5 text-center text-[13px] text-slate-400 dark:border-slate-700">
+      <div className="mt-3 rounded-2xl border border-dashed border-papier-linie p-5 text-center text-[13px] text-tinte-leise dark:border-slate-700">
         {leerText}
       </div>
     );
@@ -38,13 +38,13 @@ export function BeitragsListe({
         {eintraege.map((c) => (
           <li
             key={c.id}
-            className="flex items-center gap-3 rounded-xl bg-slate-50 px-3 py-2.5 dark:bg-slate-800/60"
+            className="flex items-center gap-3 rounded-xl bg-papier px-3 py-2.5 dark:bg-slate-800/60"
           >
             <div className="min-w-0 flex-1">
-              <div className="truncate text-[14px] font-semibold text-slate-700 dark:text-slate-200">{c.titel}</div>
-              <div className="text-[12px] text-slate-400">{datumLang(c.datum)}</div>
+              <div className="truncate text-[14px] font-semibold text-tinte dark:text-slate-200">{c.titel}</div>
+              <div className="text-[12px] text-tinte-leise">{datumLang(c.datum)}</div>
             </div>
-            <div className="shrink-0 rounded-lg bg-brand/10 px-2.5 py-1 text-[14px] font-extrabold text-brand">
+            <div className="zahl shrink-0 rounded-lg bg-brand/10 px-2.5 py-1 text-[14px] font-extrabold text-brand">
               +{c.punkte} %
             </div>
           </li>
@@ -52,7 +52,7 @@ export function BeitragsListe({
       </ul>
       <div className="mt-2 flex items-center justify-between rounded-xl bg-brand/10 px-3 py-2">
         <span className="text-[13px] font-semibold text-brand">Zusammen</span>
-        <span className="text-[15px] font-extrabold text-brand">{summe} %</span>
+        <span className="zahl text-[15px] font-extrabold text-brand">{summe} %</span>
       </div>
     </>
   );

@@ -33,8 +33,8 @@ export function UnbanRequests() {
             <span className="text-lg">🔓</span>
             <div className="min-w-0 flex-1">
               <div className="text-[15px] font-bold">Entbannungsanfrage {nameVon(r.user_id)}</div>
-              <div className="mt-0.5 text-[13px] text-slate-600 dark:text-slate-300">{r.nachricht}</div>
-              <div className="mt-1 text-[11px] text-slate-400">
+              <div className="mt-0.5 text-[13px] text-tinte-matt dark:text-slate-300">{r.nachricht}</div>
+              <div className="mt-1 text-[11px] text-tinte-leise">
                 {new Date(r.created_at).toLocaleString("de-DE")}
               </div>
             </div>
@@ -49,7 +49,7 @@ export function UnbanRequests() {
                 if (!res.ok) alert("Fehler: " + res.error);
                 laden();
               }}
-              className="flex-1 rounded-xl border border-slate-200 py-2 text-sm font-bold text-slate-500 dark:border-slate-700"
+              className="flex-1 rounded-xl border border-papier-linie py-2 text-sm font-bold text-tinte-matt dark:border-slate-700"
             >
               Ablehnen
             </button>

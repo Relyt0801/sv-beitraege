@@ -9,12 +9,12 @@ export function MassBar({ selected, onDone }: { selected: Set<string>; onDone: (
   const [titel, setTitel] = useState("");
   const [punkte, setPunkte] = useState("5");
 
-  const btn = "rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-bold text-slate-700 disabled:opacity-40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200";
+  const btn = "rounded-xl border border-papier-linie bg-papier-matt px-3 py-2 text-sm font-bold text-tinte disabled:opacity-40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200";
   const disabled = selected.size === 0;
 
   if (punkteOffen)
     return (
-      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 px-3.5 py-2.5 pb-[calc(env(safe-area-inset-bottom)+0.6rem)] backdrop-blur dark:border-slate-800 dark:bg-slate-900/95">
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-papier-linie bg-white/95 px-3.5 py-2.5 pb-[calc(env(safe-area-inset-bottom)+0.6rem)] backdrop-blur dark:border-slate-800 dark:bg-slate-900/95">
         <div className="mb-2 text-sm font-bold">
           Beitrag für {selected.size} Person{selected.size === 1 ? "" : "en"}
         </div>
@@ -44,13 +44,13 @@ export function MassBar({ selected, onDone }: { selected: Set<string>; onDone: (
           <input
             type="number"
             min={0}
-            className="w-16 rounded-xl border border-slate-200 bg-slate-50 px-2 py-2 text-center dark:border-slate-700 dark:bg-slate-800"
+            className="w-16 rounded-xl border border-papier-linie bg-papier-matt px-2 py-2 text-center dark:border-slate-700 dark:bg-slate-800"
             value={punkte}
             onChange={(e) => setPunkte(e.target.value)}
           />
           <button
             onClick={() => setPunkteOffen(false)}
-            className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-500 dark:border-slate-700"
+            className="rounded-xl border border-papier-linie px-3 py-2 text-sm font-semibold text-tinte-matt dark:border-slate-700"
           >
             Zurück
           </button>
@@ -71,10 +71,10 @@ export function MassBar({ selected, onDone }: { selected: Set<string>; onDone: (
     );
 
   return (
-    <div className="fixed inset-x-0 bottom-0 z-40 flex flex-wrap items-center gap-2 border-t border-slate-200 bg-white/95 px-3.5 py-2.5 pb-[calc(env(safe-area-inset-bottom)+0.6rem)] backdrop-blur dark:border-slate-800 dark:bg-slate-900/95">
+    <div className="fixed inset-x-0 bottom-0 z-40 flex flex-wrap items-center gap-2 border-t border-papier-linie bg-white/95 px-3.5 py-2.5 pb-[calc(env(safe-area-inset-bottom)+0.6rem)] backdrop-blur dark:border-slate-800 dark:bg-slate-900/95">
       <span className="mr-auto text-sm font-bold">{selected.size} ausgewählt</span>
       <select
-        className="rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-2 text-sm font-bold dark:border-slate-700 dark:bg-slate-800"
+        className="rounded-xl border border-papier-linie bg-papier-matt px-2.5 py-2 text-sm font-bold dark:border-slate-700 dark:bg-slate-800"
         value={h}
         onChange={(e) => setH(e.target.value as Halbjahr)}
       >

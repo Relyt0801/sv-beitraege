@@ -24,7 +24,6 @@ export function PunkteSheet({
   onClose: () => void;
 }) {
   const { contributions, templates, addContribution, updateContribution, removeContribution } = useStore();
-  const [addOpen, setAddOpen] = useState(false);
   // gewählte Vorlage + ggf. angepasster Wert + Datum der Hilfe
   const [gewaehlt, setGewaehlt] = useState<string | null>(null);
   const [wert, setWert] = useState("5");
@@ -51,7 +50,6 @@ export function PunkteSheet({
     addContribution(student!.id, vorlage.titel, p, datum);
     setGewaehlt(null);
     setDatum(new Date().toISOString().slice(0, 10));
-    setAddOpen(false);
   }
 
   return (
@@ -59,7 +57,7 @@ export function PunkteSheet({
       <div className="mb-4 flex items-start gap-3">
         <div className="flex-1">
           <div className="text-xl font-bold leading-tight">Gesammelte Prozent</div>
-          <div className="text-sm text-slate-500">
+          <div className="text-sm text-tinte-matt">
             {student.vorname} {student.nachname}
           </div>
         </div>
@@ -68,12 +66,12 @@ export function PunkteSheet({
         </button>
       </div>
 
-      <div className="mb-4 rounded-2xl bg-slate-100 p-4 dark:bg-slate-800/70">
+      <div className="mb-4 rounded-2xl bg-papier-matt p-4 dark:bg-slate-800/70">
         <PunkteBar punkte={summe} settings={settings} />
         <div className="mt-3">
           <StaffelTabelle settings={settings} pct={pct} />
         </div>
-        <p className="mt-2.5 text-[13px] leading-relaxed text-slate-600 dark:text-slate-300">
+        <p className="mt-2.5 text-[13px] leading-relaxed text-tinte-matt dark:text-slate-300">
           Das <b>erste</b> Abiballticket kostet bei diesem Stand{" "}
           <b>{(settings.ticket_preis || 0) + ticketBetrag(pct, settings)} €</b>
           {settings.ticket_preis ? ` (${settings.ticket_preis} € Grundpreis + ${ticketBetrag(pct, settings)} €)` : ""}.
@@ -81,14 +79,95 @@ export function PunkteSheet({
         </p>
       </div>
 
+      {editable && (
+        <div className="mt-4">
+          <div className="flex items-baseline justify-between">
+            <h3 className="text-[13px] font-semibold text-tinte-matt">Mithilfe eintragen</h3>
+            <span className="text-[11px] text-tinte-leise">aus der Liste wählen</span>
+          </div>
+
+          {templates.length === 0 ? (
+            <p className="mt-2 rounded-xl border border-papier-linie bg-papier-matt p-3 text-[13px] text-tinte-matt dark:border-slate-700 dark:bg-slate-800">
+              Es steht noch nichts zur Auswahl. Das Stufenteam legt die Möglichkeiten im Reiter
+              „Beiträge" an.
+            </p>
+          ) : (
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {[...templates]
+                .sort((a, b) => a.sort - b.sort || a.punkte - b.punkte)
+                .map((t) => {
+                  const aktiv = t.id === gewaehlt;
+                  return (
+                    <button
+                      key={t.id}
+                      onClick={() => waehle(t.id)}
+                      className={`flex items-center gap-1.5 rounded-xl border px-2.5 py-2 text-[12px] font-semibold transition active:scale-[.98] ${
+                        aktiv
+                          ? "border-brand bg-brand text-white"
+                          : t.variabel
+                            ? "border-brand/30 bg-brand/5 text-tinte dark:bg-slate-800 dark:text-slate-200"
+                            : "border-papier-linie bg-white text-tinte dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                      }`}
+                    >
+                      {t.titel}
+                      <span className={`zahl font-bold ${aktiv ? "text-white" : "text-brand"}`}>
+                        {t.variabel ? "% frei" : `+${t.punkte} %`}
+                      </span>
+                    </button>
+                  );
+                })}
+            </div>
+          )}
+
+          {/* Datum steht schon, Wert haengt an der Vorlage: eintragen ist ein Griff. */}
+          <div className="mt-2.5 flex items-center gap-2 rounded-xl border border-papier-linie bg-papier-matt px-3 py-2 dark:border-slate-700 dark:bg-slate-800">
+            <label htmlFor="mithilfe-datum" className="shrink-0 text-[12px] font-semibold text-tinte-matt">
+              am
+            </label>
+            <input
+              id="mithilfe-datum"
+              type="date"
+              className="w-0 min-w-[7.5rem] flex-1 bg-transparent text-[13px] font-semibold outline-none"
+              value={datum}
+              onChange={(e) => setDatum(e.target.value)}
+            />
+            {vorlage?.variabel && (
+              <span className="flex shrink-0 items-center gap-1">
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  inputMode="numeric"
+                  className="w-14 rounded-lg border border-papier-linie bg-white px-1.5 py-1.5 text-center text-[13px] font-bold text-brand dark:border-slate-600 dark:bg-slate-900"
+                  value={wert}
+                  onChange={(e) => setWert(e.target.value)}
+                />
+                <span className="text-[12px] font-bold text-brand">%</span>
+              </span>
+            )}
+            <button
+              onClick={speichern}
+              disabled={!vorlage}
+              className="h-9 shrink-0 rounded-lg bg-brand px-3.5 text-[13px] font-bold text-white transition active:scale-[.98] disabled:opacity-40"
+            >
+              Eintragen
+            </button>
+          </div>
+          {!vorlage && templates.length > 0 && (
+            <div className="mt-1.5 text-[11px] text-tinte-leise">Erst antippen, wobei geholfen wurde.</div>
+          )}
+        </div>
+      )}
+
+      <h3 className="mb-2 mt-5 text-[13px] font-semibold text-tinte-matt">Zuletzt eingetragen</h3>
       {list.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-slate-300 py-10 text-center text-sm text-slate-400 dark:border-slate-700">
+        <div className="rounded-2xl border border-dashed border-papier-linie py-10 text-center text-sm text-tinte-leise dark:border-slate-700">
           Hier steht noch nichts.
           <br />
           Sobald du bei etwas mithilfst, taucht es hier auf.
         </div>
       ) : (
-        <ul className="divide-y divide-slate-200 overflow-hidden rounded-2xl border border-slate-200 dark:divide-slate-700 dark:border-slate-700">
+        <ul className="divide-y divide-papier-linie overflow-hidden rounded-2xl border border-papier-linie dark:divide-slate-700 dark:border-slate-700">
           {list.map((c) => (
             <Zeile
               key={c.id}
@@ -101,105 +180,6 @@ export function PunkteSheet({
             />
           ))}
         </ul>
-      )}
-
-      {editable && (
-        <div className="mt-4">
-          {addOpen ? (
-            <div className="rounded-2xl border border-brand/40 bg-brand/5 p-3">
-              <div className="mb-1.5 text-[11px] font-bold uppercase tracking-wide text-slate-400">
-                Wofür?
-              </div>
-              {templates.length === 0 ? (
-                <p className="rounded-xl bg-white p-3 text-[13px] text-slate-500 dark:bg-slate-900">
-                  Es steht noch nichts zur Auswahl. Das Stufenteam legt die Möglichkeiten im Reiter
-                  „Beiträge" an.
-                </p>
-              ) : (
-                <div className="flex flex-wrap gap-1.5">
-                  {[...templates]
-                    .sort((a, b) => a.sort - b.sort || a.punkte - b.punkte)
-                    .map((t) => {
-                      const aktiv = t.id === gewaehlt;
-                      return (
-                        <button
-                          key={t.id}
-                          onClick={() => waehle(t.id)}
-                          className={`rounded-full border px-2.5 py-1.5 text-[13px] font-semibold transition ${
-                            aktiv
-                              ? "border-brand bg-brand text-white"
-                              : "border-brand/40 bg-white text-brand dark:bg-slate-900"
-                          }`}
-                        >
-                          {t.titel} <span className="opacity-70">+{t.punkte} %</span>
-                        </button>
-                      );
-                    })}
-                </div>
-              )}
-
-              {vorlage && (
-                <div className="mt-3 grid gap-2">
-                  <label className="flex items-center gap-2.5">
-                    <span className="w-16 shrink-0 text-[13px] font-semibold text-slate-500">Datum</span>
-                    <input
-                      type="date"
-                      className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-[15px] dark:border-slate-700 dark:bg-slate-800"
-                      value={datum}
-                      onChange={(e) => setDatum(e.target.value)}
-                    />
-                  </label>
-                  <label className="flex items-center gap-2.5">
-                    <span className="w-16 shrink-0 text-[13px] font-semibold text-slate-500">Wert</span>
-                    {vorlage.variabel ? (
-                      <span className="flex items-center gap-1.5">
-                        <input
-                          type="number"
-                          min={0}
-                          max={100}
-                          inputMode="numeric"
-                          className="w-20 rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-center text-[15px] font-bold text-brand dark:border-slate-700 dark:bg-slate-800"
-                          value={wert}
-                          onChange={(e) => setWert(e.target.value)}
-                        />
-                        <span className="text-[13px] font-bold text-brand">%</span>
-                        <span className="text-[12px] text-slate-400">je nach Aufwand anpassbar</span>
-                      </span>
-                    ) : (
-                      <span className="text-[15px] font-bold text-brand">{vorlage.punkte} %</span>
-                    )}
-                  </label>
-                </div>
-              )}
-
-              <div className="mt-3 flex items-center gap-2">
-                <button
-                  onClick={() => {
-                    setAddOpen(false);
-                    setGewaehlt(null);
-                  }}
-                  className="ml-auto rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-500 dark:border-slate-700"
-                >
-                  Abbrechen
-                </button>
-                <button
-                  onClick={speichern}
-                  disabled={!vorlage}
-                  className="rounded-lg bg-brand px-4 py-2 text-sm font-bold text-white disabled:opacity-40"
-                >
-                  Eintragen
-                </button>
-              </div>
-            </div>
-          ) : (
-            <button
-              onClick={() => setAddOpen(true)}
-              className="w-full rounded-2xl border border-dashed border-brand/50 py-3 text-sm font-bold text-brand transition active:scale-[.99]"
-            >
-              ＋ Beitrag eintragen
-            </button>
-          )}
-        </div>
       )}
 
       <button className="btn-primary mt-5" onClick={onClose}>
@@ -234,7 +214,7 @@ function Zeile({
           <input
             type="number"
             min={0}
-            className="w-20 rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-center dark:border-slate-700 dark:bg-slate-800"
+            className="w-20 rounded-lg border border-papier-linie bg-white px-2.5 py-2 text-center dark:border-slate-700 dark:bg-slate-800"
             value={punkte}
             onChange={(e) => setPunkte(e.target.value)}
           />
@@ -243,7 +223,7 @@ function Zeile({
           </button>
           <button
             onClick={() => setEdit(false)}
-            className="ml-auto rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-500 dark:border-slate-700"
+            className="ml-auto rounded-lg border border-papier-linie px-3 py-2 text-sm font-semibold text-tinte-matt dark:border-slate-700"
           >
             Abbrechen
           </button>
@@ -264,13 +244,13 @@ function Zeile({
     <li className="flex items-center gap-3 bg-white px-3.5 py-3 dark:bg-slate-900">
       <div className="min-w-0 flex-1">
         <div className="truncate text-[15px] font-semibold">{c.titel}</div>
-        {datum && <div className="text-[11px] text-slate-400">{datum}</div>}
+        {datum && <div className="text-[11px] text-tinte-leise">{datum}</div>}
       </div>
       <span className="shrink-0 rounded-full bg-brand/12 px-2.5 py-1 text-sm font-extrabold text-brand">
         +{c.punkte}
       </span>
       {editable && (
-        <button onClick={() => setEdit(true)} className="shrink-0 text-slate-400" aria-label="Bearbeiten">
+        <button onClick={() => setEdit(true)} className="shrink-0 text-tinte-leise" aria-label="Bearbeiten">
           ✎
         </button>
       )}

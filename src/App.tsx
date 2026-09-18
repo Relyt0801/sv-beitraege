@@ -26,9 +26,11 @@ import { RolesTab } from "./components/RolesTab";
 import { PermissionsTab } from "./components/PermissionsTab";
 import { EventsTab } from "./components/EventsTab";
 import { BeitraegeTab } from "./components/BeitraegeTab";
+import { KassenKopf } from "./components/KassenKopf";
 import { EventComposer } from "./components/EventComposer";
 import { ElternProvider } from "./eltern-store";
 import { ElternApp } from "./components/ElternApp";
+import { Icon, type IconName } from "./components/Icon";
 
 export default function App() {
   return (
@@ -53,7 +55,7 @@ function NachRolle() {
   if (!ready)
     return (
       <div className="flex min-h-dvh items-center justify-center">
-        <div className="h-9 w-9 animate-spin rounded-full border-[3px] border-slate-300 border-t-brand dark:border-slate-700 dark:border-t-brand" />
+        <div className="h-9 w-9 animate-spin rounded-full border-[3px] border-papier-linie border-t-brand dark:border-slate-700 dark:border-t-brand" />
       </div>
     );
 
@@ -201,37 +203,34 @@ function Main() {
     inp.click();
   }
 
-  async function changePassword() {
-    const pw = prompt("Neues Passwort (mindestens 6 Zeichen):");
-    if (!pw) return;
-    if (pw.length < 6) {
-      alert("Das Passwort muss mindestens 6 Zeichen haben.");
-      return;
-    }
-    const { error } = await supabase!.auth.updateUser({ password: pw });
-    alert(error ? "Fehler: " + error.message : "Passwort geändert ✓");
+  /**
+   * Passwort ändern läuft über das Profil, nicht über prompt().
+   * Installierte Apps blockieren prompt(), dann passierte hier gar nichts.
+   */
+  function changePassword() {
+    setShowSettings(true);
   }
 
   const numField =
-    "w-16 rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-center dark:border-slate-700 dark:bg-slate-800";
+    "w-16 rounded-lg border border-papier-linie bg-white px-2.5 py-2 text-center dark:border-slate-700 dark:bg-slate-800";
 
-  const navItems: { key: Tab; icon: string; label: string; badge?: number; show: boolean }[] = [
-    { key: "kasse", icon: "💶", label: "Kasse", show: true },
-    { key: "events", icon: "📣", label: "Events", badge: unread, show: true },
-    { key: "themen", icon: "💬", label: "Chats", badge: topicsUnread, show: showTopicsTab },
-    { key: "beitraege", icon: "🎟️", label: "Beiträge", show: can("beitraege.manage") },
-    { key: "rollen", icon: "👥", label: "Rollen", show: canManageRoles },
-    { key: "rechte", icon: "🛡️", label: "Rechte", show: can("perms.manage") },
+  const navItems: { key: Tab; icon: IconName; label: string; badge?: number; show: boolean }[] = [
+    { key: "kasse", icon: "kasse", label: "Kasse", show: true },
+    { key: "events", icon: "events", label: "Events", badge: unread, show: true },
+    { key: "themen", icon: "chats", label: "Chats", badge: topicsUnread, show: showTopicsTab },
+    { key: "beitraege", icon: "beitraege", label: "Beiträge", show: can("beitraege.manage") },
+    { key: "rollen", icon: "rollen", label: "Rollen", show: canManageRoles },
+    { key: "rechte", icon: "rechte", label: "Rechte", show: can("perms.manage") },
   ];
 
   return (
-    <div className="mx-auto max-w-5xl px-3 pb-36 sm:px-5">
-      <header className="sticky top-0 z-20 -mx-3 border-b border-slate-200 bg-slate-50/90 px-3 pb-3 pt-[calc(env(safe-area-inset-top)+0.7rem)] backdrop-blur dark:border-slate-800 dark:bg-slate-950/90 sm:-mx-5 sm:px-5">
+    <div className="mx-auto max-w-5xl px-3 pb-36 sm:px-5 lg:pb-12">
+      <header className="sticky top-0 z-20 -mx-3 border-b border-papier-linie bg-papier/90 px-3 pb-3 pt-[calc(env(safe-area-inset-top)+0.7rem)] backdrop-blur dark:border-slate-800 dark:bg-slate-950/90 sm:-mx-5 sm:px-5">
         <div className="mx-auto flex max-w-5xl items-center gap-2.5">
           {/* Ein Titel, der zum Reiter passt – genau wie in der Elternansicht. */}
           <div className="min-w-0 flex-1 leading-tight">
-            <div className="truncate text-lg font-bold tracking-tight">{REITER_TITEL[tab]}</div>
-            <div className="truncate text-[11px] text-slate-400">
+            <div className="truncate font-zahl text-[1.25rem] font-extrabold tracking-[-0.02em]">{REITER_TITEL[tab]}</div>
+            <div className="truncate text-[11px] text-tinte-leise">
               {isStaff ? "Stufenteam" : "Mein Zugang"} · Abi 28
             </div>
           </div>
@@ -278,11 +277,39 @@ function Main() {
           </div>
         </div>
 
+        {/* Am Rechner steht die Navigation oben – eine Leiste unten am Bildschirmrand
+            gibt es so auf keinem Dashboard. Auf dem Handy bleibt sie unten. */}
+        <div className="mx-auto mt-2.5 hidden max-w-5xl items-center gap-1 lg:flex">
+          {navItems.filter((n) => n.show).map((n) => (
+            <button
+              key={n.key}
+              onClick={() => setTab(n.key)}
+              className={`relative flex items-center gap-2 rounded-lg px-3 py-2 text-[13px] font-semibold transition ${
+                tab === n.key
+                  ? "bg-brand/10 text-brand-dark dark:bg-brand/20 dark:text-brand-soft"
+                  : "text-tinte-matt hover:bg-papier-matt dark:text-slate-300 dark:hover:bg-slate-800"
+              }`}
+            >
+              <Icon name={n.icon} size={17} />
+              {n.label}
+              {(n.badge ?? 0) > 0 && (
+                <span className="flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+                  {n.badge! > 9 ? "9+" : n.badge}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+      </header>
+
+      {/* Suche, Kennzahlen und Halbjahr laufen mit – nur die Titelzeile bleibt
+          oben kleben. Sonst verdeckt der Kopf auf dem Handy die halbe Liste. */}
+      <div>
         {tab === "kasse" && teamView && (
-          <div className="mx-auto mt-2.5 flex max-w-5xl items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 shadow-card dark:border-slate-800 dark:bg-slate-900 dark:shadow-cardDark">
-            <span className="text-slate-400">🔍</span>
+          <div className="mx-auto mt-2.5 flex max-w-5xl items-center gap-2 rounded-xl border border-papier-linie bg-white px-3.5 py-2.5 shadow-card dark:border-slate-800 dark:bg-slate-900 dark:shadow-cardDark">
+            <span className="text-tinte-leise">🔍</span>
             <input
-              className="w-full bg-transparent text-base outline-none placeholder:text-slate-400"
+              className="w-full bg-transparent text-base outline-none placeholder:text-tinte-leise"
               placeholder="Name suchen…"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
@@ -290,51 +317,52 @@ function Main() {
           </div>
         )}
 
-        {tab === "kasse" && teamView && (
-          <div className="mx-auto mt-2.5 max-w-5xl space-y-2">
-            <div className="flex gap-1.5">
-              {HY.map((h) => (
-                <button
-                  key={h}
-                  disabled={!canEditData}
-                  onClick={() => setSettings({ aktuelles_halbjahr: h })}
-                  className={`flex-1 rounded-full border px-1 py-1.5 text-xs font-bold transition disabled:cursor-default ${
-                    h === settings.aktuelles_halbjahr
-                      ? "border-brand bg-brand text-white"
-                      : "border-slate-200 bg-white text-slate-500 dark:border-slate-700 dark:bg-slate-900"
-                  }`}
-                >
-                  {h}
-                </button>
-              ))}
-            </div>
-            {isStaff && (
-              <div className="w-full rounded-full bg-white px-3.5 py-2 text-center text-sm font-semibold shadow-card dark:bg-slate-900 dark:shadow-cardDark">
-                Offen gesamt: <span className="font-extrabold text-amber-500">{totalOffen} €</span>
-                <span className="ml-1 text-slate-400">· {anzahlOffen} offen</span>
+        {/* Erst die Lage der Kasse, dann die Liste – nicht umgekehrt. */}
+        {tab === "kasse" && teamView && <KassenKopf students={students} settings={settings} />}
+
+        {tab === "kasse" && teamView && canEditData && (
+          <div className="mx-auto mt-2.5 max-w-5xl">
+            <div className="flex items-center gap-2">
+              <span className="shrink-0 text-[11px] font-semibold uppercase tracking-wide text-tinte-leise">
+                Laufendes Halbjahr
+              </span>
+              <div className="flex min-w-0 flex-1 gap-1">
+                {HY.map((h) => (
+                  <button
+                    key={h}
+                    onClick={() => setSettings({ aktuelles_halbjahr: h })}
+                    className={`min-w-0 flex-1 rounded-lg border px-1 py-1.5 text-[11px] font-bold transition ${
+                      h === settings.aktuelles_halbjahr
+                        ? "border-brand bg-brand text-white"
+                        : "border-papier-linie bg-white text-tinte-matt dark:border-slate-700 dark:bg-slate-900"
+                    }`}
+                  >
+                    {h}
+                  </button>
+                ))}
               </div>
-            )}
+            </div>
           </div>
         )}
 
         {tab === "kasse" && teamView && showFilter && (
           <div className="mx-auto mt-3 max-w-5xl">
             <div className="card grid grid-cols-2 gap-x-5 gap-y-4 p-4 sm:grid-cols-4">
-              <label className="flex flex-col gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <label className="flex flex-col gap-1.5 text-xs font-semibold uppercase tracking-wide text-tinte-matt">
                 Prozent
-                <div className="flex items-center gap-1.5 text-slate-700 dark:text-slate-200">
+                <div className="flex items-center gap-1.5 text-tinte dark:text-slate-200">
                   <input type="number" className={numField} placeholder="min" value={min} onChange={(e) => setMin(e.target.value)} />
-                  <span className="text-slate-400">–</span>
+                  <span className="text-tinte-leise">–</span>
                   <input type="number" className={numField} placeholder="max" value={max} onChange={(e) => setMax(e.target.value)} />
                 </div>
               </label>
 
-              <div className="flex flex-col gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <div className="flex flex-col gap-1.5 text-xs font-semibold uppercase tracking-wide text-tinte-matt">
                 Anzeige
                 <button
                   onClick={() => setOnlyOpen((v) => !v)}
                   className={`rounded-lg border px-3 py-2 text-[13px] font-bold normal-case transition ${
-                    onlyOpen ? "border-brand bg-brand text-white" : "border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800"
+                    onlyOpen ? "border-brand bg-brand text-white" : "border-papier-linie bg-white dark:border-slate-700 dark:bg-slate-800"
                   }`}
                 >
                   {onlyOpen ? "✓ nur offene" : "nur offene"}
@@ -342,7 +370,7 @@ function Main() {
               </div>
 
               {can("beitraege.manage") && (
-                <div className="col-span-2 flex items-center gap-2 text-[12px] text-slate-400 sm:col-span-4">
+                <div className="col-span-2 flex items-center gap-2 text-[12px] text-tinte-leise sm:col-span-4">
                   🎟️ Abiball-Staffel und Prozent-Möglichkeiten stehen jetzt im Reiter{" "}
                   <button onClick={() => setTab("beitraege")} className="font-bold text-brand underline">
                     Beiträge
@@ -350,11 +378,11 @@ function Main() {
                 </div>
               )}
 
-              <div className="col-span-2 flex flex-wrap items-center gap-2 border-t border-slate-200 pt-3 dark:border-slate-700 sm:col-span-4">
-                <span className="mr-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Daten</span>
+              <div className="col-span-2 flex flex-wrap items-center gap-2 border-t border-papier-linie pt-3 dark:border-slate-700 sm:col-span-4">
+                <span className="mr-1 text-xs font-semibold uppercase tracking-wide text-tinte-matt">Daten</span>
                 {canEditData && (
                   <>
-                    <button onClick={exportData} className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-semibold dark:border-slate-700">
+                    <button onClick={exportData} className="rounded-lg border border-papier-linie px-3 py-1.5 text-sm font-semibold dark:border-slate-700">
                       Export
                     </button>
                     <button onClick={onImport} className="rounded-lg bg-brand px-3 py-1.5 text-sm font-semibold text-white">
@@ -362,15 +390,15 @@ function Main() {
                     </button>
                   </>
                 )}
-                <button onClick={() => setShowTour(true)} className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-semibold text-slate-500 dark:border-slate-700">
+                <button onClick={() => setShowTour(true)} className="rounded-lg border border-papier-linie px-3 py-1.5 text-sm font-semibold text-tinte-matt dark:border-slate-700">
                   Einführung
                 </button>
                 {hasSupabase && (
                   <>
-                    <button onClick={changePassword} className="ml-auto rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-semibold dark:border-slate-700">
+                    <button onClick={changePassword} className="ml-auto rounded-lg border border-papier-linie px-3 py-1.5 text-sm font-semibold dark:border-slate-700">
                       Passwort ändern
                     </button>
-                    <button onClick={() => supabase!.auth.signOut()} className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-semibold text-slate-500 dark:border-slate-700">
+                    <button onClick={() => supabase!.auth.signOut()} className="rounded-lg border border-papier-linie px-3 py-1.5 text-sm font-semibold text-tinte-matt dark:border-slate-700">
                       Logout
                     </button>
                   </>
@@ -380,7 +408,7 @@ function Main() {
             </div>
           </div>
         )}
-      </header>
+      </div>
 
       {tab === "rollen" ? (
         <main className="mt-3">
@@ -411,19 +439,19 @@ function Main() {
             ready={ready && roleReady}
           />
           {mode === "local" && ready && (
-            <p className="pt-3 text-center text-[11px] text-slate-400">Testbetrieb. Die Daten liegen nur auf diesem Gerät.</p>
+            <p className="pt-3 text-center text-[11px] text-tinte-leise">Testbetrieb. Die Daten liegen nur auf diesem Gerät.</p>
           )}
         </main>
       ) : (
-        <main className="mt-3 grid gap-3 lg:grid-cols-2" data-tour="liste">
+        <main className="card mt-3 divide-y divide-papier-linie overflow-hidden dark:divide-slate-800" data-tour="liste">
           {!ready && (
-            <div className="col-span-full flex flex-col items-center justify-center gap-4 py-24 text-slate-400">
-              <div className="h-9 w-9 animate-spin rounded-full border-[3px] border-slate-300 border-t-brand dark:border-slate-700 dark:border-t-brand" />
+            <div className="flex flex-col items-center justify-center gap-4 py-24 text-tinte-leise">
+              <div className="h-9 w-9 animate-spin rounded-full border-[3px] border-papier-linie border-t-brand dark:border-slate-700 dark:border-t-brand" />
               <div className="text-sm font-medium">Beitragsliste wird geladen …</div>
             </div>
           )}
           {ready && filtered.length === 0 && (
-            <div className="col-span-full py-16 text-center text-sm text-slate-400">
+            <div className="py-16 text-center text-sm text-tinte-leise">
               Keine Treffer.{" "}
               <button
                 className="font-semibold text-brand"
@@ -436,6 +464,50 @@ function Main() {
               >
                 Filter zurücksetzen
               </button>
+            </div>
+          )}
+          {ready && (
+            <div className="flex flex-wrap items-center gap-2 border-b border-papier-linie px-3.5 py-2.5 dark:border-slate-800 sm:px-4">
+              <button
+                onClick={() => setOnlyOpen(false)}
+                className={`rounded-lg border px-3 py-1.5 text-[12px] font-semibold transition ${
+                  !onlyOpen
+                    ? "border-brand bg-brand/10 text-brand-dark dark:bg-brand/20 dark:text-brand-soft"
+                    : "border-papier-linie text-tinte-matt dark:border-slate-700 dark:text-slate-300"
+                }`}
+              >
+                Alle
+              </button>
+              <button
+                onClick={() => setOnlyOpen(true)}
+                className={`rounded-lg border px-3 py-1.5 text-[12px] font-semibold transition ${
+                  onlyOpen
+                    ? "border-brand bg-brand/10 text-brand-dark dark:bg-brand/20 dark:text-brand-soft"
+                    : "border-papier-linie text-tinte-matt dark:border-slate-700 dark:text-slate-300"
+                }`}
+              >
+                Nur offene
+              </button>
+              <span className="zahl ml-auto text-[12px] text-tinte-leise">
+                {filtered.length} von {students.length}
+              </span>
+            </div>
+          )}
+
+          {ready && filtered.length > 0 && (
+            <div className="hidden items-center gap-x-3 bg-papier-matt px-4 py-2 dark:bg-slate-800/50 sm:flex">
+              <span className="flex-1 basis-[13rem] text-[10px] font-bold uppercase tracking-[0.05em] text-tinte-leise">
+                Person
+              </span>
+              <span className="w-16 text-right text-[10px] font-bold uppercase tracking-[0.05em] text-tinte-leise">
+                Offen
+              </span>
+              <span className="max-w-[13rem] flex-1 text-[10px] font-bold uppercase tracking-[0.05em] text-tinte-leise">
+                Halbjahre
+              </span>
+              <span className="w-[5.4rem] text-right text-[10px] font-bold uppercase tracking-[0.05em] text-tinte-leise">
+                Mithilfe
+              </span>
             </div>
           )}
           {filtered.map((st, idx) => (
@@ -455,7 +527,7 @@ function Main() {
             />
           ))}
           {mode === "local" && ready && (
-            <p className="col-span-full pt-2 text-center text-[11px] text-slate-400">
+            <p className="col-span-full pt-2 text-center text-[11px] text-tinte-leise">
               Testbetrieb. Die Daten liegen nur auf diesem Gerät.
             </p>
           )}
@@ -494,7 +566,7 @@ function Main() {
 
       {/* Feste Tab-Bar unten */}
       {!massMode && (
-        <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95">
+        <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-papier-linie bg-white/95 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95 lg:hidden">
           <div className="mx-auto flex max-w-5xl items-stretch justify-around pb-[env(safe-area-inset-bottom)]">
             {navItems.filter((n) => n.show).map((n) => (
               <button
@@ -502,12 +574,12 @@ function Main() {
                 data-tour={`tab-${n.key}`}
                 onClick={() => setTab(n.key)}
                 className={`relative flex flex-1 flex-col items-center gap-0.5 py-2 text-[11px] font-semibold transition ${
-                  tab === n.key ? "text-brand" : "text-slate-400"
+                  tab === n.key ? "text-brand" : "text-tinte-leise"
                 }`}
                 aria-label={n.label}
               >
-                <span className="relative text-[22px] leading-none">
-                  {n.icon}
+                <span className="relative flex h-[22px] items-center leading-none">
+                  <Icon name={n.icon} size={21} />
                   {(n.badge ?? 0) > 0 && (
                     <span className="absolute -right-3 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
                       {n.badge! > 9 ? "9+" : n.badge}

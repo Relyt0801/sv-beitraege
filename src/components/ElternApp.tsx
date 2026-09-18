@@ -8,6 +8,7 @@ import { TermChip } from "./TermChip";
 import { Ring } from "./Ring";
 import { BeitragsListe } from "./BeitragsListe";
 import { TicketErklaerung } from "./TicketErklaerung";
+import { Icon, type IconName } from "./Icon";
 import { ElternInfosTab } from "./ElternInfosTab";
 import { KontoTab } from "./KontoTab";
 import { ProfilSheet } from "./ProfilSheet";
@@ -27,62 +28,116 @@ export function ElternApp() {
   const [profilOffen, setProfilOffen] = useState(false);
   const { theme, toggle } = useTheme();
   const { students, contributions, settings, ready } = useStore();
-  const { bereit } = useEltern();
+  const { bereit, ungelesen } = useEltern();
 
   const punkte = useMemo(() => punkteIndex(contributions), [contributions]);
   const kinder = useMemo(
     () => [...students].sort((a, b) => a.vorname.localeCompare(b.vorname, "de")),
     [students],
   );
+  const familieOffen = kinder.reduce(
+    (n, k) => n + basisOffen(k, settings.aktuelles_halbjahr, settings),
+    0,
+  );
 
-  const NAV: { key: Reiter; label: string; icon: string }[] = [
-    { key: "uebersicht", label: "Übersicht", icon: "🏠" },
-    { key: "infos", label: "Infos", icon: "📌" },
-    { key: "konto", label: "Konto", icon: "🏦" },
+  const NAV: { key: Reiter; label: string; icon: IconName; zahl?: number }[] = [
+    { key: "uebersicht", label: "Übersicht", icon: "haus" },
+    { key: "infos", label: "Infos", icon: "pin", zahl: ungelesen },
+    { key: "konto", label: "Konto", icon: "bank" },
   ];
 
   return (
-    <div className="min-h-dvh bg-slate-50 pb-24 dark:bg-slate-950">
-      <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/90 backdrop-blur dark:border-slate-800 dark:bg-slate-900/90">
+    <div className="min-h-dvh bg-papier-matt pb-24 dark:bg-slate-950 lg:pb-0">
+      <header className="sticky top-0 z-20 border-b border-papier-linie bg-white/90 backdrop-blur dark:border-slate-800 dark:bg-slate-900/90">
         <div className="mx-auto flex max-w-3xl items-center gap-3 px-4 py-3">
           <div className="min-w-0 flex-1">
             <h1 className="truncate text-lg font-extrabold leading-tight">
               {reiter === "uebersicht" ? "Stufenkasse" : reiter === "infos" ? "Infos vom Stufenteam" : "Kontodaten"}
             </h1>
-            <p className="truncate text-[12px] text-slate-500">Elternzugang · Abi 28</p>
+            <p className="truncate text-[12px] text-tinte-matt">Elternzugang · Abi 28</p>
           </div>
           <button
             onClick={toggle}
-            className="rounded-xl px-2.5 py-2 text-slate-400 transition active:scale-90"
+            className="rounded-xl px-2.5 py-2 text-tinte-leise transition active:scale-90"
             aria-label="Hell oder dunkel"
           >
             {theme === "dark" ? "☀︎" : "☾"}
           </button>
           <button
             onClick={() => setProfilOffen(true)}
-            className="rounded-xl bg-slate-100 px-3 py-2 text-sm font-bold text-slate-600 transition active:scale-95 dark:bg-slate-800 dark:text-slate-300"
+            className="rounded-xl bg-papier-matt px-3 py-2 text-sm font-bold text-tinte-matt transition active:scale-95 dark:bg-slate-800 dark:text-slate-300"
           >
             Mein Zugang
           </button>
         </div>
+
+        {/* Am Rechner steht die Navigation oben, auf dem Handy unten. */}
+        <div className="mx-auto mt-2 hidden max-w-3xl items-center gap-1 lg:flex">
+          {NAV.map((n) => (
+            <button
+              key={n.key}
+              onClick={() => setReiter(n.key)}
+              className={`relative flex items-center gap-2 rounded-lg px-3 py-2 text-[13px] font-semibold transition ${
+                reiter === n.key
+                  ? "bg-brand/10 text-brand-dark dark:bg-brand/20 dark:text-brand-soft"
+                  : "text-tinte-matt hover:bg-papier-matt dark:text-slate-300 dark:hover:bg-slate-800"
+              }`}
+            >
+              <Icon name={n.icon} size={17} />
+              {n.label}
+              {Boolean(n.zahl) && (
+                <span className="flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+                  {n.zahl}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
       </header>
 
-      <main className="mx-auto max-w-3xl px-4 py-4">
+      <main className="mx-auto max-w-3xl px-4 py-4 lg:pb-8">
         {reiter === "uebersicht" && (
           <>
             {!ready || !bereit ? (
-              <div className="flex flex-col items-center justify-center gap-4 py-24 text-slate-400">
-                <div className="h-9 w-9 animate-spin rounded-full border-[3px] border-slate-300 border-t-brand dark:border-slate-700 dark:border-t-brand" />
+              <div className="flex flex-col items-center justify-center gap-4 py-24 text-tinte-leise">
+                <div className="h-9 w-9 animate-spin rounded-full border-[3px] border-papier-linie border-t-brand dark:border-slate-700 dark:border-t-brand" />
                 <div className="text-sm font-medium">Wird geladen …</div>
               </div>
             ) : kinder.length === 0 ? (
-              <div className="card p-6 text-center text-sm text-slate-500">
+              <div className="card p-6 text-center text-sm text-tinte-matt">
                 Ihrem Zugang ist noch kein Kind zugeordnet.
                 <br />
                 Melden Sie sich beim Stufenteam, dann wird das eingerichtet.
               </div>
             ) : (
               <div className="grid gap-4">
+                {/* Erst die Summe für die ganze Familie, dann jedes Kind einzeln. */}
+                <section className="leitkarte">
+                  <div className="kennlabel text-white/60">
+                    {kinder.length > 1 ? "Offen für Ihre Kinder" : "Noch offen"}
+                  </div>
+                  <div className="mt-1.5 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                    <span className={`leitwert ${familieOffen > 0 ? "text-white" : "text-emerald-400"}`}>
+                      {familieOffen} €
+                    </span>
+                    <span className="text-[13px] text-white/60">
+                      {familieOffen > 0
+                        ? kinder.length > 1
+                          ? "bitte für jedes Kind einzeln überweisen"
+                          : "für die Stufenkasse"
+                        : "Alles bezahlt. Vielen Dank!"}
+                    </span>
+                  </div>
+                  {familieOffen > 0 && (
+                    <button
+                      onClick={() => setReiter("konto")}
+                      className="mt-4 flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-white text-[14px] font-semibold text-tinte transition active:scale-[.99]"
+                    >
+                      Kontodaten und Verwendungszweck
+                    </button>
+                  )}
+                </section>
+
                 {kinder.map((kind) => (
                   <KindKarte
                     key={kind.id}
@@ -102,17 +157,24 @@ export function ElternApp() {
         {reiter === "konto" && <KontoTab kinder={kinder} />}
       </main>
 
-      <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-slate-200 bg-white/95 backdrop-blur dark:border-slate-800 dark:bg-slate-900/95">
+      <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-papier-linie bg-white/95 backdrop-blur dark:border-slate-800 dark:bg-slate-900/95 lg:hidden">
         <div className="mx-auto flex max-w-3xl">
           {NAV.map((n) => (
             <button
               key={n.key}
               onClick={() => setReiter(n.key)}
-              className={`flex flex-1 flex-col items-center gap-0.5 py-2.5 text-[11px] font-bold transition ${
-                reiter === n.key ? "text-brand" : "text-slate-400"
+              className={`relative flex flex-1 flex-col items-center gap-0.5 py-2.5 text-[11px] font-bold transition ${
+                reiter === n.key ? "text-brand" : "text-tinte-leise"
               }`}
             >
-              <span className="text-lg leading-none">{n.icon}</span>
+              <span className="relative flex h-[21px] items-center leading-none">
+                <Icon name={n.icon} size={20} />
+                {Boolean(n.zahl) && (
+                  <span className="absolute -right-2.5 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+                    {n.zahl}
+                  </span>
+                )}
+              </span>
               {n.label}
             </button>
           ))}
@@ -141,34 +203,34 @@ function KindKarte({
   return (
     <div className="grid gap-3">
       <div className="flex items-baseline gap-2 px-1">
-        <h2 className="text-xl font-extrabold">{kind.vorname} {kind.nachname}</h2>
+        <h2 className="font-zahl text-xl font-extrabold tracking-tight">
+          {kind.vorname} {kind.nachname}
+        </h2>
       </div>
 
-      {/* offener Betrag */}
-      <section className="card p-5">
-        <div className="text-sm text-slate-500">Noch offen für die Stufenkasse</div>
-        <div className={`mt-0.5 text-4xl font-extrabold leading-none ${offen > 0 ? "text-amber-500" : "text-emerald-500"}`}>
-          {offen} €
-        </div>
-        <div className="mt-1 text-[13px] text-slate-500">
-          {offen > 0
-            ? "Wie Sie das überweisen, steht im Reiter Konto."
-            : "Alles bezahlt. Vielen Dank!"}
+      {/* Halbjahre und Betrag dieses Kindes */}
+      <section className="card p-4 sm:p-5">
+        <div className="flex items-baseline justify-between gap-2">
+          <div className="text-[13px] font-semibold text-tinte-matt">Halbjahre</div>
+          <div className="text-[13px]">
+            <span className={`zahl font-bold ${offen > 0 ? "text-offen" : "text-bezahlt"}`}>{offen} €</span>
+            <span className="ml-1 text-tinte-leise">offen</span>
+          </div>
         </div>
 
-        <div className="mt-4 flex gap-1.5">
+        <div className="mt-3 flex gap-1.5">
           {HY.map((h, i) => (
             <TermChip key={h} student={kind} h={h} i={i} current={settings.aktuelles_halbjahr} />
           ))}
         </div>
         <div className="mt-1.5 flex gap-1.5">
           {HY.map((h) => (
-            <div key={h} className="flex-1 basis-0 text-center text-[11px] font-semibold text-slate-400">
+            <div key={h} className="zahl flex-1 basis-0 text-center text-[11px] font-semibold text-tinte-leise">
               {beitragFuer(h, settings)} €
             </div>
           ))}
         </div>
-        <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-slate-400">
+        <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-tinte-leise">
           <span>✓ bezahlt</span>
           <span>€ noch offen</span>
           <span>/ erlassen</span>
@@ -179,10 +241,10 @@ function KindKarte({
       <div className="grid gap-3 lg:grid-cols-2">
         {/* Prozentstand */}
         <section className="card p-5">
-          <div className="text-sm text-slate-500">Mithelfen beim Abiball</div>
+          <div className="text-sm text-tinte-matt">Mithelfen beim Abiball</div>
           <div className="mt-2 flex items-center gap-4">
             <Ring pct={pct} />
-            <div className="min-w-0 flex-1 text-[13px] leading-relaxed text-slate-600 dark:text-slate-300">
+            <div className="min-w-0 flex-1 text-[13px] leading-relaxed text-tinte-matt dark:text-slate-300">
               Wer bei Aktionen der Stufe mithilft, sammelt Prozent. Je mehr Prozent, desto günstiger
               wird das erste Abiballticket.
             </div>
@@ -201,7 +263,7 @@ function KindKarte({
                       ? "bg-brand text-white"
                       : erreicht
                         ? "bg-brand/15 text-brand"
-                        : "bg-slate-100 text-slate-400 dark:bg-slate-800"
+                        : "bg-papier-matt text-tinte-leise dark:bg-slate-800"
                   }`}
                 >
                   <div className="text-[12px] font-extrabold leading-none">{stufe.ab}%</div>
@@ -212,7 +274,7 @@ function KindKarte({
               );
             })}
           </div>
-          <div className="mt-1.5 text-[11px] text-slate-400">
+          <div className="mt-1.5 text-[11px] text-tinte-leise">
             So viel kommt beim ersten Ticket dazu.
           </div>
         </section>
@@ -221,7 +283,7 @@ function KindKarte({
       </div>
 
       <section className="card p-5">
-        <div className="text-sm text-slate-500">Wobei {kind.vorname} geholfen hat</div>
+        <div className="text-sm text-tinte-matt">Wobei {kind.vorname} geholfen hat</div>
         <BeitragsListe
           eintraege={eintraege}
           leerText={`Bisher ist nichts eingetragen. Sobald ${kind.vorname} mithilft, erscheint es hier.`}

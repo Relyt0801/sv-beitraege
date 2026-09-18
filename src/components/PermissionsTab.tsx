@@ -89,15 +89,15 @@ export function PermissionsTab() {
 
   if (!loaded)
     return (
-      <div className="flex flex-col items-center gap-4 py-24 text-slate-400">
-        <div className="h-9 w-9 animate-spin rounded-full border-[3px] border-slate-300 border-t-brand dark:border-slate-700 dark:border-t-brand" />
+      <div className="flex flex-col items-center gap-4 py-24 text-tinte-leise">
+        <div className="h-9 w-9 animate-spin rounded-full border-[3px] border-papier-linie border-t-brand dark:border-slate-700 dark:border-t-brand" />
         <div className="text-sm font-medium">Berechtigungen werden geladen …</div>
       </div>
     );
 
   return (
     <div className="space-y-5">
-      <p className="text-sm text-slate-400">Rechte gelten pro Rolle. Für einzelne Personen kannst du unten Ausnahmen setzen, die gehen dann vor. Der Admin hat immer alle Rechte.</p>
+      <p className="text-sm text-tinte-leise">Rechte gelten pro Rolle. Für einzelne Personen kannst du unten Ausnahmen setzen, die gehen dann vor. Der Admin hat immer alle Rechte.</p>
 
       {kategorien.map((cat) => (
         <section key={cat.label} className="card p-4">
@@ -106,7 +106,7 @@ export function PermissionsTab() {
             {cat.perms.map((perm) => (
               <div key={perm.key}>
                 <div className="text-[15px] font-semibold">{perm.label}</div>
-                <div className="mb-1.5 text-[11px] leading-snug text-slate-400">{perm.desc}</div>
+                <div className="mb-1.5 text-[11px] leading-snug text-tinte-leise">{perm.desc}</div>
                 <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-5">
                   {PERM_ROLES.map((r) => {
                     const on = !!roleMatrix[r.key]?.[perm.key];
@@ -118,7 +118,7 @@ export function PermissionsTab() {
                         onClick={() => toggleRole(r.key, perm.key)}
                         aria-label={`${perm.label} für ${r.label}`}
                         className={`flex min-w-0 items-center justify-center gap-1 rounded-lg border px-1 py-2 text-center text-[11px] font-bold leading-tight transition ${
-                          on ? "border-brand bg-brand text-white" : "border-slate-200 text-slate-500 dark:border-slate-700"
+                          on ? "border-brand bg-brand text-white" : "border-papier-linie text-tinte-matt dark:border-slate-700"
                         } ${locked ? "opacity-60" : ""}`}
                       >
                         <span className="truncate">{ROLLE_KURZ[r.key] ?? r.label}</span>
@@ -135,7 +135,7 @@ export function PermissionsTab() {
 
       <section className="card p-4">
         <h3 className="font-bold">Einzelne Personen</h3>
-        <p className="mb-3 text-[11px] text-slate-400">Ausnahmen für eine Person. Ohne Auswahl gilt, was die Rolle erlaubt.</p>
+        <p className="mb-3 text-[11px] text-tinte-leise">Ausnahmen für eine Person. Ohne Auswahl gilt, was die Rolle erlaubt.</p>
         <Suchfeld wert={q} onChange={setQ} platzhalter="Person oder Konto suchen …" />
         <div className="space-y-2">
           {rows.map(({ p }) => {
@@ -143,7 +143,7 @@ export function PermissionsTab() {
             const count = Object.keys(ov).length;
             const geschuetzt = Boolean(p.is_op) || p.user_id === opUserId;
             return (
-              <div key={p.user_id} className="rounded-xl border border-slate-200 dark:border-slate-700">
+              <div key={p.user_id} className="rounded-xl border border-papier-linie dark:border-slate-700">
                 <button onClick={() => setOpenUser(openUser === p.user_id ? null : p.user_id)} className="w-full p-3 text-left">
                   <KontoZeile
                     profil={p}
@@ -155,16 +155,16 @@ export function PermissionsTab() {
                             {count} Ausnahme{count > 1 ? "n" : ""}
                           </span>
                         )}
-                        <span className="text-slate-400">{openUser === p.user_id ? "▴" : "▾"}</span>
+                        <span className="text-tinte-leise">{openUser === p.user_id ? "▴" : "▾"}</span>
                       </span>
                     }
                   />
                 </button>
                 {openUser === p.user_id && (
-                  <div className="space-y-4 border-t border-slate-100 p-3 dark:border-slate-800">
+                  <div className="space-y-4 border-t border-papier-linie p-3 dark:border-slate-800">
                     {kategorien.map((cat) => (
                       <div key={cat.label}>
-                        <div className="mb-1.5 text-[11px] font-bold uppercase tracking-wide text-slate-400">
+                        <div className="mb-1.5 text-[11px] font-bold uppercase tracking-wide text-tinte-leise">
                           {cat.icon} {cat.label}
                         </div>
                         <div className="space-y-2.5">
@@ -198,7 +198,7 @@ export function PermissionsTab() {
               </div>
             );
           })}
-          {rows.length === 0 && <div className="py-8 text-center text-sm text-slate-400">Keine Person gefunden.</div>}
+          {rows.length === 0 && <div className="py-8 text-center text-sm text-tinte-leise">Keine Person gefunden.</div>}
         </div>
       </section>
 
@@ -214,7 +214,7 @@ function TriBtn({ active, label, onClick, tone }: { active: boolean; label: stri
       : tone === "red"
         ? "border-red-300 bg-red-500/10 text-red-500"
         : "border-brand bg-brand text-white"
-    : "border-slate-200 text-slate-500 dark:border-slate-700";
+    : "border-papier-linie text-tinte-matt dark:border-slate-700";
   return (
     <button
       onClick={onClick}

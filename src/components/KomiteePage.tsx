@@ -38,20 +38,20 @@ export function KomiteePage({ topic, onBack }: { topic: Topic; onBack: () => voi
 
   return (
     <div>
-      <div className="sticky top-[52px] z-10 -mx-3 flex items-center gap-2 border-b border-slate-200 bg-slate-50/95 px-3 py-2 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95 sm:-mx-5 sm:px-5">
+      <div className="sticky top-[52px] z-10 -mx-3 flex items-center gap-2 border-b border-papier-linie bg-papier-matt/95 px-3 py-2 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95 sm:-mx-5 sm:px-5">
         <button className="iconbtn" onClick={onBack} aria-label="Zurück">‹</button>
         <span className="text-xl">{icon}</span>
         <div className="min-w-0 flex-1 truncate text-[17px] font-bold">{titel}</div>
-        <div className="flex gap-1 rounded-xl bg-slate-100 p-1 dark:bg-slate-800">
+        <div className="flex gap-1 rounded-xl bg-papier-matt p-1 dark:bg-slate-800">
           <button
             onClick={() => setTab("uebersicht")}
-            className={`rounded-lg px-2.5 py-1 text-xs font-bold ${tab === "uebersicht" ? "bg-white text-brand shadow-card dark:bg-slate-900" : "text-slate-500"}`}
+            className={`rounded-lg px-2.5 py-1 text-xs font-bold ${tab === "uebersicht" ? "bg-white text-brand shadow-card dark:bg-slate-900" : "text-tinte-matt"}`}
           >
             Übersicht
           </button>
           <button
             onClick={() => setTab("chat")}
-            className={`rounded-lg px-2.5 py-1 text-xs font-bold ${tab === "chat" ? "bg-white text-brand shadow-card dark:bg-slate-900" : "text-slate-500"}`}
+            className={`rounded-lg px-2.5 py-1 text-xs font-bold ${tab === "chat" ? "bg-white text-brand shadow-card dark:bg-slate-900" : "text-tinte-matt"}`}
           >
             Chat
           </button>
@@ -74,7 +74,7 @@ export function KomiteePage({ topic, onBack }: { topic: Topic; onBack: () => voi
                   <PersonName userId={p.created_by} name={p.author} role={p.author_role} koms={p.author_koms} className="text-[11px] font-semibold" />
                 </div>
                 {(p.created_by === uid || darfLoeschen) && (
-                  <button onClick={() => confirm("Loslösen?") && updateItem(p.id, { pinned: false })} className="text-slate-400">
+                  <button onClick={() => confirm("Loslösen?") && updateItem(p.id, { pinned: false })} className="text-tinte-leise">
                     ✕
                   </button>
                 )}
@@ -97,12 +97,12 @@ export function KomiteePage({ topic, onBack }: { topic: Topic; onBack: () => voi
               >
                 <span
                   className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border-2 text-sm text-white ${
-                    t.done ? "border-emerald-500 bg-emerald-500" : "border-slate-300 dark:border-slate-600"
+                    t.done ? "border-emerald-500 bg-emerald-500" : "border-papier-linie dark:border-slate-600"
                   }`}
                 >
                   {t.done ? "✓" : ""}
                 </span>
-                <span className={`min-w-0 flex-1 text-[15px] ${t.done ? "text-slate-400 line-through" : "font-semibold"}`}>
+                <span className={`min-w-0 flex-1 text-[15px] ${t.done ? "text-tinte-leise line-through" : "font-semibold"}`}>
                   {t.body}
                 </span>
                 <PersonName userId={t.created_by} name={t.author} role={t.author_role} koms={t.author_koms} className="shrink-0 text-[11px] font-semibold" />
@@ -117,7 +117,7 @@ export function KomiteePage({ topic, onBack }: { topic: Topic; onBack: () => voi
       )}
 
       {tab === "uebersicht" && !banned && (
-        <div className="fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+3.6rem)] z-30 border-t border-slate-200 bg-slate-50/95 px-3 py-2 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95 sm:px-5">
+        <div className="fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+3.6rem)] z-30 border-t border-papier-linie bg-papier-matt/95 px-3 py-2 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95 sm:px-5">
           <div className="mx-auto grid max-w-5xl grid-cols-3 gap-2">
             <NeuKnopf icon="📌" label="Anpinnen" onClick={() => setNeu("pin")} />
             <NeuKnopf icon="🗳️" label="Abstimmung" onClick={() => setNeu("umfrage")} />
@@ -151,10 +151,10 @@ function Abschnitt({
   const hat = Array.isArray(children) ? children.length > 0 : Boolean(children);
   return (
     <section>
-      <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-400">
+      <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-tinte-leise">
         {icon} {titel}
       </h3>
-      {hat ? <div className="grid gap-2 lg:grid-cols-2">{children}</div> : <p className="text-sm text-slate-400">{leer}</p>}
+      {hat ? <div className="grid gap-2 lg:grid-cols-2">{children}</div> : <p className="text-sm text-tinte-leise">{leer}</p>}
     </section>
   );
 }
@@ -189,7 +189,7 @@ function UmfrageKarte({
       <div className="flex items-start gap-2">
         <div className="min-w-0 flex-1">
           <div className="text-[15px] font-bold">{item.body}</div>
-          <div className="mt-0.5 flex flex-wrap gap-1.5 text-[11px] text-slate-400">
+          <div className="mt-0.5 flex flex-wrap gap-1.5 text-[11px] text-tinte-leise">
             <span>{item.poll_multi ? "Mehrfachwahl" : "Einfachwahl"}</span>
             <span>·</span>
             <span>{item.poll_anon ? "anonym" : "nicht anonym"}</span>
@@ -203,12 +203,12 @@ function UmfrageKarte({
             )}
           </div>
         </div>
-        <span className="flex shrink-0 items-center gap-1.5 text-[11px] text-slate-400">
+        <span className="flex shrink-0 items-center gap-1.5 text-[11px] text-tinte-leise">
           <Avatar userId={item.created_by} name={item.author} size={20} />
           <PersonName userId={item.created_by} name={item.author} role={item.author_role} koms={item.author_koms} className="font-semibold" />
         </span>
         {kannLoeschen && (
-          <button onClick={() => confirm("Abstimmung löschen?") && onDelete()} className="shrink-0 text-slate-400">
+          <button onClick={() => confirm("Abstimmung löschen?") && onDelete()} className="shrink-0 text-tinte-leise">
             🗑
           </button>
         )}
@@ -228,16 +228,16 @@ function UmfrageKarte({
               disabled={abgelaufen}
               onClick={() => vote(item.id, o.id, item.poll_multi)}
               className={`relative overflow-hidden rounded-xl border px-3 py-2 text-left transition disabled:opacity-60 ${
-                gewaehlt ? "border-brand" : "border-slate-200 dark:border-slate-700"
+                gewaehlt ? "border-brand" : "border-papier-linie dark:border-slate-700"
               }`}
             >
               <div className="absolute inset-y-0 left-0 bg-brand/10" style={{ width: `${pct}%` }} />
               <div className="relative flex items-center gap-2">
-                <span className={`flex h-4 w-4 shrink-0 items-center justify-center text-[10px] text-white ${item.poll_multi ? "rounded" : "rounded-full"} ${gewaehlt ? "bg-brand" : "border border-slate-300 dark:border-slate-600"}`}>
+                <span className={`flex h-4 w-4 shrink-0 items-center justify-center text-[10px] text-white ${item.poll_multi ? "rounded" : "rounded-full"} ${gewaehlt ? "bg-brand" : "border border-papier-linie dark:border-slate-600"}`}>
                   {gewaehlt ? "✓" : ""}
                 </span>
                 <span className="min-w-0 flex-1 truncate text-[14px] font-semibold">{o.label}</span>
-                <span className="shrink-0 text-[12px] text-slate-500">{n}</span>
+                <span className="shrink-0 text-[12px] text-tinte-matt">{n}</span>
               </div>
               {zeigeWaehler
                 ? waehler.length > 0 && (
@@ -248,7 +248,7 @@ function UmfrageKarte({
                         </span>
                       ))}
                       {waehler.length > 12 && (
-                        <span className="ml-1 text-[11px] font-semibold text-slate-400">+{waehler.length - 12}</span>
+                        <span className="ml-1 text-[11px] font-semibold text-tinte-leise">+{waehler.length - 12}</span>
                       )}
                     </div>
                   )
@@ -259,20 +259,20 @@ function UmfrageKarte({
                         <span key={i} style={{ marginLeft: i === 0 ? -24 : -8 }} className="relative">
                           <span
                             style={{ width: 22, height: 22 }}
-                            className="flex items-center justify-center rounded-full bg-slate-300 text-[10px] font-extrabold leading-none text-slate-500 ring-2 ring-white dark:bg-slate-600 dark:text-slate-300 dark:ring-slate-900"
+                            className="flex items-center justify-center rounded-full bg-slate-300 text-[10px] font-extrabold leading-none text-tinte-matt ring-2 ring-white dark:bg-slate-600 dark:text-slate-300 dark:ring-slate-900"
                           >
                             ?
                           </span>
                         </span>
                       ))}
-                      {n > 12 && <span className="ml-1 text-[11px] font-semibold text-slate-400">+{n - 12}</span>}
+                      {n > 12 && <span className="ml-1 text-[11px] font-semibold text-tinte-leise">+{n - 12}</span>}
                     </div>
                   )}
             </button>
           );
         })}
       </div>
-      <div className="mt-1.5 text-[11px] text-slate-400">{gesamt} Stimme{gesamt === 1 ? "" : "n"}</div>
+      <div className="mt-1.5 text-[11px] text-tinte-leise">{gesamt} Stimme{gesamt === 1 ? "" : "n"}</div>
     </div>
   );
 }
@@ -299,7 +299,7 @@ function ChatBereich({
   return (
     <div className="flex flex-col">
       <div className="space-y-2.5 py-3 pb-28">
-        {liste.length === 0 && <p className="py-12 text-center text-sm text-slate-400">Noch keine Nachricht.</p>}
+        {liste.length === 0 && <p className="py-12 text-center text-sm text-tinte-leise">Noch keine Nachricht.</p>}
         {liste.map((m) => {
           const meins = m.created_by === uid;
           return (
@@ -315,7 +315,7 @@ function ChatBereich({
                   aufFarbig={meins}
                 />
                 <div className="whitespace-pre-wrap break-words text-[15px] leading-snug">{m.body}</div>
-                <div className={`mt-1 text-right text-[10px] ${meins ? "text-white/70" : "text-slate-400"}`}>
+                <div className={`mt-1 text-right text-[10px] ${meins ? "text-white/70" : "text-tinte-leise"}`}>
                   {new Date(m.created_at).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })}
                   {(meins || darfLoeschen) && (
                     <button onClick={() => confirm("Nachricht löschen?") && deleteItem(m.id)} className="ml-2 underline">
@@ -331,7 +331,7 @@ function ChatBereich({
       </div>
 
       {!banned && (
-        <div className="fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+3.6rem)] z-30 flex items-end gap-2 border-t border-slate-200 bg-slate-50/95 px-3 py-2 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95 sm:px-5">
+        <div className="fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+3.6rem)] z-30 flex items-end gap-2 border-t border-papier-linie bg-papier-matt/95 px-3 py-2 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95 sm:px-5">
           <textarea
             rows={1}
             className="field max-h-28 flex-1 resize-none py-2.5"
@@ -406,13 +406,13 @@ function NeuSheet({ art, onClose, onSave }: { art: Neu; onClose: () => void; onS
         value={text}
         onChange={(e) => setText(e.target.value)}
       />
-      <div className="mb-3 text-right text-[11px] text-slate-400">
+      <div className="mb-3 text-right text-[11px] text-tinte-leise">
         {text.length} / {maxLen}
       </div>
 
       {art === "umfrage" && (
         <>
-          <div className="mb-2 text-sm font-semibold text-slate-500">Antworten</div>
+          <div className="mb-2 text-sm font-semibold text-tinte-matt">Antworten</div>
           {optionen.map((o, i) => (
             <input
               key={i}
@@ -426,14 +426,14 @@ function NeuSheet({ art, onClose, onSave }: { art: Neu; onClose: () => void; onS
             ＋ Antwort
           </button>
 
-          <div className="mb-4 grid gap-2 rounded-2xl bg-slate-100 p-3 dark:bg-slate-800/70">
+          <div className="mb-4 grid gap-2 rounded-2xl bg-papier-matt p-3 dark:bg-slate-800/70">
             <Schalter label="Mehrfachauswahl erlauben" on={multi} set={setMulti} />
             <Schalter label="Anonym abstimmen" on={anon} set={setAnon} />
             <label className="flex items-center gap-2 text-sm">
-              <span className="flex-1 text-slate-600 dark:text-slate-300">Frist (optional)</span>
+              <span className="flex-1 text-tinte-matt dark:text-slate-300">Frist (optional)</span>
               <input
                 type="datetime-local"
-                className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-900"
+                className="rounded-lg border border-papier-linie bg-white px-2 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-900"
                 value={frist}
                 onChange={(e) => setFrist(e.target.value)}
               />
@@ -465,10 +465,10 @@ function NeuSheet({ art, onClose, onSave }: { art: Neu; onClose: () => void; onS
 function Schalter({ label, on, set }: { label: string; on: boolean; set: (v: boolean) => void }) {
   return (
     <button onClick={() => set(!on)} className="flex items-center gap-2 text-left text-sm">
-      <span className={`flex h-5 w-5 items-center justify-center rounded border text-[11px] text-white ${on ? "border-brand bg-brand" : "border-slate-300 dark:border-slate-600"}`}>
+      <span className={`flex h-5 w-5 items-center justify-center rounded border text-[11px] text-white ${on ? "border-brand bg-brand" : "border-papier-linie dark:border-slate-600"}`}>
         {on ? "✓" : ""}
       </span>
-      <span className="text-slate-600 dark:text-slate-300">{label}</span>
+      <span className="text-tinte-matt dark:text-slate-300">{label}</span>
     </button>
   );
 }

@@ -31,11 +31,11 @@ export function KomiteeRequests() {
               <div className="text-[15px] font-bold">
                 Komitee-Wunsch {profile[r.user_id]?.anzeigename || ""}
               </div>
-              <div className="mt-0.5 text-[13px] text-slate-600 dark:text-slate-300">
+              <div className="mt-0.5 text-[13px] text-tinte-matt dark:text-slate-300">
                 möchte zu {committeeIcon(r.wunsch_tag)} <b>{committeeLabel(r.wunsch_tag)}</b>
                 {r.nachricht ? ` – „${r.nachricht}"` : ""}
               </div>
-              <div className="mt-1 text-[11px] text-slate-400">{new Date(r.created_at).toLocaleString("de-DE")}</div>
+              <div className="mt-1 text-[11px] text-tinte-leise">{new Date(r.created_at).toLocaleString("de-DE")}</div>
             </div>
           </div>
           <div className="mt-3 flex gap-2">
@@ -48,7 +48,7 @@ export function KomiteeRequests() {
                 if (!res.ok) alert("Fehler: " + res.error);
                 laden();
               }}
-              className="flex-1 rounded-xl border border-slate-200 py-2 text-sm font-bold text-slate-500 dark:border-slate-700"
+              className="flex-1 rounded-xl border border-papier-linie py-2 text-sm font-bold text-tinte-matt dark:border-slate-700"
             >
               Ablehnen
             </button>

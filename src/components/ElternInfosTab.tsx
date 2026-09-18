@@ -8,7 +8,7 @@ import { datumLang } from "./BeitragsListe";
  * darunter die eigenen Anfragen ans Stufenteam.
  */
 export function ElternInfosTab() {
-  const { infos, tickets, nachrichten, neuesTicket, antworten, bereit } = useEltern();
+  const { infos, tickets, nachrichten, neuesTicket, antworten, alsGelesen, bereit } = useEltern();
   const { role, uid } = useRole();
   const istEltern = role === "eltern";
   const [betreff, setBetreff] = useState("");
@@ -18,6 +18,14 @@ export function ElternInfosTab() {
   const [offenesTicket, setOffenesTicket] = useState<string | null>(null);
 
   const meine = istEltern ? tickets.filter((t) => t.user_id === uid) : tickets;
+
+  /** Steht in diesem Gespräch etwas, das ich noch nicht gesehen habe? */
+  const neu = (t: (typeof tickets)[number]) => {
+    const fremd = nachrichten.filter((n) => n.ticket_id === t.id && n.user_id !== uid);
+    if (!fremd.length) return false;
+    const gesehen = istEltern ? t.gelesen_eltern : t.gelesen_team;
+    return !gesehen || fremd[fremd.length - 1].created_at > gesehen;
+  };
 
   async function absenden() {
     if (!betreff.trim() || !text.trim()) return;
@@ -39,9 +47,9 @@ export function ElternInfosTab() {
       <section className="card p-5">
         <h2 className="text-lg font-bold">Vom Stufenteam</h2>
         {!bereit ? (
-          <p className="mt-2 text-[13px] text-slate-400">Wird geladen …</p>
+          <p className="mt-2 text-[13px] text-tinte-leise">Wird geladen …</p>
         ) : infos.length === 0 ? (
-          <p className="mt-2 text-[13px] text-slate-400">
+          <p className="mt-2 text-[13px] text-tinte-leise">
             Hier steht noch nichts. Sobald es Neuigkeiten gibt, finden Sie sie an dieser Stelle.
           </p>
         ) : (
@@ -52,15 +60,15 @@ export function ElternInfosTab() {
                 className={`rounded-2xl border p-3.5 ${
                   i.angeheftet
                     ? "border-brand/40 bg-brand/5"
-                    : "border-slate-200 dark:border-slate-700"
+                    : "border-papier-linie dark:border-slate-700"
                 }`}
               >
                 <div className="flex items-baseline gap-2">
                   {i.angeheftet && <span className="text-[12px]">📌</span>}
                   <h3 className="min-w-0 flex-1 text-[15px] font-bold">{i.titel}</h3>
-                  <span className="shrink-0 text-[11px] text-slate-400">{datumLang(i.created_at.slice(0, 10))}</span>
+                  <span className="shrink-0 text-[11px] text-tinte-leise">{datumLang(i.created_at.slice(0, 10))}</span>
                 </div>
-                <p className="mt-1 whitespace-pre-wrap text-[13px] leading-relaxed text-slate-600 dark:text-slate-300">
+                <p className="mt-1 whitespace-pre-wrap text-[13px] leading-relaxed text-tinte-matt dark:text-slate-300">
                   {i.text}
                 </p>
               </li>
@@ -72,7 +80,7 @@ export function ElternInfosTab() {
       {/* ------------------------------------------- eigene Anfragen */}
       <section className="card p-5">
         <h2 className="text-lg font-bold">Eine Frage ans Stufenteam</h2>
-        <p className="mt-0.5 text-[13px] leading-relaxed text-slate-500 dark:text-slate-400">
+        <p className="mt-0.5 text-[13px] leading-relaxed text-tinte-matt dark:text-slate-400">
           Schreiben Sie uns. Wir antworten hier in der App, Sie finden die Antwort dann weiter unten.
         </p>
 
@@ -102,20 +110,27 @@ export function ElternInfosTab() {
 
       {meine.length > 0 && (
         <section className="card p-5">
-          <h2 className="text-lg font-bold">Ihre Anfragen</h2>
+          <h2 className="text-lg font-bold">Ihre Gespräche mit dem Stufenteam</h2>
           <ul className="mt-3 grid gap-2">
             {meine.map((t) => {
               const verlauf = nachrichten.filter((n) => n.ticket_id === t.id);
               const auf = offenesTicket === t.id;
               return (
-                <li key={t.id} className="rounded-2xl border border-slate-200 dark:border-slate-700">
+                <li key={t.id} className="rounded-2xl border border-papier-linie dark:border-slate-700">
                   <button
-                    onClick={() => setOffenesTicket(auf ? null : t.id)}
+                    onClick={() => {
+                      const jetztOffen = auf ? null : t.id;
+                      setOffenesTicket(jetztOffen);
+                      if (jetztOffen) alsGelesen(t.id);
+                    }}
                     className="flex w-full items-center gap-2 p-3.5 text-left"
                   >
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[15px] font-bold">{t.betreff}</span>
-                      <span className="block text-[11px] text-slate-400">
+                      <span className="block truncate text-[15px] font-bold">
+                        {neu(t) && <span className="mr-1.5 inline-block h-2 w-2 rounded-full bg-red-500 align-middle" />}
+                        {t.betreff}
+                      </span>
+                      <span className="block text-[11px] text-tinte-leise">
                         {verlauf.length} {verlauf.length === 1 ? "Nachricht" : "Nachrichten"} ·{" "}
                         {datumLang(t.created_at.slice(0, 10))}
                       </span>
@@ -129,22 +144,22 @@ export function ElternInfosTab() {
                         offen
                       </span>
                     )}
-                    <span className="shrink-0 text-slate-400">{auf ? "▾" : "▸"}</span>
+                    <span className="shrink-0 text-tinte-leise">{auf ? "▾" : "▸"}</span>
                   </button>
 
                   {auf && (
-                    <div className="border-t border-slate-200 p-3.5 dark:border-slate-700">
+                    <div className="border-t border-papier-linie p-3.5 dark:border-slate-700">
                       <ul className="grid gap-2">
                         {verlauf.map((n) => (
                           <li
                             key={n.id}
                             className={`rounded-xl px-3 py-2 text-[13px] leading-relaxed ${
                               n.user_id === uid
-                                ? "bg-brand/10 text-slate-700 dark:text-slate-200"
-                                : "bg-slate-100 dark:bg-slate-800"
+                                ? "bg-brand/10 text-tinte dark:text-slate-200"
+                                : "bg-papier-matt dark:bg-slate-800"
                             }`}
                           >
-                            <div className="mb-0.5 text-[11px] font-semibold text-slate-400">
+                            <div className="mb-0.5 text-[11px] font-semibold text-tinte-leise">
                               {n.user_id === uid ? "Sie" : "Stufenteam"}
                             </div>
                             <div className="whitespace-pre-wrap">{n.text}</div>

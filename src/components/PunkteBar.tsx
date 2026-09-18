@@ -38,10 +38,10 @@ export function PunkteBar({
         >
           {pct} %
         </span>
-        <span className={`${compact ? "text-[13px]" : "text-sm"} text-slate-500 dark:text-slate-400`}>
+        <span className={`${compact ? "text-[13px]" : "text-sm"} text-tinte-matt dark:text-slate-400`}>
           dein erstes Ticket kostet {betrag} €
         </span>
-        {onClick && <span className="ml-auto text-sm text-slate-400">ansehen ›</span>}
+        {onClick && <span className="ml-auto text-sm text-tinte-leise">ansehen ›</span>}
       </div>
 
       <div className="relative mt-1.5 h-2.5 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
@@ -76,8 +76,8 @@ export function StufenHinweis({ pct, settings }: { pct: number; settings: Settin
       </div>
     );
   return (
-    <div className="mt-1.5 text-[12px] text-slate-500 dark:text-slate-400">
-      Noch <b className="text-slate-700 dark:text-slate-200">{next.fehlt} %</b> bis {next.ab} Prozent. Dann
+    <div className="mt-1.5 text-[12px] text-tinte-matt dark:text-slate-400">
+      Noch <b className="text-tinte dark:text-slate-200">{next.fehlt} %</b> bis {next.ab} Prozent. Dann
       kostet das erste Ticket nur noch {grund + next.betrag} €, also {next.spart} € weniger.
     </div>
   );
@@ -97,7 +97,7 @@ export function StaffelTabelle({ settings, pct }: { settings: Settings; pct?: nu
             className={`rounded-lg px-2 py-1 text-[12px] font-semibold ${
               ist
                 ? "bg-brand text-white"
-                : "bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300"
+                : "bg-slate-200 text-tinte-matt dark:bg-slate-700 dark:text-slate-300"
             }`}
           >
             {x.ab} % → {(settings.ticket_preis || 0) + x.betrag} €

@@ -6,8 +6,9 @@ import type { Student } from "../lib/types";
 
 /**
  * IBAN in Viererblöcken, so wie man sie auf Papier schreibt.
- * DE27428616080100548701 wird zu DE27 4286 1608 0100 5487 01 – das liest sich
+ * DE00123456781234567890 wird zu DE00 1234 5678 1234 5678 90 – das liest sich
  * besser und bricht auf schmalen Bildschirmen an sinnvollen Stellen um.
+ * Die echten Kontodaten stehen nur in der Datenbank, nie hier im Code.
  */
 export function ibanLesbar(iban: string): string {
   return (iban || "").replace(/\s+/g, "").replace(/(.{4})/g, "$1 ").trim();
@@ -33,12 +34,12 @@ export function KontoTab({ kinder }: { kinder: Student[] }) {
 
   if (!konto)
     return (
-      <div className="card p-6 text-center text-sm text-slate-500">Die Kontodaten werden geladen …</div>
+      <div className="card p-6 text-center text-sm text-tinte-matt">Die Kontodaten werden geladen …</div>
     );
 
   if (!konto.iban)
     return (
-      <div className="card p-6 text-center text-sm text-slate-500">
+      <div className="card p-6 text-center text-sm text-tinte-matt">
         Es sind noch keine Kontodaten hinterlegt.
         <br />
         Das Stufenteam trägt sie in Kürze ein.
@@ -61,7 +62,7 @@ export function KontoTab({ kinder }: { kinder: Student[] }) {
     <div className="grid gap-3">
       <section className="card p-5">
         <h2 className="text-lg font-bold">So überweisen Sie</h2>
-        <p className="mt-0.5 text-[13px] leading-relaxed text-slate-500 dark:text-slate-400">
+        <p className="mt-0.5 text-[13px] leading-relaxed text-tinte-matt dark:text-slate-400">
           Bitte immer den Verwendungszweck angeben. Sonst können wir das Geld nicht zuordnen.
         </p>
 
@@ -81,21 +82,22 @@ export function KontoTab({ kinder }: { kinder: Student[] }) {
 
       <section className="card p-5">
         <h2 className="text-lg font-bold">Verwendungszweck</h2>
-        <p className="mt-0.5 text-[13px] leading-relaxed text-slate-500 dark:text-slate-400">
+        <p className="mt-0.5 text-[13px] leading-relaxed text-tinte-matt dark:text-slate-400">
           Name, Vorname und das aktuelle Halbjahr. Bei mehreren Kindern bitte für jedes Kind einzeln
           überweisen.
         </p>
 
         <ul className="mt-3 grid gap-2">
           {kinder.length === 0 && (
-            <li className="rounded-xl bg-slate-100 px-3 py-2.5 text-[14px] font-semibold dark:bg-slate-800">
-              Nachname, Vorname, {jahr}
+            <li className="rounded-xl bg-papier-matt px-3 py-2.5 text-[14px] font-semibold dark:bg-slate-800">
+              Nachname, Vorname {jahr}
             </li>
           )}
           {kinder.map((k) => {
-            const zweck = `${k.nachname}, ${k.vorname}, ${jahr}`;
+            // Kein Komma vor der Stufe: "Adams, Tyler Q2"
+            const zweck = `${k.nachname}, ${k.vorname} ${jahr}`;
             return (
-              <li key={k.id} className="flex items-center gap-2 rounded-xl bg-slate-100 px-3 py-2.5 dark:bg-slate-800">
+              <li key={k.id} className="flex items-center gap-2 rounded-xl bg-papier-matt px-3 py-2.5 dark:bg-slate-800">
                 <span className="min-w-0 flex-1 truncate text-[14px] font-semibold">{zweck}</span>
                 <button
                   onClick={() => kopieren(zweck, k.id)}
@@ -134,8 +136,8 @@ function Zeile({
   kopiert?: boolean;
 }) {
   return (
-    <div className="flex items-center gap-2 rounded-xl bg-slate-100 px-3 py-2.5 dark:bg-slate-800">
-      <dt className="w-20 shrink-0 text-[12px] font-semibold text-slate-400">{label}</dt>
+    <div className="flex items-center gap-2 rounded-xl bg-papier-matt px-3 py-2.5 dark:bg-slate-800">
+      <dt className="w-20 shrink-0 text-[12px] font-semibold text-tinte-leise">{label}</dt>
       <dd className={`min-w-0 flex-1 break-all font-semibold ${gross ? "text-[15px] tracking-wide" : "text-[14px]"}`}>
         {wert}
       </dd>
@@ -172,7 +174,7 @@ function KontoBearbeiten({
           setInfo("");
           setOffen(true);
         }}
-        className="card p-4 text-[13px] font-bold text-slate-500 transition active:scale-[.99]"
+        className="card p-4 text-[13px] font-bold text-tinte-matt transition active:scale-[.99]"
       >
         Kontodaten ändern
       </button>
@@ -181,7 +183,7 @@ function KontoBearbeiten({
   return (
     <section className="card p-5">
       <h2 className="text-lg font-bold">Kontodaten ändern</h2>
-      <p className="mt-0.5 text-[13px] text-slate-500">
+      <p className="mt-0.5 text-[13px] text-tinte-matt">
         Diese Angaben sehen alle angemeldeten Konten. Bitte sorgfältig prüfen.
       </p>
       <div className="mt-3 grid gap-2">
@@ -193,7 +195,7 @@ function KontoBearbeiten({
           ["hinweis", "Hinweis"],
         ] as const).map(([feld, label]) => (
           <label key={feld} className="grid gap-1">
-            <span className="text-[12px] font-semibold text-slate-400">{label}</span>
+            <span className="text-[12px] font-semibold text-tinte-leise">{label}</span>
             <input
               className="field"
               value={entwurf[feld]}
@@ -219,7 +221,7 @@ function KontoBearbeiten({
         </button>
         <button
           onClick={() => setOffen(false)}
-          className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-bold text-slate-500 dark:border-slate-700"
+          className="rounded-xl border border-papier-linie px-4 py-2.5 text-sm font-bold text-tinte-matt dark:border-slate-700"
         >
           Abbrechen
         </button>

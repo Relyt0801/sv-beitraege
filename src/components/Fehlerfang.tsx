@@ -30,21 +30,21 @@ export class Fehlerfang extends Component<
         <div className="card w-full max-w-sm p-6 text-center">
           <div className="text-3xl">😵</div>
           <div className="mt-2 text-lg font-bold">Da ist etwas schiefgegangen</div>
-          <p className="mt-1 text-sm text-slate-500">
+          <p className="mt-1 text-sm text-tinte-matt">
             Die Seite konnte nicht angezeigt werden. Ein Neustart hilft fast immer.
           </p>
-          <pre className="mt-3 max-h-48 overflow-auto rounded-xl bg-slate-100 p-2 text-left text-[11px] leading-relaxed text-slate-500 dark:bg-slate-800">
+          <pre className="mt-3 max-h-48 overflow-auto rounded-xl bg-papier-matt p-2 text-left text-[11px] leading-relaxed text-tinte-matt dark:bg-slate-800">
             {f.message}
             {this.state.stelle ? "\n" + this.state.stelle : ""}
           </pre>
-          <p className="mt-2 text-[11px] text-slate-400">
+          <p className="mt-2 text-[11px] text-tinte-leise">
             Bitte diesen Kasten abfotografieren – daraus lässt sich die Ursache ablesen.
           </p>
           <button className="btn-primary mt-4" onClick={() => window.location.reload()}>
             Neu laden
           </button>
           <button
-            className="mt-2 w-full text-sm font-semibold text-slate-400"
+            className="mt-2 w-full text-sm font-semibold text-tinte-leise"
             onClick={() => this.setState({ fehler: null })}
           >
             Trotzdem weiter

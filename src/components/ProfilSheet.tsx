@@ -7,6 +7,7 @@ import { useTopicsOptional } from "../topics-store";
 import { useRole } from "../auth/RoleProvider";
 import { hasSupabase, supabase } from "../lib/supabase";
 import { farbKontur, farbwert, lesbarerName, speichereProfil, waehlbareFarben } from "../lib/profil";
+import { passwortProblem } from "../lib/passwort";
 import { SELECTABLE_COMMITTEES, committeeIcon, committeeLabel, rolleUndKomitees } from "../lib/committees";
 import { ladeKomiteeAntraege, stelleKomiteeAntrag } from "../lib/komitee-antrag";
 import { useTheme } from "../lib/theme";
@@ -52,8 +53,9 @@ export function ProfilSheet({
 
   async function passwortSpeichern() {
     setPwInfo("");
-    if (pw1.length < 6) {
-      setPwInfo("Dein Passwort braucht mindestens 6 Zeichen.");
+    const problem = passwortProblem(pw1, mein?.anzeigename || "");
+    if (problem) {
+      setPwInfo(problem);
       return;
     }
     if (pw1 !== pw2) {
@@ -74,7 +76,7 @@ export function ProfilSheet({
   }
 
   const row =
-    "flex w-full items-center gap-3 rounded-xl border border-slate-200 px-4 py-3 text-left text-[15px] font-semibold transition active:scale-[.99] dark:border-slate-700";
+    "flex w-full items-center gap-3 rounded-xl border border-papier-linie px-4 py-3 text-left text-[15px] font-semibold transition active:scale-[.99] dark:border-slate-700";
 
   return (
     <Sheet open={open} onClose={onClose}>
@@ -99,7 +101,7 @@ export function ProfilSheet({
               ? mein?.anzeigename || "Ihr Zugang"
               : `${personIcon(role, meine)} | ${lesbarerName(mein?.anzeigename || "") || "Dein Name"}`}
           </div>
-          <div className="text-[12px] text-slate-400">
+          <div className="text-[12px] text-tinte-leise">
             {istEltern ? "Elternzugang" : rolleUndKomitees(role, meine) || "noch kein Komitee"}
           </div>
         </div>
@@ -108,7 +110,7 @@ export function ProfilSheet({
       {/* Farbe – bei Elternzugaengen gibt es keine, die Namen stehen neutral da. */}
       {!istEltern && (
       <>
-      <div className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-400">Farbe deines Namens</div>
+      <div className="mb-2 text-xs font-bold uppercase tracking-wide text-tinte-leise">Farbe deines Namens</div>
       <div className="mb-5 grid max-w-sm grid-cols-8 gap-2 sm:gap-2.5">
         {waehlbareFarben({ staff: isStaff, op: isOp }).map((f) => {
           const aktiv = (mein?.farbe || "indigo") === f.key;
@@ -145,7 +147,7 @@ export function ProfilSheet({
       )}
 
       {/* Benachrichtigungen */}
-      <div className="mb-5 rounded-2xl bg-slate-100 p-3 dark:bg-slate-800/70">
+      <div className="mb-5 rounded-2xl bg-papier-matt p-3 dark:bg-slate-800/70">
         <button
           onClick={async () => {
             const neu = !(mein?.push_chats ?? true);
@@ -167,7 +169,7 @@ export function ProfilSheet({
           </span>
           <span className="min-w-0 flex-1">
             <span className="block text-[15px] font-semibold">Benachrichtigungen für Chats</span>
-            <span className="block text-[12px] text-slate-500">
+            <span className="block text-[12px] text-tinte-matt">
               Nur für Chats. Mitteilungen des Stufenteams im Events-Reiter kommen immer.
             </span>
           </span>
@@ -182,10 +184,10 @@ export function ProfilSheet({
 
       {/* Komitee-Wechsel – Eltern gehoeren in kein Komitee */}
       {!isStaff && !istEltern && (
-        <div className="mb-5 rounded-2xl bg-slate-100 p-3 dark:bg-slate-800/70">
+        <div className="mb-5 rounded-2xl bg-papier-matt p-3 dark:bg-slate-800/70">
           <div className="mb-1 text-sm font-bold">Komitee wechseln</div>
           {hatAntrag ? (
-            <p className="text-[13px] text-slate-500">Dein Wunsch liegt beim Stufenteam. Sie melden sich.</p>
+            <p className="text-[13px] text-tinte-matt">Dein Wunsch liegt beim Stufenteam. Sie melden sich.</p>
           ) : antragOffen ? (
             <>
               <select
@@ -207,7 +209,7 @@ export function ProfilSheet({
                 onChange={(e) => setGrund(e.target.value)}
               />
               <div className="flex gap-2">
-                <button onClick={() => setAntragOffen(false)} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-500 dark:border-slate-600">
+                <button onClick={() => setAntragOffen(false)} className="rounded-lg border border-papier-linie px-3 py-2 text-sm font-semibold text-tinte-matt dark:border-slate-600">
                   Abbrechen
                 </button>
                 <button
@@ -227,10 +229,10 @@ export function ProfilSheet({
             </>
           ) : (
             <>
-              <p className="mb-2 text-[13px] text-slate-500">
+              <p className="mb-2 text-[13px] text-tinte-matt">
                 Das Stufenteam schaut sich deinen Wunsch an.
               </p>
-              <button onClick={() => setAntragOffen(true)} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-bold text-brand dark:border-slate-600">
+              <button onClick={() => setAntragOffen(true)} className="rounded-lg border border-papier-linie px-3 py-2 text-sm font-bold text-brand dark:border-slate-600">
                 Wechsel beantragen
               </button>
             </>
@@ -240,10 +242,10 @@ export function ProfilSheet({
 
       {/* Benachrichtigungen */}
       {hasSupabase && (
-        <div className="mb-3 rounded-2xl bg-slate-100 p-3 dark:bg-slate-800/70">
+        <div className="mb-3 rounded-2xl bg-papier-matt p-3 dark:bg-slate-800/70">
           <div className="text-sm font-bold">Benachrichtigungen aufs Gerät</div>
           {!pushConfigured() ? (
-            <p className="mt-1 text-[13px] text-slate-500">
+            <p className="mt-1 text-[13px] text-tinte-matt">
               {isStaff
                 ? "Für diese Seite ist noch kein Schlüssel hinterlegt. In der Anleitung PUSH-SETUP.md steht, wie das geht."
                 : "Hier noch nicht eingerichtet. Sag dem Stufenteam Bescheid."}
@@ -253,13 +255,13 @@ export function ProfilSheet({
               Sind an. Du bekommst Bescheid, wenn es etwas Neues gibt.
             </p>
           ) : perm === "denied" ? (
-            <p className="mt-1 text-[13px] text-slate-500">
+            <p className="mt-1 text-[13px] text-tinte-matt">
               Dein Browser blockiert sie gerade. Du kannst das in den Einstellungen deines
               Browsers wieder erlauben, dann klappt es hier sofort.
             </p>
           ) : (
             <>
-              <p className="mt-1 text-[13px] text-slate-500">
+              <p className="mt-1 text-[13px] text-tinte-matt">
                 Noch aus. Einmal antippen und du verpasst nichts mehr.
               </p>
               <button
@@ -308,7 +310,7 @@ export function ProfilSheet({
                 setPwOffen(false);
                 setPwInfo("");
               }}
-              className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-500 dark:border-slate-600"
+              className="rounded-lg border border-papier-linie px-3 py-2 text-sm font-semibold text-tinte-matt dark:border-slate-600"
             >
               Abbrechen
             </button>

@@ -21,7 +21,7 @@ export function SettingsSheet({
   const meine = committeesOf(uid);
 
   const row =
-    "flex w-full items-center gap-3 rounded-xl border border-slate-200 px-4 py-3 text-left text-[15px] font-semibold transition active:scale-[.99] dark:border-slate-700";
+    "flex w-full items-center gap-3 rounded-xl border border-papier-linie px-4 py-3 text-left text-[15px] font-semibold transition active:scale-[.99] dark:border-slate-700";
 
   return (
     <Sheet open={open} onClose={onClose}>
@@ -32,8 +32,8 @@ export function SettingsSheet({
         </button>
       </div>
 
-      <div className="mb-4 rounded-2xl bg-slate-100 p-4 dark:bg-slate-800/70">
-        <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Mein Komitee</div>
+      <div className="mb-4 rounded-2xl bg-papier-matt p-4 dark:bg-slate-800/70">
+        <div className="text-xs font-semibold uppercase tracking-wide text-tinte-matt">Mein Komitee</div>
         <div className="mt-1.5 flex flex-wrap gap-1.5">
           {meine.length ? (
             meine.map((s) => (
@@ -42,7 +42,7 @@ export function SettingsSheet({
               </span>
             ))
           ) : (
-            <span className="text-sm text-slate-500">noch keins – das Stufenteam kann dich zuordnen</span>
+            <span className="text-sm text-tinte-matt">noch keins. Das Stufenteam kann dich eintragen</span>
           )}
         </div>
       </div>

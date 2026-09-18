@@ -34,7 +34,7 @@ export function BeitraegeTab() {
       {/* ---------------- Möglichkeiten ---------------- */}
       <section className="card p-4 sm:p-5">
         <h2 className="text-lg font-bold">Wofür gibt es Prozent?</h2>
-        <p className="mt-0.5 text-[13px] leading-relaxed text-slate-500 dark:text-slate-400">
+        <p className="mt-0.5 text-[13px] leading-relaxed text-tinte-matt dark:text-slate-400">
           Diese Liste siehst du später, wenn du bei jemandem etwas einträgst. Setz einen Haken bei
           „anpassbar", wenn der Wert je nach Aufwand schwankt.
         </p>
@@ -53,13 +53,13 @@ export function BeitraegeTab() {
         <div className="mt-3 min-w-0 rounded-2xl border border-dashed border-brand/50 p-2.5">
           <div className="flex min-w-0 items-center gap-2">
             <input
-              className="w-0 min-w-0 flex-1 rounded-lg bg-slate-100 px-2.5 py-2 text-[15px] dark:bg-slate-800"
+              className="w-0 min-w-0 flex-1 rounded-lg bg-papier-matt px-2.5 py-2 text-[15px] dark:bg-slate-800"
               placeholder="Noch etwas, z. B. Fotobox betreut"
               value={titel}
               onChange={(e) => setTitel(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && anlegen()}
             />
-            <div className="flex shrink-0 items-center gap-1 rounded-lg bg-slate-100 px-2 py-1 dark:bg-slate-800">
+            <div className="flex shrink-0 items-center gap-1 rounded-lg bg-papier-matt px-2 py-1 dark:bg-slate-800">
               <input
                 type="number"
                 min={0}
@@ -85,7 +85,7 @@ export function BeitraegeTab() {
       {/* ---------------- Beitrag je Halbjahr ---------------- */}
       <section className="card h-fit p-4 sm:p-5">
         <h2 className="text-lg font-bold">Was kostet ein Halbjahr?</h2>
-        <p className="mt-0.5 text-[13px] leading-relaxed text-slate-500 dark:text-slate-400">
+        <p className="mt-0.5 text-[13px] leading-relaxed text-tinte-matt dark:text-slate-400">
           Der Betrag gilt für jede Person, die in dem Halbjahr dabei ist. Änderst du einen Wert,
           rechnen sich alle offenen Beträge sofort neu aus.
         </p>
@@ -102,8 +102,8 @@ export function BeitraegeTab() {
           ))}
         </ul>
 
-        <div className="mt-3 flex items-center justify-between rounded-2xl bg-slate-100 px-3 py-2.5 dark:bg-slate-800/70">
-          <span className="text-[13px] font-semibold text-slate-500">Alle sechs Halbjahre zusammen</span>
+        <div className="mt-3 flex items-center justify-between rounded-2xl bg-papier-matt px-3 py-2.5 dark:bg-slate-800/70">
+          <span className="text-[13px] font-semibold text-tinte-matt">Alle sechs Halbjahre zusammen</span>
           <span className="text-[15px] font-extrabold">{gesamt} €</span>
         </div>
       </section>
@@ -111,12 +111,12 @@ export function BeitraegeTab() {
       {/* ---------------- Abiballticket ---------------- */}
       <section className="card h-fit p-4 sm:p-5">
         <h2 className="text-lg font-bold">Abiballticket</h2>
-        <p className="mt-0.5 text-[13px] leading-relaxed text-slate-500 dark:text-slate-400">
+        <p className="mt-0.5 text-[13px] leading-relaxed text-tinte-matt dark:text-slate-400">
           Der Zusatzbeitrag gilt <b>nur fürs erste Ticket</b>. Jedes weitere kostet den
           Grundpreis. Es zählt immer die höchste erreichte Stufe, 60 Prozent zählen also als 50.
         </p>
 
-        <label className="mt-4 flex items-center gap-3 rounded-2xl bg-slate-100 p-3 dark:bg-slate-800/70">
+        <label className="mt-4 flex items-center gap-3 rounded-2xl bg-papier-matt p-3 dark:bg-slate-800/70">
           <span className="flex-1 text-[15px] font-semibold">Grundpreis je Ticket</span>
           <input
             type="number"
@@ -127,15 +127,15 @@ export function BeitraegeTab() {
             onChange={(e) => preis.aendern(Math.max(0, Number(e.target.value) || 0))}
             onBlur={preis.jetztSpeichern}
           />
-          <span className="text-[15px] font-bold text-slate-500">€</span>
+          <span className="text-[15px] font-bold text-tinte-matt">€</span>
         </label>
         {grund === 0 && (
-          <p className="mt-1.5 text-[12px] text-slate-400">
+          <p className="mt-1.5 text-[12px] text-tinte-leise">
             Steht 0 drin, ist der Preis noch offen. Dann sehen alle nur den Zusatzbeitrag.
           </p>
         )}
 
-        <div className="mt-4 text-xs font-semibold uppercase tracking-wide text-slate-500">
+        <div className="mt-4 text-xs font-semibold uppercase tracking-wide text-tinte-matt">
           Zusatzbeitrag je Prozentstufe
         </div>
         <ul className="mt-2 grid gap-2">
@@ -172,15 +172,15 @@ function VorlagenZeile({
   const punkte = useEntwurf(vorlage.punkte, (wert) => onAendern({ punkte: wert }));
 
   return (
-    <li className="min-w-0 rounded-2xl border border-slate-200 p-2.5 dark:border-slate-700">
+    <li className="min-w-0 rounded-2xl border border-papier-linie p-2.5 dark:border-slate-700">
       <div className="flex min-w-0 items-center gap-2">
         <input
-          className="w-0 min-w-0 flex-1 rounded-lg bg-slate-100 px-2.5 py-2 text-[15px] font-semibold dark:bg-slate-800"
+          className="w-0 min-w-0 flex-1 rounded-lg bg-papier-matt px-2.5 py-2 text-[15px] font-semibold dark:bg-slate-800"
           value={titel.wert}
           onChange={(e) => titel.aendern(e.target.value)}
           onBlur={titel.jetztSpeichern}
         />
-        <div className="flex shrink-0 items-center gap-1 rounded-lg bg-slate-100 px-2 py-1 dark:bg-slate-800">
+        <div className="flex shrink-0 items-center gap-1 rounded-lg bg-papier-matt px-2 py-1 dark:bg-slate-800">
           <input
             type="number"
             min={0}
@@ -195,13 +195,13 @@ function VorlagenZeile({
         </div>
         <button
           onClick={() => confirm(`„${vorlage.titel}" wirklich löschen?`) && onLoeschen()}
-          className="shrink-0 rounded-lg px-2 py-2 text-slate-400 transition active:scale-90"
+          className="shrink-0 rounded-lg px-2 py-2 text-tinte-leise transition active:scale-90"
           aria-label="Löschen"
         >
           🗑
         </button>
       </div>
-      <label className="mt-1.5 flex cursor-pointer items-center gap-2 pl-1 text-[12px] text-slate-500 dark:text-slate-400">
+      <label className="mt-1.5 flex cursor-pointer items-center gap-2 pl-1 text-[12px] text-tinte-matt dark:text-slate-400">
         <input
           type="checkbox"
           className="h-4 w-4 accent-brand"
@@ -227,14 +227,14 @@ function StufenZeile({
   const betrag = useEntwurf(stufe.betrag, onBetrag);
 
   return (
-    <li className="flex min-w-0 items-center gap-2 rounded-2xl border border-slate-200 px-3 py-2 dark:border-slate-700">
+    <li className="flex min-w-0 items-center gap-2 rounded-2xl border border-papier-linie px-3 py-2 dark:border-slate-700">
       <span className="shrink-0 whitespace-nowrap text-[15px] font-bold text-brand">ab {stufe.ab} %</span>
-      <span className="min-w-0 flex-1 truncate text-[13px] text-slate-500 dark:text-slate-400">
+      <span className="min-w-0 flex-1 truncate text-[13px] text-tinte-matt dark:text-slate-400">
         1. Ticket {grund + betrag.wert} €
         {grund > 0 && betrag.wert > 0 ? ` (${grund} + ${betrag.wert})` : ""}
       </span>
-      <div className="flex shrink-0 items-center gap-1 rounded-lg bg-slate-100 px-2 py-1 dark:bg-slate-800">
-        <span className="text-[13px] font-semibold text-slate-400">+</span>
+      <div className="flex shrink-0 items-center gap-1 rounded-lg bg-papier-matt px-2 py-1 dark:bg-slate-800">
+        <span className="text-[13px] font-semibold text-tinte-leise">+</span>
         <input
           type="number"
           min={0}
@@ -244,7 +244,7 @@ function StufenZeile({
           onChange={(e) => betrag.aendern(Math.max(0, Number(e.target.value) || 0))}
           onBlur={betrag.jetztSpeichern}
         />
-        <span className="text-[15px] font-bold text-slate-500">€</span>
+        <span className="text-[15px] font-bold text-tinte-matt">€</span>
       </div>
     </li>
   );
@@ -267,14 +267,14 @@ function HalbjahrZeile({
   return (
     <li
       className={`flex min-w-0 items-center gap-2 rounded-2xl border px-3 py-2 ${
-        aktuell ? "border-brand bg-brand/5" : "border-slate-200 dark:border-slate-700"
+        aktuell ? "border-brand bg-brand/5" : "border-papier-linie dark:border-slate-700"
       }`}
     >
       <span className="w-14 shrink-0 text-[15px] font-bold">{halbjahr}</span>
-      <span className="min-w-0 flex-1 truncate text-[12px] text-slate-400">
+      <span className="min-w-0 flex-1 truncate text-[12px] text-tinte-leise">
         {aktuell ? "läuft gerade" : ""}
       </span>
-      <div className="flex shrink-0 items-center gap-1 rounded-lg bg-slate-100 px-2 py-1 dark:bg-slate-800">
+      <div className="flex shrink-0 items-center gap-1 rounded-lg bg-papier-matt px-2 py-1 dark:bg-slate-800">
         <input
           type="number"
           min={0}
@@ -284,7 +284,7 @@ function HalbjahrZeile({
           onChange={(e) => wert.aendern(Math.max(0, Number(e.target.value) || 0))}
           onBlur={wert.jetztSpeichern}
         />
-        <span className="text-[15px] font-bold text-slate-500">€</span>
+        <span className="text-[15px] font-bold text-tinte-matt">€</span>
       </div>
     </li>
   );

@@ -26,7 +26,7 @@ export function ChatBlasen({
 
   return (
     <div className="space-y-2 py-3 pb-28">
-      {liste.length === 0 && <p className="py-12 text-center text-sm text-slate-400">{leerText}</p>}
+      {liste.length === 0 && <p className="py-12 text-center text-sm text-tinte-leise">{leerText}</p>}
       {liste.map((m) => {
         const meins = m.created_by === uid;
         return (
@@ -46,7 +46,7 @@ export function ChatBlasen({
                 aufFarbig={meins}
               />
               <div className="whitespace-pre-wrap break-words text-[15px] leading-snug">{m.body}</div>
-              <div className={`mt-0.5 text-right text-[10px] ${meins ? "text-white/70" : "text-slate-400"}`}>
+              <div className={`mt-0.5 text-right text-[10px] ${meins ? "text-white/70" : "text-tinte-leise"}`}>
                 {new Date(m.created_at).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })}
                 {(meins || darfLoeschen) && (
                   <button
@@ -79,7 +79,7 @@ export function ChatEingabe({
   platzhalter?: string;
 }) {
   return (
-    <div className="fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+3.6rem)] z-30 flex items-end gap-2 border-t border-slate-200 bg-slate-50/95 px-3 py-2 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95 sm:px-5">
+    <div className="fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+3.6rem)] z-30 flex items-end gap-2 border-t border-papier-linie bg-papier-matt/95 px-3 py-2 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95 sm:px-5">
       <textarea
         rows={1}
         className="field max-h-28 flex-1 resize-none py-2.5"

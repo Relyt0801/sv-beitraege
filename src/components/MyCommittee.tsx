@@ -11,24 +11,24 @@ export function MyCommittee() {
 
   if (mine.length) {
     return (
-      <div className="col-span-2 flex flex-col gap-1.5 border-t border-slate-200 pt-3 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:border-slate-700 sm:col-span-4">
+      <div className="col-span-2 flex flex-col gap-1.5 border-t border-papier-linie pt-3 text-xs font-semibold uppercase tracking-wide text-tinte-matt dark:border-slate-700 sm:col-span-4">
         Mein Komitee
         <div className="flex flex-wrap items-center gap-1.5 normal-case">
           {mine.map((s) => (
             <span key={s} className="rounded-full bg-brand/15 px-2.5 py-1 text-sm font-bold text-brand">{committeeLabel(s)}</span>
           ))}
-          <span className="text-[11px] font-normal text-slate-400">festgelegt – Änderung nur über das Stufenteam</span>
+          <span className="text-[11px] font-normal text-tinte-leise">festgelegt. Ändern kann das nur das Stufenteam</span>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="col-span-2 flex flex-col gap-1.5 border-t border-slate-200 pt-3 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:border-slate-700 sm:col-span-4">
+    <div className="col-span-2 flex flex-col gap-1.5 border-t border-papier-linie pt-3 text-xs font-semibold uppercase tracking-wide text-tinte-matt dark:border-slate-700 sm:col-span-4">
       Mein Komitee wählen
       <div className="flex flex-wrap items-center gap-2 normal-case">
         <select
-          className="rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"
+          className="rounded-lg border border-papier-linie bg-white px-2.5 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"
           value={sel}
           onChange={(e) => setSel(e.target.value)}
         >
@@ -49,7 +49,7 @@ export function MyCommittee() {
         >
           {busy ? "…" : "Festlegen"}
         </button>
-        <span className="text-[11px] font-normal text-slate-400">⚠️ danach nicht mehr änderbar</span>
+        <span className="text-[11px] font-normal text-tinte-leise">⚠️ danach nicht mehr änderbar</span>
       </div>
     </div>
   );

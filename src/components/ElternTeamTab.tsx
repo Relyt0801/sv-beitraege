@@ -3,6 +3,7 @@ import { useEltern } from "../eltern-store";
 import { useRole } from "../auth/RoleProvider";
 import { useProfiles } from "../profiles-store";
 import { useStore } from "../store";
+import { normalize } from "../lib/logic";
 import { datumLang } from "./BeitragsListe";
 
 /**
@@ -10,7 +11,7 @@ import { datumLang } from "./BeitragsListe";
  * Anfragen der Eltern beantworten. Erscheint im Reiter Chats.
  */
 export function ElternTeamTab() {
-  const { infos, tickets, nachrichten, infoAnlegen, infoLoeschen, antworten, ticketSchliessen, zuordnung } = useEltern();
+  const { infos, tickets, nachrichten, infoAnlegen, infoLoeschen, antworten, ticketSchliessen, zuordnung, konten, anEltern, alsGelesen } = useEltern();
   const { uid } = useRole();
   const { profile } = useProfiles();
   const { students } = useStore();
@@ -32,9 +33,17 @@ export function ElternTeamTab() {
   const [anheften, setAnheften] = useState(false);
   const [offen, setOffen] = useState<string | null>(null);
   const [neuOffen, setNeuOffen] = useState(false);
+  const [schreibOffen, setSchreibOffen] = useState(false);
 
   const offeneTickets = tickets.filter((t) => !t.erledigt);
   const erledigte = tickets.filter((t) => t.erledigt);
+
+  /** Hat hier jemand geschrieben, seit wir zuletzt geschaut haben? */
+  const neu = (t: (typeof tickets)[number]) => {
+    const fremd = nachrichten.filter((n) => n.ticket_id === t.id && n.user_id !== uid);
+    if (!fremd.length) return false;
+    return !t.gelesen_team || fremd[fremd.length - 1].created_at > t.gelesen_team;
+  };
 
   const wer = (userId: string) =>
     userId === uid ? "Du" : profile[userId]?.anzeigename || "Eltern";
@@ -52,7 +61,7 @@ export function ElternTeamTab() {
             {neuOffen ? "Abbrechen" : "Neue Info"}
           </button>
         </div>
-        <p className="mt-0.5 text-[13px] leading-relaxed text-slate-500 dark:text-slate-400">
+        <p className="mt-0.5 text-[13px] leading-relaxed text-tinte-matt dark:text-slate-400">
           Was hier steht, sehen alle Eltern in ihrem Reiter Infos.
         </p>
 
@@ -70,7 +79,7 @@ export function ElternTeamTab() {
               value={text}
               onChange={(e) => setText(e.target.value)}
             />
-            <label className="flex cursor-pointer items-center gap-2 text-[13px] text-slate-500">
+            <label className="flex cursor-pointer items-center gap-2 text-[13px] text-tinte-matt">
               <input
                 type="checkbox"
                 className="h-4 w-4 accent-brand"
@@ -96,25 +105,25 @@ export function ElternTeamTab() {
         )}
 
         {infos.length === 0 ? (
-          <p className="mt-3 text-[13px] text-slate-400">Noch nichts veröffentlicht.</p>
+          <p className="mt-3 text-[13px] text-tinte-leise">Noch nichts veröffentlicht.</p>
         ) : (
           <ul className="mt-3 grid gap-2">
             {infos.map((i) => (
               <li
                 key={i.id}
-                className="flex items-start gap-2 rounded-2xl border border-slate-200 p-3 dark:border-slate-700"
+                className="flex items-start gap-2 rounded-2xl border border-papier-linie p-3 dark:border-slate-700"
               >
                 <div className="min-w-0 flex-1">
                   <div className="flex items-baseline gap-1.5">
                     {i.angeheftet && <span className="text-[12px]">📌</span>}
                     <span className="truncate text-[14px] font-bold">{i.titel}</span>
                   </div>
-                  <p className="mt-0.5 line-clamp-2 text-[12px] text-slate-500">{i.text}</p>
-                  <span className="text-[11px] text-slate-400">{datumLang(i.created_at.slice(0, 10))}</span>
+                  <p className="mt-0.5 line-clamp-2 text-[12px] text-tinte-matt">{i.text}</p>
+                  <span className="text-[11px] text-tinte-leise">{datumLang(i.created_at.slice(0, 10))}</span>
                 </div>
                 <button
                   onClick={() => confirm(`„${i.titel}" wirklich löschen?`) && infoLoeschen(i.id)}
-                  className="shrink-0 rounded-lg px-2 py-1.5 text-slate-400 transition active:scale-90"
+                  className="shrink-0 rounded-lg px-2 py-1.5 text-tinte-leise transition active:scale-90"
                   aria-label="Löschen"
                 >
                   🗑
@@ -127,12 +136,22 @@ export function ElternTeamTab() {
 
       {/* -------------------------------------------- Anfragen */}
       <section className="card p-4 sm:p-5">
-        <h2 className="text-lg font-bold">
-          Anfragen von Eltern{offeneTickets.length > 0 && ` (${offeneTickets.length} offen)`}
-        </h2>
+        <div className="flex items-center gap-2">
+          <h2 className="min-w-0 flex-1 text-lg font-bold">
+            Gespräche mit Eltern{offeneTickets.length > 0 && ` (${offeneTickets.length} offen)`}
+          </h2>
+          <button
+            onClick={() => setSchreibOffen((v) => !v)}
+            className="shrink-0 rounded-lg bg-brand px-3 py-1.5 text-sm font-bold text-white"
+          >
+            {schreibOffen ? "Abbrechen" : "Anschreiben"}
+          </button>
+        </div>
+
+        {schreibOffen && <AnEltern konten={konten} onSenden={anEltern} onFertig={() => setSchreibOffen(false)} />}
 
         {tickets.length === 0 ? (
-          <p className="mt-2 text-[13px] text-slate-400">Bisher hat niemand etwas gefragt.</p>
+          <p className="mt-2 text-[13px] text-tinte-leise">Bisher hat niemand etwas gefragt.</p>
         ) : (
           <ul className="mt-3 grid gap-2">
             {[...offeneTickets, ...erledigte].map((t) => {
@@ -142,34 +161,41 @@ export function ElternTeamTab() {
                 <li
                   key={t.id}
                   className={`rounded-2xl border ${
-                    t.erledigt ? "border-slate-200 opacity-70 dark:border-slate-700" : "border-amber-300 dark:border-amber-500/40"
+                    t.erledigt ? "border-papier-linie opacity-70 dark:border-slate-700" : "border-amber-300 dark:border-amber-500/40"
                   }`}
                 >
                   <button
-                    onClick={() => setOffen(auf ? null : t.id)}
+                    onClick={() => {
+                      const jetztOffen = auf ? null : t.id;
+                      setOffen(jetztOffen);
+                      if (jetztOffen) alsGelesen(t.id);
+                    }}
                     className="flex w-full items-center gap-2 p-3.5 text-left"
                   >
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[15px] font-bold">{t.betreff}</span>
-                      <span className="block text-[11px] text-slate-400">
+                      <span className="block truncate text-[15px] font-bold">
+                        {neu(t) && <span className="mr-1.5 inline-block h-2 w-2 rounded-full bg-red-500 align-middle" />}
+                        {t.betreff}
+                      </span>
+                      <span className="block text-[11px] text-tinte-leise">
                         {absender(t.user_id)} · {verlauf.length}{" "}
                         {verlauf.length === 1 ? "Nachricht" : "Nachrichten"}
                       </span>
                     </span>
-                    <span className="shrink-0 text-slate-400">{auf ? "▾" : "▸"}</span>
+                    <span className="shrink-0 text-tinte-leise">{auf ? "▾" : "▸"}</span>
                   </button>
 
                   {auf && (
-                    <div className="border-t border-slate-200 p-3.5 dark:border-slate-700">
+                    <div className="border-t border-papier-linie p-3.5 dark:border-slate-700">
                       <ul className="grid gap-2">
                         {verlauf.map((n) => (
                           <li
                             key={n.id}
                             className={`rounded-xl px-3 py-2 text-[13px] leading-relaxed ${
-                              n.user_id === uid ? "bg-brand/10" : "bg-slate-100 dark:bg-slate-800"
+                              n.user_id === uid ? "bg-brand/10" : "bg-papier-matt dark:bg-slate-800"
                             }`}
                           >
-                            <div className="mb-0.5 text-[11px] font-semibold text-slate-400">{wer(n.user_id)}</div>
+                            <div className="mb-0.5 text-[11px] font-semibold text-tinte-leise">{wer(n.user_id)}</div>
                             <div className="whitespace-pre-wrap">{n.text}</div>
                           </li>
                         ))}
@@ -177,7 +203,7 @@ export function ElternTeamTab() {
                       <Antwort onSenden={(txt) => antworten(t.id, txt)} />
                       <button
                         onClick={() => ticketSchliessen(t.id, !t.erledigt)}
-                        className="mt-2 w-full rounded-xl border border-slate-200 py-2 text-[13px] font-bold text-slate-500 dark:border-slate-700"
+                        className="mt-2 w-full rounded-xl border border-papier-linie py-2 text-[13px] font-bold text-tinte-matt dark:border-slate-700"
                       >
                         {t.erledigt ? "Wieder öffnen" : "Als erledigt markieren"}
                       </button>
@@ -219,6 +245,123 @@ function Antwort({ onSenden }: { onSenden: (text: string) => void }) {
       >
         Senden
       </button>
+    </div>
+  );
+}
+
+/**
+ * Ein bestimmtes Elternhaus anschreiben.
+ *
+ * Erst die Familie suchen, dann Betreff und Text. Die Eltern sehen das
+ * Gespraech danach in ihrem Reiter Infos und bekommen eine Benachrichtigung.
+ */
+function AnEltern({
+  konten,
+  onSenden,
+  onFertig,
+}: {
+  konten: import("../eltern-store").Elternkonto[];
+  onSenden: (userId: string, betreff: string, text: string) => Promise<string | null>;
+  onFertig: () => void;
+}) {
+  const { students } = useStore();
+  const [suche, setSuche] = useState("");
+  const [gewaehlt, setGewaehlt] = useState<string | null>(null);
+  const [betreff, setBetreff] = useState("");
+  const [text, setText] = useState("");
+  const [fehler, setFehler] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const kindNamen = (ids: string[]) =>
+    ids
+      .map((id) => students.find((s) => s.id === id))
+      .filter(Boolean)
+      .map((s) => `${s!.vorname} ${s!.nachname}`)
+      .join(" und ");
+
+  const q = normalize(suche);
+  const treffer = konten
+    .filter((k) => !q || normalize(`${k.anzeigename} ${k.username} ${kindNamen(k.kinder)}`).includes(q))
+    .slice(0, 8);
+  const ziel = konten.find((k) => k.user_id === gewaehlt);
+
+  return (
+    <div className="mt-3 grid gap-2 rounded-2xl border border-dashed border-brand/50 p-3">
+      {!ziel ? (
+        <>
+          <input
+            className="field"
+            placeholder="Familie oder Kind suchen …"
+            value={suche}
+            onChange={(e) => setSuche(e.target.value)}
+            autoFocus
+          />
+          {konten.length === 0 ? (
+            <p className="text-[13px] text-tinte-leise">Es gibt noch keine Elternzugänge.</p>
+          ) : (
+            <ul className="grid gap-1">
+              {treffer.map((k) => (
+                <li key={k.user_id}>
+                  <button
+                    onClick={() => setGewaehlt(k.user_id)}
+                    className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left hover:bg-papier-matt dark:hover:bg-slate-800"
+                  >
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[14px] font-semibold">{k.anzeigename}</span>
+                      <span className="block truncate text-[11px] text-tinte-leise">
+                        {kindNamen(k.kinder) || k.username}
+                      </span>
+                    </span>
+                  </button>
+                </li>
+              ))}
+              {treffer.length === 0 && (
+                <li className="px-1 py-2 text-[13px] text-tinte-leise">Niemand gefunden.</li>
+              )}
+            </ul>
+          )}
+        </>
+      ) : (
+        <>
+          <div className="flex items-center gap-2 rounded-xl bg-papier-matt px-3 py-2 dark:bg-slate-800">
+            <span className="min-w-0 flex-1 truncate text-[14px] font-semibold">
+              An {ziel.anzeigename}
+              {kindNamen(ziel.kinder) && ` · ${kindNamen(ziel.kinder)}`}
+            </span>
+            <button onClick={() => setGewaehlt(null)} className="shrink-0 text-[12px] font-bold text-brand">
+              ändern
+            </button>
+          </div>
+          <input className="field" placeholder="Betreff" value={betreff} onChange={(e) => setBetreff(e.target.value)} />
+          <textarea
+            className="field min-h-[90px]"
+            placeholder="Ihre Nachricht …"
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+          />
+          {fehler && <p className="text-[13px] font-semibold text-amber-600">{fehler}</p>}
+          <button
+            disabled={busy || !betreff.trim() || !text.trim()}
+            onClick={async () => {
+              setBusy(true);
+              const problem = await onSenden(ziel.user_id, betreff, text);
+              setBusy(false);
+              if (problem) {
+                setFehler(problem);
+                return;
+              }
+              setBetreff("");
+              setText("");
+              setGewaehlt(null);
+              setSuche("");
+              onFertig();
+            }}
+            className="rounded-xl bg-brand py-2.5 text-sm font-bold text-white disabled:opacity-40"
+          >
+            Abschicken
+          </button>
+        </>
+      )}
     </div>
   );
 }

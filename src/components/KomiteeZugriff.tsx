@@ -62,13 +62,13 @@ export function KomiteeZugriff() {
   return (
     <section className="card p-4">
       <h3 className="font-bold">Fremdzugriff auf Komitees</h3>
-      <p className="mb-3 text-[11px] text-slate-400">
+      <p className="mb-3 text-[11px] text-tinte-leise">
         Lesen = mitlesen. Schreiben = mitreden, abstimmen, To-dos abhaken.
       </p>
 
       <div className="mb-3 grid gap-2 sm:grid-cols-4">
         <select
-          className="rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"
+          className="rounded-xl border border-papier-linie bg-papier-matt px-2.5 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"
           value={tag}
           onChange={(e) => setTag(e.target.value)}
         >
@@ -78,7 +78,7 @@ export function KomiteeZugriff() {
         </select>
 
         <select
-          className="rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-2 text-sm sm:col-span-2 dark:border-slate-700 dark:bg-slate-800"
+          className="rounded-xl border border-papier-linie bg-papier-matt px-2.5 py-2 text-sm sm:col-span-2 dark:border-slate-700 dark:bg-slate-800"
           value={wer}
           onChange={(e) => setWer(e.target.value)}
         >
@@ -98,13 +98,13 @@ export function KomiteeZugriff() {
         <div className="flex gap-1.5">
           <button
             onClick={() => setModus("read")}
-            className={`flex-1 rounded-xl border px-2 py-2 text-sm font-bold ${modus === "read" ? "border-brand bg-brand text-white" : "border-slate-200 dark:border-slate-700"}`}
+            className={`flex-1 rounded-xl border px-2 py-2 text-sm font-bold ${modus === "read" ? "border-brand bg-brand text-white" : "border-papier-linie dark:border-slate-700"}`}
           >
             Lesen
           </button>
           <button
             onClick={() => setModus("write")}
-            className={`flex-1 rounded-xl border px-2 py-2 text-sm font-bold ${modus === "write" ? "border-brand bg-brand text-white" : "border-slate-200 dark:border-slate-700"}`}
+            className={`flex-1 rounded-xl border px-2 py-2 text-sm font-bold ${modus === "write" ? "border-brand bg-brand text-white" : "border-papier-linie dark:border-slate-700"}`}
           >
             Schreiben
           </button>
@@ -120,11 +120,11 @@ export function KomiteeZugriff() {
       </button>
 
       {liste.length === 0 ? (
-        <p className="text-sm text-slate-400">Noch kein Fremdzugriff vergeben.</p>
+        <p className="text-sm text-tinte-leise">Noch kein Fremdzugriff vergeben.</p>
       ) : (
         <div className="grid gap-1.5">
           {liste.map((z) => (
-            <div key={z.id} className="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm dark:border-slate-700">
+            <div key={z.id} className="flex items-center gap-2 rounded-xl border border-papier-linie px-3 py-2 text-sm dark:border-slate-700">
               <span>{committeeIcon(z.tag)}</span>
               <span className="min-w-0 flex-1 truncate">
                 <b>{z.from_tag ? committeeLabel(z.from_tag) : nameVon(z.user_id!)}</b>
@@ -137,7 +137,7 @@ export function KomiteeZugriff() {
                   await supabase!.from("committee_access").delete().eq("id", z.id);
                   void laden();
                 }}
-                className="shrink-0 text-slate-400"
+                className="shrink-0 text-tinte-leise"
               >
                 🗑
               </button>

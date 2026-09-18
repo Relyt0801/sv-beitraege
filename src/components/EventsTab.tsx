@@ -12,7 +12,7 @@ function PushBanner() {
   if (!pushConfigured() || perm === "granted" || perm === "denied" || perm === "unsupported") return null;
   return (
     <div className="mb-3 flex flex-wrap items-center gap-3 rounded-2xl border border-brand/30 bg-brand/5 p-3.5">
-      <span className="text-sm font-medium text-slate-600 dark:text-slate-300">
+      <span className="text-sm font-medium text-tinte-matt dark:text-slate-300">
         🔔 Willst du eine Nachricht aufs Handy bekommen, wenn es etwas Neues gibt?
       </span>
       <button
@@ -43,8 +43,8 @@ export function EventsTab() {
 
   if (!ready) {
     return (
-      <div className="flex flex-col items-center justify-center gap-4 py-24 text-slate-400">
-        <div className="h-9 w-9 animate-spin rounded-full border-[3px] border-slate-300 border-t-brand dark:border-slate-700 dark:border-t-brand" />
+      <div className="flex flex-col items-center justify-center gap-4 py-24 text-tinte-leise">
+        <div className="h-9 w-9 animate-spin rounded-full border-[3px] border-papier-linie border-t-brand dark:border-slate-700 dark:border-t-brand" />
         <div className="text-sm font-medium">Events werden geladen …</div>
       </div>
     );
@@ -53,7 +53,7 @@ export function EventsTab() {
     return (
       <>
         <PushBanner />
-        <div className="py-16 text-center text-sm text-slate-400">Noch keine Events.</div>
+        <div className="py-16 text-center text-sm text-tinte-leise">Noch keine Events.</div>
       </>
     );
 
@@ -110,21 +110,21 @@ function EventCard({
 
   return (
     <div className={`card p-4 sm:p-5 ${e.is_warning ? "!border-red-400 bg-red-50/40 dark:bg-red-500/5" : ""}`}>
-      <div className="mb-1 flex items-center gap-2 text-xs font-semibold text-slate-400">
+      <div className="mb-1 flex items-center gap-2 text-xs font-semibold text-tinte-leise">
         <span>{e.is_warning ? "⚠️" : meta.icon}</span>
         <span>{e.is_warning ? "Warnung" : meta.label}</span>
         {e.audience === "selected" && <span>· gezielt</span>}
         {e.audience === "komitee" && <span>· {(e.tags || []).map(committeeLabel).join(", ") || "Komitees"}</span>}
         <span className="ml-auto">{date}</span>
         {canDelete && (
-          <button onClick={onDelete} className="ml-1 text-slate-400 hover:text-red-500" aria-label="Löschen">
+          <button onClick={onDelete} className="ml-1 text-tinte-leise hover:text-red-500" aria-label="Löschen">
             🗑
           </button>
         )}
       </div>
 
       <div className={`text-lg font-bold ${e.is_warning ? "text-red-600 dark:text-red-400" : ""}`}>{e.title}</div>
-      {e.body && <div className="mt-1 whitespace-pre-wrap text-[15px] text-slate-600 dark:text-slate-300">{e.body}</div>}
+      {e.body && <div className="mt-1 whitespace-pre-wrap text-[15px] text-tinte-matt dark:text-slate-300">{e.body}</div>}
 
       {e.type === "umfrage" && (
         <div className="mt-3 flex flex-col gap-2">
@@ -137,7 +137,7 @@ function EventCard({
                 key={o.id}
                 onClick={() => onVote(o.id)}
                 className={`relative overflow-hidden rounded-xl border px-3 py-2.5 text-left text-sm font-semibold transition ${
-                  picked ? "border-brand" : "border-slate-200 dark:border-slate-700"
+                  picked ? "border-brand" : "border-papier-linie dark:border-slate-700"
                 }`}
               >
                 {canSeeResults && (
@@ -147,11 +147,11 @@ function EventCard({
                   />
                 )}
                 <span className="relative flex items-center gap-2">
-                  <span className={`flex h-5 w-5 items-center justify-center border text-[11px] text-white ${e.poll_multiple ? "rounded-md" : "rounded-full"} ${picked ? "border-brand bg-brand" : "border-slate-300 dark:border-slate-600"}`}>
+                  <span className={`flex h-5 w-5 items-center justify-center border text-[11px] text-white ${e.poll_multiple ? "rounded-md" : "rounded-full"} ${picked ? "border-brand bg-brand" : "border-papier-linie dark:border-slate-600"}`}>
                     {picked ? "✓" : ""}
                   </span>
                   <span className="flex-1">{o.label}</span>
-                  {canSeeResults && <span className="text-xs text-slate-400">{c} · {pct}%</span>}
+                  {canSeeResults && <span className="text-xs text-tinte-leise">{c} · {pct}%</span>}
                 </span>
                 {canSeeResults && c > 0 && (
                   <span className="relative mt-1.5 flex items-center pl-7">
@@ -168,19 +168,19 @@ function EventCard({
                           <span key={i} style={{ marginLeft: i === 0 ? -28 : -8 }} className="relative">
                             <span
                               style={{ width: 22, height: 22 }}
-                              className="flex items-center justify-center rounded-full bg-slate-300 text-[10px] font-extrabold leading-none text-slate-500 ring-2 ring-white dark:bg-slate-600 dark:text-slate-300 dark:ring-slate-900"
+                              className="flex items-center justify-center rounded-full bg-slate-300 text-[10px] font-extrabold leading-none text-tinte-matt ring-2 ring-white dark:bg-slate-600 dark:text-slate-300 dark:ring-slate-900"
                             >
                               ?
                             </span>
                           </span>
                         ))}
-                    {c > 12 && <span className="ml-1 text-[11px] font-semibold text-slate-400">+{c - 12}</span>}
+                    {c > 12 && <span className="ml-1 text-[11px] font-semibold text-tinte-leise">+{c - 12}</span>}
                   </span>
                 )}
               </button>
             );
           })}
-          {canSeeResults && <div className="text-xs text-slate-400">{total} Stimme{total === 1 ? "" : "n"}</div>}
+          {canSeeResults && <div className="text-xs text-tinte-leise">{total} Stimme{total === 1 ? "" : "n"}</div>}
         </div>
       )}
     </div>

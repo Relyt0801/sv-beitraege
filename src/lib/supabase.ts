@@ -21,6 +21,11 @@ const url = clean(import.meta.env.VITE_SUPABASE_URL);
 const key = clean(import.meta.env.VITE_SUPABASE_ANON_KEY);
 
 export const hasSupabase = Boolean(url && key);
+/**
+ * @deprecated Der Zugangscode war fuer die Selbstregistrierung gedacht. Die
+ * gibt es nicht mehr: der Code stand im ausgelieferten JavaScript und war
+ * damit fuer jeden lesbar. Konten legt jetzt nur noch das Stufenteam an.
+ */
 export const ACCESS_CODE = clean(import.meta.env.VITE_ACCESS_CODE) || "";
 
 export const supabase: SupabaseClient | null = hasSupabase

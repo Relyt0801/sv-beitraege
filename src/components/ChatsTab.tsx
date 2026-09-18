@@ -55,8 +55,8 @@ export function ChatsTab() {
 
   if (!ready)
     return (
-      <div className="flex flex-col items-center gap-4 py-24 text-slate-400">
-        <div className="h-9 w-9 animate-spin rounded-full border-[3px] border-slate-300 border-t-brand dark:border-slate-700 dark:border-t-brand" />
+      <div className="flex flex-col items-center gap-4 py-24 text-tinte-leise">
+        <div className="h-9 w-9 animate-spin rounded-full border-[3px] border-papier-linie border-t-brand dark:border-slate-700 dark:border-t-brand" />
         <div className="text-sm font-medium">Chats werden geladen …</div>
       </div>
     );
@@ -102,11 +102,11 @@ export function ChatsTab() {
   return (
     <div className="space-y-5 pb-4">
       <section>
-        <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-400">
+        <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-tinte-leise">
           {isStaff ? "Alle Komitees" : "Mein Komitee"}
         </h3>
         {komiteeChats.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-slate-300 py-8 text-center text-sm text-slate-400 dark:border-slate-700">
+          <div className="rounded-2xl border border-dashed border-papier-linie py-8 text-center text-sm text-tinte-leise dark:border-slate-700">
             {meineKoms.length
               ? "Der Chat wird gerade eingerichtet."
               : "Du bist noch in keinem Komitee. Das Stufenteam kann dich eintragen."}
@@ -137,7 +137,7 @@ export function ChatsTab() {
       </section>
 
       <section>
-        <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-400">
+        <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-tinte-leise">
           {isStaff ? "Fragen an euch" : "Stufenteam"}
         </h3>
 
@@ -201,7 +201,7 @@ function TicketCard({ topic, unread, onOpen }: { topic: Topic; unread: number; o
       <Avatar userId={topic.created_by} name={name} size={32} />
       <span className="min-w-0 flex-1">
         <span className="block truncate text-[15px] font-bold">{name || "Frage"}</span>
-        <span className="block truncate text-[12px] text-slate-400">{topic.title}</span>
+        <span className="block truncate text-[12px] text-tinte-leise">{topic.title}</span>
       </span>
       {unread > 0 && (
         <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[11px] font-bold text-white">
@@ -268,12 +268,12 @@ function TeamChatSchueler({ tickets, onBack }: { tickets: Topic[]; onBack: () =>
 
   return (
     <div>
-      <div className="sticky top-[52px] z-10 -mx-3 flex items-center gap-2 border-b border-slate-200 bg-slate-50/95 px-3 py-2 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95 sm:-mx-5 sm:px-5">
+      <div className="sticky top-[52px] z-10 -mx-3 flex items-center gap-2 border-b border-papier-linie bg-papier-matt/95 px-3 py-2 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95 sm:-mx-5 sm:px-5">
         <button className="iconbtn" onClick={onBack} aria-label="Zurück">‹</button>
         <span className="text-xl">🛡️</span>
         <div className="min-w-0 flex-1">
           <div className="truncate text-[17px] font-bold">Stufenteam</div>
-          <div className="text-[11px] text-slate-400">Frag hier alles, das Team antwortet dir</div>
+          <div className="text-[11px] text-tinte-leise">Frag hier alles, das Team antwortet dir</div>
         </div>
       </div>
 
@@ -323,19 +323,19 @@ function TicketChat({ topic, onBack }: { topic: Topic; onBack: () => void }) {
 
   return (
     <div>
-      <div className="sticky top-[52px] z-10 -mx-3 flex items-center gap-2 border-b border-slate-200 bg-slate-50/95 px-3 py-2 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95 sm:-mx-5 sm:px-5">
+      <div className="sticky top-[52px] z-10 -mx-3 flex items-center gap-2 border-b border-papier-linie bg-papier-matt/95 px-3 py-2 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95 sm:-mx-5 sm:px-5">
         <button className="iconbtn" onClick={onBack} aria-label="Zurück">‹</button>
         <Avatar userId={topic.created_by} name={name} size={28} />
         <div className="min-w-0 flex-1">
           <div className="truncate text-[16px] font-bold">{name || "Frage"}</div>
-          <div className="truncate text-[11px] text-slate-400">
+          <div className="truncate text-[11px] text-tinte-leise">
             {topic.status === "erledigt" ? "erledigt" : topic.title}
           </div>
         </div>
         {isStaff && (
           <>
             <button
-              className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-bold dark:border-slate-700"
+              className="rounded-lg border border-papier-linie px-2.5 py-1.5 text-xs font-bold dark:border-slate-700"
               onClick={() => updateTopic(topic.id, { status: topic.status === "erledigt" ? "offen" : "erledigt" })}
             >
               {topic.status === "erledigt" ? "öffnen" : "erledigt"}
@@ -384,7 +384,7 @@ function TicketUebersichtKarte({
       <span className="text-xl">🛡️</span>
       <span className="min-w-0 flex-1">
         <span className="block text-[15px] font-bold">Stufenteam-Tickets</span>
-        <span className="block truncate text-[12px] text-slate-400">{text}</span>
+        <span className="block truncate text-[12px] text-tinte-leise">{text}</span>
       </span>
       {unread > 0 && (
         <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[11px] font-bold text-white">
@@ -403,14 +403,14 @@ function TicketListe({
   const { unreadCount } = useTopics();
   return (
     <div>
-      <div className="sticky top-[52px] z-10 -mx-3 mb-3 flex items-center gap-2 border-b border-slate-200 bg-slate-50/95 px-3 py-2 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95 sm:-mx-5 sm:px-5">
+      <div className="sticky top-[52px] z-10 -mx-3 mb-3 flex items-center gap-2 border-b border-papier-linie bg-papier-matt/95 px-3 py-2 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95 sm:-mx-5 sm:px-5">
         <button className="iconbtn" onClick={onBack} aria-label="Zurück">‹</button>
         <span className="text-xl">🛡️</span>
         <div className="min-w-0 flex-1 truncate text-[17px] font-bold">Stufenteam-Tickets</div>
       </div>
 
       {offene.length === 0 ? (
-        <p className="py-8 text-center text-sm text-slate-400">Gerade keine offenen Fragen.</p>
+        <p className="py-8 text-center text-sm text-tinte-leise">Gerade keine offenen Fragen.</p>
       ) : (
         <div className="grid gap-2.5 lg:grid-cols-2">
           {offene.map((t) => (
@@ -421,7 +421,7 @@ function TicketListe({
 
       {erledigt.length > 0 && (
         <details className="mt-4">
-          <summary className="cursor-pointer text-xs font-bold uppercase tracking-wide text-slate-400">
+          <summary className="cursor-pointer text-xs font-bold uppercase tracking-wide text-tinte-leise">
             Erledigt ({erledigt.length})
           </summary>
           <div className="mt-2 grid gap-2.5 lg:grid-cols-2">

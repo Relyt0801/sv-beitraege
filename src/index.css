@@ -11,7 +11,7 @@ html, body, #root {
 }
 
 body {
-  @apply bg-slate-50 text-slate-900 antialiased;
+  @apply bg-papier text-tinte antialiased;
   margin: 0;
   -webkit-tap-highlight-color: transparent;
   overscroll-behavior-y: none;
@@ -20,28 +20,46 @@ body {
   @apply bg-slate-950 text-slate-100;
 }
 
+/* Betraege und Prozente stehen untereinander, statt zu tanzen. */
+.zahl {
+  @apply font-zahl;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
 /* hide scrollbars on the horizontal term rails but keep scroll */
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
 @layer components {
   .card {
-    @apply rounded-2xl border border-slate-200 bg-white shadow-card transition
+    @apply rounded-2xl border border-papier-linie bg-white shadow-card transition
            dark:border-slate-800 dark:bg-slate-900 dark:shadow-cardDark;
+  }
+  /* Die eine Zahl, auf die es ankommt: dunkles Feld, alles andere tritt zurueck. */
+  .leitkarte {
+    @apply rounded-2xl bg-tinte p-5 text-white dark:bg-slate-900 dark:ring-1 dark:ring-slate-800;
+  }
+  .leitwert {
+    @apply zahl text-[2.75rem] font-extrabold leading-none;
+  }
+  /* Beschriftung ueber einer Kennzahl */
+  .kennlabel {
+    @apply text-[11px] font-semibold uppercase tracking-[0.06em] text-tinte-matt;
   }
   .pill {
     @apply inline-flex items-center rounded-full px-2.5 py-1 text-xs font-bold;
   }
   .iconbtn {
-    @apply flex h-10 w-10 min-w-10 items-center justify-center rounded-xl border border-slate-200
-           bg-white text-slate-600 shadow-card transition active:scale-95
+    @apply flex h-10 w-10 min-w-10 items-center justify-center rounded-xl border border-papier-linie
+           bg-white text-tinte-matt shadow-card transition active:scale-95
            dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:shadow-cardDark;
   }
   .iconbtn-active {
     @apply border-brand bg-brand text-white dark:border-brand;
   }
   .field {
-    @apply w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-base outline-none
+    @apply w-full rounded-xl border border-papier-linie bg-papier px-4 py-3 text-base outline-none
            transition focus:border-brand focus:ring-2 focus:ring-brand/20
            dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100;
   }

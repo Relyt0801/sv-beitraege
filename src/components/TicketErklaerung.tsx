@@ -23,15 +23,15 @@ export function TicketErklaerung({
 
   return (
     <section className="card p-5">
-      <div className="text-sm text-slate-500">Abiballticket</div>
+      <div className="text-sm text-tinte-matt">Abiballticket</div>
 
       <div className="mt-3 grid gap-2">
         <div className="rounded-2xl border-2 border-brand/40 bg-brand/5 p-3">
           <div className="text-[12px] font-bold uppercase tracking-wide text-brand">Das 1. Ticket</div>
-          <div className="mt-0.5 text-3xl font-extrabold leading-none text-slate-800 dark:text-slate-100">
+          <div className="mt-0.5 text-3xl font-extrabold leading-none text-tinte dark:text-slate-100">
             {preisSteht ? `${erstes} €` : `${zusatz} € extra`}
           </div>
-          <div className="mt-1 text-[12px] leading-relaxed text-slate-500 dark:text-slate-400">
+          <div className="mt-1 text-[12px] leading-relaxed text-tinte-matt dark:text-slate-400">
             {preisSteht ? (
               zusatz > 0 ? (
                 <>
@@ -52,21 +52,21 @@ export function TicketErklaerung({
           </div>
         </div>
 
-        <div className="rounded-2xl border border-slate-200 p-3 dark:border-slate-700">
-          <div className="text-[12px] font-bold uppercase tracking-wide text-slate-400">
+        <div className="rounded-2xl border border-papier-linie p-3 dark:border-slate-700">
+          <div className="text-[12px] font-bold uppercase tracking-wide text-tinte-leise">
             Jedes weitere Ticket
           </div>
-          <div className="mt-0.5 text-2xl font-extrabold leading-none text-slate-600 dark:text-slate-300">
+          <div className="mt-0.5 text-2xl font-extrabold leading-none text-tinte-matt dark:text-slate-300">
             {preisSteht ? `${grund} €` : "der normale Preis"}
           </div>
-          <div className="mt-1 text-[12px] leading-relaxed text-slate-500 dark:text-slate-400">
+          <div className="mt-1 text-[12px] leading-relaxed text-tinte-matt dark:text-slate-400">
             Karten für Eltern, Geschwister oder Gäste kosten immer gleich viel. Der Zusatzbeitrag gilt
             nur für das erste Ticket.
           </div>
         </div>
       </div>
 
-      <div className="mt-3 text-[12px] leading-relaxed text-slate-400">
+      <div className="mt-3 text-[12px] leading-relaxed text-tinte-leise">
         Der Ticketpreis hat mit dem offenen Betrag der Stufenkasse nichts zu tun. Das sind zwei
         getrennte Sachen.
       </div>

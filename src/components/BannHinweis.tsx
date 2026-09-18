@@ -20,12 +20,12 @@ export function BannHinweis() {
       <div className="text-sm font-bold text-red-500">
         🚫 Du bist {sperrText(bannedUntil, bannPermanent)}
       </div>
-      <p className="mt-1 text-[13px] text-slate-600 dark:text-slate-300">
+      <p className="mt-1 text-[13px] text-tinte-matt dark:text-slate-300">
         Solange kannst du nichts schreiben und nicht abstimmen. Mitlesen geht weiter.
       </p>
 
       {gesendet || schonGestellt ? (
-        <div className="mt-3 rounded-xl bg-white/70 px-3 py-2 text-[13px] font-semibold text-slate-600 dark:bg-slate-900/60 dark:text-slate-300">
+        <div className="mt-3 rounded-xl bg-white/70 px-3 py-2 text-[13px] font-semibold text-tinte-matt dark:bg-slate-900/60 dark:text-slate-300">
           Deine Anfrage liegt beim Stufenteam. Du bekommst Bescheid.
         </div>
       ) : offen ? (
@@ -43,7 +43,7 @@ export function BannHinweis() {
           <div className="flex gap-2">
             <button
               onClick={() => setOffen(false)}
-              className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-500 dark:border-slate-600"
+              className="rounded-lg border border-papier-linie px-3 py-2 text-sm font-semibold text-tinte-matt dark:border-slate-600"
             >
               Abbrechen
             </button>
