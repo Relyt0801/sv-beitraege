@@ -68,6 +68,7 @@ interface ElternCtx {
   alsGelesen: (ticketId: string) => void;
   antworten: (ticketId: string, text: string) => Promise<void>;
   ticketSchliessen: (ticketId: string, erledigt: boolean) => Promise<void>;
+  ticketLoeschen: (ticketId: string) => Promise<void>;
   infoAnlegen: (titel: string, text: string, angeheftet: boolean) => Promise<void>;
   infoLoeschen: (id: string) => Promise<void>;
   kontoSpeichern: (patch: Partial<BankKonto>) => Promise<string | null>;
@@ -285,6 +286,24 @@ export function ElternProvider({ children }: { children: ReactNode }) {
     await supabase!.from("eltern_tickets").update({ erledigt }).eq("id", ticketId);
   }, []);
 
+  /**
+   * Ein Gespraech ganz entfernen. Die Nachrichten haengen per ON DELETE CASCADE
+   * am Ticket, die gehen von selbst mit. Laeuft das Loeschen ins Leere, sagt die
+   * App es – sonst steht der Eintrag nach dem naechsten Laden wieder da.
+   */
+  const ticketLoeschen = useCallback<ElternCtx["ticketLoeschen"]>(async (ticketId) => {
+    if (!hasSupabase) return;
+    const vorher = tickets;
+    setTickets((prev) => prev.filter((t) => t.id !== ticketId));
+    setNachrichten((prev) => prev.filter((n) => n.ticket_id !== ticketId));
+    const { error } = await supabase!.from("eltern_tickets").delete().eq("id", ticketId);
+    if (error) {
+      setTickets(vorher);
+      void laden();
+      alert("Das Gespräch konnte nicht gelöscht werden: " + error.message);
+    }
+  }, [tickets, laden]);
+
   const infoAnlegen = useCallback<ElternCtx["infoAnlegen"]>(async (titel, text, angeheftet) => {
     if (!hasSupabase || !uid.current) return;
     const { error } = await supabase!
@@ -344,6 +363,7 @@ export function ElternProvider({ children }: { children: ReactNode }) {
         alsGelesen,
         antworten,
         ticketSchliessen,
+        ticketLoeschen,
         infoAnlegen,
         infoLoeschen,
         kontoSpeichern,

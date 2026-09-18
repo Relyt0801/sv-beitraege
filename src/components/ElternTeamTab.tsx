@@ -11,7 +11,7 @@ import { datumLang } from "./BeitragsListe";
  * Anfragen der Eltern beantworten. Erscheint im Reiter Chats.
  */
 export function ElternTeamTab() {
-  const { infos, tickets, nachrichten, infoAnlegen, infoLoeschen, antworten, ticketSchliessen, zuordnung, konten, anEltern, alsGelesen } = useEltern();
+  const { infos, tickets, nachrichten, infoAnlegen, infoLoeschen, antworten, ticketSchliessen, ticketLoeschen, zuordnung, konten, anEltern, alsGelesen } = useEltern();
   const { uid } = useRole();
   const { profile } = useProfiles();
   const { students } = useStore();
@@ -164,26 +164,42 @@ export function ElternTeamTab() {
                     t.erledigt ? "border-papier-linie opacity-70 dark:border-slate-700" : "border-amber-300 dark:border-amber-500/40"
                   }`}
                 >
-                  <button
-                    onClick={() => {
-                      const jetztOffen = auf ? null : t.id;
-                      setOffen(jetztOffen);
-                      if (jetztOffen) alsGelesen(t.id);
-                    }}
-                    className="flex w-full items-center gap-2 p-3.5 text-left"
-                  >
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[15px] font-bold">
-                        {neu(t) && <span className="mr-1.5 inline-block h-2 w-2 rounded-full bg-red-500 align-middle" />}
-                        {t.betreff}
+                  <div className="flex items-center">
+                    <button
+                      onClick={() => {
+                        const jetztOffen = auf ? null : t.id;
+                        setOffen(jetztOffen);
+                        if (jetztOffen) alsGelesen(t.id);
+                      }}
+                      className="flex min-w-0 flex-1 items-center gap-2 p-3.5 text-left"
+                    >
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-[15px] font-bold">
+                          {neu(t) && <span className="mr-1.5 inline-block h-2 w-2 rounded-full bg-red-500 align-middle" />}
+                          {t.betreff}
+                        </span>
+                        <span className="block truncate text-[11px] text-tinte-leise">
+                          {absender(t.user_id)} · {verlauf.length}{" "}
+                          {verlauf.length === 1 ? "Nachricht" : "Nachrichten"}
+                        </span>
                       </span>
-                      <span className="block text-[11px] text-tinte-leise">
-                        {absender(t.user_id)} · {verlauf.length}{" "}
-                        {verlauf.length === 1 ? "Nachricht" : "Nachrichten"}
-                      </span>
-                    </span>
-                    <span className="shrink-0 text-tinte-leise">{auf ? "▾" : "▸"}</span>
-                  </button>
+                      <span className="shrink-0 text-tinte-leise">{auf ? "▾" : "▸"}</span>
+                    </button>
+                    {/* Weg damit: geloeschte Gespraeche sind endgueltig weg, auch
+                        fuer die Eltern. Deshalb die Rueckfrage. */}
+                    <button
+                      onClick={() =>
+                        confirm(
+                          `Das Gespräch „${t.betreff}" endgültig löschen?\n\nAlle Nachrichten darin verschwinden – auch für die Eltern.`,
+                        ) && ticketLoeschen(t.id)
+                      }
+                      className="mr-2 shrink-0 rounded-lg px-2 py-2 text-tinte-leise transition hover:text-red-500 active:scale-90"
+                      aria-label="Gespräch löschen"
+                      title="Gespräch löschen"
+                    >
+                      🗑
+                    </button>
+                  </div>
 
                   {auf && (
                     <div className="border-t border-papier-linie p-3.5 dark:border-slate-700">
@@ -201,12 +217,24 @@ export function ElternTeamTab() {
                         ))}
                       </ul>
                       <Antwort onSenden={(txt) => antworten(t.id, txt)} />
-                      <button
-                        onClick={() => ticketSchliessen(t.id, !t.erledigt)}
-                        className="mt-2 w-full rounded-xl border border-papier-linie py-2 text-[13px] font-bold text-tinte-matt dark:border-slate-700"
-                      >
-                        {t.erledigt ? "Wieder öffnen" : "Als erledigt markieren"}
-                      </button>
+                      <div className="mt-2 flex gap-2">
+                        <button
+                          onClick={() => ticketSchliessen(t.id, !t.erledigt)}
+                          className="min-w-0 flex-1 rounded-xl border border-papier-linie py-2 text-[13px] font-bold text-tinte-matt dark:border-slate-700"
+                        >
+                          {t.erledigt ? "Wieder öffnen" : "Als erledigt markieren"}
+                        </button>
+                        <button
+                          onClick={() =>
+                            confirm(
+                              `Das Gespräch „${t.betreff}" endgültig löschen?\n\nAlle Nachrichten darin verschwinden – auch für die Eltern.`,
+                            ) && ticketLoeschen(t.id)
+                          }
+                          className="shrink-0 rounded-xl border border-red-300 px-3 py-2 text-[13px] font-bold text-red-500 dark:border-red-500/40"
+                        >
+                          Löschen
+                        </button>
+                      </div>
                     </div>
                   )}
                 </li>
