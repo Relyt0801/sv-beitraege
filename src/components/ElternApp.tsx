@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { HY } from "../lib/types";
 import { basisOffen, beitragFuer, prozentVon, punkteIndex, staffelVon, ticketBetrag } from "../lib/logic";
 import { useStore } from "../store";
@@ -12,6 +12,7 @@ import { Icon, type IconName } from "./Icon";
 import { ElternInfosTab } from "./ElternInfosTab";
 import { KontoTab } from "./KontoTab";
 import { ProfilSheet } from "./ProfilSheet";
+import { pushAboAuffrischen } from "../lib/push";
 import { useTheme } from "../lib/theme";
 
 type Reiter = "uebersicht" | "infos" | "konto";
@@ -39,6 +40,14 @@ export function ElternApp() {
     (n, k) => n + basisOffen(k, settings.aktuelles_halbjahr, settings),
     0,
   );
+
+  // Abo wieder eintragen, falls der Server es aufgeraeumt hat.
+  //
+  // Diesen Schritt gab es bisher nur in der Schueler-/Team-Ansicht. Wurde das
+  // Abo eines Elternteils einmal geloescht (das passiert bei abgelaufenen
+  // Abos automatisch), bekam es nie wieder eine Benachrichtigung - und musste
+  // sie im Profil von Hand neu einschalten, ohne dass irgendwo stand warum.
+  useEffect(() => pushAboAuffrischen(), []);
 
   const NAV: { key: Reiter; label: string; icon: IconName; zahl?: number }[] = [
     { key: "uebersicht", label: "Übersicht", icon: "haus" },

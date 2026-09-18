@@ -8,6 +8,7 @@ import { Sheet } from "./Sheet";
 import { heuteKey, tagLang, uhr, zeitText, type NeuerTermin, type Sichtbarkeit, type Termin } from "../lib/termine";
 import { committeeLabel } from "../lib/committees";
 import { umfangText } from "../lib/termine";
+import { frage } from "../lib/melder";
 
 const seg = "flex-1 rounded-lg py-2 text-[13px] font-bold transition";
 
@@ -350,10 +351,11 @@ export function TerminSheet({
         {termin && (
           <button
             onClick={() => {
-              if (confirm(`Den Termin „${termin.titel}" wirklich löschen?`)) {
+              void frage(`Den Termin „${termin.titel}" wirklich löschen?`, "Löschen", true).then((ok) => {
+                if (!ok) return;
                 void loeschen(termin.id);
                 onSchliessen();
-              }
+              });
             }}
             className="shrink-0 rounded-xl border border-red-300 px-4 text-[14px] font-bold text-red-500 dark:border-red-500/40"
           >

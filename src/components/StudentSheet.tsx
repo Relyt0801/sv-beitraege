@@ -5,6 +5,7 @@ import { useStore } from "../store";
 import { useRole } from "../auth/RoleProvider";
 import { Sheet } from "./Sheet";
 import { PunkteSheet } from "./PunkteSheet";
+import { frage } from "../lib/melder";
 
 /**
  * Wie ein Halbjahr aussieht, je nach Stand. Die Farben kommen aus der Palette
@@ -189,10 +190,11 @@ export function StudentSheet({
           </select>
           <button
             onClick={() => {
-              if (confirm("Diese Person wirklich löschen?")) {
+              void frage("Diese Person wirklich löschen?", "Löschen", true).then((ok) => {
+                if (!ok) return;
                 removeStudent(student.id);
                 onClose();
-              }
+              });
             }}
             className="ml-auto rounded-xl border border-red-300 px-3 py-2 text-[13px] font-bold text-red-500"
           >

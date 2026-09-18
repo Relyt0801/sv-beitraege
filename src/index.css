@@ -4,10 +4,45 @@
 
 :root {
   color-scheme: light dark;
+
+  /* ----------------------------------------------------------------
+     Die zwei Hoehen, die das ganze Layout bestimmen
+     ----------------------------------------------------------------
+     Vorher standen dieselben Werte als geratene Zahlen an zwoelf Stellen im
+     Code verteilt: 3.6rem fuer die Eingabezeile, 5rem fuer die runden Knoepfe,
+     52px fuer die Unterkoepfe. Sie widersprachen sich gegenseitig und keiner
+     passte zur echten Hoehe. Ergebnis war der gemeldete Scroll-Fehler: die
+     Antwortzeile schwebte ueber dem Inhalt und Nachrichten liefen dahinter
+     durch.
+
+     --leiste = Hoehe der unteren Reiter-Leiste.
+     --kopf   = Hoehe des Kopfbereichs. Wird beim Start gemessen (App.tsx),
+                weil sie je nach Geraet zwischen 64 und 123 Pixeln liegt. */
+  --leiste: calc(3.55rem + env(safe-area-inset-bottom));
+  --kopf: 64px;
+
+  /* Hoehe der Chat-Eingabezeile: Rahmen + Polsterung + Feld. */
+  --eingabe: 3.9rem;
 }
 
-html, body, #root {
+/* Am Rechner steht die Navigation oben - unten ist dann nichts, was Platz
+   braucht. Ohne diese Zeile schwebte die Antwortzeile dort grundlos ueber
+   dem Fensterrand. */
+@media (min-width: 1024px) {
+  :root {
+    --leiste: 0px;
+  }
+}
+
+html, body {
   height: 100%;
+}
+
+/* min-height statt height: der Inhalt darf laenger als der Bildschirm werden.
+   Mit height: 100% war #root exakt fensterhoch und alles darunter quoll heraus -
+   Randfaelle beim Scrollen kamen genau daher. */
+#root {
+  min-height: 100%;
 }
 
 body {

@@ -11,7 +11,8 @@ import { passwortProblem } from "../lib/passwort";
 import { SELECTABLE_COMMITTEES, committeeIcon, committeeLabel, rolleUndKomitees } from "../lib/committees";
 import { ladeKomiteeAntraege, stelleKomiteeAntrag } from "../lib/komitee-antrag";
 import { useTheme } from "../lib/theme";
-import { enablePush, pushConfigured, pushPermission } from "../lib/push";
+import { enablePush, pushConfigured, pushDiagnose, pushPermission } from "../lib/push";
+import { frage, meldeFehler } from "../lib/melder";
 
 /** Das eigene Profil: Bild, Namensfarbe, Passwort, Komitee-Wechsel, Hilfe. */
 export function ProfilSheet({
@@ -219,7 +220,7 @@ export function ProfilSheet({
                     if (r.ok) {
                       setHatAntrag(true);
                       setAntragOffen(false);
-                    } else alert(r.error);
+                    } else meldeFehler(r.error || "Hat nicht geklappt.");
                   }}
                   className="ml-auto rounded-lg bg-brand px-4 py-2 text-sm font-bold text-white disabled:opacity-40"
                 >
@@ -271,7 +272,7 @@ export function ProfilSheet({
                   const r = await enablePush();
                   setPushBusy(false);
                   setPerm(pushPermission());
-                  if (!r.ok && r.error) alert("Hat nicht geklappt: " + r.error);
+                  if (!r.ok && r.error) meldeFehler("Hat nicht geklappt: " + r.error);
                 }}
                 className="mt-2 rounded-lg bg-brand px-3.5 py-2 text-sm font-bold text-white disabled:opacity-40"
               >
@@ -279,6 +280,8 @@ export function ProfilSheet({
               </button>
             </>
           )}
+
+          <Pushdiagnose />
         </div>
       )}
 
@@ -339,7 +342,9 @@ export function ProfilSheet({
         {hasSupabase && (
           <button
             className={`${row} text-red-500`}
-            onClick={() => confirm("Wirklich abmelden?") && void supabase!.auth.signOut()}
+            onClick={() =>
+              void frage("Wirklich abmelden?", "Abmelden").then((ok) => ok && void supabase!.auth.signOut())
+            }
           >
             <span>↩</span> Abmelden
           </button>
@@ -349,6 +354,65 @@ export function ProfilSheet({
       <button className="btn-primary mt-5" onClick={onClose}>
         Fertig
       </button>
+
+      <Versionszeile />
     </Sheet>
+  );
+}
+
+/**
+ * Welcher Stand laeuft hier gerade?
+ *
+ * Ohne diese Zeile kann niemand unterscheiden, ob eine Funktion fehlt oder ob
+ * nur der Deploy haengt. Genau das ist schon passiert: gemeldet wurden
+ * Aenderungen als fehlend, die im Code laengst drin waren - der Browser hatte
+ * nur den alten Stand. Das Kuerzel laesst sich mit dem letzten Commit auf
+ * GitHub vergleichen.
+ */
+function Versionszeile() {
+  const commit = typeof __BAU_COMMIT__ === "string" ? __BAU_COMMIT__ : "dev";
+  const zeit = typeof __BAU_ZEIT__ === "string" ? __BAU_ZEIT__ : "";
+  const datum = zeit
+    ? new Date(zeit).toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" })
+    : "";
+  return (
+    <p className="mt-4 text-center text-[11px] text-tinte-leise">
+      Stand {datum} · Version {commit}
+    </p>
+  );
+}
+
+/**
+ * "Warum kommt bei mir nichts an?"
+ *
+ * Bis eben verschluckte die App jeden Fehler beim Verschicken von
+ * Benachrichtigungen (siehe src/lib/push.ts). Niemand konnte sagen, ob der
+ * Schlüssel auf dem Server fehlt, die Erlaubnis nicht erteilt ist oder das Abo
+ * gelöscht wurde. Diese Zeile beantwortet genau das – aufklappbar, damit sie
+ * niemanden stört, der kein Problem hat.
+ */
+function Pushdiagnose() {
+  const [offen, setOffen] = useState(false);
+  const [text, setText] = useState("Wird geprüft …");
+
+  useEffect(() => {
+    if (!offen) return;
+    let aktuell = true;
+    void pushDiagnose().then((t) => aktuell && setText(t));
+    return () => {
+      aktuell = false;
+    };
+  }, [offen]);
+
+  return (
+    <div className="mt-2">
+      <button
+        onClick={() => setOffen((v) => !v)}
+        className="text-[12px] font-semibold text-tinte-leise underline"
+      >
+        {offen ? "Prüfung ausblenden" : "Kommt nichts an? Hier prüfen"}
+      </button>
+      {offen && <p className="mt-1.5 text-[12px] leading-relaxed text-tinte-matt">{text}</p>}
+    </div>
   );
 }

@@ -2,6 +2,8 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState, ty
 import { hasSupabase, supabase } from "./lib/supabase";
 import { pushToUsers } from "./lib/push";
 import { lesbarerName } from "./lib/profil";
+import { meldeFehler } from "./lib/melder";
+import { abonniere } from "./lib/realtime";
 
 export type TopicItemType = "nachricht" | "todo" | "umfrage";
 
@@ -50,6 +52,14 @@ export interface TopicItem {
   author_koms: string[] | null; // relevante Komitees des Autors (Slugs)
   created_by: string | null;
   created_at: string;
+  /**
+   * Nur im Browser gesetzt, steht in keiner Tabelle: die Nachricht konnte nicht
+   * gespeichert werden. Vorher wurde sie in dem Fall einfach wieder entfernt
+   * und der Grund per alert() gemeldet - kam der Hinweis nicht durch, war die
+   * Nachricht kommentarlos weg. Genau das war mit "Nachrichten tauchen nicht
+   * mehr auf" gemeint.
+   */
+  nicht_gesendet?: string;
 }
 
 const LS = "sv-beitraege:topics";
@@ -207,7 +217,8 @@ export function TopicsProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!hasSupabase) return;
-    let channel: ReturnType<NonNullable<typeof supabase>["channel"]> | null = null;
+    let alive = true;
+    let abmelden: (() => void) | null = null;
     const start = async () => {
       const { data } = await supabase!.auth.getSession();
       if (!data.session) {
@@ -231,9 +242,13 @@ export function TopicsProvider({ children }: { children: ReactNode }) {
         if (st) nameRef.current = `${st.vorname ?? ""} ${st.nachname ?? ""}`.trim() || nameRef.current;
       }
       await loadAll();
-      if (channel) return;
-      channel = supabase!
-        .channel("sv-topics")
+      // Siehe events-store: der Kanal entsteht erst nach mehreren awaits.
+      if (!alive || abmelden) return;
+      abmelden = abonniere({
+        name: "sv-topics",
+        nachholen: planeNachladen,
+        aufbauen: (kanal) =>
+          kanal
         .on("postgres_changes", { event: "*", schema: "public", table: "topics" }, planeNachladen)
         // Chat-Nachrichten kommen einzeln an und werden einzeln eingefügt –
         // das ist der Unterschied zwischen "sofort da" und "lädt kurz".
@@ -263,21 +278,23 @@ export function TopicsProvider({ children }: { children: ReactNode }) {
           const wer = ((p.eventType === "DELETE" ? p.old : p.new) as { user_id?: string })?.user_id;
           if (wer && wer === uidRef.current) return;
           planeNachladen();
-        })
-        .subscribe();
+        }),
+      });
     };
     void start();
     const { data: sub } = supabase!.auth.onAuthStateChange((event) => {
       if (event === "SIGNED_IN" || event === "SIGNED_OUT") {
         setTopics([]); setItems([]); setMembersState({}); setTopicTagsState({}); setMyVotes({}); setReads({});
-        if (channel) { supabase!.removeChannel(channel); channel = null; }
+        abmelden?.();
+        abmelden = null;
         void start();
       }
     });
     return () => {
+      alive = false;
       sub.subscription.unsubscribe();
       if (nachladeTimer.current) clearTimeout(nachladeTimer.current);
-      if (channel) supabase!.removeChannel(channel);
+      abmelden?.();
     };
   }, [loadAll, planeNachladen]);
 
@@ -299,7 +316,7 @@ export function TopicsProvider({ children }: { children: ReactNode }) {
       id, title: topic.title, tag: topic.tag, kind: topic.kind, visibility: nt.visibility,
       parent_id: topic.parent_id, created_by: uidRef.current,
     });
-    if (error) { alert((topic.kind === "ticket" ? "Frage senden" : "Ordner anlegen") + " fehlgeschlagen: " + error.message); return null; }
+    if (error) { meldeFehler((topic.kind === "ticket" ? "Frage senden" : "Ordner anlegen") + " fehlgeschlagen: " + error.message); return null; }
     if (nt.memberIds.length)
       await supabase!.from("topic_members").insert(nt.memberIds.map((user_id) => ({ topic_id: id, user_id })));
     if (nt.komiteeSlugs.length)
@@ -378,7 +395,7 @@ export function TopicsProvider({ children }: { children: ReactNode }) {
     });
     if (hasSupabase) {
       const { error } = await supabase!.from("tag_members").insert({ tag: slug, user_id: uid });
-      if (error) { alert("Komitee setzen fehlgeschlagen: " + error.message); return false; }
+      if (error) { meldeFehler("Komitee setzen fehlgeschlagen: " + error.message); return false; }
     }
     return true;
   }, []);
@@ -409,8 +426,10 @@ export function TopicsProvider({ children }: { children: ReactNode }) {
       author_role: item.author_role, author_koms: item.author_koms, created_by: uidRef.current,
     });
     if (error) {
-      setItems((p) => p.filter((i) => i.id !== item.id)); // wieder entfernen
-      alert("Senden fehlgeschlagen: " + error.message);
+      // Stehen lassen und markieren statt loeschen: so sieht man, dass etwas
+      // geschrieben wurde und dass es nicht angekommen ist.
+      setItems((p) => p.map((i) => (i.id === item.id ? { ...i, nicht_gesendet: error.message } : i)));
+      meldeFehler("Die Nachricht ging nicht raus: " + error.message);
       return;
     }
     // Empfänger: Ordner-Mitglieder + Komitee-Mitglieder (Tag), ohne Autor

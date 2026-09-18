@@ -3,6 +3,8 @@ import {
 } from "react";
 import { hasSupabase, supabase } from "./lib/supabase";
 import type { NeuerTermin, Termin } from "./lib/termine";
+import { meldeFehler } from "./lib/melder";
+import { abonniere } from "./lib/realtime";
 
 const LS = "sv-beitraege:termine";
 const LOCAL_UID = "local-user";
@@ -107,7 +109,7 @@ export function TermineProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!hasSupabase) return;
     let alive = true;
-    let channel: ReturnType<NonNullable<typeof supabase>["channel"]> | null = null;
+    let abmelden: (() => void) | null = null;
 
     const start = async () => {
       const { data } = await supabase!.auth.getSession();
@@ -117,13 +119,18 @@ export function TermineProvider({ children }: { children: ReactNode }) {
         return;
       }
       await Promise.all([laden(), michLaden()]);
-      if (channel) return;
-      channel = supabase!
-        .channel("sv-termine")
-        .on("postgres_changes", { event: "*", schema: "public", table: "termine" }, planeNachladen)
-        .on("postgres_changes", { event: "*", schema: "public", table: "termin_komitees" }, planeNachladen)
-        .on("postgres_changes", { event: "*", schema: "public", table: "termin_personen" }, planeNachladen)
-        .subscribe();
+      // Siehe events-store: der Kanal entsteht erst nach einem await, deshalb
+      // hier pruefen, ob die Ansicht ueberhaupt noch da ist.
+      if (!alive || abmelden) return;
+      abmelden = abonniere({
+        name: "sv-termine",
+        nachholen: planeNachladen,
+        aufbauen: (kanal) =>
+          kanal
+            .on("postgres_changes", { event: "*", schema: "public", table: "termine" }, planeNachladen)
+            .on("postgres_changes", { event: "*", schema: "public", table: "termin_komitees" }, planeNachladen)
+            .on("postgres_changes", { event: "*", schema: "public", table: "termin_personen" }, planeNachladen),
+      });
     };
     void start();
 
@@ -132,10 +139,8 @@ export function TermineProvider({ children }: { children: ReactNode }) {
         setTermine([]);
         setMeineKomitees([]);
         setMeineStudentIds([]);
-        if (channel) {
-          supabase!.removeChannel(channel);
-          channel = null;
-        }
+        abmelden?.();
+        abmelden = null;
         void start();
       }
     });
@@ -144,7 +149,7 @@ export function TermineProvider({ children }: { children: ReactNode }) {
       alive = false;
       sub.subscription.unsubscribe();
       if (timer.current) clearTimeout(timer.current);
-      if (channel) supabase!.removeChannel(channel);
+      abmelden?.();
     };
   }, [laden, michLaden, planeNachladen]);
 
@@ -240,7 +245,7 @@ export function TermineProvider({ children }: { children: ReactNode }) {
       const { error } = await supabase!.from("termine").delete().eq("id", id);
       if (error) {
         setTermine(vorher);
-        alert("Der Termin konnte nicht gelöscht werden: " + error.message);
+        meldeFehler("Der Termin konnte nicht gelöscht werden: " + error.message);
       }
     },
     [termine, lokalSpeichern],

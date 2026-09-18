@@ -9,6 +9,7 @@ import { Wochenstreifen } from "./Wochenstreifen";
 import { Kalender } from "./Kalender";
 import { TerminSheet, TerminAnsehen } from "./TerminSheet";
 import { heuteKey, type Termin } from "../lib/termine";
+import { frage, meldeFehler } from "../lib/melder";
 
 function PushBanner() {
   const [perm, setPerm] = useState(pushPermission());
@@ -26,7 +27,7 @@ function PushBanner() {
           const r = await enablePush();
           setBusy(false);
           setPerm(pushPermission());
-          if (!r.ok && r.error) alert("Hat nicht geklappt: " + r.error);
+          if (!r.ok && r.error) meldeFehler("Hat nicht geklappt: " + r.error);
         }}
         className="ml-auto rounded-lg bg-brand px-3 py-1.5 text-sm font-semibold text-white"
       >
@@ -142,7 +143,9 @@ export function EventsTab() {
           canDelete={canEditData}
           onVote={(optId) => vote(e.id, optId, e.poll_multiple)}
           onDelete={() => {
-            if (confirm("Dieses Event wirklich löschen?")) void deleteEvent(e.id);
+            void frage("Dieses Event wirklich löschen?", "Löschen", true).then(
+              (ok) => ok && void deleteEvent(e.id),
+            );
           }}
         />
         ))}
