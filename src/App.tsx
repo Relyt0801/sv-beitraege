@@ -155,6 +155,34 @@ function Main() {
   const [onlyOpen, setOnlyOpen] = useState(false);
 
   const [massMode, setMassMode] = useState(false);
+
+  // Kopf und Reiter-Leiste messen, statt ihre Hoehe zu raten.
+  //
+  // An zwoelf Stellen standen feste Werte (52px, 3.6rem, 5rem). Die echte
+  // Kopfhoehe liegt je nach Geraet zwischen 64 und 123 Pixeln - beim iPhone im
+  // Standalone-Modus kommt die Statusleiste dazu, am Rechner eine zweite
+  // Navigationszeile. Deshalb rutschten Unterkoepfe hinter den Kopf und die
+  // Antwortzeile stand falsch. Gemessen wird bei jeder Groessenaenderung.
+  const kopfRef = useRef<HTMLElement | null>(null);
+  const leisteRef = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    const setzen = () => {
+      const wurzel = document.documentElement;
+      const kopf = kopfRef.current?.offsetHeight;
+      if (kopf) wurzel.style.setProperty("--kopf", `${Math.round(kopf)}px`);
+      const leiste = leisteRef.current?.offsetHeight;
+      wurzel.style.setProperty("--leiste", leiste ? `${Math.round(leiste)}px` : "0px");
+    };
+    setzen();
+    const beobachter = new ResizeObserver(setzen);
+    if (kopfRef.current) beobachter.observe(kopfRef.current);
+    if (leisteRef.current) beobachter.observe(leisteRef.current);
+    window.addEventListener("resize", setzen);
+    return () => {
+      beobachter.disconnect();
+      window.removeEventListener("resize", setzen);
+    };
+  }, [massMode]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [openId, setOpenId] = useState<string | null>(null);
   const [showAdd, setShowAdd] = useState(false);
@@ -278,8 +306,8 @@ function Main() {
   ];
 
   return (
-    <div className="mx-auto max-w-5xl px-3 pb-36 sm:px-5 lg:pb-12">
-      <header className="sticky top-0 z-20 -mx-3 border-b border-papier-linie bg-papier/90 px-3 pb-3 pt-[calc(env(safe-area-inset-top)+0.7rem)] backdrop-blur dark:border-slate-800 dark:bg-slate-950/90 sm:-mx-5 sm:px-5">
+    <div className="mx-auto max-w-5xl px-3 pb-[calc(var(--leiste)+1.5rem)] sm:px-5">
+      <header ref={kopfRef} className="sticky top-0 z-20 -mx-3 border-b border-papier-linie bg-papier/90 px-3 pb-3 pt-[calc(env(safe-area-inset-top)+0.7rem)] backdrop-blur dark:border-slate-800 dark:bg-slate-950/90 sm:-mx-5 sm:px-5">
         <div className="mx-auto flex max-w-5xl items-center gap-2.5">
           {/* Ein Titel, der zum Reiter passt – genau wie in der Elternansicht. */}
           <div className="min-w-0 flex-1 leading-tight">
@@ -600,7 +628,7 @@ function Main() {
       {tab === "kasse" && teamView && canEditData && !massMode && (
         <button
           onClick={() => setShowAdd(true)}
-          className="fixed bottom-[calc(env(safe-area-inset-bottom)+5rem)] right-4 z-30 flex h-14 w-14 items-center justify-center rounded-2xl bg-brand text-3xl text-white shadow-lg shadow-brand/40 transition active:scale-95 sm:right-6"
+          className="fixed bottom-[calc(var(--leiste)+1.25rem)] right-4 z-30 flex h-14 w-14 items-center justify-center rounded-2xl bg-brand text-3xl text-white shadow-lg shadow-brand/40 transition active:scale-95 sm:right-6"
           aria-label="Person hinzufügen"
         >
           ＋
@@ -610,7 +638,7 @@ function Main() {
       {tab === "events" && canEditData && (
         <button
           onClick={() => setShowComposer(true)}
-          className="fixed bottom-[calc(env(safe-area-inset-bottom)+5rem)] right-4 z-30 flex h-14 w-14 items-center justify-center rounded-2xl bg-brand text-3xl text-white shadow-lg shadow-brand/40 transition active:scale-95 sm:right-6"
+          className="fixed bottom-[calc(var(--leiste)+1.25rem)] right-4 z-30 flex h-14 w-14 items-center justify-center rounded-2xl bg-brand text-3xl text-white shadow-lg shadow-brand/40 transition active:scale-95 sm:right-6"
           aria-label="Event erstellen"
         >
           ＋
@@ -629,7 +657,7 @@ function Main() {
 
       {/* Feste Tab-Bar unten */}
       {!massMode && (
-        <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-papier-linie bg-white/95 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95 lg:hidden">
+        <nav ref={leisteRef} className="fixed inset-x-0 bottom-0 z-40 border-t border-papier-linie bg-white/95 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95 lg:hidden">
           <div className="mx-auto flex max-w-5xl items-stretch justify-around pb-[env(safe-area-inset-bottom)]">
             {navItems.filter((n) => n.show).map((n) => (
               <button

@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTopics, type Topic, type TopicItem } from "../topics-store";
 import { useRole } from "../auth/RoleProvider";
 import { useStore } from "../store";
 import { committeeIcon, committeeLabel } from "../lib/committees";
 import { Avatar, PersonName } from "./Avatar";
+import { ChatBlasen, ChatEingabe } from "./ChatBlasen";
 import { BannHinweis } from "./BannHinweis";
 import { Sheet } from "./Sheet";
 
@@ -38,7 +39,7 @@ export function KomiteePage({ topic, onBack }: { topic: Topic; onBack: () => voi
 
   return (
     <div>
-      <div className="sticky top-[52px] z-10 -mx-3 flex items-center gap-2 border-b border-papier-linie bg-papier-matt/95 px-3 py-2 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95 sm:-mx-5 sm:px-5">
+      <div className="sticky top-[var(--kopf)] z-10 -mx-3 flex items-center gap-2 border-b border-papier-linie bg-papier-matt/95 px-3 py-2 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95 sm:-mx-5 sm:px-5">
         <button className="iconbtn" onClick={onBack} aria-label="Zurück">‹</button>
         <span className="text-xl">{icon}</span>
         <div className="min-w-0 flex-1 truncate text-[17px] font-bold">{titel}</div>
@@ -117,7 +118,7 @@ export function KomiteePage({ topic, onBack }: { topic: Topic; onBack: () => voi
       )}
 
       {tab === "uebersicht" && !banned && (
-        <div className="fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+3.6rem)] z-30 border-t border-papier-linie bg-papier-matt/95 px-3 py-2 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95 sm:px-5">
+        <div className="fixed inset-x-0 bottom-[var(--leiste)] z-30 border-t border-papier-linie bg-papier-matt/95 px-3 py-2 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95 sm:px-5">
           <div className="mx-auto grid max-w-5xl grid-cols-3 gap-2">
             <NeuKnopf icon="📌" label="Anpinnen" onClick={() => setNeu("pin")} />
             <NeuKnopf icon="🗳️" label="Abstimmung" onClick={() => setNeu("umfrage")} />
@@ -277,17 +278,19 @@ function UmfrageKarte({
   );
 }
 
+/**
+ * Der Chat einer Komitee-Seite.
+ *
+ * Hier stand bis eben eine wortgleiche Kopie von ChatBlasen und ChatEingabe.
+ * Jeder Fehler im Layout musste deshalb zweimal behoben werden – und genau das
+ * ist beim Scroll-Fehler auch passiert. Jetzt sind es dieselben Bausteine.
+ */
 function ChatBereich({
   topic, liste, banned, darfLoeschen, uid,
 }: { topic: Topic; liste: TopicItem[]; banned: boolean; darfLoeschen: boolean; uid: string }) {
   const { postItem, deleteItem, committeesOf } = useTopics();
   const { role } = useRole();
   const [text, setText] = useState("");
-  const ende = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    ende.current?.scrollIntoView({ block: "end" });
-  }, [liste.length]);
 
   async function senden() {
     if (!text.trim()) return;
@@ -297,64 +300,9 @@ function ChatBereich({
   }
 
   return (
-    <div className="flex flex-col">
-      <div className="space-y-2.5 py-3 pb-28">
-        {liste.length === 0 && <p className="py-12 text-center text-sm text-tinte-leise">Noch keine Nachricht.</p>}
-        {liste.map((m) => {
-          const meins = m.created_by === uid;
-          return (
-            <div key={m.id} className={`flex items-end gap-2 ${meins ? "justify-end" : "justify-start"}`}>
-              {!meins && <Avatar userId={m.created_by} name={m.author} size={28} />}
-              <div className={`max-w-[80%] rounded-2xl px-3.5 py-2 sm:max-w-[65%] lg:max-w-[50%] ${meins ? "bg-brand text-white" : "bg-white shadow-card dark:bg-slate-900 dark:shadow-cardDark"}`}>
-                <PersonName
-                  userId={m.created_by}
-                  name={m.author}
-                  role={m.author_role}
-                  koms={m.author_koms}
-                  className={`mb-0.5 block text-[12px] font-bold leading-tight ${meins ? "text-right" : ""}`}
-                  aufFarbig={meins}
-                />
-                <div className="whitespace-pre-wrap break-words text-[15px] leading-snug">{m.body}</div>
-                <div className={`mt-1 text-right text-[10px] ${meins ? "text-white/70" : "text-tinte-leise"}`}>
-                  {new Date(m.created_at).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })}
-                  {(meins || darfLoeschen) && (
-                    <button onClick={() => confirm("Nachricht löschen?") && deleteItem(m.id)} className="ml-2 underline">
-                      löschen
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
-          );
-        })}
-        <div ref={ende} />
-      </div>
-
-      {!banned && (
-        <div className="fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+3.6rem)] z-30 flex items-end gap-2 border-t border-papier-linie bg-papier-matt/95 px-3 py-2 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95 sm:px-5">
-          <textarea
-            rows={1}
-            className="field max-h-28 flex-1 resize-none py-2.5"
-            placeholder="Nachricht…"
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                void senden();
-              }
-            }}
-          />
-          <button
-            onClick={senden}
-            disabled={!text.trim()}
-            className="flex h-11 w-11 items-center justify-center rounded-xl bg-brand text-lg text-white disabled:opacity-40"
-            aria-label="Senden"
-          >
-            ➤
-          </button>
-        </div>
-      )}
+    <div>
+      <ChatBlasen liste={liste} uid={uid} darfLoeschen={darfLoeschen} onDelete={deleteItem} />
+      {!banned && <ChatEingabe wert={text} setWert={setText} onSenden={() => void senden()} />}
     </div>
   );
 }

@@ -106,6 +106,40 @@ Was `nachtrag.sql` im Einzelnen tut:
 | 12 Indizes | Ohne sie liest Postgres bei jeder Chat-Ansicht die ganze Tabelle. Bei 300 Personen merkt man das. |
 | `replica identity full` | Beim Löschen kam bisher nur der Schlüssel an, die App konnte nicht prüfen, ob es sie betrifft. |
 
+### Der Scroll-Fehler aus dem Screenshot
+
+Auf dem Bild hing die „Antworten…"-Leiste mitten im Fenster, lief über die
+ganze Breite, und Nachrichten scrollten dahinter durch. Dahinter steckten vier
+Fehler auf einmal:
+
+1. Die Leiste war **nicht** auf die Inhaltsbreite begrenzt, der Text aber
+   schon. Am Laptop lief sie deshalb über das ganze Fenster.
+2. Ihr Abstand nach unten war fest auf die Höhe der **Handy**-Reiterleiste
+   gesetzt. Am Rechner steht die Navigation aber oben – dort schwebte die
+   Leiste grundlos über dem Rand.
+3. Der Abstand am Seitenende reichte nicht für Leiste plus Reiterleiste.
+   **Deshalb liefen die letzten Nachrichten dahinter durch.**
+4. Das automatische Scrollen ans Ende richtete sich an der Unterkante des
+   Fensters aus – also unter der Leiste. Der vorgesehene Freiraum lag hinter
+   dem Zielpunkt und wurde einfach mitgescrollt.
+
+Statt der zwölf geratenen Zahlen, die im Code verstreut waren (`3.6rem`,
+`5rem`, `52px` – und alle widersprachen sich), misst die App jetzt beim Start
+die echte Höhe von Kopf und Reiterleiste und rechnet damit. Nachgemessen im
+Browser: die letzte Nachricht endet auf Handy **und** Laptop 32 px über der
+Eingabezeile.
+
+Dazu zwei Nebeneffekte:
+
+- Beim Lesen alter Nachrichten reißt es dich nicht mehr nach unten, sobald
+  jemand schreibt. Nur wer ohnehin unten steht, rutscht mit.
+- Am Handy hängt sich die Leiste nicht mehr ab, wenn die Tastatur aufgeht
+  (`interactive-widget=resizes-content` im Viewport).
+
+Außerdem: die Komitee-Seite hatte eine **wortgleiche Kopie** des ganzen Chats.
+Jeder Layout-Fehler musste zweimal behoben werden – beim Scroll-Fehler ist
+genau das passiert. Jetzt sind es dieselben Bausteine.
+
 ### SQL-Dateien brechen nicht mehr beim zweiten Ausführen ab
 
 `supabase/termine.sql` und `supabase/schema.sql` haben Tabellen ohne Schutz zur

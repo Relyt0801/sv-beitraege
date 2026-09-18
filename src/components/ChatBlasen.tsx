@@ -20,12 +20,44 @@ export function ChatBlasen({
   leerText?: string;
 }) {
   const ende = useRef<HTMLDivElement | null>(null);
+  const stehtUnten = useRef(true);
+  const erstesMal = useRef(true);
+  // Bis zu diesem Zeitpunkt scrollt die App selbst. Scroll-Meldungen aus dem
+  // Zeitraum stammen nicht vom Leser und duerfen nicht als "er ist weggerollt"
+  // gewertet werden - sonst bremst die sanfte Bewegung sich selbst aus.
+  const eigenerSprung = useRef(0);
+
+  // Steht der Leser gerade ganz unten?
+  //
+  // Vorher wurde bei jeder eingehenden Nachricht nach unten gesprungen - auch
+  // mitten im Nachlesen alter Nachrichten. Wer oben liest, bleibt jetzt oben
+  // und bekommt den neuen Stand, sobald er selbst wieder nach unten scrollt.
   useEffect(() => {
-    ende.current?.scrollIntoView({ block: "end" });
+    const pruefen = () => {
+      if (Date.now() < eigenerSprung.current) return;
+      const rest = document.documentElement.scrollHeight - window.scrollY - window.innerHeight;
+      stehtUnten.current = rest < 180;
+    };
+    pruefen();
+    window.addEventListener("scroll", pruefen, { passive: true });
+    return () => window.removeEventListener("scroll", pruefen);
+  }, []);
+
+  useEffect(() => {
+    if (!stehtUnten.current) return;
+    // Der Platzhalter unten ist so hoch wie Eingabezeile plus Reiter-Leiste.
+    // Deshalb landet die letzte Blase ueber der Eingabe statt dahinter - genau
+    // das war der gemeldete Fehler.
+    eigenerSprung.current = Date.now() + 900;
+    ende.current?.scrollIntoView({
+      block: "end",
+      behavior: erstesMal.current ? "auto" : "smooth",
+    });
+    erstesMal.current = false;
   }, [liste.length]);
 
   return (
-    <div className="space-y-2 py-3 pb-28">
+    <div className="space-y-2 py-3">
       {liste.length === 0 && <p className="py-12 text-center text-sm text-tinte-leise">{leerText}</p>}
       {liste.map((m) => {
         const meins = m.created_by === uid;
@@ -61,12 +93,23 @@ export function ChatBlasen({
           </div>
         );
       })}
-      <div ref={ende} />
+      {/* Platzhalter statt padding-bottom: scrollIntoView richtet sich nach der
+          Unterkante dieses Elements. Ein blosses pb-28 lag dahinter und wurde
+          einfach mitgescrollt. */}
+      <div ref={ende} aria-hidden className="h-[calc(var(--leiste)+var(--eingabe))]" />
     </div>
   );
 }
 
-/** Eingabezeile, fest unten über der Reiter-Leiste. */
+/**
+ * Eingabezeile, fest unten über der Reiter-Leiste.
+ *
+ * Zwei Dinge waren hier falsch: der Abstand nach unten war fest auf die Höhe
+ * der Handy-Reiterleiste gesetzt, die es am Rechner gar nicht gibt – dort
+ * schwebte die Zeile grundlos über dem Rand. Und die Leiste lief über die
+ * ganze Fensterbreite, während der Inhalt auf max-w-5xl begrenzt ist. Auf dem
+ * Laptop sah das aus, als hinge sie frei im Bild.
+ */
 export function ChatEingabe({
   wert,
   setWert,
@@ -79,7 +122,8 @@ export function ChatEingabe({
   platzhalter?: string;
 }) {
   return (
-    <div className="fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+3.6rem)] z-30 flex items-end gap-2 border-t border-papier-linie bg-papier-matt/95 px-3 py-2 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95 sm:px-5">
+    <div className="fixed inset-x-0 bottom-[var(--leiste)] z-30 border-t border-papier-linie bg-papier-matt/95 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95">
+      <div className="mx-auto flex max-w-5xl items-end gap-2 px-3 py-2 sm:px-5">
       <textarea
         rows={1}
         className="field max-h-28 flex-1 resize-none py-2.5"
@@ -101,6 +145,7 @@ export function ChatEingabe({
       >
         ➤
       </button>
+      </div>
     </div>
   );
 }
