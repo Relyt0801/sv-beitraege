@@ -112,7 +112,7 @@ export function ChatsTab() {
               : "Du bist noch in keinem Komitee. Das Stufenteam kann dich eintragen."}
           </div>
         ) : (
-          <div className="grid gap-2.5 lg:grid-cols-2">
+          <div className="grid items-start gap-2.5 lg:grid-cols-2">
             {komiteeChats.map((t) => (
               <ChatCard
                 key={t.id}
@@ -412,7 +412,7 @@ function TicketListe({
       {offene.length === 0 ? (
         <p className="py-8 text-center text-sm text-tinte-leise">Gerade keine offenen Fragen.</p>
       ) : (
-        <div className="grid gap-2.5 lg:grid-cols-2">
+        <div className="grid items-start gap-2.5 lg:grid-cols-2">
           {offene.map((t) => (
             <TicketCard key={t.id} topic={t} unread={unreadCount(t.id)} onOpen={() => onOpen(t.id)} />
           ))}
@@ -424,7 +424,7 @@ function TicketListe({
           <summary className="cursor-pointer text-xs font-bold uppercase tracking-wide text-tinte-leise">
             Erledigt ({erledigt.length})
           </summary>
-          <div className="mt-2 grid gap-2.5 lg:grid-cols-2">
+          <div className="mt-2 grid items-start gap-2.5 lg:grid-cols-2">
             {erledigt.map((t) => (
               <TicketCard key={t.id} topic={t} unread={0} onOpen={() => onOpen(t.id)} />
             ))}

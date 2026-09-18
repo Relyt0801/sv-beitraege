@@ -30,7 +30,7 @@ export function BeitraegeTab() {
   }
 
   return (
-    <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+    <div className="grid items-start gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
       {/* ---------------- Möglichkeiten ---------------- */}
       <section className="card p-4 sm:p-5">
         <h2 className="text-lg font-bold">Wofür gibt es Prozent?</h2>

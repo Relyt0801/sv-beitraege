@@ -53,7 +53,10 @@ export function MyKasse({
     .sort((a, b) => (a.datum < b.datum ? 1 : -1));
 
   return (
-    <div className="mx-auto grid max-w-3xl gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]" data-tour="meine-karte">
+    <div
+      className="mx-auto grid max-w-3xl items-start gap-3 lg:max-w-5xl lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]"
+      data-tour="meine-karte"
+    >
       {/* ------------------------------------------ die eine Zahl */}
       <section className="leitkarte lg:col-span-2">
         <div className="kennlabel text-white/60">

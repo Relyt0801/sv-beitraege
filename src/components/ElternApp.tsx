@@ -49,7 +49,7 @@ export function ElternApp() {
   return (
     <div className="min-h-dvh bg-papier-matt pb-24 dark:bg-slate-950 lg:pb-0">
       <header className="sticky top-0 z-20 border-b border-papier-linie bg-white/90 backdrop-blur dark:border-slate-800 dark:bg-slate-900/90">
-        <div className="mx-auto flex max-w-3xl items-center gap-3 px-4 py-3">
+        <div className="mx-auto flex max-w-5xl items-center gap-3 px-4 py-3">
           <div className="min-w-0 flex-1">
             <h1 className="truncate text-lg font-extrabold leading-tight">
               {reiter === "uebersicht" ? "Stufenkasse" : reiter === "infos" ? "Infos vom Stufenteam" : "Kontodaten"}
@@ -72,7 +72,7 @@ export function ElternApp() {
         </div>
 
         {/* Am Rechner steht die Navigation oben, auf dem Handy unten. */}
-        <div className="mx-auto mt-2 hidden max-w-3xl items-center gap-1 lg:flex">
+        <div className="mx-auto mt-2 hidden max-w-5xl items-center gap-1 lg:flex">
           {NAV.map((n) => (
             <button
               key={n.key}
@@ -95,7 +95,7 @@ export function ElternApp() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-3xl px-4 py-4 lg:pb-8">
+      <main className="mx-auto max-w-3xl px-4 py-4 lg:max-w-5xl lg:pb-8">
         {reiter === "uebersicht" && (
           <>
             {!ready || !bereit ? (
@@ -112,28 +112,30 @@ export function ElternApp() {
             ) : (
               <div className="grid gap-4">
                 {/* Erst die Summe für die ganze Familie, dann jedes Kind einzeln. */}
-                <section className="leitkarte">
-                  <div className="kennlabel text-white/60">
-                    {kinder.length > 1 ? "Offen für Ihre Kinder" : "Noch offen"}
-                  </div>
-                  <div className="mt-1.5 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                    <span className={`leitwert ${familieOffen > 0 ? "text-white" : "text-emerald-400"}`}>
-                      {familieOffen} €
-                    </span>
-                    <span className="text-[13px] text-white/60">
-                      {familieOffen > 0
-                        ? kinder.length > 1
-                          ? "bitte für jedes Kind einzeln überweisen"
-                          : "für die Stufenkasse"
-                        : "Alles bezahlt. Vielen Dank!"}
-                    </span>
+                <section className="leitkarte sm:flex sm:items-end sm:justify-between sm:gap-6">
+                  <div className="min-w-0">
+                    <div className="kennlabel text-white/60">
+                      {kinder.length > 1 ? "Offen für Ihre Kinder" : "Noch offen"}
+                    </div>
+                    <div className="mt-1.5 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                      <span className={`leitwert ${familieOffen > 0 ? "text-white" : "text-emerald-400"}`}>
+                        {familieOffen} €
+                      </span>
+                      <span className="text-[13px] text-white/60">
+                        {familieOffen > 0
+                          ? kinder.length > 1
+                            ? "bitte für jedes Kind einzeln überweisen"
+                            : "für die Stufenkasse"
+                          : "Alles bezahlt. Vielen Dank!"}
+                      </span>
+                    </div>
                   </div>
                   {familieOffen > 0 && (
                     <button
                       onClick={() => setReiter("konto")}
-                      className="mt-4 flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-white text-[14px] font-semibold text-tinte transition active:scale-[.99]"
+                      className="mt-4 flex h-11 w-full shrink-0 items-center justify-center rounded-xl bg-white px-5 text-[14px] font-semibold text-tinte transition active:scale-[.99] sm:mt-0 sm:w-auto"
                     >
-                      Kontodaten und Verwendungszweck
+                      Kontodaten der Stufenkasse
                     </button>
                   )}
                 </section>
@@ -153,8 +155,16 @@ export function ElternApp() {
           </>
         )}
 
-        {reiter === "infos" && <ElternInfosTab />}
-        {reiter === "konto" && <KontoTab kinder={kinder} />}
+        {reiter === "infos" && (
+          <div className="mx-auto max-w-3xl">
+            <ElternInfosTab />
+          </div>
+        )}
+        {reiter === "konto" && (
+          <div className="mx-auto max-w-3xl">
+            <KontoTab />
+          </div>
+        )}
       </main>
 
       <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-papier-linie bg-white/95 backdrop-blur dark:border-slate-800 dark:bg-slate-900/95 lg:hidden">
@@ -238,7 +248,7 @@ function KindKarte({
         </div>
       </section>
 
-      <div className="grid gap-3 lg:grid-cols-2">
+      <div className="grid items-start gap-3 lg:grid-cols-2">
         {/* Prozentstand */}
         <section className="card p-5">
           <div className="text-sm text-tinte-matt">Mithelfen beim Abiball</div>

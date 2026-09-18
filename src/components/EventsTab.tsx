@@ -60,7 +60,7 @@ export function EventsTab() {
   return (
     <>
       <PushBanner />
-      <div className="grid gap-3 lg:grid-cols-2">
+      <div className="grid items-start gap-3 lg:grid-cols-2">
         {events.map((e) => (
         <EventCard
           key={e.id}

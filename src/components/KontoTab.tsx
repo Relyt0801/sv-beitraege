@@ -1,8 +1,6 @@
 import { useState } from "react";
 import { useEltern } from "../eltern-store";
-import { useStore } from "../store";
 import { useRole } from "../auth/RoleProvider";
-import type { Student } from "../lib/types";
 
 /**
  * IBAN in Viererblöcken, so wie man sie auf Papier schreibt.
@@ -25,9 +23,8 @@ export function jahrgangKurz(halbjahr: string): string {
  * Die Daten kommen aus der Datenbank und stehen an keiner Stelle im Quellcode.
  * Lesen darf sie jedes angemeldete Konto, ändern nur Admin und Kassenwart.
  */
-export function KontoTab({ kinder }: { kinder: Student[] }) {
+export function KontoTab() {
   const { konto, kontoSpeichern } = useEltern();
-  const { settings } = useStore();
   const { role } = useRole();
   const [kopiert, setKopiert] = useState<string | null>(null);
   const darfAendern = role === "admin" || role === "kassenwart";
@@ -46,8 +43,6 @@ export function KontoTab({ kinder }: { kinder: Student[] }) {
       </div>
     );
 
-  const jahr = jahrgangKurz(settings.aktuelles_halbjahr);
-
   async function kopieren(text: string, was: string) {
     try {
       await navigator.clipboard.writeText(text);
@@ -63,7 +58,7 @@ export function KontoTab({ kinder }: { kinder: Student[] }) {
       <section className="card p-5">
         <h2 className="text-lg font-bold">So überweisen Sie</h2>
         <p className="mt-0.5 text-[13px] leading-relaxed text-tinte-matt dark:text-slate-400">
-          Bitte immer den Verwendungszweck angeben. Sonst können wir das Geld nicht zuordnen.
+          Bei mehreren Kindern bitte für jedes Kind einzeln überweisen.
         </p>
 
         <dl className="mt-4 grid gap-2">
@@ -78,37 +73,6 @@ export function KontoTab({ kinder }: { kinder: Student[] }) {
           <Zeile label="BIC" wert={konto.bic} onKopieren={() => kopieren(konto.bic, "bic")} kopiert={kopiert === "bic"} />
           <Zeile label="Bank" wert={konto.bank} />
         </dl>
-      </section>
-
-      <section className="card p-5">
-        <h2 className="text-lg font-bold">Verwendungszweck</h2>
-        <p className="mt-0.5 text-[13px] leading-relaxed text-tinte-matt dark:text-slate-400">
-          Name, Vorname und das aktuelle Halbjahr. Bei mehreren Kindern bitte für jedes Kind einzeln
-          überweisen.
-        </p>
-
-        <ul className="mt-3 grid gap-2">
-          {kinder.length === 0 && (
-            <li className="rounded-xl bg-papier-matt px-3 py-2.5 text-[14px] font-semibold dark:bg-slate-800">
-              Nachname, Vorname {jahr}
-            </li>
-          )}
-          {kinder.map((k) => {
-            // Kein Komma vor der Stufe: "Adams, Tyler Q2"
-            const zweck = `${k.nachname}, ${k.vorname} ${jahr}`;
-            return (
-              <li key={k.id} className="flex items-center gap-2 rounded-xl bg-papier-matt px-3 py-2.5 dark:bg-slate-800">
-                <span className="min-w-0 flex-1 truncate text-[14px] font-semibold">{zweck}</span>
-                <button
-                  onClick={() => kopieren(zweck, k.id)}
-                  className="shrink-0 rounded-lg bg-white px-2.5 py-1.5 text-[12px] font-bold text-brand transition active:scale-95 dark:bg-slate-900"
-                >
-                  {kopiert === k.id ? "kopiert ✓" : "kopieren"}
-                </button>
-              </li>
-            );
-          })}
-        </ul>
 
         {konto.hinweis && (
           <p className="mt-3 rounded-xl bg-amber-50 p-3 text-[12px] leading-relaxed text-amber-900 dark:bg-amber-500/10 dark:text-amber-200">
