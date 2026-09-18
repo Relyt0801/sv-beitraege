@@ -1,5 +1,6 @@
+import { memo } from "react";
 import { HY, type Settings, type Student } from "../lib/types";
-import { basisOffen, beitragFuer, isActive, idx } from "../lib/logic";
+import { basisOffen, beitragFuer, isActive, idx, prozentVon } from "../lib/logic";
 
 /**
  * Wie steht die Stufenkasse da?
@@ -9,12 +10,15 @@ import { basisOffen, beitragFuer, isActive, idx } from "../lib/logic";
  * wirklich braucht: was reingekommen ist, was noch fehlt, und wie viele durch
  * sind. Darunter je Halbjahr die Quote.
  */
-export function KassenKopf({
+function KassenKopfRoh({
   students,
   settings,
+  punkte,
 }: {
   students: Student[];
   settings: Settings;
+  /** student_id -> gesammelte Prozentpunkte */
+  punkte: Record<string, number>;
 }) {
   const bis = idx(settings.aktuelles_halbjahr);
 
@@ -32,6 +36,15 @@ export function KassenKopf({
       if (i <= bis && isActive(s, i) && s.terms[h].status !== "erlassen") soll += beitragFuer(h, settings);
     });
   }
+
+  // Durchschnittliche Mithilfe. Gezaehlt wird nur, wer im laufenden Halbjahr
+  // dabei ist – wer die Stufe verlassen hat, zieht den Schnitt sonst runter,
+  // ohne dass jemand etwas dagegen tun koennte.
+  const dabei = students.filter((s) => isActive(s, bis));
+  const schnitt = dabei.length
+    ? Math.round(dabei.reduce((n, s) => n + prozentVon(punkte[s.id] || 0, settings), 0) / dabei.length)
+    : 0;
+  const beiNull = dabei.filter((s) => (punkte[s.id] || 0) === 0).length;
 
   const ein = Math.max(0, soll - offen);
   const quote = soll > 0 ? Math.round((ein / soll) * 100) : 100;
@@ -56,7 +69,7 @@ export function KassenKopf({
   return (
     <div className="mx-auto mt-2.5 max-w-5xl space-y-2.5">
       {/* --------------------------------------------- drei Kennzahlen */}
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+      <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
         <div className="card p-3.5 sm:p-4">
           <div className="kennlabel">Eingegangen</div>
           <div className="zahl mt-1.5 text-[1.75rem] font-extrabold leading-none sm:text-[2rem]">{ein} €</div>
@@ -81,7 +94,7 @@ export function KassenKopf({
           </div>
         </div>
 
-        <div className="card col-span-2 p-3.5 sm:col-span-1 sm:p-4">
+        <div className="card p-3.5 sm:p-4">
           <div className="kennlabel">Vollständig bezahlt</div>
           <div className="mt-1.5 flex items-baseline gap-2">
             <span className="zahl text-[1.75rem] font-extrabold leading-none sm:text-[2rem]">{fertig}</span>
@@ -90,6 +103,28 @@ export function KassenKopf({
           <div className="mt-1.5 text-[12px] text-tinte-matt">{anteilFertig} % der Stufe</div>
           <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-papier-matt dark:bg-slate-800">
             <div className="h-full rounded-full bg-brand" style={{ width: `${anteilFertig}%` }} />
+          </div>
+        </div>
+
+        {/* Wie viel hilft die Stufe im Schnitt mit? Sagt mehr ueber die
+            Stimmung als der Kassenstand – und zeigt, wie viele noch gar
+            nichts gemacht haben. */}
+        <div className="card p-3.5 sm:p-4">
+          <div className="kennlabel">Mithilfe im Schnitt</div>
+          <div className="zahl mt-1.5 text-[1.75rem] font-extrabold leading-none text-brand sm:text-[2rem]">
+            {schnitt} %
+          </div>
+          <div className="mt-1.5 text-[12px] text-tinte-matt">
+            {beiNull === 0 ? (
+              "alle haben schon mitgeholfen"
+            ) : (
+              <>
+                <span className="font-semibold">{beiNull}</span> noch bei 0 %
+              </>
+            )}
+          </div>
+          <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-papier-matt dark:bg-slate-800">
+            <div className="h-full rounded-full bg-brand" style={{ width: `${Math.min(100, schnitt)}%` }} />
           </div>
         </div>
       </div>
@@ -127,3 +162,9 @@ export function KassenKopf({
     </div>
   );
 }
+
+/**
+ * Der Kopf rechnet ueber alle Personen. Beim Tippen im Suchfeld aendert sich
+ * an ihm nichts – also darf er sich auch nicht neu ausrechnen.
+ */
+export const KassenKopf = memo(KassenKopfRoh);

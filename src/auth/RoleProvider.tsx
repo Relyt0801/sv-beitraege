@@ -31,6 +31,9 @@ interface RoleCtx {
   canManageRoles: boolean; // Rollen-Reiter
   profiles: Profile[];
   loginByStudent: Record<string, boolean>;
+  /** student_id -> user_id, damit Listen den Namenskreis in der Farbe der
+   *  Person zeichnen koennen – wie im Rollen-Reiter. */
+  userByStudent: Record<string, string>;
   banned: boolean;
   bannedUntil: string | null;
   bannPermanent: boolean;
@@ -226,8 +229,12 @@ export function RoleProvider({ children }: { children: ReactNode }) {
   const opUserId = profiles.find((p) => p.is_op)?.user_id ?? (isOp ? (uidRef.current ?? null) : null);
   // Grüner Punkt = Konto wird wirklich genutzt (Startpasswort wurde geändert)
   const loginByStudent: Record<string, boolean> = {};
+  const userByStudent: Record<string, string> = {};
   for (const p of profiles)
-    if (p.student_id) loginByStudent[p.student_id] = p.must_change_password === false;
+    if (p.student_id) {
+      loginByStudent[p.student_id] = p.must_change_password === false;
+      userByStudent[p.student_id] = p.user_id;
+    }
 
   const value: RoleCtx = {
     role,
@@ -241,6 +248,7 @@ export function RoleProvider({ children }: { children: ReactNode }) {
     canManageRoles: can("roles.manage"),
     profiles,
     loginByStudent,
+    userByStudent,
     banned,
     bannedUntil,
     bannPermanent: bannPerm,

@@ -13,6 +13,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { readFileSync, writeFileSync } from "node:fs";
 import { priv, privOut } from "./privat.mjs";
+import { startpasswort } from "./passwoerter.mjs";
 
 const URL = process.env.SUPABASE_URL;
 const KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -32,12 +33,10 @@ const vornamePart = (s) => clean(s).split(" ")[0].replace(/^-+|-+$/g, "");
 const nachnamePart = (s) => clean(s).replace(/ /g, "").replace(/^-+|-+$/g, "");
 const makeUsername = (n, v) => `${nachnamePart(n)}.${vornamePart(v)}`;
 
-function makePassword(len = 8) {
-  const abc = "abcdefghijkmnpqrstuvwxyz23456789"; // ohne verwechselbare Zeichen
-  let p = "";
-  for (let i = 0; i < len; i++) p += abc[Math.floor(Math.random() * abc.length)];
-  return p;
-}
+// Startpasswörter kommen aus einer Quelle, damit Schüler- und Elternzugänge
+// dieselbe Qualität haben. Acht Kleinbuchstaben waren zwar zufällig, aber
+// kurz genug, dass die App sie selbst abgelehnt hätte.
+const makePassword = startpasswort;
 
 const supabase = createClient(URL, KEY, { auth: { autoRefreshToken: false, persistSession: false } });
 const students = JSON.parse(readFileSync(priv(file), "utf8")).students;

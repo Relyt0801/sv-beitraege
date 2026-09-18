@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNachschub } from "../lib/liste";
+import { useVerzoegert } from "../lib/entwurf";
 import { hasSupabase, supabase } from "../lib/supabase";
 import { useRole } from "../auth/RoleProvider";
 import { useStore } from "../store";
@@ -47,8 +49,11 @@ export function PermissionsTab() {
   const kategorien = PERM_CATEGORIES.map((c) => ({ ...c, perms: c.perms.filter((p) => sichtbar(p.key)) }))
     .filter((c) => c.perms.length > 0);
 
+  // Nachschlagen statt durchsuchen – sonst laeuft je Konto eine Suche ueber
+  // alle Personen.
+  const nachId = useMemo(() => new Map(students.map((s) => [s.id, s])), [students]);
   const nameFor = (sid: string | null) => {
-    const s = sid ? students.find((x) => x.id === sid) : null;
+    const s = sid ? nachId.get(sid) : null;
     return s ? `${s.nachname}, ${s.vorname}` : null;
   };
 
@@ -76,8 +81,10 @@ export function PermissionsTab() {
     }
   }
 
+  const suche = useVerzoegert(q, 120);
+
   const rows = useMemo(() => {
-    const norm = normalize(q);
+    const norm = normalize(suche);
     return [...profiles]
       // Elternzugaenge haben keine Befugnisse und stehen deshalb auch nicht hier.
       .filter((p) => p.role !== "eltern")
@@ -85,7 +92,9 @@ export function PermissionsTab() {
       .filter(({ p, name }) => !norm || normalize(`${p.username} ${name ?? ""}`).includes(norm))
       .sort((a, b) => (a.name ?? a.p.username ?? "").localeCompare(b.name ?? b.p.username ?? "", "de"));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profiles, q, students]);
+  }, [profiles, suche, nachId]);
+
+  const { sichtbar: zeilenSichtbar, marke, rest } = useNachschub(rows.length, [suche]);
 
   if (!loaded)
     return (
@@ -138,7 +147,7 @@ export function PermissionsTab() {
         <p className="mb-3 text-[11px] text-tinte-leise">Ausnahmen für eine Person. Ohne Auswahl gilt, was die Rolle erlaubt.</p>
         <Suchfeld wert={q} onChange={setQ} platzhalter="Person oder Konto suchen …" />
         <div className="space-y-2">
-          {rows.map(({ p }) => {
+          {rows.slice(0, zeilenSichtbar).map(({ p }) => {
             const ov = overrides[p.user_id] || {};
             const count = Object.keys(ov).length;
             const geschuetzt = Boolean(p.is_op) || p.user_id === opUserId;
@@ -198,6 +207,11 @@ export function PermissionsTab() {
               </div>
             );
           })}
+          {rest > 0 && (
+            <div ref={marke} className="py-6 text-center text-[12px] text-tinte-leise">
+              lädt weitere … ({rest} übrig)
+            </div>
+          )}
           {rows.length === 0 && <div className="py-8 text-center text-sm text-tinte-leise">Keine Person gefunden.</div>}
         </div>
       </section>

@@ -11,6 +11,15 @@ import { TerminZeile } from "./Wochenstreifen";
 
 type Ansicht = "monat" | "woche" | "tag";
 
+/** Was auf dem Umschalter steht und was die Pfeile bewegen. */
+const ANSICHT_NAME: Record<Ansicht, string> = { monat: "Monat", woche: "Woche", tag: "Tag" };
+const SCHRITT: Record<Ansicht, string> = { monat: "Monat", woche: "Woche", tag: "Tag" };
+const ANSICHT_LANG: Record<Ansicht, string> = {
+  monat: "Monatsansicht",
+  woche: "Wochenansicht",
+  tag: "Tagesansicht",
+};
+
 /**
  * Der große Kalender.
  *
@@ -71,34 +80,45 @@ export function Kalender({
           </button>
           <div className="min-w-0 flex-1">
             <div className="truncate font-zahl text-[1.25rem] font-extrabold tracking-[-0.02em]">{titel}</div>
-            <div className="truncate text-[11px] text-tinte-leise">Termine der Stufe · Abi 28</div>
+            <div className="truncate text-[11px] text-tinte-leise">{ANSICHT_LANG[ansicht]} · Termine der Stufe</div>
           </div>
           <button
             onClick={() => weiter(-1)}
             className="iconbtn shrink-0"
-            aria-label="Zurück"
+            aria-label={`Vorheriger ${SCHRITT[ansicht]}`}
+            title={`Vorheriger ${SCHRITT[ansicht]}`}
           >
             ‹
           </button>
-          <button onClick={() => weiter(1)} className="iconbtn shrink-0" aria-label="Vor">
+          <button
+            onClick={() => weiter(1)}
+            className="iconbtn shrink-0"
+            aria-label={`Nächster ${SCHRITT[ansicht]}`}
+            title={`Nächster ${SCHRITT[ansicht]}`}
+          >
             ›
           </button>
         </div>
 
-        <div className="mx-auto flex max-w-5xl items-center gap-1.5 pb-2.5">
-          {(["monat", "woche", "tag"] as Ansicht[]).map((a) => (
-            <button
-              key={a}
-              onClick={() => setAnsicht(a)}
-              className={`rounded-lg px-3 py-1.5 text-[12px] font-semibold capitalize transition ${
-                ansicht === a
-                  ? "bg-brand/10 text-brand-dark dark:bg-brand/20 dark:text-brand-soft"
-                  : "text-tinte-matt hover:bg-papier-matt dark:text-slate-300 dark:hover:bg-slate-800"
-              }`}
-            >
-              {a}
-            </button>
-          ))}
+        <div className="mx-auto flex max-w-5xl items-center gap-2 pb-2.5">
+          {/* Sichtbarer Umschalter mit Rahmen: so erkennt man, dass es drei
+              Ansichten gibt und welche gerade laeuft. */}
+          <div className="flex shrink-0 gap-0.5 rounded-xl bg-papier-matt p-1 dark:bg-slate-800">
+            {(["monat", "woche", "tag"] as Ansicht[]).map((a) => (
+              <button
+                key={a}
+                onClick={() => setAnsicht(a)}
+                aria-pressed={ansicht === a}
+                className={`rounded-lg px-3 py-1.5 text-[12px] font-bold transition ${
+                  ansicht === a
+                    ? "bg-white text-brand-dark shadow-card dark:bg-slate-900 dark:text-brand-soft"
+                    : "text-tinte-matt dark:text-slate-300"
+                }`}
+              >
+                {ANSICHT_NAME[a]}
+              </button>
+            ))}
+          </div>
           <button
             onClick={() => setAnker(heute)}
             className="ml-auto rounded-lg border border-papier-linie px-3 py-1.5 text-[12px] font-semibold text-tinte-matt transition active:scale-95 dark:border-slate-700 dark:text-slate-300"

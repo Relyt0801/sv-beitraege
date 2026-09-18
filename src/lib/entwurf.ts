@@ -51,3 +51,19 @@ export function useEntwurf<T>(vonAussen: T, speichern: (wert: T) => void, verzoe
 
   return { wert, aendern, jetztSpeichern };
 }
+
+/**
+ * Ein Wert, der der Eingabe hinterherlaeuft.
+ *
+ * Fuers Suchfeld: das Tippen soll sofort im Feld stehen, aber die Liste mit
+ * 300 Personen muss nicht bei jedem Buchstaben neu gefiltert und gezeichnet
+ * werden. Erst wenn kurz nichts mehr kommt, zieht die Liste nach.
+ */
+export function useVerzoegert<T>(wert: T, verzoegerung = 120): T {
+  const [spaet, setSpaet] = useState(wert);
+  useEffect(() => {
+    const t = setTimeout(() => setSpaet(wert), verzoegerung);
+    return () => clearTimeout(t);
+  }, [wert, verzoegerung]);
+  return spaet;
+}

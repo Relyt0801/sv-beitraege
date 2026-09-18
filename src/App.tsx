@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { HY } from "./lib/types";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { HY, type Halbjahr, type Status } from "./lib/types";
 import { normalize, offenGesamt, offenStufe, sortStudents, staffelVon } from "./lib/logic";
 import { MyKasse } from "./components/MyKasse";
 import { PunkteSheet } from "./components/PunkteSheet";
@@ -7,6 +7,7 @@ import { ProfilSheet } from "./components/ProfilSheet";
 import { Avatar } from "./components/Avatar";
 import { Tour, tourSteps } from "./components/Tour";
 import { useTheme } from "./lib/theme";
+import { useVerzoegert } from "./lib/entwurf";
 import { hasSupabase, supabase } from "./lib/supabase";
 import { enablePush, pushConfigured, pushPermission } from "./lib/push";
 import { useStore } from "./store";
@@ -86,6 +87,9 @@ function NachRolle() {
 
 type Tab = "kasse" | "events" | "themen" | "beitraege" | "rollen" | "rechte";
 
+/** Wie viele Personenzeilen auf einmal dazukommen. */
+const SCHRITT_LISTE = 40;
+
 /** Was oben im Kopf steht – je Reiter eine kurze Überschrift. */
 const REITER_TITEL: Record<Tab, string> = {
   kasse: "Stufenkasse",
@@ -98,7 +102,7 @@ const REITER_TITEL: Record<Tab, string> = {
 
 function Main() {
   const { students, punkte, settings, ready, mode, reload, setTerm, setSettings, exportData, importData } = useStore();
-  const { can, canEditData, canEditBeitrag, canManageRoles, isStaff, ready: roleReady, role, loginByStudent, studentId, tourResetAt } = useRole();
+  const { can, canEditData, canEditBeitrag, canManageRoles, isStaff, ready: roleReady, role, loginByStudent, userByStudent, studentId, tourResetAt } = useRole();
   const { events: allEvents, reads } = useEvents();
   const { topics, unreadCount } = useTopics();
   // Kennung fürs eigene Namensbild aus dem Profil-Speicher – im Themen-Speicher
@@ -159,8 +163,24 @@ function Main() {
   // Listen-, Such- und Filterwerkzeug nur für Leute, die wirklich alle Personen verwalten.
   const teamView = isStaff;
 
+  // Das Feld reagiert sofort, die Liste zieht kurz danach nach.
+  const suche = useVerzoegert(query, 120);
+
+  const studentsRef = useRef(students);
+  studentsRef.current = students;
+
+  // Wie viele Zeilen gerade im Dokument haengen. Beim Filtern faengt es
+  // wieder von vorn an, sonst waeren nach einer langen Sitzung doch alle da.
+  const [sichtbar, setSichtbar] = useState(SCHRITT_LISTE);
+  const nachschub = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    setSichtbar(SCHRITT_LISTE);
+  }, [suche, min, max, onlyOpen, tab]);
+
+
   const filtered = useMemo(() => {
-    const q = normalize(query);
+    const q = normalize(suche);
     const mn = min === "" ? null : Number(min);
     const mx = max === "" ? null : Number(max);
     return sortStudents(students).filter((st) => {
@@ -175,11 +195,42 @@ function Main() {
       if (onlyOpen && offenGesamt(st, settings, p) === 0) return false;
       return true;
     });
-  }, [students, query, min, max, onlyOpen, settings, punkte]);
+  }, [students, suche, min, max, onlyOpen, settings, punkte]);
+
+  // Diese drei Funktionen werden einmal erzeugt und nicht bei jedem Zeichnen
+  // neu. Sonst haelt React jede Zeile fuer veraendert und baut sie neu auf.
+  const oeffnePerson = useCallback((id: string) => setOpenId(id), []);
+  const waehleAus = useCallback((id: string) => toggleSelect(id), []);
+  const schalteHalbjahr = useCallback(
+    (id: string, h: Halbjahr) => {
+      const st = studentsRef.current.find((x) => x.id === id);
+      if (st) setTerm(id, h, nextStatus(st.terms[h].status) as Status);
+    },
+    [setTerm],
+  );
+
+  useEffect(() => {
+    const ziel = nachschub.current;
+    if (!ziel) return;
+    const beobachter = new IntersectionObserver(
+      (eintraege) => {
+        if (eintraege.some((e) => e.isIntersecting)) setSichtbar((v) => v + SCHRITT_LISTE);
+      },
+      { rootMargin: "600px" },
+    );
+    beobachter.observe(ziel);
+    return () => beobachter.disconnect();
+  }, [sichtbar, filtered.length]);
 
   const openStudent = students.find((s) => s.id === openId) ?? null;
-  const totalOffen = offenStufe(students, settings, punkte);
-  const anzahlOffen = students.filter((s) => offenGesamt(s, settings, punkte[s.id] || 0) > 0).length;
+  // Laeuft ueber alle Personen – nicht bei jedem Tastendruck neu.
+  const { totalOffen, anzahlOffen } = useMemo(
+    () => ({
+      totalOffen: offenStufe(students, settings, punkte),
+      anzahlOffen: students.filter((s) => offenGesamt(s, settings, punkte[s.id] || 0) > 0).length,
+    }),
+    [students, settings, punkte],
+  );
   // Eigene Zeile gezielt über die verknüpfte Personen-Kennung suchen. Für das
   // Stufenteam wären das sonst alle 130 Personen – und "die erste" wäre fremd.
   const meinEintrag = studentId
@@ -321,7 +372,7 @@ function Main() {
         )}
 
         {/* Erst die Lage der Kasse, dann die Liste – nicht umgekehrt. */}
-        {tab === "kasse" && teamView && <KassenKopf students={students} settings={settings} />}
+        {tab === "kasse" && teamView && <KassenKopf students={students} settings={settings} punkte={punkte} />}
 
         {tab === "kasse" && teamView && canEditData && (
           <div className="mx-auto mt-2.5 max-w-5xl">
@@ -513,7 +564,7 @@ function Main() {
               </span>
             </div>
           )}
-          {filtered.map((st, idx) => (
+          {filtered.slice(0, sichtbar).map((st, idx) => (
             <StudentCard
               key={st.id}
               anchor={idx === 0 ? "person" : undefined}
@@ -524,11 +575,20 @@ function Main() {
               selected={selected.has(st.id)}
               canToggleBeitrag={canEditBeitrag}
               loginState={isStaff ? (loginByStudent[st.id] ?? false) : null}
-              onOpen={() => setOpenId(st.id)}
-              onToggleSelect={() => toggleSelect(st.id)}
-              onToggleTerm={(h) => setTerm(st.id, h, nextStatus(st.terms[h].status))}
+              userId={userByStudent[st.id] ?? null}
+              onOpen={oeffnePerson}
+              onToggleSelect={waehleAus}
+              onToggleTerm={schalteHalbjahr}
             />
           ))}
+          {/* Nachschubmarke: sobald sie in Sicht kommt, kommen weitere Zeilen.
+              So haengen nie 300 Zeilen gleichzeitig im Dokument. */}
+          {filtered.length > sichtbar && (
+            <div ref={nachschub} className="py-6 text-center text-[12px] text-tinte-leise">
+              lädt weitere {Math.min(SCHRITT_LISTE, filtered.length - sichtbar)} von{" "}
+              {filtered.length - sichtbar} …
+            </div>
+          )}
           {mode === "local" && ready && (
             <p className="col-span-full pt-2 text-center text-[11px] text-tinte-leise">
               Testbetrieb. Die Daten liegen nur auf diesem Gerät.

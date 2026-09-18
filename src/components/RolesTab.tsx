@@ -1,4 +1,6 @@
 import { useMemo, useState } from "react";
+import { useNachschub } from "../lib/liste";
+import { useVerzoegert } from "../lib/entwurf";
 import { normalize } from "../lib/logic";
 import { useStore } from "../store";
 import { useRole, type Role } from "../auth/RoleProvider";
@@ -35,29 +37,36 @@ export function RolesTab() {
   const [openKom, setOpenKom] = useState<string | null>(null);
   const [openBan, setOpenBan] = useState<string | null>(null);
 
+  // Nachschlagen statt durchsuchen. Vorher lief fuer jedes der 300 Konten ein
+  // students.find() ueber alle 300 Personen – 90.000 Vergleiche je Zeichnung.
+  const nachId = useMemo(() => new Map(students.map((s) => [s.id, s])), [students]);
   const nameFor = (studentId: string | null) => {
-    const s = studentId ? students.find((x) => x.id === studentId) : null;
+    const s = studentId ? nachId.get(studentId) : null;
     return s ? `${s.nachname}, ${s.vorname}` : null;
   };
 
+  const suche = useVerzoegert(q, 120);
+
   const rows = useMemo(() => {
-    const norm = normalize(q);
+    const norm = normalize(suche);
     return [...profiles]
       .filter((p) => !VERSTECKT.includes(p.role))
-      .map((p) => ({ p, name: nameFor(p.student_id) }))
+      .map((p) => ({ p, name: p.student_id ? nachId.get(p.student_id) ?? null : null }))
+      .map(({ p, name }) => ({ p, name: name ? `${name.nachname}, ${name.vorname}` : null }))
       .filter(({ p, name }) => !norm || normalize(`${p.username} ${name ?? ""}`).includes(norm))
       .sort((a, b) =>
         (a.name ?? a.p.username ?? "").localeCompare(b.name ?? b.p.username ?? "", "de"),
       );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profiles, q, students]);
+  }, [profiles, suche, nachId]);
+
+  const { sichtbar, marke, rest } = useNachschub(rows.length, [suche]);
 
   return (
     <div>
       <Suchfeld wert={q} onChange={setQ} />
 
       <div className="grid gap-2.5 [&>*]:min-w-0">
-        {rows.map(({ p }) => {
+        {rows.slice(0, sichtbar).map(({ p }) => {
           const koms = committeesOf(p.user_id);
           const banned = isBanned(p);
           const geschuetzt = p.is_op || p.user_id === opUserId;
@@ -66,7 +75,7 @@ export function RolesTab() {
               {/* Zeile 1: Person */}
               <KontoZeile
                 profil={p}
-                student={p.student_id ? students.find((x) => x.id === p.student_id) : null}
+                student={p.student_id ? nachId.get(p.student_id) ?? null : null}
                 punkt={p.must_change_password === false}
               />
 
@@ -180,6 +189,11 @@ export function RolesTab() {
             </div>
           );
         })}
+        {rest > 0 && (
+          <div ref={marke} className="py-6 text-center text-[12px] text-tinte-leise">
+            lädt weitere … ({rest} übrig)
+          </div>
+        )}
         {rows.length === 0 && (
           <div className="py-16 text-center text-sm text-tinte-leise">
             Noch keine Konten. Sobald Konten angelegt sind, erscheinen sie hier.

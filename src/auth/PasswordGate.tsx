@@ -3,7 +3,14 @@ import { hasSupabase, supabase } from "../lib/supabase";
 import { SELECTABLE_COMMITTEES, committeeLabel } from "../lib/committees";
 import { passwortProblem, passwortStaerke } from "../lib/passwort";
 
-const SKIP_KEY = "sv:komitee-spaeter";
+// Das Vertagen gilt pro Konto und nicht ewig.
+//
+// Vorher stand hier ein einziger Schluessel fuer den ganzen Browser. Wer sich
+// auf dem Familien-Laptop nach jemandem anmeldete, der "spaeter" getippt
+// hatte, wurde nie wieder nach seinem Komitee gefragt. Und wer einmal
+// vertagte, bekam die Frage nie wieder – auch Monate spaeter nicht.
+const SKIP_PREFIX = "sv:komitee-spaeter:";
+const SKIP_TAGE = 14;
 
 /**
  * Erzwingt nach dem Login zwei Dinge:
@@ -79,10 +86,26 @@ export function PasswordGate({ children }: { children: ReactNode }) {
 
 /** Ist der Nutzer noch in keinem Komitee und hat es auch nicht vertagt? */
 async function braucheKomitee(uid: string): Promise<boolean> {
-  if (localStorage.getItem(SKIP_KEY) === "1") return false;
+  if (vertagtBis(uid) > Date.now()) return false;
   const { data, error } = await supabase!.from("tag_members").select("tag").eq("user_id", uid).limit(1);
   if (error) return false; // Tabelle/Recht fehlt -> nicht blockieren
   return !data || data.length === 0;
+}
+
+function vertagtBis(uid: string): number {
+  try {
+    return Number(localStorage.getItem(SKIP_PREFIX + uid) || 0);
+  } catch {
+    return 0; // privates Fenster o. Ae. – dann eben fragen
+  }
+}
+
+function vertagen(uid: string) {
+  try {
+    localStorage.setItem(SKIP_PREFIX + uid, String(Date.now() + SKIP_TAGE * 864e5));
+  } catch {
+    /* nicht schlimm: dann kommt die Frage beim naechsten Mal wieder */
+  }
 }
 
 function KomiteeForm({ onDone }: { onDone: () => void }) {
@@ -96,7 +119,11 @@ function KomiteeForm({ onDone }: { onDone: () => void }) {
     setErr("");
     const { data: s } = await supabase!.auth.getSession();
     const uid = s.session?.user.id;
-    if (!uid) return;
+    if (!uid) {
+      setBusy(false);
+      setErr("Die Anmeldung ist abgelaufen. Bitte neu anmelden.");
+      return;
+    }
     const { error } = await supabase!.from("tag_members").insert({ tag: sel, user_id: uid });
     setBusy(false);
     if (error) {
@@ -149,8 +176,10 @@ function KomiteeForm({ onDone }: { onDone: () => void }) {
           Aufsichtsrat wird ausschließlich vom Stufenteam vergeben.
         </p>
         <button
-          onClick={() => {
-            localStorage.setItem(SKIP_KEY, "1");
+          onClick={async () => {
+            const { data: s } = await supabase!.auth.getSession();
+            const uid = s.session?.user.id;
+            if (uid) vertagen(uid);
             onDone();
           }}
           className="mt-3 w-full text-center text-sm font-semibold text-tinte-leise"

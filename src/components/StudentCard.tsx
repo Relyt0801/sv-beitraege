@@ -1,6 +1,8 @@
+import { memo } from "react";
 import { HY, STATI, type Settings, type Student } from "../lib/types";
 import { offenGesamt, prozentVon } from "../lib/logic";
 import { TermChip } from "./TermChip";
+import { Avatar } from "./Avatar";
 
 /**
  * Eine Person in der Kassenliste – eine Zeile, die man am Stueck liest:
@@ -8,7 +10,7 @@ import { TermChip } from "./TermChip";
  * eine eigene Karte; bei 130 Leuten wurde daraus eine sehr lange Kachelwand,
  * in der man nichts vergleichen konnte.
  */
-export function StudentCard({
+function StudentCardRoh({
   student,
   settings,
   punkte,
@@ -17,6 +19,7 @@ export function StudentCard({
   selected,
   canToggleBeitrag,
   loginState,
+  userId,
   onOpen,
   onToggleSelect,
   onToggleTerm,
@@ -30,15 +33,16 @@ export function StudentCard({
   selected: boolean;
   canToggleBeitrag: boolean;
   loginState?: boolean | null;
-  onOpen: () => void;
-  onToggleSelect: () => void;
-  onToggleTerm: (h: (typeof HY)[number]) => void;
+  /** Konto der Person – faerbt den Namenskreis wie im Rollen-Reiter. */
+  userId?: string | null;
+  onOpen: (id: string) => void;
+  onToggleSelect: (id: string) => void;
+  onToggleTerm: (id: string, h: (typeof HY)[number]) => void;
 }) {
   const leaving = student.verlaesst_ab != null;
   const joiningLate = student.beigetreten_ab !== "EF.1";
   const betrag = offenGesamt(student, settings);
   const prozent = prozentVon(punkte, settings);
-  const kuerzel = ((student.vorname[0] || "") + (student.nachname[0] || "")).toUpperCase();
 
   return (
     <div
@@ -49,7 +53,7 @@ export function StudentCard({
     >
       {selectable && (
         <button
-          onClick={onToggleSelect}
+          onClick={() => onToggleSelect(student.id)}
           aria-label="Auswählen"
           className={`flex h-6 w-6 min-w-6 shrink-0 items-center justify-center rounded-lg border-2 text-sm text-white transition ${
             selected ? "border-brand bg-brand" : "border-papier-linie dark:border-slate-600"
@@ -61,15 +65,13 @@ export function StudentCard({
 
       {/* Person */}
       <button
-        onClick={() => (selectable ? onToggleSelect() : onOpen())}
+        onClick={() => (selectable ? onToggleSelect(student.id) : onOpen(student.id))}
         className="flex min-w-0 flex-1 items-center gap-2.5 text-left sm:basis-[13rem]"
       >
-        <span
-          className={`relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[12px] font-bold text-white ${
-            betrag > 0 ? "bg-tinte-matt" : "bg-bezahlt"
-          }`}
-        >
-          {kuerzel}
+        {/* Derselbe Namenskreis wie im Rollen-Reiter: Farbe der Person, nicht
+            Farbe des Zahlungsstands. Der Betrag rechts sagt das ohnehin. */}
+        <span className="relative shrink-0">
+          <Avatar userId={userId} name={`${student.nachname}, ${student.vorname}`} size={36} />
           {loginState != null && (
             <span
               title={loginState ? "hat ein eigenes Passwort gesetzt" : "nutzt noch das Startpasswort"}
@@ -95,7 +97,7 @@ export function StudentCard({
 
       {/* Offen */}
       <button
-        onClick={() => (selectable ? onToggleSelect() : onOpen())}
+        onClick={() => (selectable ? onToggleSelect(student.id) : onOpen(student.id))}
         className={`zahl shrink-0 text-right text-[17px] font-bold sm:w-16 ${
           betrag > 0 ? "text-offen dark:text-amber-300" : "text-bezahlt dark:text-emerald-300"
         }`}
@@ -113,14 +115,14 @@ export function StudentCard({
             i={i}
             current={settings.aktuelles_halbjahr}
             kompakt
-            onToggle={!selectable && canToggleBeitrag ? () => onToggleTerm(h) : undefined}
+            onToggle={!selectable && canToggleBeitrag ? () => onToggleTerm(student.id, h) : undefined}
           />
         ))}
       </div>
 
       {/* Mithilfe */}
       <button
-        onClick={() => (selectable ? onToggleSelect() : onOpen())}
+        onClick={() => (selectable ? onToggleSelect(student.id) : onOpen(student.id))}
         className="flex shrink-0 items-center gap-1.5"
         aria-label={`Mithilfe ${prozent} Prozent`}
       >
@@ -137,6 +139,15 @@ export function StudentCard({
     </div>
   );
 }
+
+/**
+ * Eine Zeile zeichnet sich nur neu, wenn sich an ihr etwas geaendert hat.
+ *
+ * Ohne das wurden bei 300 Personen mit jedem Buchstaben im Suchfeld alle 300
+ * Zeilen neu gebaut – rund 10.000 DOM-Knoten. Genau daher kam das Nachhaengen
+ * beim Tippen.
+ */
+export const StudentCard = memo(StudentCardRoh);
 
 export function nextStatus(cur: string) {
   const i = STATI.indexOf(cur as any);

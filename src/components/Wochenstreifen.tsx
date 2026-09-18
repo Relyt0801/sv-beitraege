@@ -66,14 +66,16 @@ export function Wochenstreifen({ onKalender }: { onKalender: (tag: string) => vo
         >
           ›
         </button>
+        {/* Beschriftung steht immer dabei. Ein Kalender-Icon allein sagt nicht,
+            dass dahinter Monat, Woche und Tag stecken. */}
         <button
           onClick={() => onKalender(gewaehlt)}
           className="flex h-8 shrink-0 items-center gap-1.5 rounded-lg bg-brand/10 px-2.5 text-[12px] font-semibold text-brand-dark transition active:scale-95 dark:bg-brand/20 dark:text-brand-soft"
-          aria-label="Großen Kalender öffnen"
-          title="Großen Kalender öffnen"
+          aria-label="Ganzen Kalender öffnen"
+          title="Ganzen Kalender öffnen – Monat, Woche und Tag"
         >
           <Icon name="kalender" size={15} />
-          <span className="hidden sm:inline">Kalender</span>
+          Kalender
         </button>
       </div>
 

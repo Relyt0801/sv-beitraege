@@ -76,16 +76,26 @@ function LoginForm() {
           Anmelden
         </div>
 
+        {/* Ein Anmeldeformular, wie Browser es erwarten: name und autoComplete
+            gesetzt. Ohne das raten Chrome und Safari, worum es geht, bieten an
+            falschen Stellen Passwoerter an und melden sich mit Hinweisen, die
+            nichts mit dieser App zu tun haben. */}
         <input
           className="field mb-3"
+          name="username"
+          autoComplete="username"
           placeholder="Benutzername"
           autoCapitalize="none"
+          autoCorrect="off"
+          spellCheck={false}
           value={username}
           onChange={(e) => setUsername(e.target.value)}
         />
         <input
           className="field mb-3"
           type="password"
+          name="password"
+          autoComplete="current-password"
           placeholder="Passwort"
           value={password}
           onChange={(e) => setPassword(e.target.value)}

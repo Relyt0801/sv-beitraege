@@ -28,6 +28,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { writeFileSync } from "node:fs";
 import { privOut } from "./privat.mjs";
+import { startpasswort } from "./passwoerter.mjs";
 
 const URL = process.env.SUPABASE_URL;
 const KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -67,20 +68,9 @@ function schlicht(s) {
     .replace(/[^a-z0-9]+/g, "");
 }
 
-// Gut lesbare Passwörter: zwei Wörter und zwei Ziffern, keine Verwechslungen.
-const WOERTER = [
-  "Anker", "Birke", "Brise", "Delta", "Feder", "Funke", "Garten", "Hafen",
-  "Insel", "Kiesel", "Komet", "Krone", "Lampe", "Linde", "Muschel", "Nebel",
-  "Norden", "Pfeil", "Quelle", "Regen", "Ritter", "Salbei", "Segel", "Silber",
-  "Sonne", "Spiegel", "Stern", "Tanne", "Turm", "Ufer", "Welle", "Wolke",
-];
-function passwort() {
-  const w = () => WOERTER[Math.floor(Math.random() * WOERTER.length)];
-  const zahl = 10 + Math.floor(Math.random() * 90);
-  let a = w(), b = w();
-  while (b === a) b = w();
-  return `${a}-${b}-${zahl}`;
-}
+// Startpasswörter kommen aus scripts/passwoerter.mjs – dieselbe Quelle wie
+// bei den Schülerkonten.
+const passwort = startpasswort;
 
 // ------------------------------------------------------------ Personen holen
 const { data: alleSchueler, error: sErr } = await db.from("students").select("id, vorname, nachname, verlaesst_ab");
