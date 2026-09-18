@@ -4,6 +4,7 @@ import App from "./App";
 import { StoreProvider } from "./store";
 import { Fehlerfang } from "./components/Fehlerfang";
 import { MelderProvider } from "./components/Melder";
+import { Verbindungshinweis } from "./components/Verbindungshinweis";
 import "./index.css";
 
 /**
@@ -25,6 +26,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
     <Fehlerfang>
       {/* Ganz aussen, damit auch die Datenspeicher Meldungen zeigen koennen. */}
       <MelderProvider>
+        <Verbindungshinweis />
         <StoreProvider>
           <App />
         </StoreProvider>

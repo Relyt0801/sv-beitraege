@@ -9,7 +9,7 @@ import { Tour, tourSteps } from "./components/Tour";
 import { useTheme } from "./lib/theme";
 import { useVerzoegert } from "./lib/entwurf";
 import { hasSupabase, supabase } from "./lib/supabase";
-import { enablePush, pushConfigured, pushPermission } from "./lib/push";
+import { pushAboAuffrischen } from "./lib/push";
 import { useStore } from "./store";
 import { AuthGate } from "./auth/AuthGate";
 import { PasswordGate } from "./auth/PasswordGate";
@@ -117,15 +117,7 @@ function Main() {
   // Läuft erst NACH Zustimmungs- und Passwort-Gate (Main sitzt dahinter):
   // - Erlaubnis schon erteilt -> Abo still (neu) registrieren
   // - Login-Häkchen gesetzt (Rückkehrer, Zustimmung lag schon vor) -> jetzt aktivieren
-  useEffect(() => {
-    const optin = localStorage.getItem("sv:push-optin") === "1";
-    if (pushConfigured() && (pushPermission() === "granted" || optin)) {
-      localStorage.removeItem("sv:push-optin");
-      void enablePush().then((r) => {
-        if (!r.ok) console.warn("[push] Auto-Registrierung fehlgeschlagen:", r.error);
-      });
-    } else console.log("[push] kein Auto-Abo:", { konfiguriert: pushConfigured(), erlaubnis: pushPermission() });
-  }, []);
+  useEffect(() => pushAboAuffrischen(), []);
 
   // Main läuft erst hinter Zustimmungs- und Passwort-Gate. Vorher liefert die
   // Datenbank wegen RLS (has_consented) nichts – deshalb hier einmal nachladen.

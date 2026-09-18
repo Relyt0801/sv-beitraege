@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState, ty
 import { hasSupabase, supabase } from "./lib/supabase";
 import type { EventItem, NewEvent } from "./lib/events";
 import { meldeFehler } from "./lib/melder";
+import { abonniere } from "./lib/realtime";
 
 const LS = "sv-beitraege:events";
 const LOCAL_UID = "local-user";
@@ -123,7 +124,7 @@ export function EventsProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!hasSupabase) return;
     let alive = true;
-    let channel: ReturnType<NonNullable<typeof supabase>["channel"]> | null = null;
+    let abmelden: (() => void) | null = null;
     const start = async () => {
       const { data } = await supabase!.auth.getSession();
       uidRef.current = data.session?.user.id || LOCAL_UID;
@@ -132,12 +133,20 @@ export function EventsProvider({ children }: { children: ReactNode }) {
         return;
       }
       await loadAll();
-      if (channel) return;
-      channel = supabase!
-        .channel("sv-events")
-        .on("postgres_changes", { event: "*", schema: "public", table: "events" }, planeNachladen)
-        .on("postgres_changes", { event: "*", schema: "public", table: "poll_votes" }, planeNachladen)
-        .subscribe();
+      // Der Kanal entsteht erst NACH einem await. Ohne diese Pruefung wird er
+      // auch dann noch angelegt, wenn die Ansicht laengst weg ist - die
+      // Aufraeumfunktion hat ihn dann nie zu Gesicht bekommen. In der
+      // Entwicklung (StrictMode) passierte das bei jedem Start, dadurch lief
+      // alles doppelt.
+      if (!alive || abmelden) return;
+      abmelden = abonniere({
+        name: "sv-events",
+        nachholen: planeNachladen,
+        aufbauen: (kanal) =>
+          kanal
+            .on("postgres_changes", { event: "*", schema: "public", table: "events" }, planeNachladen)
+            .on("postgres_changes", { event: "*", schema: "public", table: "poll_votes" }, planeNachladen),
+      });
     };
     void start();
     const { data: sub } = supabase!.auth.onAuthStateChange((event) => {
@@ -145,10 +154,8 @@ export function EventsProvider({ children }: { children: ReactNode }) {
         setEvents([]);
         setMyVotes({});
         setVoteCounts({});
-        if (channel) {
-          supabase!.removeChannel(channel);
-          channel = null;
-        }
+        abmelden?.();
+        abmelden = null;
         void start();
       }
     });
@@ -156,7 +163,7 @@ export function EventsProvider({ children }: { children: ReactNode }) {
       alive = false;
       sub.subscription.unsubscribe();
       if (nachladeTimer.current) clearTimeout(nachladeTimer.current);
-      if (channel) supabase!.removeChannel(channel);
+      abmelden?.();
     };
   }, [loadAll, planeNachladen]);
 
@@ -216,11 +223,20 @@ export function EventsProvider({ children }: { children: ReactNode }) {
         await supabase!.from("event_targets").insert(e.target_ids.map((student_id) => ({ event_id: ev.id, student_id })));
       if (e.audience === "komitee" && e.tags.length)
         await supabase!.from("event_committees").insert(e.tags.map((tag) => ({ event_id: ev.id, tag })));
-      // Push-Benachrichtigung auslösen (Function optional – Fehler ignorieren, falls noch nicht deployt)
+      // Push-Benachrichtigung auslösen.
+      //
+      // functions.invoke wirft nicht, sondern gibt { error } zurück. Das wurde
+      // vorher nie gelesen, deshalb war unsichtbar, wenn auf dem Server der
+      // VAPID-Schlüssel fehlt oder die Function gar nicht hochgeladen ist. Das
+      // Anlegen des Events soll daran trotzdem nicht scheitern - nur sichtbar
+      // sein soll es (Diagnose-Zeile im Profil).
       try {
-        await supabase!.functions.invoke("send-push", { body: { event_id: ev.id } });
-      } catch {
-        /* Function evtl. noch nicht deployt */
+        const { error: pushFehler } = await supabase!.functions.invoke("send-push", {
+          body: { event_id: ev.id },
+        });
+        if (pushFehler) console.warn("[push] send-push meldet:", pushFehler.message);
+      } catch (e) {
+        console.warn("[push] send-push nicht erreichbar:", (e as Error).message);
       }
       await loadAll();
     },

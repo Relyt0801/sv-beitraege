@@ -168,6 +168,89 @@ Jetzt bleibt sie stehen und trägt den Vermerk **„⚠ Nicht gesendet – nochm
 abschicken"**. Man sieht also, dass etwas geschrieben wurde und dass es nicht
 angekommen ist.
 
+### Benachrichtigungen: Fehler sind nicht mehr unsichtbar
+
+Der Code hat jeden Fehler beim Verschicken verschluckt:
+
+```ts
+try { await supabase.functions.invoke("send-push", …); }
+catch { /* Function evtl. nicht deployt – optional */ }
+```
+
+Das sieht harmlos aus, ist aber der Kern des Problems: `functions.invoke`
+**wirft gar nicht**, sondern gibt `{ data, error }` zurück – und dieses `error`
+wurde nie gelesen. Fehlende Schlüssel auf dem Server, eine nicht hochgeladene
+Function, ein abgelehnter Zugriff: alles blieb spurlos. Deshalb konnte niemand
+sagen, warum keine Benachrichtigungen ankommen.
+
+Jetzt gibt es im Profil unter „Benachrichtigungen aufs Gerät" die Zeile
+**„Kommt nichts an? Hier prüfen"**. Sie sagt im Klartext, woran es hängt – vom
+fehlenden Schlüssel auf dem Server bis zur abgelehnten Erlaubnis.
+
+Dazu ein eigener Fehler: tote Abos werden vom Server aufgeräumt, neu eintragen
+konnte sich aber **nur die Schüler- und Team-Ansicht**. Ein Elternteil, dessen
+Abo einmal weggeräumt wurde, bekam nie wieder eine Benachrichtigung. Jetzt
+trägt sich auch die Elternansicht wieder ein.
+
+### Live-Aktualisierung: Verbindung wird überwacht und wieder aufgebaut
+
+An sieben Stellen stand `.subscribe()` – **ohne Rückmeldung**. Damit war nicht
+zu erkennen, ob die Anmeldung überhaupt geklappt hat. Lehnt der Server sie ab
+(passiert, wenn zu viele Geräte gleichzeitig verbunden sind) oder bricht die
+Verbindung weg (Handy gesperrt, WLAN gewechselt), passierte genau nichts: kein
+Fehler, kein Hinweis, kein neuer Versuch. Die App zeigte einfach weiter den
+alten Stand.
+
+Neu:
+
+- Der Verbindungszustand wird ausgewertet. Bricht sie ab, wird mit wachsendem
+  Abstand neu verbunden (1 s, 2 s, 4 s … höchstens 30 s). Der Abstand ist
+  Absicht: sonst klopfen nach einer Störung 300 Geräte gleichzeitig wieder an.
+- Nach dem Wiederverbinden werden die Daten einmal nachgeladen – was während
+  der Trennung passiert ist, hat man ja nicht mitbekommen.
+- Kommt die App aus dem Hintergrund zurück oder ist das Gerät wieder online,
+  wird sofort nachgesehen.
+- Ist die Verbindung länger als sechs Sekunden weg, erscheint oben ein
+  Streifen: „Keine Live-Verbindung – neue Beiträge kommen gerade nicht an"
+  mit einem Knopf zum Neuverbinden.
+
+### Fremde Änderungen werden nicht mehr verschluckt
+
+Die App merkt sich kurz, was man selbst geändert hat, damit das Echo vom Server
+die eigene Eingabe nicht überschreibt. Das war richtig gedacht, aber zu grob:
+gemerkt wurde nur die **Zeilennummer**, und fünf Sekunden lang wurde dann
+*alles* zu dieser Zeile weggeworfen – auch die Änderungen anderer Leute.
+
+Zwei Beispiele aus dem Alltag:
+
+- Du hakst bei Anna ein Halbjahr ab, der Kassenwart trägt zwei Sekunden später
+  bei derselben Anna „verlässt ab" ein. Bei dir kam das nie an.
+- Bei den Einstellungen war der Schlüssel sogar ein fester Text. Wer irgendetwas
+  umstellte, machte damit für fünf Sekunden **alle** Einstellungsänderungen von
+  **allen** unsichtbar.
+
+Jetzt wird nichts mehr weggeworfen, sondern zusammengeführt: der Stand vom
+Server gilt, nur die Felder, die man selbst gerade geschrieben hat, behalten
+kurz Vorrang.
+
+### Weniger Last, damit die Live-Verbindung nicht zumacht
+
+- **Jede Anmeldung löste eine Welle aus.** Beim Start schrieb die App
+  ungeprüft `has_logged_in = true` ins eigene Profil. Da Profile live übertragen
+  werden, bekam jedes Team-Gerät davon eine Meldung und zeichnete die komplette
+  Personenliste neu. Morgens, wenn 300 Leute die App öffnen, sind das 300
+  solcher Wellen – pro Gerät. Jetzt wird nur geschrieben, wenn es noch nicht
+  gesetzt ist.
+- **Farbe ändern lud alles neu.** Änderte eine Person ihre Profilfarbe, holten
+  sich alle anderen sofort die komplette Profilliste. Jetzt wird nur die eine
+  geänderte Zeile eingepflegt.
+- **Vier Abfragen liefen nacheinander** statt gleichzeitig (Personen, Beiträge,
+  Vorlagen, Einstellungen). Bei 300 Personen summiert sich das beim Start.
+- **Ein Fehler, der nur in der Entwicklung auftrat**, aber jede Messung
+  verfälschte: drei Kanäle wurden erst nach einem Ladevorgang angemeldet; war
+  die Ansicht bis dahin schon wieder weg, blieb der Kanal für immer offen. Es
+  lief alles doppelt.
+
 ### Drei Dateien gelöscht, die niemand mehr benutzt hat
 
 `MyCommittee.tsx`, `SettingsSheet.tsx` und `TopicsTab.tsx` waren nirgends mehr

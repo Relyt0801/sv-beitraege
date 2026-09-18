@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState, ty
 import { hasSupabase, supabase } from "../lib/supabase";
 import { ALL_PERMS, ROLE_DEFAULTS, rechteRolle, type PermKey } from "../lib/permissions";
 import { meldeFehler } from "../lib/melder";
+import { abonniere } from "../lib/realtime";
 
 export type Role = "schueler" | "stufenteam" | "kassenwart" | "admin" | "sprecher" | "stv_sprecher" | "eltern";
 
@@ -109,12 +110,15 @@ export function RoleProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!hasSupabase) return;
     let alive = true;
-    let channel: ReturnType<NonNullable<typeof supabase>["channel"]> | null = null;
+    let abmelden: (() => void) | null = null;
 
     const subscribe = () => {
-      if (channel) return;
-      channel = supabase!
-        .channel("sv-profiles")
+      if (abmelden) return;
+      abmelden = abonniere({
+        name: "sv-profiles",
+        nachholen: () => void loadPerms(roleRef.current, uidRef.current),
+        aufbauen: (kanal) =>
+          kanal
         .on("postgres_changes", { event: "*", schema: "public", table: "profiles" }, (p) => {
           if (p.eventType === "DELETE") {
             const old = p.old as Partial<Profile>;
@@ -140,8 +144,8 @@ export function RoleProvider({ children }: { children: ReactNode }) {
           });
         })
         .on("postgres_changes", { event: "*", schema: "public", table: "role_permissions" }, () => void loadPerms(roleRef.current, uidRef.current))
-        .on("postgres_changes", { event: "*", schema: "public", table: "user_permissions" }, () => void loadPerms(roleRef.current, uidRef.current))
-        .subscribe();
+        .on("postgres_changes", { event: "*", schema: "public", table: "user_permissions" }, () => void loadPerms(roleRef.current, uidRef.current)),
+      });
     };
 
     const load = async () => {
@@ -155,7 +159,7 @@ export function RoleProvider({ children }: { children: ReactNode }) {
       }
       const { data: me } = await supabase!
         .from("profiles")
-        .select("role, student_id, chat_banned_until, chat_ban_permanent, is_op, tour_reset_at")
+        .select("role, student_id, chat_banned_until, chat_ban_permanent, is_op, tour_reset_at, has_logged_in")
         .eq("user_id", uid)
         .maybeSingle();
       const r = (me?.role as Role) || "schueler";
@@ -168,7 +172,16 @@ export function RoleProvider({ children }: { children: ReactNode }) {
       setTourResetAt(((me as { tour_reset_at?: string | null } | null)?.tour_reset_at) ?? null);
       await loadPerms(r, uid);
       setReady(true);
-      void supabase!.from("profiles").update({ has_logged_in: true }).eq("user_id", uid);
+      // Nur schreiben, wenn es noch nicht gesetzt ist.
+      //
+      // Vorher lief dieses UPDATE bei JEDEM Start der App. Da profiles live
+      // uebertragen wird, loeste jede Anmeldung damit eine Meldung an alle
+      // Team-Geraete aus, die dort die komplette Personenliste neu zeichnete.
+      // Morgens, wenn 300 Leute die App oeffnen, sind das 300 solcher Wellen
+      // pro Geraet - genau die Art Last, die die Live-Verbindung ausbremst.
+      if (!(me as { has_logged_in?: boolean } | null)?.has_logged_in) {
+        void supabase!.from("profiles").update({ has_logged_in: true }).eq("user_id", uid);
+      }
       void loadProfiles(STAFF.includes(r));
       subscribe();
     };
@@ -179,17 +192,15 @@ export function RoleProvider({ children }: { children: ReactNode }) {
         setProfiles([]);
         setPerms(new Set());
         setStudentId(null);
-        if (channel) {
-          supabase!.removeChannel(channel);
-          channel = null;
-        }
+        abmelden?.();
+        abmelden = null;
         void load();
       }
     });
     return () => {
       alive = false;
       sub.subscription.unsubscribe();
-      if (channel) supabase!.removeChannel(channel);
+      abmelden?.();
     };
   }, [loadProfiles, loadPerms]);
 

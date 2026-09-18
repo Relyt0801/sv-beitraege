@@ -63,14 +63,72 @@ function urlBase64ToUint8Array(base64: string): Uint8Array {
   return arr;
 }
 
-/** Push direkt an bestimmte Nutzer senden (via Edge Function, best effort). */
+/**
+ * Der letzte Fehler beim Verschicken einer Benachrichtigung.
+ *
+ * Hintergrund: functions.invoke() wirft in supabase-js v2 **nicht**, sondern
+ * gibt { data, error } zurück. Der alte Code hat den Aufruf in try/catch
+ * gesteckt und den error nie gelesen. Fehlende VAPID-Schlüssel, eine nicht
+ * hochgeladene Function, ein abgelehnter Zugriff – alles blieb unsichtbar.
+ * Genau deshalb konnte niemand sagen, warum keine Benachrichtigungen kommen.
+ *
+ * Der Text landet in der Diagnose-Zeile im Profil.
+ */
+let letzterSendefehler: string | null = null;
+export const sendeFehler = () => letzterSendefehler;
+
+/** Push direkt an bestimmte Nutzer senden (via Edge Function). */
 export async function pushToUsers(user_ids: string[], title: string, body: string): Promise<void> {
   if (!hasSupabase || !user_ids.length) return;
   try {
-    await supabase!.functions.invoke("send-push", { body: { user_ids, title, body } });
-  } catch {
-    /* Function evtl. nicht deployt – Benachrichtigung ist optional */
+    const { error } = await supabase!.functions.invoke("send-push", { body: { user_ids, title, body } });
+    if (error) {
+      letzterSendefehler = error.message || String(error);
+      console.warn("[push] send-push meldet:", letzterSendefehler);
+      return;
+    }
+    letzterSendefehler = null;
+  } catch (e) {
+    letzterSendefehler = (e as Error).message;
+    console.warn("[push] send-push nicht erreichbar:", letzterSendefehler);
   }
+}
+
+/**
+ * Was ist hier eigentlich los?
+ *
+ * Fragt der Reihe nach ab, woran es hängen kann, und gibt einen Satz zurück,
+ * den man jemandem vorlesen kann. Steht im Profil unter den Benachrichtigungen.
+ */
+export async function pushDiagnose(): Promise<string> {
+  if (!pushSupported) return "Dieses Gerät kann keine Benachrichtigungen anzeigen.";
+  if (!hasSupabase) return "Ohne Server-Verbindung gibt es keine Benachrichtigungen.";
+
+  const key = await schluessel();
+  if (!key) {
+    return (
+      "Auf dem Server ist kein Schlüssel hinterlegt. In Supabase müssen unter " +
+      "Edge Functions → Secrets VAPID_PUBLIC_KEY und VAPID_PRIVATE_KEY gesetzt " +
+      "und die Functions send-push und vapid-info hochgeladen sein."
+    );
+  }
+
+  const erlaubnis = pushPermission();
+  if (erlaubnis === "denied") {
+    return "Du hast Benachrichtigungen für diese Seite abgelehnt. Das lässt sich nur in den Browser-Einstellungen wieder erlauben.";
+  }
+  if (erlaubnis === "default") return "Benachrichtigungen sind noch nicht eingeschaltet.";
+
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    const abo = await reg.pushManager.getSubscription();
+    if (!abo) return "Erlaubnis liegt vor, aber es ist kein Abo eingetragen. Schalte die Benachrichtigungen einmal aus und wieder an.";
+  } catch {
+    return "Der Hintergrunddienst der App antwortet nicht. Ein Neuladen hilft meistens.";
+  }
+
+  if (letzterSendefehler) return `Zuletzt meldete der Server beim Versenden: ${letzterSendefehler}`;
+  return "Alles eingerichtet.";
 }
 
 /** Benachrichtigungen aktivieren: Erlaubnis holen, Abo anlegen, in Supabase speichern. */
@@ -116,4 +174,28 @@ export async function enablePush(): Promise<{ ok: boolean; error?: string }> {
   } catch (e) {
     return { ok: false, error: (e as Error).message };
   }
+}
+
+/**
+ * Abo nach dem Anmelden still (wieder) eintragen.
+ *
+ * Wichtig, weil send-push tote Abos serverseitig loescht (bei 403/404/410).
+ * Danach muss sich jedes Geraet neu eintragen, sonst kommt dort nie wieder
+ * etwas an. Bisher stand dieser Code nur in Main - **die Elternansicht hat ihn
+ * nie ausgefuehrt.** Wurde das Abo eines Elternteils einmal aufgeraeumt, bekam
+ * es nie wieder eine Benachrichtigung.
+ *
+ * Bewusst keine React-Datei: so koennen Main und ElternApp denselben Hook
+ * benutzen, ohne einander zu importieren.
+ */
+export function pushAboAuffrischen(): void {
+  const optin = localStorage.getItem("sv:push-optin") === "1";
+  if (!pushConfigured() || (pushPermission() !== "granted" && !optin)) {
+    console.log("[push] kein Auto-Abo:", { konfiguriert: pushConfigured(), erlaubnis: pushPermission() });
+    return;
+  }
+  localStorage.removeItem("sv:push-optin");
+  void enablePush().then((r) => {
+    if (!r.ok) console.warn("[push] Auto-Registrierung fehlgeschlagen:", r.error);
+  });
 }

@@ -3,6 +3,7 @@ import { hasSupabase, supabase } from "./lib/supabase";
 import type { BankKonto } from "./lib/types";
 import { pushToUsers } from "./lib/push";
 import { meldeFehler } from "./lib/melder";
+import { abonniere } from "./lib/realtime";
 
 export interface ElternInfo {
   id: string;
@@ -175,25 +176,25 @@ export function ElternProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!hasSupabase) return;
     void laden();
-    let kanal: ReturnType<NonNullable<typeof supabase>["channel"]> | null = supabase!
-      .channel("sv-eltern")
-      .on("postgres_changes", { event: "*", schema: "public", table: "eltern_infos" }, () => void laden())
-      .on("postgres_changes", { event: "*", schema: "public", table: "eltern_tickets" }, () => void laden())
-      .on("postgres_changes", { event: "*", schema: "public", table: "eltern_ticket_nachrichten" }, (p) => {
-        const row = p.new as TicketNachricht;
-        if (!row?.id) return;
-        setNachrichten((prev) => (prev.some((x) => x.id === row.id) ? prev : [...prev, row]));
-      })
-      .subscribe();
+    const abmelden = abonniere({
+      name: "sv-eltern",
+      nachholen: () => void laden(),
+      aufbauen: (kanal) =>
+        kanal
+          .on("postgres_changes", { event: "*", schema: "public", table: "eltern_infos" }, () => void laden())
+          .on("postgres_changes", { event: "*", schema: "public", table: "eltern_tickets" }, () => void laden())
+          .on("postgres_changes", { event: "*", schema: "public", table: "eltern_ticket_nachrichten" }, (p) => {
+            const row = p.new as TicketNachricht;
+            if (!row?.id) return;
+            setNachrichten((prev) => (prev.some((x) => x.id === row.id) ? prev : [...prev, row]));
+          }),
+    });
     const { data: sub } = supabase!.auth.onAuthStateChange((e) => {
       if (e === "SIGNED_IN" || e === "SIGNED_OUT") void laden();
     });
     return () => {
       sub.subscription.unsubscribe();
-      if (kanal) {
-        supabase!.removeChannel(kanal);
-        kanal = null;
-      }
+      abmelden();
     };
   }, [laden]);
 

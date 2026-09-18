@@ -3,6 +3,7 @@ import { hasSupabase, supabase } from "./lib/supabase";
 import { pushToUsers } from "./lib/push";
 import { lesbarerName } from "./lib/profil";
 import { meldeFehler } from "./lib/melder";
+import { abonniere } from "./lib/realtime";
 
 export type TopicItemType = "nachricht" | "todo" | "umfrage";
 
@@ -216,7 +217,8 @@ export function TopicsProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!hasSupabase) return;
-    let channel: ReturnType<NonNullable<typeof supabase>["channel"]> | null = null;
+    let alive = true;
+    let abmelden: (() => void) | null = null;
     const start = async () => {
       const { data } = await supabase!.auth.getSession();
       if (!data.session) {
@@ -240,9 +242,13 @@ export function TopicsProvider({ children }: { children: ReactNode }) {
         if (st) nameRef.current = `${st.vorname ?? ""} ${st.nachname ?? ""}`.trim() || nameRef.current;
       }
       await loadAll();
-      if (channel) return;
-      channel = supabase!
-        .channel("sv-topics")
+      // Siehe events-store: der Kanal entsteht erst nach mehreren awaits.
+      if (!alive || abmelden) return;
+      abmelden = abonniere({
+        name: "sv-topics",
+        nachholen: planeNachladen,
+        aufbauen: (kanal) =>
+          kanal
         .on("postgres_changes", { event: "*", schema: "public", table: "topics" }, planeNachladen)
         // Chat-Nachrichten kommen einzeln an und werden einzeln eingefügt –
         // das ist der Unterschied zwischen "sofort da" und "lädt kurz".
@@ -272,21 +278,23 @@ export function TopicsProvider({ children }: { children: ReactNode }) {
           const wer = ((p.eventType === "DELETE" ? p.old : p.new) as { user_id?: string })?.user_id;
           if (wer && wer === uidRef.current) return;
           planeNachladen();
-        })
-        .subscribe();
+        }),
+      });
     };
     void start();
     const { data: sub } = supabase!.auth.onAuthStateChange((event) => {
       if (event === "SIGNED_IN" || event === "SIGNED_OUT") {
         setTopics([]); setItems([]); setMembersState({}); setTopicTagsState({}); setMyVotes({}); setReads({});
-        if (channel) { supabase!.removeChannel(channel); channel = null; }
+        abmelden?.();
+        abmelden = null;
         void start();
       }
     });
     return () => {
+      alive = false;
       sub.subscription.unsubscribe();
       if (nachladeTimer.current) clearTimeout(nachladeTimer.current);
-      if (channel) supabase!.removeChannel(channel);
+      abmelden?.();
     };
   }, [loadAll, planeNachladen]);
 

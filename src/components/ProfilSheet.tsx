@@ -11,7 +11,7 @@ import { passwortProblem } from "../lib/passwort";
 import { SELECTABLE_COMMITTEES, committeeIcon, committeeLabel, rolleUndKomitees } from "../lib/committees";
 import { ladeKomiteeAntraege, stelleKomiteeAntrag } from "../lib/komitee-antrag";
 import { useTheme } from "../lib/theme";
-import { enablePush, pushConfigured, pushPermission } from "../lib/push";
+import { enablePush, pushConfigured, pushDiagnose, pushPermission } from "../lib/push";
 import { frage, meldeFehler } from "../lib/melder";
 
 /** Das eigene Profil: Bild, Namensfarbe, Passwort, Komitee-Wechsel, Hilfe. */
@@ -280,6 +280,8 @@ export function ProfilSheet({
               </button>
             </>
           )}
+
+          <Pushdiagnose />
         </div>
       )}
 
@@ -377,5 +379,40 @@ function Versionszeile() {
     <p className="mt-4 text-center text-[11px] text-tinte-leise">
       Stand {datum} · Version {commit}
     </p>
+  );
+}
+
+/**
+ * "Warum kommt bei mir nichts an?"
+ *
+ * Bis eben verschluckte die App jeden Fehler beim Verschicken von
+ * Benachrichtigungen (siehe src/lib/push.ts). Niemand konnte sagen, ob der
+ * Schlüssel auf dem Server fehlt, die Erlaubnis nicht erteilt ist oder das Abo
+ * gelöscht wurde. Diese Zeile beantwortet genau das – aufklappbar, damit sie
+ * niemanden stört, der kein Problem hat.
+ */
+function Pushdiagnose() {
+  const [offen, setOffen] = useState(false);
+  const [text, setText] = useState("Wird geprüft …");
+
+  useEffect(() => {
+    if (!offen) return;
+    let aktuell = true;
+    void pushDiagnose().then((t) => aktuell && setText(t));
+    return () => {
+      aktuell = false;
+    };
+  }, [offen]);
+
+  return (
+    <div className="mt-2">
+      <button
+        onClick={() => setOffen((v) => !v)}
+        className="text-[12px] font-semibold text-tinte-leise underline"
+      >
+        {offen ? "Prüfung ausblenden" : "Kommt nichts an? Hier prüfen"}
+      </button>
+      {offen && <p className="mt-1.5 text-[12px] leading-relaxed text-tinte-matt">{text}</p>}
+    </div>
   );
 }
