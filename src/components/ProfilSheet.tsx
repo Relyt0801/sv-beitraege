@@ -349,6 +349,30 @@ export function ProfilSheet({
       <button className="btn-primary mt-5" onClick={onClose}>
         Fertig
       </button>
+
+      <Versionszeile />
     </Sheet>
+  );
+}
+
+/**
+ * Welcher Stand laeuft hier gerade?
+ *
+ * Ohne diese Zeile kann niemand unterscheiden, ob eine Funktion fehlt oder ob
+ * nur der Deploy haengt. Genau das ist schon passiert: gemeldet wurden
+ * Aenderungen als fehlend, die im Code laengst drin waren - der Browser hatte
+ * nur den alten Stand. Das Kuerzel laesst sich mit dem letzten Commit auf
+ * GitHub vergleichen.
+ */
+function Versionszeile() {
+  const commit = typeof __BAU_COMMIT__ === "string" ? __BAU_COMMIT__ : "dev";
+  const zeit = typeof __BAU_ZEIT__ === "string" ? __BAU_ZEIT__ : "";
+  const datum = zeit
+    ? new Date(zeit).toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" })
+    : "";
+  return (
+    <p className="mt-4 text-center text-[11px] text-tinte-leise">
+      Stand {datum} · Version {commit}
+    </p>
   );
 }

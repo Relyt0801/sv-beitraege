@@ -35,8 +35,8 @@ insert into public.app_settings (id) values (1) on conflict (id) do nothing;
 alter table public.app_settings add column if not exists zusatzbetrag int not null default 25;
 
 -- ---- Realtime ----
-alter publication supabase_realtime add table public.students;
-alter publication supabase_realtime add table public.app_settings;
+do $$ begin alter publication supabase_realtime add table public.students; exception when duplicate_object then null; end $$;
+do $$ begin alter publication supabase_realtime add table public.app_settings; exception when duplicate_object then null; end $$;
 
 -- ============================================================
 -- Row Level Security: nur eingeloggte Nutzer dürfen lesen/schreiben

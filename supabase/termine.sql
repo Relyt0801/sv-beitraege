@@ -137,6 +137,9 @@ insert into role_permissions (role, perm, allowed) values
 on conflict (role, perm) do update set allowed = excluded.allowed;
 
 -- Realtime
-alter publication supabase_realtime add table termine;
-alter publication supabase_realtime add table termin_komitees;
-alter publication supabase_realtime add table termin_personen;
+-- Mit Schutz gegen doppeltes Ausfuehren: ohne ihn bricht das ganze Skript ab,
+-- sobald es ein zweites Mal laeuft - und man weiss nicht, was davor noch
+-- durchgelaufen ist und was nicht.
+do $$ begin alter publication supabase_realtime add table termine;         exception when duplicate_object then null; end $$;
+do $$ begin alter publication supabase_realtime add table termin_komitees; exception when duplicate_object then null; end $$;
+do $$ begin alter publication supabase_realtime add table termin_personen; exception when duplicate_object then null; end $$;
