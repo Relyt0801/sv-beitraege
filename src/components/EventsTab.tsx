@@ -5,6 +5,10 @@ import { Avatar } from "./Avatar";
 import { committeeLabel } from "../lib/committees";
 import { TYPE_META, type EventItem } from "../lib/events";
 import { enablePush, pushConfigured, pushPermission } from "../lib/push";
+import { Wochenstreifen } from "./Wochenstreifen";
+import { Kalender } from "./Kalender";
+import { TerminSheet, TerminAnsehen } from "./TerminSheet";
+import { heuteKey, type Termin } from "../lib/termine";
 
 function PushBanner() {
   const [perm, setPerm] = useState(pushPermission());
@@ -34,30 +38,95 @@ function PushBanner() {
 
 export function EventsTab() {
   const { events, ready, myVotes, voteCounts, voters, reads, vote, deleteEvent, markRead } = useEvents();
-  const { canEditData, isStaff } = useRole();
+  const { canEditData, isStaff, can } = useRole();
+
+  // Kalender und Terminformular liegen ueber dem Reiter, nicht darin.
+  const [kalenderOffen, setKalenderOffen] = useState(false);
+  const [formOffen, setFormOffen] = useState(false);
+  const [bearbeite, setBearbeite] = useState<Termin | null>(null);
+  const [angesehen, setAngesehen] = useState<Termin | null>(null);
+  const [startDatum, setStartDatum] = useState(heuteKey());
+  const [kalenderTag, setKalenderTag] = useState(heuteKey());
+  const darfTermine = isStaff || can("termine.manage");
+
+  const terminNeu = (datum: string) => {
+    setBearbeite(null);
+    setStartDatum(datum);
+    setFormOffen(true);
+  };
 
   // Beim Ansehen als gelesen markieren
   useEffect(() => {
     for (const e of events) if (!reads.has(e.id)) markRead(e.id);
   }, [events, reads, markRead]);
 
+  // Rund um den Feed stehen immer der Wochenstreifen und die Aufbauten fuer
+  // Kalender und Termine – auch waehrend die Events noch laden.
+  const rahmen = (inhalt: React.ReactNode) => (
+    <>
+      <Wochenstreifen
+        onKalender={(tag) => {
+          setKalenderTag(tag);
+          setKalenderOffen(true);
+        }}
+      />
+      {inhalt}
+
+      {kalenderOffen && (
+        <Kalender
+          startTag={kalenderTag}
+          onSchliessen={() => setKalenderOffen(false)}
+          onNeu={darfTermine ? terminNeu : undefined}
+          onOeffnen={(t) => setAngesehen(t)}
+        />
+      )}
+
+      <TerminSheet
+        offen={formOffen}
+        termin={bearbeite}
+        startDatum={startDatum}
+        onSchliessen={() => {
+          setFormOffen(false);
+          setBearbeite(null);
+        }}
+      />
+
+      {angesehen && !formOffen && (
+        <TerminAnsehen
+          termin={angesehen}
+          onSchliessen={() => setAngesehen(null)}
+          onBearbeiten={
+            darfTermine
+              ? () => {
+                  setBearbeite(angesehen);
+                  setStartDatum(angesehen.datum);
+                  setAngesehen(null);
+                  setFormOffen(true);
+                }
+              : undefined
+          }
+        />
+      )}
+    </>
+  );
+
   if (!ready) {
-    return (
-      <div className="flex flex-col items-center justify-center gap-4 py-24 text-tinte-leise">
+    return rahmen(
+      <div className="flex flex-col items-center justify-center gap-4 py-16 text-tinte-leise">
         <div className="h-9 w-9 animate-spin rounded-full border-[3px] border-papier-linie border-t-brand dark:border-slate-700 dark:border-t-brand" />
         <div className="text-sm font-medium">Events werden geladen …</div>
-      </div>
+      </div>,
     );
   }
   if (events.length === 0)
-    return (
+    return rahmen(
       <>
         <PushBanner />
-        <div className="py-16 text-center text-sm text-tinte-leise">Noch keine Events.</div>
-      </>
+        <div className="py-12 text-center text-sm text-tinte-leise">Noch keine Beiträge.</div>
+      </>,
     );
 
-  return (
+  return rahmen(
     <>
       <PushBanner />
       <div className="grid items-start gap-3 lg:grid-cols-2">
@@ -78,7 +147,7 @@ export function EventsTab() {
         />
         ))}
       </div>
-    </>
+    </>,
   );
 }
 

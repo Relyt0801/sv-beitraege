@@ -16,6 +16,7 @@ import { RoleProvider, useRole } from "./auth/RoleProvider";
 import { Sheet } from "./components/Sheet";
 import { ProfilesProvider, useProfiles } from "./profiles-store";
 import { EventsProvider, useEvents } from "./events-store";
+import { TermineProvider } from "./termine-store";
 import { TopicsProvider, useTopics } from "./topics-store";
 import { ChatsTab } from "./components/ChatsTab";
 import { StudentCard, nextStatus } from "./components/StudentCard";
@@ -71,11 +72,13 @@ function NachRolle() {
   return (
     <ProfilesProvider>
       <EventsProvider>
-        <TopicsProvider>
-          <ElternProvider>
-            <Main />
-          </ElternProvider>
-        </TopicsProvider>
+        <TermineProvider>
+          <TopicsProvider>
+            <ElternProvider>
+              <Main />
+            </ElternProvider>
+          </TopicsProvider>
+        </TermineProvider>
       </EventsProvider>
     </ProfilesProvider>
   );

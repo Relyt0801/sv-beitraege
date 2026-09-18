@@ -9,6 +9,7 @@ export type PermKey =
   | "kasse.edit"
   | "data.edit"
   | "beitraege.manage"
+  | "termine.manage"
   | "roles.manage"
   | "perms.manage";
 
@@ -43,6 +44,11 @@ export const PERM_CATEGORIES: PermCategory[] = [
     label: "Daten", icon: "🗂️", perms: [
       { key: "data.edit", label: "Daten bearbeiten", desc: "Namen, Beteiligungen, Personen, Halbjahr, Import/Export." },
       { key: "beitraege.manage", label: "Beiträge-Reiter", desc: "Halbjahresbeiträge, Möglichkeiten zum Prozentsammeln und die Abiball-Staffel festlegen." },
+    ],
+  },
+  {
+    label: "Termine", icon: "📅", perms: [
+      { key: "termine.manage", label: "Termine verwalten", desc: "Termine anlegen, ändern, löschen und festlegen, wer sie sehen darf." },
     ],
   },
   {
@@ -111,14 +117,14 @@ export function rollenDerZeile(key: string): string[] {
 }
 
 // Standard-Rechte je Rolle (Fallback im Client, Seeds in permissions.sql identisch)
-const TEAM_STANDARD: PermKey[] = ["chats.view_all", "chats.delete_messages", "chats.manage", "komitees.assign", "data.edit"];
+const TEAM_STANDARD: PermKey[] = ["chats.view_all", "chats.delete_messages", "chats.manage", "komitees.assign", "data.edit", "termine.manage"];
 
 export const ROLE_DEFAULTS: Record<string, PermKey[]> = {
   schueler: [],
   eltern: [], // Elternzugang bekommt keine der Befugnisse
   sprecher: [...TEAM_STANDARD],
   stv_sprecher: [...TEAM_STANDARD],
-  stufenteam: ["chats.view_all", "chats.delete_messages", "chats.manage", "komitees.assign", "data.edit"],
-  kassenwart: ["chats.view_all", "chats.delete_messages", "chats.manage", "komitees.assign", "data.edit", "kasse.edit", "beitraege.manage"],
+  stufenteam: [...TEAM_STANDARD],
+  kassenwart: [...TEAM_STANDARD, "kasse.edit", "beitraege.manage"],
   admin: [...ALL_PERMS],
 };
