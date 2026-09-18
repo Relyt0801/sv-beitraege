@@ -30,7 +30,7 @@ export function BeitraegeTab() {
   }
 
   return (
-    <div className="grid gap-3 lg:grid-cols-2">
+    <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
       {/* ---------------- Möglichkeiten ---------------- */}
       <section className="card p-4 sm:p-5">
         <h2 className="text-lg font-bold">Wofür gibt es Prozent?</h2>
@@ -50,11 +50,11 @@ export function BeitraegeTab() {
           ))}
         </ul>
 
-        <div className="mt-3 rounded-2xl border border-dashed border-brand/50 p-2.5">
-          <div className="flex items-center gap-2">
+        <div className="mt-3 min-w-0 rounded-2xl border border-dashed border-brand/50 p-2.5">
+          <div className="flex min-w-0 items-center gap-2">
             <input
-              className="min-w-0 flex-1 rounded-lg bg-slate-100 px-2.5 py-2 text-[15px] dark:bg-slate-800"
-              placeholder="Noch etwas, zum Beispiel Fotobox betreut"
+              className="w-0 min-w-0 flex-1 rounded-lg bg-slate-100 px-2.5 py-2 text-[15px] dark:bg-slate-800"
+              placeholder="Noch etwas, z. B. Fotobox betreut"
               value={titel}
               onChange={(e) => setTitel(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && anlegen()}
@@ -172,10 +172,10 @@ function VorlagenZeile({
   const punkte = useEntwurf(vorlage.punkte, (wert) => onAendern({ punkte: wert }));
 
   return (
-    <li className="rounded-2xl border border-slate-200 p-2.5 dark:border-slate-700">
-      <div className="flex items-center gap-2">
+    <li className="min-w-0 rounded-2xl border border-slate-200 p-2.5 dark:border-slate-700">
+      <div className="flex min-w-0 items-center gap-2">
         <input
-          className="min-w-0 flex-1 rounded-lg bg-slate-100 px-2.5 py-2 text-[15px] font-semibold dark:bg-slate-800"
+          className="w-0 min-w-0 flex-1 rounded-lg bg-slate-100 px-2.5 py-2 text-[15px] font-semibold dark:bg-slate-800"
           value={titel.wert}
           onChange={(e) => titel.aendern(e.target.value)}
           onBlur={titel.jetztSpeichern}
@@ -186,7 +186,7 @@ function VorlagenZeile({
             min={0}
             max={100}
             inputMode="numeric"
-            className="w-12 bg-transparent text-right text-[15px] font-bold text-brand outline-none"
+            className="w-10 bg-transparent text-right text-[15px] font-bold text-brand outline-none"
             value={punkte.wert}
             onChange={(e) => punkte.aendern(Math.max(0, Math.min(100, Number(e.target.value) || 0)))}
             onBlur={punkte.jetztSpeichern}
@@ -227,8 +227,8 @@ function StufenZeile({
   const betrag = useEntwurf(stufe.betrag, onBetrag);
 
   return (
-    <li className="flex items-center gap-3 rounded-2xl border border-slate-200 px-3 py-2 dark:border-slate-700">
-      <span className="w-[4.5rem] shrink-0 whitespace-nowrap text-[15px] font-bold text-brand">ab {stufe.ab} %</span>
+    <li className="flex min-w-0 items-center gap-2 rounded-2xl border border-slate-200 px-3 py-2 dark:border-slate-700">
+      <span className="shrink-0 whitespace-nowrap text-[15px] font-bold text-brand">ab {stufe.ab} %</span>
       <span className="min-w-0 flex-1 truncate text-[13px] text-slate-500 dark:text-slate-400">
         1. Ticket {grund + betrag.wert} €
         {grund > 0 && betrag.wert > 0 ? ` (${grund} + ${betrag.wert})` : ""}
@@ -266,7 +266,7 @@ function HalbjahrZeile({
 
   return (
     <li
-      className={`flex items-center gap-3 rounded-2xl border px-3 py-2 ${
+      className={`flex min-w-0 items-center gap-2 rounded-2xl border px-3 py-2 ${
         aktuell ? "border-brand bg-brand/5" : "border-slate-200 dark:border-slate-700"
       }`}
     >

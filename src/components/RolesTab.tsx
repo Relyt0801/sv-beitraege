@@ -56,13 +56,13 @@ export function RolesTab() {
     <div>
       <Suchfeld wert={q} onChange={setQ} />
 
-      <div className="grid gap-2.5">
+      <div className="grid gap-2.5 [&>*]:min-w-0">
         {rows.map(({ p }) => {
           const koms = committeesOf(p.user_id);
           const banned = isBanned(p);
           const geschuetzt = p.is_op || p.user_id === opUserId;
           return (
-            <div key={p.user_id} className="card p-4">
+            <div key={p.user_id} className="card min-w-0 p-4">
               {/* Zeile 1: Person */}
               <KontoZeile
                 profil={p}
@@ -71,11 +71,11 @@ export function RolesTab() {
               />
 
               {/* Zeile 2: Rolle + Komitees + Chat-Sperre nebeneinander */}
-              <div className="mt-2.5 flex items-stretch gap-2">
+              <div className="mt-2.5 flex min-w-0 flex-wrap items-stretch gap-2">
                 <select
                   disabled={geschuetzt}
                   title={geschuetzt ? "Diese Rolle kann nicht geändert werden" : undefined}
-                  className="h-[42px] shrink-0 rounded-xl border border-slate-200 bg-slate-50 px-2.5 font-semibold disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800"
+                  className="h-[42px] w-0 min-w-[8.5rem] flex-1 rounded-xl border border-slate-200 bg-slate-50 px-2.5 font-semibold disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800"
                   value={p.role}
                   onChange={(e) => setRole(p.user_id, e.target.value as Role)}
                 >
@@ -93,7 +93,7 @@ export function RolesTab() {
                 </select>
 
                 {canAssignKom && (
-                  <div className="relative min-w-0 flex-1">
+                  <div className="relative w-0 min-w-[7rem] flex-1">
                     <button
                       onClick={() => setOpenKom(openKom === p.user_id ? null : p.user_id)}
                       className="flex h-[42px] w-full items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3 font-semibold dark:border-slate-700 dark:bg-slate-800"

@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { HY } from "../lib/types";
-import { basisOffen, beitragFuer, prozentVon, punkteIndex, ticketBetrag } from "../lib/logic";
+import { basisOffen, beitragFuer, prozentVon, punkteIndex, staffelVon, ticketBetrag } from "../lib/logic";
 import { useStore } from "../store";
 import { useEltern } from "../eltern-store";
 import { useRole } from "../auth/RoleProvider";
@@ -186,6 +186,34 @@ function KindKarte({
               Wer bei Aktionen der Stufe mithilft, sammelt Prozent. Je mehr Prozent, desto günstiger
               wird das erste Abiballticket.
             </div>
+          </div>
+
+          {/* Die Staffel zum Nachsehen: ab wie viel Prozent kostet das Ticket wie viel extra */}
+          <div className="mt-4 grid grid-cols-5 gap-1">
+            {staffelVon(settings).map((stufe) => {
+              const erreicht = pct >= stufe.ab;
+              const aktuell = staffelVon(settings).filter((x) => pct >= x.ab).pop()?.ab === stufe.ab;
+              return (
+                <div
+                  key={stufe.ab}
+                  className={`rounded-lg px-1 py-1.5 text-center ${
+                    aktuell
+                      ? "bg-brand text-white"
+                      : erreicht
+                        ? "bg-brand/15 text-brand"
+                        : "bg-slate-100 text-slate-400 dark:bg-slate-800"
+                  }`}
+                >
+                  <div className="text-[12px] font-extrabold leading-none">{stufe.ab}%</div>
+                  <div className="mt-0.5 text-[10px] font-semibold leading-none opacity-90">
+                    +{stufe.betrag} €
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <div className="mt-1.5 text-[11px] text-slate-400">
+            So viel kommt beim ersten Ticket dazu.
           </div>
         </section>
 

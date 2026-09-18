@@ -81,6 +81,16 @@ function NachRolle() {
 
 type Tab = "kasse" | "events" | "themen" | "beitraege" | "rollen" | "rechte";
 
+/** Was oben im Kopf steht – je Reiter eine kurze Überschrift. */
+const REITER_TITEL: Record<Tab, string> = {
+  kasse: "Stufenkasse",
+  events: "Events",
+  themen: "Chats",
+  beitraege: "Beiträge & Abiball",
+  rollen: "Rollen & Rechte",
+  rechte: "Berechtigungen",
+};
+
 function Main() {
   const { students, punkte, settings, ready, mode, reload, setTerm, setSettings, exportData, importData } = useStore();
   const { can, canEditData, canEditBeitrag, canManageRoles, isStaff, ready: roleReady, role, loginByStudent, studentId, tourResetAt } = useRole();
@@ -218,16 +228,13 @@ function Main() {
     <div className="mx-auto max-w-5xl px-3 pb-36 sm:px-5">
       <header className="sticky top-0 z-20 -mx-3 border-b border-slate-200 bg-slate-50/90 px-3 pb-3 pt-[calc(env(safe-area-inset-top)+0.7rem)] backdrop-blur dark:border-slate-800 dark:bg-slate-950/90 sm:-mx-5 sm:px-5">
         <div className="mx-auto flex max-w-5xl items-center gap-2.5">
-          <div className="leading-tight">
-            <div className="text-lg font-bold tracking-tight">Stufenkasse</div>
-            <div className="text-[11px] text-slate-400">SV · Beiträge</div>
-          </div>
-
-          {tab !== "kasse" && (
-            <div className="min-w-0 flex-1 truncate text-lg font-bold">
-              {tab === "events" ? "Events" : tab === "themen" ? "Chats" : tab === "beitraege" ? "Beiträge & Abiball" : tab === "rechte" ? "Berechtigungen" : "Rollen & Rechte"}
+          {/* Ein Titel, der zum Reiter passt – genau wie in der Elternansicht. */}
+          <div className="min-w-0 flex-1 leading-tight">
+            <div className="truncate text-lg font-bold tracking-tight">{REITER_TITEL[tab]}</div>
+            <div className="truncate text-[11px] text-slate-400">
+              {isStaff ? "Stufenteam" : "Mein Zugang"} · Abi 28
             </div>
-          )}
+          </div>
 
           <div className="ml-auto flex shrink-0 items-center gap-2">
             {tab === "kasse" && (

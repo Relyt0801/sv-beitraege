@@ -4,6 +4,15 @@ import { useStore } from "../store";
 import { useRole } from "../auth/RoleProvider";
 import type { Student } from "../lib/types";
 
+/**
+ * IBAN in Viererblöcken, so wie man sie auf Papier schreibt.
+ * DE27428616080100548701 wird zu DE27 4286 1608 0100 5487 01 – das liest sich
+ * besser und bricht auf schmalen Bildschirmen an sinnvollen Stellen um.
+ */
+export function ibanLesbar(iban: string): string {
+  return (iban || "").replace(/\s+/g, "").replace(/(.{4})/g, "$1 ").trim();
+}
+
 /** Aus "Q1.1" wird "Q1" – so wie es auf die Überweisung gehört. */
 export function jahrgangKurz(halbjahr: string): string {
   return halbjahr.split(".")[0];
@@ -58,7 +67,13 @@ export function KontoTab({ kinder }: { kinder: Student[] }) {
 
         <dl className="mt-4 grid gap-2">
           <Zeile label="Empfänger" wert={konto.inhaber} onKopieren={() => kopieren(konto.inhaber, "inhaber")} kopiert={kopiert === "inhaber"} />
-          <Zeile label="IBAN" wert={konto.iban} gross onKopieren={() => kopieren(konto.iban, "iban")} kopiert={kopiert === "iban"} />
+          <Zeile
+            label="IBAN"
+            wert={ibanLesbar(konto.iban)}
+            gross
+            onKopieren={() => kopieren(konto.iban.replace(/\s+/g, ""), "iban")}
+            kopiert={kopiert === "iban"}
+          />
           <Zeile label="BIC" wert={konto.bic} onKopieren={() => kopieren(konto.bic, "bic")} kopiert={kopiert === "bic"} />
           <Zeile label="Bank" wert={konto.bank} />
         </dl>
