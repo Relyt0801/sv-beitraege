@@ -16,10 +16,17 @@ export function PersonAnlegenSheet({ open, onClose, onFertig }: { open: boolean;
   const [nachname, setNachname] = useState("");
   const [ab, setAb] = useState<string>("Q1.1");
   const [rolle, setRolle] = useState("schueler");
+  const [mitEltern, setMitEltern] = useState(true);
   const [busy, setBusy] = useState(false);
   const [fehler, setFehler] = useState("");
   const [doppelt, setDoppelt] = useState(false);
-  const [ergebnis, setErgebnis] = useState<{ username: string; passwort: string; name: string } | null>(null);
+  const [ergebnis, setErgebnis] = useState<{
+    username: string;
+    passwort: string;
+    name: string;
+    eltern: { username: string; passwort: string } | null;
+    elternFehler: string;
+  } | null>(null);
   const [kopiert, setKopiert] = useState(false);
 
   useEffect(() => {
@@ -38,7 +45,7 @@ export function PersonAnlegenSheet({ open, onClose, onFertig }: { open: boolean;
     if (!hasSupabase) return setFehler("Ohne Datenbank geht das nicht.");
     setBusy(true);
     const { data, error } = await supabase!.functions.invoke("person-anlegen", {
-      body: { vorname: vorname.trim(), nachname: nachname.trim(), beigetreten_ab: ab, rolle, trotzdem },
+      body: { vorname: vorname.trim(), nachname: nachname.trim(), beigetreten_ab: ab, rolle, trotzdem, mit_eltern: mitEltern },
     });
     setBusy(false);
     if (error) {
@@ -55,11 +62,22 @@ export function PersonAnlegenSheet({ open, onClose, onFertig }: { open: boolean;
       setDoppelt(istDoppelt);
       return setFehler(text);
     }
-    setErgebnis({ username: data.username, passwort: data.passwort, name: `${vorname.trim()} ${nachname.trim()}` });
+    setErgebnis({
+      username: data.username,
+      passwort: data.passwort,
+      name: `${vorname.trim()} ${nachname.trim()}`,
+      eltern: data.eltern ?? null,
+      elternFehler: data.elternFehler || "",
+    });
     onFertig();
   }
 
-  const zugang = ergebnis ? `Nutzername: ${ergebnis.username}\nStartpasswort: ${ergebnis.passwort}` : "";
+  const zugang = ergebnis
+    ? `${ergebnis.name}\nNutzername: ${ergebnis.username}\nStartpasswort: ${ergebnis.passwort}` +
+      (ergebnis.eltern
+        ? `\n\nElternzugang\nNutzername: ${ergebnis.eltern.username}\nStartpasswort: ${ergebnis.eltern.passwort}`
+        : "")
+    : "";
 
   return (
     <Sheet open={open} onClose={onClose}>
@@ -99,6 +117,15 @@ export function PersonAnlegenSheet({ open, onClose, onFertig }: { open: boolean;
               </select>
             </div>
           </div>
+          <label className="mt-3 flex cursor-pointer items-center gap-2 text-[13px] text-tinte-matt dark:text-slate-300">
+            <input
+              type="checkbox"
+              className="h-4 w-4 accent-brand"
+              checked={mitEltern}
+              onChange={(e) => setMitEltern(e.target.checked)}
+            />
+            Elternzugang gleich mit anlegen
+          </label>
           {fehler && <p className="mt-2 text-[13px] font-semibold text-amber-600">{fehler}</p>}
           {doppelt ? (
             <button disabled={busy} onClick={() => void anlegen(true)} className="btn-primary mt-4 disabled:opacity-50">
@@ -127,6 +154,24 @@ export function PersonAnlegenSheet({ open, onClose, onFertig }: { open: boolean;
               <b className="select-all">{ergebnis.passwort}</b>
             </div>
           </div>
+          {ergebnis.eltern && (
+            <>
+              <div className="mt-3 text-[12px] font-bold uppercase tracking-wide text-tinte-leise">Elternzugang</div>
+              <div className="mt-1 grid gap-1 rounded-xl bg-papier-matt p-3 font-mono text-[15px] dark:bg-slate-800">
+                <div>
+                  <span className="text-tinte-leise">Nutzername </span>
+                  <b className="select-all">{ergebnis.eltern.username}</b>
+                </div>
+                <div>
+                  <span className="text-tinte-leise">Passwort </span>
+                  <b className="select-all">{ergebnis.eltern.passwort}</b>
+                </div>
+              </div>
+            </>
+          )}
+          {ergebnis.elternFehler && (
+            <p className="mt-2 text-[13px] font-semibold text-amber-600">{ergebnis.elternFehler}</p>
+          )}
           <div className="mt-3 grid grid-cols-2 gap-2">
             <button
               onClick={async () => {

@@ -305,3 +305,13 @@ im Repo, damit ein Neuaufbau funktioniert:
 - **Meine Kasse**: Am Rechner links „Mithelfen beim Abiball“ und die Liste
   „Wobei du geholfen hast“, rechts das Abiballticket – keine Lücke mehr.
   Kürzere Ticket-Texte; Legende „noch nicht dabei“ im Dunkelmodus sichtbar.
+
+## 15. Elternzugang beim Anlegen
+
+- „+ Person hinzufügen“ (Rollen-Reiter) legt auf Wunsch gleich den
+  Elternzugang mit an (Häkchen, standardmäßig an): Nutzername wie bei allen
+  Eltern `vorname.nachname`, Anzeigename „Familie Nachname“, sieht nur dieses
+  Kind. Beide Startpasswörter werden genau einmal angezeigt.
+- Die Edge Function `person-anlegen` kann mit `eltern_fuer` auch nachträglich
+  einen Elternzugang zu einer vorhandenen Person anlegen.
+- Zugangslisten bleiben in `privat/` (von Git ausgeschlossen).

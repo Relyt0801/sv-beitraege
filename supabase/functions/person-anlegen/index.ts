@@ -43,6 +43,53 @@ function startpasswort(): string {
 
 const sauber = (s: unknown) => String(s ?? "").replace(/\s+/g, " ").trim();
 
+/** Wie scripts/eltern-anlegen.mjs: "Liv Icking" -> "liv.icking" (Kind andersherum). */
+function schlicht(s: string): string {
+  return (s || "")
+    .toLowerCase()
+    .replace(/ä/g, "ae").replace(/ö/g, "oe").replace(/ü/g, "ue").replace(/ß/g, "ss")
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "");
+}
+
+type Db = ReturnType<typeof createClient>;
+
+/** Elternzugang für ein Kind: sieht nur dieses Kind (parent_children + RLS). */
+async function elternAnlegen(admin: Db, kind: { id: string; vorname: string; nachname: string }) {
+  let username = `${schlicht(kind.vorname)}.${schlicht(kind.nachname)}`;
+  const basis = username;
+  for (let i = 2; i < 50; i++) {
+    const { data: da } = await admin.from("profiles").select("user_id").eq("username", username).maybeSingle();
+    if (!da) break;
+    username = `${basis}${i}`;
+  }
+  const passwort = startpasswort();
+  const { data: neu, error } = await admin.auth.admin.createUser({
+    email: `${username}@sv-beitraege.local`,
+    password: passwort,
+    email_confirm: true,
+  });
+  if (error || !neu?.user) return { error: "Elternzugang: " + (error?.message || "unbekannt") };
+  const uid = neu.user.id;
+  const { error: pErr } = await admin.from("profiles").upsert(
+    { user_id: uid, username, role: "eltern", student_id: null, must_change_password: true, has_logged_in: false },
+    { onConflict: "user_id" },
+  );
+  if (pErr) {
+    await admin.auth.admin.deleteUser(uid);
+    return { error: "Elternprofil: " + pErr.message };
+  }
+  await admin.from("public_profiles").upsert({
+    user_id: uid,
+    anzeigename: `Familie ${kind.nachname}`,
+    initialen: kind.nachname.slice(0, 2).toUpperCase(),
+    farbe: "slate",
+  });
+  const { error: kErr } = await admin.from("parent_children").upsert({ user_id: uid, student_id: kind.id });
+  if (kErr) return { error: "Kind-Zuordnung: " + kErr.message };
+  return { username, passwort };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (req.method !== "POST") return json({ error: "Nur POST." }, 405);
@@ -63,6 +110,18 @@ Deno.serve(async (req) => {
 
   // ---- Eingaben prüfen -----------------------------------------------------
   const k = (await req.json().catch(() => ({}))) as Record<string, unknown>;
+
+  // Nur einen Elternzugang zu einer schon vorhandenen Person anlegen
+  if (typeof k.eltern_fuer === "string") {
+    const { data: kind } = await admin.from("students").select("id, vorname, nachname").eq("id", k.eltern_fuer).maybeSingle();
+    if (!kind) return json({ error: "Person nicht gefunden." }, 404);
+    const { data: schon } = await admin.from("parent_children").select("user_id").eq("student_id", kind.id);
+    if (schon && schon.length && !k.trotzdem) return json({ error: "Für diese Person gibt es schon einen Elternzugang.", doppelt: true }, 409);
+    const e = await elternAnlegen(admin, kind);
+    if ("error" in e) return json({ error: e.error }, 500);
+    console.log("Elternzugang angelegt:", e.username, "von", wer.user.id);
+    return json({ ok: true, eltern: e });
+  }
   const vorname = sauber(k.vorname);
   const nachname = sauber(k.nachname);
   const ab = HALBJAHRE.includes(String(k.beigetreten_ab)) ? String(k.beigetreten_ab) : "EF.1";
@@ -113,5 +172,12 @@ Deno.serve(async (req) => {
   }
 
   console.log("Person angelegt:", username, "von", wer.user.id);
-  return json({ ok: true, username, passwort, student_id: st.id, user_id: neu.user.id });
+  let eltern: { username: string; passwort: string } | null = null;
+  let elternFehler = "";
+  if (k.mit_eltern) {
+    const e = await elternAnlegen(admin, { id: st.id, vorname, nachname });
+    if ("error" in e) elternFehler = e.error || "";
+    else eltern = e;
+  }
+  return json({ ok: true, username, passwort, student_id: st.id, user_id: neu.user.id, eltern, elternFehler });
 });
