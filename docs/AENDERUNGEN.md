@@ -264,3 +264,25 @@ im Repo, damit ein Neuaufbau funktioniert:
   nächsten Nachladen, nicht mehr live.
 - Buchungsfenster: „Einnahme | Ausgabe“ steht im selben Raster wie
   „Datum | Wofür“ darunter, Kanten fluchten.
+
+## 13. Chat-Pop-ups, Stufenteam-Chat, Gespräche mit Schülern, Beitragshilfen-Recht
+
+- **Chat-Pop-ups repariert**: Die Empfänger wurden im Browser berechnet. Ein
+  Schüler sieht dort aber nur seine eigene Komitee-Zeile – Pop-ups kamen
+  deshalb nur an, wenn das Team schrieb. Jetzt rechnet `send-push`
+  (Modus `chat_item_id`) die Empfänger auf dem Server aus.
+- **Profil-Schalter „Pop-ups für Chats“** gilt nur für normale Chat-Nachrichten.
+  Angepinnte Nachrichten (auch nachträglich angepinnt), Gespräche mit dem
+  Stufenteam, Events und Termine kommen immer.
+- **Stufenteam-Chat** steht fürs Team ganz oben im Chats-Reiter. Das Team
+  sieht ihn per RLS immer, auch ohne „Alle Chats sehen“.
+- **Gespräche mit Schülern** (direkt über den Gesprächen mit Eltern):
+  Übersicht der Fragen aus der Stufe + „Anschreiben“ (Schüler suchen, Betreff,
+  Nachricht). Schüler finden es unter „Frag das Stufenteam“.
+- **Events nie für Eltern**, auch nicht über die API (`can_see_event`).
+  Knopf im Event-Fenster heißt „Alle Schüler“.
+- **Neues Recht „Beitragshilfen eintragen“** (`hilfen.edit`) im Rechte-Reiter
+  unter Daten, getrennt von „Daten bearbeiten“. Wer data.edit hatte, hat es
+  automatisch bekommen.
+- **Elternansicht**: kürzere Texte, kein Chat-Schalter im Profil.
+- Migration: `supabase/chats-push-und-rechte.sql` (eingespielt), send-push v17.

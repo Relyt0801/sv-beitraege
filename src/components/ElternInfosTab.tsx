@@ -49,9 +49,7 @@ export function ElternInfosTab() {
         {!bereit ? (
           <p className="mt-2 text-[13px] text-tinte-leise">Wird geladen …</p>
         ) : infos.length === 0 ? (
-          <p className="mt-2 text-[13px] text-tinte-leise">
-            Hier steht noch nichts. Sobald es Neuigkeiten gibt, finden Sie sie an dieser Stelle.
-          </p>
+          <p className="mt-2 text-[13px] text-tinte-leise">Noch keine Neuigkeiten.</p>
         ) : (
           <ul className="mt-3 grid gap-2">
             {infos.map((i) => (
@@ -79,10 +77,8 @@ export function ElternInfosTab() {
 
       {/* ------------------------------------------- eigene Anfragen */}
       <section className="card p-5">
-        <h2 className="text-lg font-bold">Eine Frage ans Stufenteam</h2>
-        <p className="mt-0.5 text-[13px] leading-relaxed text-tinte-matt dark:text-slate-400">
-          Schreiben Sie uns. Wir antworten hier in der App, Sie finden die Antwort dann weiter unten.
-        </p>
+        <h2 className="text-lg font-bold">Frage ans Stufenteam</h2>
+        <p className="mt-0.5 text-[13px] text-tinte-matt dark:text-slate-400">Die Antwort kommt hier in die App.</p>
 
         <div className="mt-3 grid gap-2">
           <label className="-mb-1 text-[12px] font-semibold text-tinte-leise" htmlFor="eltern-betreff">
@@ -114,7 +110,7 @@ export function ElternInfosTab() {
 
       {meine.length > 0 && (
         <section className="card p-5">
-          <h2 className="text-lg font-bold">Ihre Gespräche mit dem Stufenteam</h2>
+          <h2 className="text-lg font-bold">Ihre Gespräche</h2>
           <ul className="mt-3 grid gap-2">
             {meine.map((t) => {
               const verlauf = nachrichten.filter((n) => n.ticket_id === t.id);

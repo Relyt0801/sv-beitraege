@@ -45,7 +45,7 @@ export function StudentSheet({
   onClose: () => void;
 }) {
   const { settings, setTerm, updateStudent, removeStudent } = useStore();
-  const { canEditBeitrag, canEditData } = useRole();
+  const { canEditBeitrag, canEditData, canEditHilfen } = useRole();
   const [showPunkte, setShowPunkte] = useState(false);
   const [showStamm, setShowStamm] = useState(false);
 
@@ -151,7 +151,7 @@ export function StudentSheet({
         onClick={() => setShowPunkte(true)}
         className="mt-3 w-full rounded-xl border border-papier-linie py-2.5 text-[13px] font-semibold text-tinte-matt transition active:scale-[.99] dark:border-slate-600 dark:text-slate-300"
       >
-        {canEditData ? "Mithilfe eintragen" : "Mithilfe ansehen"}
+        {canEditHilfen ? "Mithilfe eintragen" : "Mithilfe ansehen"}
       </button>
 
       {/* ------------------------------------------------- Stammdaten */}
@@ -208,7 +208,7 @@ export function StudentSheet({
       <PunkteSheet
         student={student}
         settings={settings}
-        editable={canEditData}
+        editable={canEditHilfen}
         open={showPunkte}
         onClose={() => setShowPunkte(false)}
       />

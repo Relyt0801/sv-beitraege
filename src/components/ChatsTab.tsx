@@ -10,6 +10,9 @@ import { BannHinweis } from "./BannHinweis";
 import { ChatBlasen, ChatEingabe } from "./ChatBlasen";
 import { Avatar } from "./Avatar";
 import { useProfiles } from "../profiles-store";
+import { useStore } from "../store";
+import { Sheet } from "./Sheet";
+import { normalize } from "../lib/logic";
 
 const TEAM_CHAT_TITLE = "Stufenteam";
 
@@ -19,8 +22,9 @@ const TEAM_CHAT_TITLE = "Stufenteam";
  * im Hintergrund entsteht daraus ein Ticket, das das Team beantwortet.
  */
 export function ChatsTab() {
-  const { topics, ready, unreadCount, createTopic, committeesOf, uid } = useTopics();
+  const { topics, members, ready, unreadCount, createTopic, committeesOf, uid } = useTopics();
   const { can, isStaff } = useRole();
+  const [anschreiben, setAnschreiben] = useState(false);
   const darfVerwalten = can("chats.manage");
   const [openId, setOpenId] = useState<string | null>(null);
   const [teamOffen, setTeamOffen] = useState(false);
@@ -49,8 +53,12 @@ export function ChatsTab() {
   }, [ready, darfVerwalten, topics, chats, teamChat, createTopic]);
 
   const tickets = useMemo(
-    () => topics.filter((t) => t.kind === "ticket" && (isStaff || t.created_by === uid)),
-    [topics, isStaff, uid],
+    // Schüler: eigene Fragen UND Gespräche, die das Team mit ihnen begonnen hat
+    () =>
+      topics.filter(
+        (t) => t.kind === "ticket" && (isStaff || t.created_by === uid || (members[t.id] || []).includes(uid)),
+      ),
+    [topics, members, isStaff, uid],
   );
 
   if (!ready)
@@ -101,6 +109,20 @@ export function ChatsTab() {
 
   return (
     <div className="space-y-5 pb-4">
+      {/* Der Chat des Stufenteams – nur fürs Team, ganz oben */}
+      {isStaff && teamChat && (
+        <section>
+          <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-tinte-leise">Stufenteam</h3>
+          <ChatCard
+            titel="Stufenteam-Chat"
+            icon="👑"
+            unread={unreadCount(teamChat.id)}
+            mine
+            onOpen={() => setOpenId(teamChat.id)}
+          />
+        </section>
+      )}
+
       <section>
         <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-tinte-leise">
           {isStaff ? "Alle Komitees" : "Mein Komitee"}
@@ -123,49 +145,39 @@ export function ChatsTab() {
                 onOpen={() => setOpenId(t.id)}
               />
             ))}
-            {isStaff && teamChat && (
-              <ChatCard
-                titel="Stufenteam"
-                icon="👑"
-                unread={unreadCount(teamChat.id)}
-                mine
-                onOpen={() => setOpenId(teamChat.id)}
-              />
-            )}
           </div>
         )}
       </section>
 
       <section>
         <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-tinte-leise">
-          {isStaff ? "Fragen an euch" : "Stufenteam"}
+          {isStaff ? "Gespräche" : "Stufenteam"}
         </h3>
 
         {/* Bitten aus der Stufe: Komitee wechseln, Sperre aufheben.
             Der Abstand gehoert hierher: vorher stiessen die Elternkarten
             direkt an die Ticketkarte und der Anschreiben-Knopf sass auf ihr. */}
         <div className="grid gap-2.5">
-        {isStaff && (
+        {isStaff ? (
           <>
             <KomiteeRequests />
             <UnbanRequests />
+            <TicketUebersichtKarte
+              offene={offeneTickets}
+              unread={ticketUngelesen}
+              onOpen={() => setTicketListe(true)}
+              onAnschreiben={() => setAnschreiben(true)}
+            />
             <ElternTeamTab />
+            <SchuelerAnschreiben open={anschreiben} onClose={() => setAnschreiben(false)} />
           </>
-        )}
-
-        {!isStaff ? (
+        ) : (
           <ChatCard
-            titel="Stufenteam"
+            titel="Frag das Stufenteam"
             icon="🛡️"
             unread={ticketUngelesen}
             mine
             onOpen={() => setTeamOffen(true)}
-          />
-        ) : (
-          <TicketUebersichtKarte
-            offene={offeneTickets}
-            unread={ticketUngelesen}
-            onOpen={() => setTicketListe(true)}
           />
         )}
         </div>
@@ -198,14 +210,15 @@ function TicketCard({
   topic, unread, onOpen, onDelete,
 }: { topic: Topic; unread: number; onOpen: () => void; onDelete?: () => void }) {
   const { profile } = useProfiles();
-  const name = topic.created_by ? profile[topic.created_by]?.anzeigename : "";
+  const person = useTicketPerson(topic);
+  const name = person ? profile[person]?.anzeigename : "";
   return (
     <div className="card flex items-center">
     <button
       onClick={onOpen}
       className="flex min-w-0 flex-1 items-center gap-3 p-4 text-left transition active:scale-[.99]"
     >
-      <Avatar userId={topic.created_by} name={name} size={32} />
+      <Avatar userId={person} name={name} size={32} />
       <span className="min-w-0 flex-1">
         <span className="block truncate text-[15px] font-bold">{name || "Frage"}</span>
         <span className="block truncate text-[12px] text-tinte-leise">{topic.title}</span>
@@ -337,13 +350,14 @@ function TicketChat({ topic, onBack }: { topic: Topic; onBack: () => void }) {
     await postItem(topic, "nachricht", t, undefined, "", { role, koms: committeesOf(uid) });
   }
 
-  const name = topic.created_by ? profile[topic.created_by]?.anzeigename : "";
+  const person = useTicketPerson(topic);
+  const name = person ? profile[person]?.anzeigename : "";
 
   return (
     <div>
       <div className="sticky top-[52px] z-10 -mx-3 flex items-center gap-2 border-b border-papier-linie bg-papier-matt/95 px-3 py-2 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95 sm:-mx-5 sm:px-5">
         <button className="iconbtn" onClick={onBack} aria-label="Zurück">‹</button>
-        <Avatar userId={topic.created_by} name={name} size={28} />
+        <Avatar userId={person} name={name} size={28} />
         <div className="min-w-0 flex-1">
           <div className="truncate text-[16px] font-bold">{name || "Frage"}</div>
           <div className="truncate text-[11px] text-tinte-leise">
@@ -383,34 +397,152 @@ function TicketChat({ topic, onBack }: { topic: Topic; onBack: () => void }) {
 }
 
 
-/** Karte "Stufenteam-Tickets" mit kurzer Statuszeile. */
+/** Karte "Gespräche mit Schülern" – steht direkt über den Gesprächen mit Eltern. */
 function TicketUebersichtKarte({
-  offene, unread, onOpen,
-}: { offene: Topic[]; unread: number; onOpen: () => void }) {
+  offene, unread, onOpen, onAnschreiben,
+}: { offene: Topic[]; unread: number; onOpen: () => void; onAnschreiben: () => void }) {
   const { profile } = useProfiles();
   const neueste = offene[0];
-  const name = neueste?.created_by ? profile[neueste.created_by]?.anzeigename : "";
+  const person = useTicketPerson(neueste ?? null);
+  const name = person ? profile[person]?.anzeigename : "";
   const text =
     offene.length === 0
-      ? "gerade keine offenen Fragen"
+      ? "Gerade nichts offen"
       : offene.length === 1
-        ? `Es gibt 1 neue Mitteilung von ${name || "einer Person"}: ${neueste.title}`
-        : `Es gibt ${offene.length} neue Mitteilungen`;
+        ? `${name || "Jemand"}: ${neueste.title}`
+        : `${offene.length} offen`;
 
   return (
-    <button onClick={onOpen} className="card flex w-full items-center gap-3 p-4 text-left transition active:scale-[.99]">
-      <span className="text-xl">🛡️</span>
-      <span className="min-w-0 flex-1">
-        <span className="block text-[15px] font-bold">Stufenteam-Tickets</span>
-        <span className="block truncate text-[12px] text-tinte-leise">{text}</span>
-      </span>
-      {unread > 0 && (
-        <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[11px] font-bold text-white">
-          {unread > 9 ? "9+" : unread}
-        </span>
+    <section className="card p-4 sm:p-5">
+      <div className="flex items-center gap-2">
+        <h2 className="min-w-0 flex-1 text-lg font-bold">
+          Gespräche mit Schülern
+          {unread > 0 && (
+            <span className="ml-2 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 align-middle text-[11px] font-bold text-white">
+              {unread > 9 ? "9+" : unread} neu
+            </span>
+          )}
+        </h2>
+        <button onClick={onAnschreiben} className="shrink-0 rounded-lg bg-brand px-3 py-1.5 text-sm font-bold text-white">
+          Anschreiben
+        </button>
+      </div>
+      <button
+        onClick={onOpen}
+        className="mt-3 flex w-full items-center gap-2 rounded-2xl border border-papier-linie p-3.5 text-left dark:border-slate-700"
+      >
+        <span className="min-w-0 flex-1 truncate text-[14px] text-tinte-matt dark:text-slate-300">{text}</span>
+        <span className="shrink-0 text-[13px] font-bold text-brand">Alle ansehen ›</span>
+      </button>
+    </section>
+  );
+}
+
+/** Mit wem läuft das Gespräch? Bei Team-Anfängen die angeschriebene Person. */
+function useTicketPerson(topic: Topic | null): string | null {
+  const { members } = useTopics();
+  const { profiles } = useRole();
+  if (!topic) return null;
+  const team = new Set(
+    profiles.filter((p) => ["stufenteam", "kassenwart", "admin", "sprecher", "stv_sprecher"].includes(p.role)).map((p) => p.user_id),
+  );
+  const kandidaten = [topic.created_by, ...(members[topic.id] || [])].filter(Boolean) as string[];
+  return kandidaten.find((u) => !team.has(u)) ?? topic.created_by ?? null;
+}
+
+/** Das Team schreibt eine Schülerin / einen Schüler direkt an. */
+function SchuelerAnschreiben({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { profiles } = useRole();
+  const { students } = useStore();
+  const { createTopic, postItem, committeesOf, uid } = useTopics();
+  const { role } = useRole();
+  const [q, setQ] = useState("");
+  const [wer, setWer] = useState<string | null>(null);
+  const [betreff, setBetreff] = useState("");
+  const [text, setText] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    setQ("");
+    setWer(null);
+    setBetreff("");
+    setText("");
+  }, [open]);
+
+  const nachId = useMemo(() => new Map(students.map((s) => [s.id, s])), [students]);
+  const liste = useMemo(() => {
+    const n = normalize(q);
+    return profiles
+      .filter((p) => p.role !== "eltern" && p.student_id && p.user_id !== uid)
+      .map((p) => {
+        const s = nachId.get(p.student_id!);
+        return { id: p.user_id, name: s ? `${s.vorname} ${s.nachname}` : p.username || "?" };
+      })
+      .filter((x) => !n || normalize(x.name).includes(n))
+      .sort((a, b) => a.name.localeCompare(b.name, "de"))
+      .slice(0, 30);
+  }, [profiles, nachId, q, uid]);
+  const gewaehlt = liste.find((x) => x.id === wer) ?? (wer ? { id: wer, name: "" } : null);
+
+  async function senden() {
+    if (!wer || !betreff.trim() || !text.trim() || busy) return;
+    setBusy(true);
+    const titel = betreff.trim().slice(0, 60);
+    const id = await createTopic({
+      title: titel, tag: "", visibility: "stufenteam", memberIds: [wer], komiteeSlugs: [], kind: "ticket",
+    });
+    if (id) {
+      await postItem(
+        { id, title: titel, tag: "", kind: "ticket", status: "offen", pinned: false, admin_only: false, visibility: "stufenteam", parent_id: null, created_by: uid, created_at: new Date().toISOString() },
+        "nachricht",
+        text,
+        undefined,
+        "",
+        { role, koms: committeesOf(uid) },
+      );
+    }
+    setBusy(false);
+    if (id) onClose();
+  }
+
+  return (
+    <Sheet open={open} onClose={onClose}>
+      <h2 className="text-xl font-extrabold">Schüler anschreiben</h2>
+      {!wer ? (
+        <>
+          <input className="field mt-3" placeholder="Name suchen …" value={q} autoFocus onChange={(e) => setQ(e.target.value)} />
+          <ul className="mt-2 grid max-h-[50vh] gap-1 overflow-y-auto">
+            {liste.map((x) => (
+              <li key={x.id}>
+                <button
+                  onClick={() => setWer(x.id)}
+                  className="flex w-full items-center gap-2.5 rounded-xl px-2 py-2 text-left hover:bg-papier-matt dark:hover:bg-slate-800"
+                >
+                  <Avatar userId={x.id} name={x.name} size={28} />
+                  <span className="truncate text-[14px] font-semibold">{x.name}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : (
+        <>
+          <button onClick={() => setWer(null)} className="mt-3 flex items-center gap-2 rounded-xl bg-papier-matt px-3 py-2 text-[14px] font-semibold dark:bg-slate-800">
+            <Avatar userId={wer} name={gewaehlt?.name} size={24} />
+            {gewaehlt?.name || "Ausgewählt"} <span className="text-tinte-leise">· ändern</span>
+          </button>
+          <label className="mt-3 block text-[12px] font-semibold text-tinte-leise">Betreff</label>
+          <input className="field mt-1" placeholder="z. B. Waffelstand 1. Pause" value={betreff} maxLength={60} onChange={(e) => setBetreff(e.target.value)} />
+          <label className="mt-3 block text-[12px] font-semibold text-tinte-leise">Nachricht</label>
+          <textarea className="field mt-1 min-h-[90px]" value={text} onChange={(e) => setText(e.target.value)} />
+          <button disabled={busy || !betreff.trim() || !text.trim()} onClick={senden} className="btn-primary mt-4 disabled:opacity-40">
+            {busy ? "…" : "Senden"}
+          </button>
+          <p className="mt-2 text-center text-[11px] text-tinte-leise">Kommt als Pop-up an – auch wenn Chat-Meldungen aus sind.</p>
+        </>
       )}
-      <span className="text-slate-300">›</span>
-    </button>
+    </Sheet>
   );
 }
 
@@ -427,8 +559,8 @@ function TicketListe({
     <div>
       <div className="sticky top-[52px] z-10 -mx-3 mb-3 flex items-center gap-2 border-b border-papier-linie bg-papier-matt/95 px-3 py-2 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95 sm:-mx-5 sm:px-5">
         <button className="iconbtn" onClick={onBack} aria-label="Zurück">‹</button>
-        <span className="text-xl">🛡️</span>
-        <div className="min-w-0 flex-1 truncate text-[17px] font-bold">Stufenteam-Tickets</div>
+        <span className="text-xl">🎓</span>
+        <div className="min-w-0 flex-1 truncate text-[17px] font-bold">Gespräche mit Schülern</div>
       </div>
 
       {offene.length === 0 ? (

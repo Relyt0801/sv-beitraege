@@ -116,7 +116,7 @@ const REITER_TITEL: Record<Tab, string> = {
 
 function Main() {
   const { students, punkte, settings, ready, mode, reload, setTerm, setSettings, exportData, importData } = useStore();
-  const { can, canEditData, canEditBeitrag, canManageRoles, isStaff, ready: roleReady, role, loginByStudent, userByStudent, studentId, tourResetAt } = useRole();
+  const { can, canEditData, canEditHilfen, canEditBeitrag, canManageRoles, isStaff, ready: roleReady, role, loginByStudent, userByStudent, studentId, tourResetAt } = useRole();
   const { events: allEvents, reads } = useEvents();
   const { topics, unreadCount } = useTopics();
   // Kennung fürs eigene Namensbild aus dem Profil-Speicher – im Themen-Speicher
@@ -332,7 +332,7 @@ function Main() {
                     ⚙︎
                   </button>
                 )}
-                {teamView && canEditData && (
+                {teamView && (canEditData || canEditHilfen) && (
                   <button
                     data-tour="massen"
                     className={`iconbtn ${massMode ? "iconbtn-active" : ""}`}

@@ -26,7 +26,8 @@ interface RoleCtx {
   /** Elternzugang: sieht nur die eigenen Kinder, keine Chats, keine Events. */
   isEltern: boolean;
   can: (perm: PermKey) => boolean;
-  canEditData: boolean; // Namen/Beteiligungen/Personen
+  canEditData: boolean; // Namen/Personen/Halbjahr
+  canEditHilfen: boolean; // Beitragshilfen (Mithilfe/Prozent)
   canEditBeitrag: boolean; // bezahlt/offen/erlassen
   canManageRoles: boolean; // Rollen-Reiter
   profiles: Profile[];
@@ -249,6 +250,7 @@ export function RoleProvider({ children }: { children: ReactNode }) {
     isEltern,
     can,
     canEditData: can("data.edit"),
+    canEditHilfen: can("hilfen.edit"),
     canEditBeitrag: can("kasse.edit"),
     canManageRoles: can("roles.manage"),
     profiles,

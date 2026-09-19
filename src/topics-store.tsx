@@ -4,6 +4,16 @@ import { pushToUsers } from "./lib/push";
 import { lesbarerName } from "./lib/profil";
 import { committeeIcon, committeeLabel } from "./lib/committees";
 
+/** Pop-up zu einer Chat-Nachricht. Wer es bekommt, entscheidet der Server. */
+async function chatPush(itemId: string, angepinnt = false): Promise<void> {
+  if (!hasSupabase) return;
+  try {
+    await supabase!.functions.invoke("send-push", { body: { chat_item_id: itemId, angepinnt } });
+  } catch {
+    /* Benachrichtigung ist optional */
+  }
+}
+
 export type TopicItemType = "nachricht" | "todo" | "umfrage";
 
 export type Visibility = "privat" | "personen" | "stufenteam" | "komitee" | "custom";
@@ -426,34 +436,18 @@ export function TopicsProvider({ children }: { children: ReactNode }) {
       alert("Senden fehlgeschlagen: " + error.message);
       return;
     }
-    // Empfänger: Ordner-Mitglieder + Komitee-Mitglieder (Tag), ohne Autor
-    const s = stateRef.current;
-    const komSlugs = [...(s.topicTags[topic.id] || []), ...(topic.tag ? [topic.tag] : [])];
-    const komRecipients = komSlugs.flatMap((slug) => s.tagMembers[slug] || []);
-    let recipients = [...new Set([...(s.members[topic.id] || []), ...komRecipients])]
-      .filter((u) => u !== uidRef.current); // nie an sich selbst
-    // Benachrichtigungen im Hintergrund – das Senden wartet nicht darauf.
-    void (async () => {
-      // Wer Chat-Benachrichtigungen ausgeschaltet hat, bekommt kein Pop-up.
-      if (recipients.length) {
-        const { data: pp } = await supabase!
-          .from("public_profiles")
-          .select("user_id, push_chats")
-          .in("user_id", recipients);
-        const aus = new Set(
-          ((pp as { user_id: string; push_chats: boolean }[]) || [])
-            .filter((x) => x.push_chats === false)
-            .map((x) => x.user_id),
-        );
-        recipients = recipients.filter((u) => !aus.has(u));
-      }
-      await pushToUsers(recipients, `Neues in „${topic.title}"`, (item.title ? item.title + ": " : "") + body.slice(0, 100), "./#chats");
-    })();
+    // Empfänger rechnet der Server aus (send-push, chat_item_id). Im Browser
+    // sieht ein Schüler nur seine eigene Komitee-Zeile – vorher landeten
+    // Chat-Pop-ups deshalb nur bei den Nachrichten des Teams.
+    void chatPush(item.id);
   }, []);
 
   const updateItem: TopicsValue["updateItem"] = useCallback(async (id, patch) => {
     setItems((p) => p.map((i) => (i.id === id ? { ...i, ...patch } : i)));
-    if (hasSupabase) await supabase!.from("topic_items").update(patch).eq("id", id);
+    if (!hasSupabase) return;
+    const { error } = await supabase!.from("topic_items").update(patch).eq("id", id);
+    // Frisch angepinnt: alle Bescheid geben – auch wer Chat-Meldungen aus hat.
+    if (!error && patch.pinned === true) void chatPush(id, true);
   }, []);
 
   const deleteItem: TopicsValue["deleteItem"] = useCallback(async (id) => {

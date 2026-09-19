@@ -8,6 +8,7 @@ export type PermKey =
   | "mod.timeout"
   | "kasse.edit"
   | "data.edit"
+  | "hilfen.edit"
   | "beitraege.manage"
   | "termine.manage"
   | "finanzen.view"
@@ -44,7 +45,8 @@ export const PERM_CATEGORIES: PermCategory[] = [
   },
   {
     label: "Daten", icon: "🗂️", perms: [
-      { key: "data.edit", label: "Daten bearbeiten", desc: "Namen, Beteiligungen, Personen, Halbjahr, Import/Export." },
+      { key: "data.edit", label: "Daten bearbeiten", desc: "Namen, Personen, Halbjahr, Import/Export." },
+      { key: "hilfen.edit", label: "Beitragshilfen eintragen", desc: "Mithilfe (Prozent) bei Personen eintragen – einzeln oder für mehrere auf einmal." },
       { key: "beitraege.manage", label: "Beiträge-Reiter", desc: "Halbjahresbeiträge, Möglichkeiten zum Prozentsammeln und die Abiball-Staffel festlegen." },
     ],
   },
@@ -125,7 +127,7 @@ export function rollenDerZeile(key: string): string[] {
 }
 
 // Standard-Rechte je Rolle (Fallback im Client, Seeds in permissions.sql identisch)
-const TEAM_STANDARD: PermKey[] = ["chats.view_all", "chats.delete_messages", "chats.manage", "komitees.assign", "data.edit", "termine.manage"];
+const TEAM_STANDARD: PermKey[] = ["chats.view_all", "chats.delete_messages", "chats.manage", "komitees.assign", "data.edit", "hilfen.edit", "termine.manage"];
 
 export const ROLE_DEFAULTS: Record<string, PermKey[]> = {
   schueler: [],

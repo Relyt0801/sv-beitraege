@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { HY, type Halbjahr } from "../lib/types";
 import { useStore } from "../store";
+import { useRole } from "../auth/RoleProvider";
 
 export function MassBar({ selected, onDone }: { selected: Set<string>; onDone: () => void }) {
   const { massApply, templates, addContributionMany } = useStore();
+  const { canEditHilfen } = useRole();
   const [h, setH] = useState<Halbjahr>("EF.1");
   const [punkteOffen, setPunkteOffen] = useState(false);
   const [titel, setTitel] = useState("");
@@ -91,9 +93,11 @@ export function MassBar({ selected, onDone }: { selected: Set<string>; onDone: (
       <button disabled={disabled} className={btn} onClick={() => massApply(selected, h, "offen")}>
         offen
       </button>
-      <button disabled={disabled} className={btn} onClick={() => setPunkteOffen(true)}>
-        ＋ Beitragspunkte
-      </button>
+      {canEditHilfen && (
+        <button disabled={disabled} className={btn} onClick={() => setPunkteOffen(true)}>
+          ＋ Beitragspunkte
+        </button>
+      )}
       <button className="rounded-xl bg-brand px-3 py-2 text-sm font-bold text-white" onClick={onDone}>
         Fertig
       </button>

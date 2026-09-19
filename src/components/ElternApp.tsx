@@ -124,9 +124,7 @@ export function ElternApp() {
               </div>
             ) : kinder.length === 0 ? (
               <div className="card p-6 text-center text-sm text-tinte-matt">
-                Ihrem Zugang ist noch kein Kind zugeordnet.
-                <br />
-                Melden Sie sich beim Stufenteam, dann wird das eingerichtet.
+                Noch kein Kind zugeordnet – bitte beim Stufenteam melden.
               </div>
             ) : (
               <div className="grid gap-4">
@@ -143,9 +141,9 @@ export function ElternApp() {
                       <span className="text-[13px] text-white/60">
                         {familieOffen > 0
                           ? kinder.length > 1
-                            ? "bitte für jedes Kind einzeln überweisen"
-                            : "für die Stufenkasse"
-                          : "Alles bezahlt. Vielen Dank!"}
+                            ? "je Kind einzeln überweisen"
+                            : ""
+                          : "Alles bezahlt. Danke!"}
                       </span>
                     </div>
                   </div>
@@ -154,7 +152,7 @@ export function ElternApp() {
                       onClick={() => setReiter("konto")}
                       className="mt-4 flex h-11 w-full shrink-0 items-center justify-center rounded-xl bg-white px-5 text-[14px] font-semibold text-tinte transition active:scale-[.99] sm:mt-0 sm:w-auto"
                     >
-                      Kontodaten der Stufenkasse
+                      Kontodaten
                     </button>
                   )}
                 </section>
@@ -274,8 +272,7 @@ function KindKarte({
           <div className="mt-2 flex items-center gap-4">
             <Ring pct={pct} />
             <div className="min-w-0 flex-1 text-[13px] leading-relaxed text-tinte-matt dark:text-slate-300">
-              Wer bei Aktionen der Stufe mithilft, sammelt Prozent. Je mehr Prozent, desto günstiger
-              wird das erste Abiballticket.
+              Mithelfen bei Aktionen senkt den Preis des ersten Abiballtickets.
             </div>
           </div>
 
@@ -303,9 +300,7 @@ function KindKarte({
               );
             })}
           </div>
-          <div className="mt-1.5 text-[11px] text-tinte-leise">
-            So viel kommt beim ersten Ticket dazu.
-          </div>
+          <div className="mt-1.5 text-[11px] text-tinte-leise">Aufschlag aufs erste Ticket</div>
         </section>
 
         <TicketErklaerung settings={settings} zusatz={ticketBetrag(pct, settings)} prozent={pct} fuerEltern />
@@ -315,7 +310,7 @@ function KindKarte({
         <div className="text-sm text-tinte-matt">Wobei {kind.vorname} geholfen hat</div>
         <BeitragsListe
           eintraege={eintraege}
-          leerText={`Bisher ist nichts eingetragen. Sobald ${kind.vorname} mithilft, erscheint es hier.`}
+          leerText="Noch nichts eingetragen."
         />
       </section>
     </div>

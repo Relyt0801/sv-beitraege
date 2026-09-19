@@ -159,7 +159,7 @@ export function EventComposer({
       <div className="mb-2 text-sm font-semibold text-tinte-matt">Empfänger</div>
       <div className="mb-2 flex gap-1.5 rounded-xl bg-papier-matt p-1 dark:bg-slate-800">
         <button onClick={() => setAudience("all")} className={`${seg} ${audience === "all" ? "bg-brand text-white" : "text-tinte-matt"}`}>
-          Alle
+          Alle Schüler
         </button>
         <button onClick={() => setAudience("komitee")} className={`${seg} ${audience === "komitee" ? "bg-brand text-white" : "text-tinte-matt"}`}>
           Komitees
@@ -168,6 +168,9 @@ export function EventComposer({
           Personen
         </button>
       </div>
+      {audience === "all" && (
+        <p className="-mt-1 mb-2 text-[11px] text-tinte-leise">Alle Schüler und das Stufenteam – Elternzugänge bekommen nichts.</p>
+      )}
 
       {audience === "komitee" && (
         <div className="mb-3 grid gap-1.5 rounded-2xl border border-papier-linie p-2 dark:border-slate-700 sm:grid-cols-2">

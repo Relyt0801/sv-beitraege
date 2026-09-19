@@ -43,8 +43,10 @@ Deno.serve(async (req) => {
       return json({ passt });
     }
 
-    const { probe, event_id, termin_id, an_team, user_ids, title: directTitle, body: directBody, url: wunschUrl } = koerper as {
+    const { probe, event_id, termin_id, an_team, user_ids, chat_item_id, angepinnt, title: directTitle, body: directBody, url: wunschUrl } = koerper as {
       probe?: boolean;
+      chat_item_id?: string;
+      angepinnt?: boolean;
       event_id?: string;
       termin_id?: string;
       an_team?: boolean;
@@ -61,6 +63,17 @@ Deno.serve(async (req) => {
       oeffentlich,
       privat,
     );
+
+    // Nur angemeldete Personen dürfen Benachrichtigungen auslösen. Vorher
+    // reichte der öffentliche Schlüssel der App – damit hätte jeder beliebigen
+    // Text an alle Handys schicken können.
+    const jwt = req.headers.get("authorization")?.replace(/^Bearer /i, "");
+    const { data: me } = jwt ? await supabase.auth.getUser(jwt) : { data: null };
+    const selbst = me?.user?.id;
+    if (!selbst) {
+      console.log("Abgelehnt: kein angemeldeter Absender");
+      return json({ sent: 0, error: "nicht angemeldet" }, 401);
+    }
 
     console.log("send-push aufgerufen, event_id:", event_id, "| direkt an:", user_ids?.length || 0);
 
@@ -81,6 +94,61 @@ Deno.serve(async (req) => {
       userIds = (data || []).map((p: { user_id: string }) => p.user_id);
       title = String(directTitle || "Stufenkasse");
       body = String(directBody || "");
+    } else if (chat_item_id) {
+      // Chat-Nachricht: Empfänger rechnet der Server aus. Im Browser sieht ein
+      // Schüler nur seine eigene Komitee-Zeile – dort kam deshalb nie jemand an.
+      const { data: it } = await supabase.from("topic_items")
+        .select("id, topic_id, created_by, author, title, body, type, pinned").eq("id", chat_item_id).single();
+      if (!it) return json({ error: "item not found" }, 404);
+      const { data: tp } = await supabase.from("topics")
+        .select("id, title, tag, visibility, kind, created_by, admin_only").eq("id", it.topic_id).single();
+      if (!tp) return json({ error: "topic not found" }, 404);
+      const { data: alle } = await supabase.from("profiles").select("user_id, role");
+      const rolle = new Map<string, string>((alle || []).map((p: { user_id: string; role: string }) => [p.user_id, p.role] as [string, string]));
+      const istTeam = (u: string) => TEAM.includes(rolle.get(u) || "");
+      // Auslösen darf nur, wer die Nachricht geschrieben hat – oder das Team (Anheften).
+      if (it.created_by !== selbst && !istTeam(selbst as string)) return json({ error: "nicht erlaubt" }, 403);
+
+      const { data: mm } = await supabase.from("topic_members").select("user_id").eq("topic_id", tp.id);
+      const mitglieder = (mm || []).map((x: { user_id: string }) => x.user_id);
+      const teamIds = [...rolle.entries()].filter(([, r]) => TEAM.includes(r)).map(([u]) => u);
+
+      if (tp.kind === "ticket") {
+        // Gespräch Schüler <-> Stufenteam
+        const person = [tp.created_by as string, ...mitglieder].filter((u) => u && !istTeam(u));
+        userIds = istTeam(it.created_by as string) ? person : teamIds;
+      } else if (tp.admin_only) {
+        userIds = [...rolle.entries()].filter(([, r]) => r === "admin").map(([u]) => u);
+      } else if (tp.visibility === "stufenteam") {
+        userIds = teamIds;
+      } else {
+        const { data: tt } = await supabase.from("topic_tags").select("tag").eq("topic_id", tp.id);
+        const tags = [...new Set([...(tt || []).map((x: { tag: string }) => x.tag), ...(tp.tag ? [tp.tag] : [])])];
+        const { data: g } = tags.length
+          ? await supabase.from("tag_members").select("user_id").in("tag", tags)
+          : { data: [] };
+        userIds = [...mitglieder, ...(g || []).map((x: { user_id: string }) => x.user_id)];
+      }
+      // Eltern sind in keinem Chat.
+      userIds = [...new Set(userIds)].filter((u) => rolle.get(u) !== "eltern");
+
+      // Chat-Schalter im Profil: gilt nur für normale Chat-Nachrichten.
+      // Angepinntes und Gespräche mit dem Stufenteam kommen immer.
+      const wichtig = Boolean(angepinnt) || Boolean(it.pinned) || tp.kind === "ticket";
+      if (!wichtig && userIds.length) {
+        const { data: aus } = await supabase.from("public_profiles").select("user_id").eq("push_chats", false).in("user_id", userIds);
+        const weg = new Set((aus || []).map((x: { user_id: string }) => x.user_id));
+        userIds = userIds.filter((u) => !weg.has(u));
+      }
+
+      const { data: pp } = await supabase.from("public_profiles").select("anzeigename").eq("user_id", it.created_by).maybeSingle();
+      const von = (pp?.anzeigename || it.author || "Jemand").split(" ")[0];
+      const text = (it.title && it.type !== "nachricht" ? it.title + ": " : "") + (it.body || "");
+      const raum = tp.kind === "ticket" ? (istTeam(it.created_by as string) ? "Stufenteam" : `Frage: ${tp.title}`) : tp.title;
+      title = (wichtig && tp.kind !== "ticket" ? "📌 " : "💬 ") + raum;
+      body = tp.kind === "ticket" && istTeam(it.created_by as string) ? text : `${von}: ${text}`;
+      if (it.type === "umfrage") body = `${von} fragt: ${it.body || it.title}`;
+      if (ziel === "./") ziel = "./#chats";
     } else if (termin_id) {
       // Ein Termin oder eine Schichtreihe: an alle, die ihn sehen dürfen –
       // mit denselben Regeln wie im Kalender.
@@ -151,16 +219,6 @@ Deno.serve(async (req) => {
       if (ziel === "./") ziel = "./#events";
     }
 
-    // Nur angemeldete Personen dürfen Benachrichtigungen auslösen. Vorher
-    // reichte der öffentliche Schlüssel der App – damit hätte jeder beliebigen
-    // Text an alle 260 Handys schicken können.
-    const jwt = req.headers.get("authorization")?.replace(/^Bearer /i, "");
-    const { data: me } = jwt ? await supabase.auth.getUser(jwt) : { data: null };
-    const selbst = me?.user?.id;
-    if (!selbst) {
-      console.log("Abgelehnt: kein angemeldeter Absender");
-      return json({ sent: 0, error: "nicht angemeldet" }, 401);
-    }
     // Niemand bekommt eine Benachrichtigung über die eigene Nachricht.
     userIds = userIds.filter((u) => u !== selbst);
 

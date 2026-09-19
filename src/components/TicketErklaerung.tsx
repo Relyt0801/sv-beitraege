@@ -54,7 +54,7 @@ export function TicketErklaerung({
           </div>
           <div className="mt-2 rounded-lg bg-white/70 px-2.5 py-1.5 text-[12px] font-semibold text-brand-dark dark:bg-slate-900/60 dark:text-brand-soft">
             {fuerEltern
-              ? "Der Zusatzbeitrag fällt nur auf dieses eine Ticket Ihres Kindes – nicht auf Ihre Karten."
+              ? "Nur dieses Ticket – nicht Ihre Karten."
               : "Der Zusatzbeitrag fällt nur auf dein eigenes Ticket – nicht auf Karten für Eltern oder Gäste."}
           </div>
         </div>
@@ -67,17 +67,23 @@ export function TicketErklaerung({
             {preisSteht ? `${grund} €` : "Preis noch offen"}
           </div>
           <div className="mt-1 text-[12px] leading-relaxed text-tinte-matt dark:text-slate-400">
-            {preisSteht
-              ? "Karten für Eltern, Geschwister oder Gäste kosten den normalen Ticketpreis – ohne Zusatzbeitrag."
-              : "Der Ticketpreis wurde noch nicht festgelegt. Karten für Eltern, Geschwister oder Gäste kosten dann den normalen Preis – ohne Zusatzbeitrag."}
+            {fuerEltern
+              ? preisSteht
+                ? "Normaler Preis, ohne Zusatzbeitrag."
+                : "Noch nicht festgelegt. Normaler Preis, ohne Zusatzbeitrag."
+              : preisSteht
+                ? "Karten für Eltern, Geschwister oder Gäste kosten den normalen Ticketpreis – ohne Zusatzbeitrag."
+                : "Der Ticketpreis wurde noch nicht festgelegt. Karten für Eltern, Geschwister oder Gäste kosten dann den normalen Preis – ohne Zusatzbeitrag."}
           </div>
         </div>
       </div>
 
-      <div className="mt-3 text-[12px] leading-relaxed text-tinte-leise">
-        Der Ticketpreis hat mit dem offenen Betrag der Stufenkasse nichts zu tun. Das sind zwei
-        getrennte Sachen.
-      </div>
+      {!fuerEltern && (
+        <div className="mt-3 text-[12px] leading-relaxed text-tinte-leise">
+          Der Ticketpreis hat mit dem offenen Betrag der Stufenkasse nichts zu tun. Das sind zwei
+          getrennte Sachen.
+        </div>
+      )}
     </section>
   );
 }

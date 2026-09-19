@@ -153,7 +153,8 @@ export function ProfilSheet({
       </>
       )}
 
-      {/* Benachrichtigungen */}
+      {/* Chat-Schalter – Eltern haben keine Chats */}
+      {!istEltern && (
       <div className="mb-5 rounded-2xl bg-papier-matt p-3 dark:bg-slate-800/70">
         <button
           onClick={async () => {
@@ -175,13 +176,14 @@ export function ProfilSheet({
             />
           </span>
           <span className="min-w-0 flex-1">
-            <span className="block text-[15px] font-semibold">Benachrichtigungen für Chats</span>
+            <span className="block text-[15px] font-semibold">Pop-ups für Chats</span>
             <span className="block text-[12px] text-tinte-matt">
-              Nur für Chats. Mitteilungen des Stufenteams im Events-Reiter kommen immer.
+              Nur normale Chat-Nachrichten. Angepinntes, Nachrichten vom Stufenteam und Events kommen immer.
             </span>
           </span>
         </button>
       </div>
+      )}
 
       {farbFehler && (
         <div className="mb-4 rounded-xl bg-red-500/10 px-3 py-2 text-[13px] font-semibold text-red-500">
