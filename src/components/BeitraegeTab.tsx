@@ -21,6 +21,11 @@ export function BeitraegeTab() {
   const preise = beitraegeVon(settings);
   const gesamt = HY.reduce((n, h) => n + (preise[h] || 0), 0);
 
+  // Drei Bereiche, einer zur Zeit. Oben stehen sie als Kacheln mit der
+  // wichtigsten Zahl – so sieht man alles auf einen Blick und tippt hinein.
+  const [bereich, setBereich] = useState<"prozente" | "halbjahre" | "ticket">("prozente");
+  const hoechsterZusatz = Math.max(0, ...staffel.map((x) => x.betrag));
+
   function anlegen() {
     const t = titel.trim();
     if (!t) return;
@@ -29,9 +34,34 @@ export function BeitraegeTab() {
     setPunkte("5");
   }
 
+  const kacheln: { key: typeof bereich; titel: string; wert: string; unter: string }[] = [
+    { key: "prozente", titel: "Prozente", wert: `${sortiert.length}`, unter: sortiert.length === 1 ? "Möglichkeit" : "Möglichkeiten" },
+    { key: "halbjahre", titel: "Halbjahre", wert: `${gesamt} €`, unter: "für alle sechs" },
+    { key: "ticket", titel: "Ticket", wert: grund > 0 ? `${grund} €` : "offen", unter: `+ bis ${hoechsterZusatz} € Zusatz` },
+  ];
+
   return (
-    <div className="grid items-start gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+    <div className="mx-auto grid max-w-3xl gap-3">
+      <div className="grid grid-cols-3 gap-2">
+        {kacheln.map((k) => (
+          <button
+            key={k.key}
+            onClick={() => setBereich(k.key)}
+            className={`min-w-0 rounded-2xl border p-3 text-left transition active:scale-[0.98] ${
+              bereich === k.key
+                ? "border-brand bg-brand/10 dark:bg-brand/20"
+                : "border-papier-linie bg-white dark:border-slate-800 dark:bg-slate-900"
+            }`}
+          >
+            <div className={`truncate text-[11px] font-semibold ${bereich === k.key ? "text-brand" : "text-tinte-leise"}`}>{k.titel}</div>
+            <div className="zahl mt-0.5 truncate text-[1.25rem] font-extrabold leading-tight">{k.wert}</div>
+            <div className="truncate text-[11px] text-tinte-leise">{k.unter}</div>
+          </button>
+        ))}
+      </div>
+
       {/* ---------------- Möglichkeiten ---------------- */}
+      {bereich === "prozente" && (
       <section className="card p-4 sm:p-5">
         <h2 className="text-lg font-bold">Wofür gibt es Prozent?</h2>
         <p className="mt-0.5 text-[13px] leading-relaxed text-tinte-matt dark:text-slate-400">
@@ -81,8 +111,10 @@ export function BeitraegeTab() {
           </div>
         </div>
       </section>
+      )}
 
       {/* ---------------- Beitrag je Halbjahr ---------------- */}
+      {bereich === "halbjahre" && (
       <section className="card h-fit p-4 sm:p-5">
         <h2 className="text-lg font-bold">Was kostet ein Halbjahr?</h2>
         <p className="mt-0.5 text-[13px] leading-relaxed text-tinte-matt dark:text-slate-400">
@@ -107,13 +139,15 @@ export function BeitraegeTab() {
           <span className="text-[15px] font-extrabold">{gesamt} €</span>
         </div>
       </section>
+      )}
 
       {/* ---------------- Abiballticket ---------------- */}
+      {bereich === "ticket" && (
       <section className="card h-fit p-4 sm:p-5">
         <h2 className="text-lg font-bold">Abiballticket</h2>
         <p className="mt-0.5 text-[13px] leading-relaxed text-tinte-matt dark:text-slate-400">
           Der Zusatzbeitrag gilt <b>nur fürs erste Ticket</b>. Jedes weitere kostet den
-          Grundpreis. Es zählt immer die höchste erreichte Stufe, 60 Prozent zählen also als 50.
+          Grundpreis. Es zählt immer die höchste erreichte Stufe, 60 % zählen also als 50 %.
         </p>
 
         <label className="mt-4 flex items-center gap-3 rounded-2xl bg-papier-matt p-3 dark:bg-slate-800/70">
@@ -151,6 +185,7 @@ export function BeitraegeTab() {
           ))}
         </ul>
       </section>
+      )}
     </div>
   );
 }

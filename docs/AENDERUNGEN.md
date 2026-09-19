@@ -198,3 +198,30 @@ im Repo, damit ein Neuaufbau funktioniert:
   es aus allen Komitees; `can_access_topic()` sperrt Chats für Eltern zusätzlich.
 - **Kontodaten:** einheitliche Zeilen (Beschriftung oben, Wert darunter),
   IBAN in normaler Schrift statt Schreibmaschinenschrift.
+
+---
+
+## 10. Finanzen-Reiter (Kassenbuch) und neuer Beiträge-Reiter
+
+**Dateien:** `src/components/FinanzenTab.tsx`, `src/lib/finanzen.ts`,
+`supabase/finanzen.sql` (eingespielt), `BeitraegeTab.tsx`, `permissions.ts`
+
+- **Kontostand = Summe aller Buchungen** in `kasse_buchungen` (Beträge in Cent).
+  Keine Bankverbindung; einmal über „Mit der Bank abgleichen“ auf den echten
+  Stand bringen – die Differenz wird als Buchung `abgleich` festgehalten.
+- **Beiträge buchen sich selbst:** Trigger `beitrag_buchen` auf `students`.
+  „bezahlt“ → Einnahme; „bezahlt“ zurückgenommen → Buchung weg (bzw.
+  Gegenbuchung, wenn die Zahlung von vor dem Kassenbuch war). Nur bei UPDATE,
+  damit ein Import nicht doppelt zählt.
+- Was vor dem Kassenbuch schon bezahlt war, steht als **eine Sammelbuchung je
+  Halbjahr** drin (EF.1: 111 Personen, EF.2: 100 Personen).
+- Kreisdiagramm: Einnahmen nach Quelle (Beiträge, Aktionen, Spenden,
+  Sonstiges) im Verhältnis zum **Zielbetrag** (`kasse_einstellungen`).
+  Farben aus der geprüften, farbenblind-sicheren Palette; hell/dunkel getrennt.
+- Verlauf mit Filtern, Suche, Monatssummen; Realtime → sofort aktuell.
+- **Rechte:** `finanzen.view` (lesen) und `finanzen.manage` (buchen).
+  Standard: nur Admin und Kassenwart. Der Admin kann im Rechte-Reiter
+  (Kategorie „Finanzen“) Rollen oder einzelnen Personen das Lesen erlauben.
+  Durchgesetzt per RLS, nicht nur in der Oberfläche.
+- Beiträge-Reiter: drei Kacheln oben (Prozente · Halbjahre · Ticket) mit der
+  wichtigsten Zahl; ein Bereich zur Zeit statt allem untereinander.

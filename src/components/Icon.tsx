@@ -15,7 +15,8 @@ export type IconName =
   | "haus"
   | "pin"
   | "bank"
-  | "kalender";
+  | "kalender"
+  | "finanzen";
 
 const PFADE: Record<IconName, JSX.Element> = {
   kasse: (
@@ -59,6 +60,12 @@ const PFADE: Record<IconName, JSX.Element> = {
       <rect x="3" y="5" width="18" height="16" rx="2" />
       <path d="M3 10h18" />
       <path d="M8 3v4M16 3v4" />
+    </>
+  ),
+  finanzen: (
+    <>
+      <path d="M12 3a9 9 0 1 0 9 9h-9z" />
+      <path d="M15 3.5A9 9 0 0 1 20.5 9H15z" />
     </>
   ),
   bank: (

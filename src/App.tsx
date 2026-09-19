@@ -29,6 +29,7 @@ import { RolesTab } from "./components/RolesTab";
 import { PermissionsTab } from "./components/PermissionsTab";
 import { EventsTab } from "./components/EventsTab";
 import { BeitraegeTab } from "./components/BeitraegeTab";
+import { FinanzenTab } from "./components/FinanzenTab";
 import { KassenKopf } from "./components/KassenKopf";
 import { EventComposer } from "./components/EventComposer";
 import { AktionSheet } from "./components/AktionSheet";
@@ -87,7 +88,7 @@ function NachRolle() {
   );
 }
 
-type Tab = "kasse" | "events" | "themen" | "beitraege" | "rollen" | "rechte";
+type Tab = "kasse" | "events" | "themen" | "beitraege" | "finanzen" | "rollen" | "rechte";
 
 /** "#events" -> Events, "#chats" -> Chats. Danach wird die Marke entfernt,
  *  damit ein Neuladen nicht wieder dorthin springt. */
@@ -107,6 +108,7 @@ const REITER_TITEL: Record<Tab, string> = {
   events: "Events",
   themen: "Chats",
   beitraege: "Beiträge & Abiball",
+  finanzen: "Finanzen",
   rollen: "Rollen & Rechte",
   rechte: "Berechtigungen",
 };
@@ -293,6 +295,7 @@ function Main() {
     { key: "events", icon: "events", label: "Events", badge: unread, show: true },
     { key: "themen", icon: "chats", label: "Chats", badge: topicsUnread, show: showTopicsTab },
     { key: "beitraege", icon: "beitraege", label: "Beiträge", show: can("beitraege.manage") },
+    { key: "finanzen", icon: "finanzen", label: "Finanzen", show: can("finanzen.view") || can("finanzen.manage") },
     { key: "rollen", icon: "rollen", label: "Rollen", show: canManageRoles },
     { key: "rechte", icon: "rechte", label: "Rechte", show: can("perms.manage") },
   ];
@@ -503,6 +506,10 @@ function Main() {
       ) : tab === "themen" ? (
         <main className="mt-3 pb-4">
           <ChatsTab />
+        </main>
+      ) : tab === "finanzen" ? (
+        <main className="mt-3 pb-4">
+          <FinanzenTab />
         </main>
       ) : tab === "beitraege" ? (
         <main className="mt-3 pb-4">

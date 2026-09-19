@@ -10,6 +10,8 @@ export type PermKey =
   | "data.edit"
   | "beitraege.manage"
   | "termine.manage"
+  | "finanzen.view"
+  | "finanzen.manage"
   | "roles.manage"
   | "perms.manage";
 
@@ -44,6 +46,12 @@ export const PERM_CATEGORIES: PermCategory[] = [
     label: "Daten", icon: "🗂️", perms: [
       { key: "data.edit", label: "Daten bearbeiten", desc: "Namen, Beteiligungen, Personen, Halbjahr, Import/Export." },
       { key: "beitraege.manage", label: "Beiträge-Reiter", desc: "Halbjahresbeiträge, Möglichkeiten zum Prozentsammeln und die Abiball-Staffel festlegen." },
+    ],
+  },
+  {
+    label: "Finanzen", icon: "💰", perms: [
+      { key: "finanzen.view", label: "Finanzen ansehen", desc: "Den Reiter Finanzen lesen: Kontostand, Ziel, Einnahmen und Verlauf." },
+      { key: "finanzen.manage", label: "Kassenbuch führen", desc: "Buchungen eintragen und löschen, Ziel setzen, mit der Bank abgleichen." },
     ],
   },
   {
@@ -125,6 +133,6 @@ export const ROLE_DEFAULTS: Record<string, PermKey[]> = {
   sprecher: [...TEAM_STANDARD],
   stv_sprecher: [...TEAM_STANDARD],
   stufenteam: [...TEAM_STANDARD],
-  kassenwart: [...TEAM_STANDARD, "kasse.edit", "beitraege.manage"],
+  kassenwart: [...TEAM_STANDARD, "kasse.edit", "beitraege.manage", "finanzen.view", "finanzen.manage"],
   admin: [...ALL_PERMS],
 };
