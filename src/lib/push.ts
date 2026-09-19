@@ -23,17 +23,27 @@ async function schluessel(): Promise<string> {
   if (serverSchluessel !== undefined) return serverSchluessel || VAPID_AUS_ENV;
   if (!abfrage) {
     abfrage = (async () => {
-      try {
-        const { data } = await supabase!.functions.invoke("vapid-info");
-        const k = (data as { public_key?: string } | null)?.public_key;
-        serverSchluessel = typeof k === "string" && k.length > 20 ? k : null;
-      } catch {
-        serverSchluessel = null;
+      // Zwei Versuche: die Funktion braucht nach einer Pause manchmal einen
+      // Moment zum Aufwachen.
+      for (let versuch = 0; versuch < 2 && !serverSchluessel; versuch++) {
+        try {
+          const { data } = await supabase!.functions.invoke("vapid-info");
+          const k = (data as { public_key?: string } | null)?.public_key;
+          serverSchluessel = typeof k === "string" && k.length > 20 ? k : null;
+        } catch {
+          serverSchluessel = null;
+        }
       }
       if (serverSchluessel && VAPID_AUS_ENV && serverSchluessel !== VAPID_AUS_ENV) {
         console.log("[push] Server hat einen anderen Schlüssel als die App – der vom Server gilt");
       }
-      return serverSchluessel || VAPID_AUS_ENV;
+      const k = serverSchluessel || VAPID_AUS_ENV;
+      if (!serverSchluessel) {
+        // beim nächsten Mal wieder fragen, statt den Fehlschlag zu merken
+        serverSchluessel = undefined;
+        abfrage = null;
+      }
+      return k;
     })();
   }
   return abfrage;
@@ -73,40 +83,88 @@ export async function pushToUsers(user_ids: string[], title: string, body: strin
   }
 }
 
-/** Benachrichtigungen aktivieren: Erlaubnis holen, Abo anlegen, in Supabase speichern. */
-export async function enablePush(): Promise<{ ok: boolean; error?: string }> {
-  if (!pushSupported) return { ok: false, error: "Dein Gerät kann keine Benachrichtigungen" };
-  const VAPID = await schluessel();
-  if (!VAPID) return { ok: false, error: "Für diese Seite ist noch kein Schlüssel hinterlegt" };
+/**
+ * Die Erlaubnis erfragen – SOFORT, ohne vorher irgendetwas abzuwarten.
+ *
+ * Safari (iPhone), Firefox und zunehmend auch Chrome zeigen die Frage nur,
+ * wenn sie direkt aus einem Tippen heraus kommt. Wartet man vorher auf eine
+ * Serverantwort, ist das Tippen "verbraucht" und der Browser lehnt still ab.
+ * Genau daran scheiterten die Knöpfe bisher: erst Schlüssel holen, dann fragen.
+ */
+function erlaubnisSofort(): Promise<NotificationPermission> {
+  if (typeof Notification === "undefined") return Promise.resolve("denied");
+  if (Notification.permission !== "default") return Promise.resolve(Notification.permission);
   try {
-    const perm = await Notification.requestPermission();
-    if (perm !== "granted") return { ok: false, error: "keine Erlaubnis" };
-    const reg = await navigator.serviceWorker.ready;
-    const want = urlBase64ToUint8Array(VAPID);
+    return Notification.requestPermission();
+  } catch {
+    // ganz alte Safari-Versionen kennen nur die Rückruf-Form
+    return new Promise((r) => Notification.requestPermission(r));
+  }
+}
 
+/** Benachrichtigungen aktivieren: Erlaubnis holen, Abo anlegen, in Supabase speichern.
+ *  MUSS direkt aus einem Klick/Tippen aufgerufen werden, wenn noch nicht erlaubt. */
+export async function enablePush(): Promise<{ ok: boolean; error?: string }> {
+  if (!pushSupported) return { ok: false, error: istIphoneImBrowser() ? IPHONE_HINWEIS : "Dein Gerät kann keine Benachrichtigungen" };
+  // Zuerst fragen, dann erst Netzwerk – siehe erlaubnisSofort().
+  const erlaubnis = erlaubnisSofort();
+  const [perm, VAPID] = await Promise.all([erlaubnis, schluessel()]);
+  if (perm !== "granted") return { ok: false, error: perm === "denied" ? "blockiert" : "keine Erlaubnis" };
+  return aboAnlegen(VAPID);
+}
+
+/**
+ * Stilles Auffrischen beim Öffnen der App. Fragt NIE nach Erlaubnis, sondern
+ * legt nur dann ein Abo an, wenn der Browser es schon erlaubt hat. So stehen
+ * Geräte, deren Abo der Server wegräumen musste, beim nächsten Öffnen wieder
+ * in der Liste.
+ */
+export async function pushAuffrischen(): Promise<void> {
+  if (!pushSupported || pushPermission() !== "granted") return;
+  const VAPID = await schluessel();
+  const r = await aboAnlegen(VAPID);
+  if (!r.ok) console.warn("[push] Auffrischen fehlgeschlagen:", r.error);
+}
+
+async function aboAnlegen(VAPID: string): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const reg = await navigator.serviceWorker.ready;
     let sub = await reg.pushManager.getSubscription();
-    // Altes Abo mit anderem VAPID-Schlüssel? -> kündigen und frisch anlegen.
-    if (sub) {
+    const { data } = await supabase!.auth.getSession();
+    const uid = data.session?.user.id;
+    if (!uid) return { ok: false, error: "nicht eingeloggt" };
+
+    // Ein vorhandenes Abo nur dann ersetzen, wenn wir SICHER wissen, dass es
+    // zu einem anderen Schlüssel gehört – also nur mit der Antwort des Servers.
+    // Früher wurde bei einem kurzen Aussetzer des Servers auf einen anderen
+    // Schlüssel ausgewichen, das Abo gekündigt und neu angelegt. Das erzeugte
+    // bei einer Person 22 tote Abos, und mit dem falschen Schlüssel kam nichts an.
+    if (sub && serverSchluessel) {
+      const want = urlBase64ToUint8Array(serverSchluessel);
       const curKey = sub.options?.applicationServerKey
         ? new Uint8Array(sub.options.applicationServerKey as ArrayBuffer)
         : null;
       const same = !!curKey && curKey.length === want.length && curKey.every((v, i) => v === want[i]);
       if (!same) {
-        console.log("[push] altes Abo mit anderem Schlüssel – wird erneuert");
-        await sub.unsubscribe();
+        console.log("[push] Abo gehört zu einem alten Schlüssel – wird erneuert");
+        await supabase!.from("push_subscriptions").delete().eq("endpoint", sub.endpoint);
+        await sub.unsubscribe().catch(() => {});
         sub = null;
       }
     }
     if (!sub) {
+      // Neu anlegen NUR mit dem Schlüssel des Servers. Der Notnagel aus der
+      // Build-Umgebung passt nachweislich nicht mehr zum Server – ein Abo damit
+      // wäre von Anfang an tot.
+      if (!serverSchluessel) {
+        return { ok: false, error: VAPID ? "Server gerade nicht erreichbar – bitte gleich noch einmal" : "Für diese Seite ist noch kein Schlüssel hinterlegt" };
+      }
       sub = await reg.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: want as BufferSource,
+        applicationServerKey: urlBase64ToUint8Array(serverSchluessel) as BufferSource,
       });
     }
 
-    const { data } = await supabase!.auth.getSession();
-    const uid = data.session?.user.id;
-    if (!uid) return { ok: false, error: "nicht eingeloggt" };
     const { error } = await supabase!
       .from("push_subscriptions")
       .upsert({ user_id: uid, endpoint: sub.endpoint, subscription: sub.toJSON() }, { onConflict: "endpoint" });
@@ -115,5 +173,34 @@ export async function enablePush(): Promise<{ ok: boolean; error?: string }> {
     return { ok: true };
   } catch (e) {
     return { ok: false, error: (e as Error).message };
+  }
+}
+
+// ---------------------------------------------------------------- iPhone
+
+/** iPhone/iPad im normalen Safari-Tab: dort gibt es gar keine Benachrichtigungen.
+ *  Apple erlaubt sie nur, wenn die Seite zum Home-Bildschirm hinzugefügt wurde. */
+export function istIphoneImBrowser(): boolean {
+  if (typeof navigator === "undefined") return false;
+  const ios = /iphone|ipad|ipod/i.test(navigator.userAgent) ||
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  const alsApp = window.matchMedia?.("(display-mode: standalone)").matches ||
+    (navigator as unknown as { standalone?: boolean }).standalone === true;
+  return ios && !alsApp;
+}
+
+export const IPHONE_HINWEIS =
+  "Auf dem iPhone gehen Benachrichtigungen nur, wenn die Stufenkasse auf dem Home-Bildschirm liegt: in Safari unten auf Teilen tippen, dann „Zum Home-Bildschirm“. Danach die App von dort öffnen.";
+
+// ---------------------------------------------------------------- Zähler am App-Symbol
+
+/** Roter Zähler am App-Symbol (Android, Windows, Mac, iPhone als Home-App). */
+export function appZaehler(n: number): void {
+  const nav = navigator as Navigator & { setAppBadge?: (n?: number) => Promise<void>; clearAppBadge?: () => Promise<void> };
+  try {
+    if (n > 0) void nav.setAppBadge?.(n).catch(() => {});
+    else void nav.clearAppBadge?.().catch(() => {});
+  } catch {
+    /* nicht unterstützt – dann eben ohne */
   }
 }

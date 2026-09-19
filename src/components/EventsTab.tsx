@@ -4,7 +4,6 @@ import { useRole } from "../auth/RoleProvider";
 import { Avatar } from "./Avatar";
 import { committeeLabel } from "../lib/committees";
 import { TYPE_META, type EventItem } from "../lib/events";
-import { enablePush, pushConfigured, pushPermission } from "../lib/push";
 import { Wochenstreifen } from "./Wochenstreifen";
 import { Kalender } from "./Kalender";
 import { TerminSheet, TerminAnsehen } from "./TerminSheet";
@@ -12,32 +11,6 @@ import { anfrageAlsEntwurf, heuteKey, type NeuerTermin, type Termin, type Termin
 import { AktionenListe } from "./AktionenListe";
 import { AnfragenFuerTeam, MeineAnfragen } from "./TerminAnfragen";
 import { useTermine } from "../termine-store";
-
-function PushBanner() {
-  const [perm, setPerm] = useState(pushPermission());
-  const [busy, setBusy] = useState(false);
-  if (!pushConfigured() || perm === "granted" || perm === "denied" || perm === "unsupported") return null;
-  return (
-    <div className="mb-3 flex flex-wrap items-center gap-3 rounded-2xl border border-brand/30 bg-brand/5 p-3.5">
-      <span className="text-sm font-medium text-tinte-matt dark:text-slate-300">
-        🔔 Willst du eine Nachricht aufs Handy bekommen, wenn es etwas Neues gibt?
-      </span>
-      <button
-        disabled={busy}
-        onClick={async () => {
-          setBusy(true);
-          const r = await enablePush();
-          setBusy(false);
-          setPerm(pushPermission());
-          if (!r.ok && r.error) alert("Hat nicht geklappt: " + r.error);
-        }}
-        className="ml-auto rounded-lg bg-brand px-3 py-1.5 text-sm font-semibold text-white"
-      >
-        {busy ? "…" : "Ja, gerne"}
-      </button>
-    </div>
-  );
-}
 
 export function EventsTab() {
   const { events, ready, myVotes, voteCounts, voters, reads, vote, deleteEvent, markRead } = useEvents();
@@ -154,14 +127,12 @@ export function EventsTab() {
   if (events.length === 0)
     return rahmen(
       <>
-        <PushBanner />
         <div className="py-12 text-center text-sm text-tinte-leise">Noch keine Beiträge.</div>
       </>,
     );
 
   return rahmen(
     <>
-      <PushBanner />
       <div className="grid items-start gap-3 lg:grid-cols-2">
         {events.map((e) => (
         <EventCard

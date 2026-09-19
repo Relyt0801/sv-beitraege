@@ -25,9 +25,8 @@ export function Ring({ pct, klein }: { pct: number; klein?: boolean }) {
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center leading-none">
         <span className={`zahl font-extrabold ${klein ? "text-xl" : "text-2xl"} ${voll ? "text-bezahlt" : "text-brand"}`}>
-          {pct}
+          {pct}&nbsp;%
         </span>
-        <span className="text-[10px] font-bold tracking-wide text-tinte-leise">PROZENT</span>
       </div>
     </div>
   );

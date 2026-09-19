@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { HY } from "../lib/types";
 import { basisOffen, beitragFuer, prozentVon, punkteIndex, staffelVon, ticketBetrag } from "../lib/logic";
 import { useStore } from "../store";
@@ -13,6 +13,8 @@ import { ElternInfosTab } from "./ElternInfosTab";
 import { KontoTab } from "./KontoTab";
 import { ProfilSheet } from "./ProfilSheet";
 import { useTheme } from "../lib/theme";
+import { PushHinweis, usePushAuffrischen } from "./PushHinweis";
+import { appZaehler } from "../lib/push";
 
 type Reiter = "uebersicht" | "infos" | "konto";
 
@@ -29,12 +31,21 @@ export function ElternApp() {
   const { theme, toggle } = useTheme();
   const { students, contributions, settings, ready } = useStore();
   const { bereit, ungelesen } = useEltern();
+  usePushAuffrischen();
+  useEffect(() => appZaehler(ungelesen || 0), [ungelesen]);
 
   const punkte = useMemo(() => punkteIndex(contributions), [contributions]);
   const kinder = useMemo(
     () => [...students].sort((a, b) => a.vorname.localeCompare(b.vorname, "de")),
     [students],
   );
+  // "Familie Buja" statt "Mein Zugang". Bei Geschwistern mit verschiedenen
+  // Nachnamen stehen beide da, getrennt durch einen Schraegstrich.
+  const familienName = useMemo(() => {
+    const namen = [...new Set(kinder.map((k) => k.nachname).filter(Boolean))];
+    return namen.length ? `Familie ${namen.join(" / ")}` : "Mein Zugang";
+  }, [kinder]);
+
   const familieOffen = kinder.reduce(
     (n, k) => n + basisOffen(k, settings.aktuelles_halbjahr, settings),
     0,
@@ -52,7 +63,7 @@ export function ElternApp() {
         <div className="mx-auto flex max-w-5xl items-center gap-3 px-4 py-3">
           <div className="min-w-0 flex-1">
             <h1 className="truncate text-lg font-extrabold leading-tight">
-              {reiter === "uebersicht" ? "Stufenkasse" : reiter === "infos" ? "Infos vom Stufenteam" : "Kontodaten"}
+              {reiter === "uebersicht" ? "Stufenkasse" : reiter === "infos" ? "Infos" : "Kontodaten"}
             </h1>
             <p className="truncate text-[12px] text-tinte-matt">Elternzugang · Abi 28</p>
           </div>
@@ -65,9 +76,9 @@ export function ElternApp() {
           </button>
           <button
             onClick={() => setProfilOffen(true)}
-            className="rounded-xl bg-papier-matt px-3 py-2 text-sm font-bold text-tinte-matt transition active:scale-95 dark:bg-slate-800 dark:text-slate-300"
+            className="max-w-[46vw] truncate rounded-xl bg-papier-matt px-3 py-2 text-sm font-bold text-tinte-matt transition active:scale-95 dark:bg-slate-800 dark:text-slate-300"
           >
-            Mein Zugang
+            {familienName}
           </button>
         </div>
 
@@ -96,6 +107,7 @@ export function ElternApp() {
       </header>
 
       <main className="mx-auto max-w-3xl px-4 py-4 lg:max-w-5xl lg:pb-8">
+        <PushHinweis fuerEltern />
         {reiter === "uebersicht" && (
           <>
             {!ready || !bereit ? (

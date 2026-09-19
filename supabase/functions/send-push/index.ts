@@ -97,13 +97,18 @@ Deno.serve(async (req) => {
       body = (ev.body || "").slice(0, 120);
     }
 
-    // Niemand bekommt eine Benachrichtigung über die eigene Nachricht.
+    // Nur angemeldete Personen dürfen Benachrichtigungen auslösen. Vorher
+    // reichte der öffentliche Schlüssel der App – damit hätte jeder beliebigen
+    // Text an alle 260 Handys schicken können.
     const jwt = req.headers.get("authorization")?.replace(/^Bearer /i, "");
-    if (jwt) {
-      const { data: me } = await supabase.auth.getUser(jwt);
-      const selbst = me?.user?.id;
-      if (selbst) userIds = userIds.filter((u) => u !== selbst);
+    const { data: me } = jwt ? await supabase.auth.getUser(jwt) : { data: null };
+    const selbst = me?.user?.id;
+    if (!selbst) {
+      console.log("Abgelehnt: kein angemeldeter Absender");
+      return json({ sent: 0, error: "nicht angemeldet" }, 401);
     }
+    // Niemand bekommt eine Benachrichtigung über die eigene Nachricht.
+    userIds = userIds.filter((u) => u !== selbst);
 
     console.log("Empfänger (userIds):", userIds.length);
     if (!userIds.length) return json({ sent: 0 });

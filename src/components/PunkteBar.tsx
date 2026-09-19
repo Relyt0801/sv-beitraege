@@ -72,12 +72,12 @@ export function StufenHinweis({ pct, settings }: { pct: number; settings: Settin
   if (!next)
     return (
       <div className="mt-1.5 text-[12px] font-semibold text-emerald-600 dark:text-emerald-400">
-        Volle 100 Prozent. Auf dein erstes Abiballticket kommt nichts mehr drauf.
+        Volle 100 %. Auf dein erstes Abiballticket kommt nichts mehr drauf.
       </div>
     );
   return (
     <div className="mt-1.5 text-[12px] text-tinte-matt dark:text-slate-400">
-      Noch <b className="text-tinte dark:text-slate-200">{next.fehlt} %</b> bis {next.ab} Prozent. Dann
+      Noch <b className="text-tinte dark:text-slate-200">{next.fehlt} %</b> bis {next.ab} %. Dann
       kostet das erste Ticket nur noch {grund + next.betrag} €, also {next.spart} € weniger.
     </div>
   );

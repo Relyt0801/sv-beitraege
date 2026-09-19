@@ -43,7 +43,15 @@ self.addEventListener("push", (event: PushEvent) => {
     options.renotify = true;
   }
 
-  event.waitUntil(self.registration.showNotification(data.title || "Stufenkasse", options));
+  // Roter Punkt am App-Symbol, bis die App wieder geöffnet wird (dort wird
+  // er durch die echte Zahl ersetzt).
+  const nav = self.navigator as WorkerNavigator & { setAppBadge?: () => Promise<void> };
+  event.waitUntil(
+    Promise.all([
+      self.registration.showNotification(data.title || "Stufenkasse", options),
+      nav.setAppBadge?.().catch(() => {}) ?? Promise.resolve(),
+    ]),
+  );
 });
 
 self.addEventListener("notificationclick", (event: NotificationEvent) => {

@@ -49,6 +49,15 @@ function LoginForm() {
 
   async function submit() {
     setErr("");
+    // Die Frage nach Benachrichtigungen MUSS direkt aus dem Tippen kommen –
+    // nach dem Warten auf die Anmeldung lehnen iPhone und Firefox sie still ab.
+    if (wantPush && pushSupported && typeof Notification !== "undefined" && Notification.permission === "default") {
+      try {
+        void Notification.requestPermission();
+      } catch {
+        /* alter Browser – dann eben über die Karte in der App */
+      }
+    }
     if (!username.trim() || !password) {
       setErr("Benutzername und Passwort ausfüllen.");
       return;

@@ -85,9 +85,13 @@ export function ElternInfosTab() {
         </p>
 
         <div className="mt-3 grid gap-2">
+          <label className="-mb-1 text-[12px] font-semibold text-tinte-leise" htmlFor="eltern-betreff">
+            Betreff
+          </label>
           <input
+            id="eltern-betreff"
             className="field"
-            placeholder="Worum geht es? Zum Beispiel: Frage zur Überweisung"
+            placeholder="z. B. Überweisung"
             value={betreff}
             onChange={(e) => setBetreff(e.target.value)}
           />

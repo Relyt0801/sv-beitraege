@@ -9,7 +9,8 @@ import { Tour, tourSteps } from "./components/Tour";
 import { useTheme } from "./lib/theme";
 import { useVerzoegert } from "./lib/entwurf";
 import { hasSupabase, supabase } from "./lib/supabase";
-import { enablePush, pushConfigured, pushPermission } from "./lib/push";
+import { appZaehler } from "./lib/push";
+import { PushHinweis, usePushAuffrischen } from "./components/PushHinweis";
 import { useStore } from "./store";
 import { AuthGate } from "./auth/AuthGate";
 import { PasswordGate } from "./auth/PasswordGate";
@@ -114,18 +115,8 @@ function Main() {
   const showTopicsTab = true;
   const topicsUnread = topics.reduce((s, t) => s + unreadCount(t.id), 0);
 
-  // Läuft erst NACH Zustimmungs- und Passwort-Gate (Main sitzt dahinter):
-  // - Erlaubnis schon erteilt -> Abo still (neu) registrieren
-  // - Login-Häkchen gesetzt (Rückkehrer, Zustimmung lag schon vor) -> jetzt aktivieren
-  useEffect(() => {
-    const optin = localStorage.getItem("sv:push-optin") === "1";
-    if (pushConfigured() && (pushPermission() === "granted" || optin)) {
-      localStorage.removeItem("sv:push-optin");
-      void enablePush().then((r) => {
-        if (!r.ok) console.warn("[push] Auto-Registrierung fehlgeschlagen:", r.error);
-      });
-    } else console.log("[push] kein Auto-Abo:", { konfiguriert: pushConfigured(), erlaubnis: pushPermission() });
-  }, []);
+  // Abo beim Öffnen still auffrischen (fragt nie selbst nach Erlaubnis).
+  usePushAuffrischen();
 
   // Main läuft erst hinter Zustimmungs- und Passwort-Gate. Vorher liefert die
   // Datenbank wegen RLS (has_consented) nichts – deshalb hier einmal nachladen.
@@ -147,6 +138,8 @@ function Main() {
   }, [roleReady, ready, isStaff, tourResetAt]);
 
   const unread = allEvents.filter((e) => !reads.has(e.id)).length;
+  // Roter Zähler am App-Symbol: ungelesene Chats und Events zusammen.
+  useEffect(() => appZaehler(topicsUnread + unread), [topicsUnread, unread]);
   const [tab, setTab] = useState<Tab>("kasse");
   const [showComposer, setShowComposer] = useState(false);
   const [showAktion, setShowAktion] = useState(false);
@@ -464,6 +457,10 @@ function Main() {
             </div>
           </div>
         )}
+      </div>
+
+      <div className="mt-3">
+        <PushHinweis />
       </div>
 
       {tab === "rollen" ? (
