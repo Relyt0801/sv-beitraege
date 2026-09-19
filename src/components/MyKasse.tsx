@@ -54,7 +54,7 @@ export function MyKasse({
 
   return (
     <div
-      className="mx-auto grid max-w-3xl items-start gap-3 lg:max-w-5xl lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]"
+      className="mx-auto grid max-w-3xl items-start gap-3 lg:max-w-5xl lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-stretch"
       data-tour="meine-karte"
     >
       {/* ------------------------------------------ die eine Zahl */}

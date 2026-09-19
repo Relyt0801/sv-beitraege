@@ -18,6 +18,12 @@ export interface Aktion {
   prozent: number;
   geschlossen: boolean;
   created_at: string;
+  /** Vorlage für neue Schichten: Zeiten, Ort, Plätze (null = keine Vorlage). */
+  vorlage_von?: string | null;
+  vorlage_bis?: string | null;
+  vorlage_ganztaegig?: boolean;
+  vorlage_ort?: string;
+  vorlage_plaetze?: number | null;
 }
 
 /**

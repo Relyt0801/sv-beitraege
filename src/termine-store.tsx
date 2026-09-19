@@ -25,7 +25,7 @@ interface TermineValue {
   anlegenViele: (liste: NeuerTermin[]) => Promise<string | null>;
   aendern: (id: string, t: NeuerTermin) => Promise<string | null>;
   loeschen: (id: string) => Promise<void>;
-  aktionAnlegen: (a: Omit<Aktion, "id" | "created_at">) => Promise<string | null>;
+  aktionAnlegen: (a: Omit<Aktion, "id" | "created_at"> & { id?: string }) => Promise<string | null>;
   aktionAendern: (id: string, patch: Partial<Aktion>) => Promise<void>;
   aktionLoeschen: (id: string) => Promise<void>;
   /** Sich selbst fuer eine Schicht ein- oder austragen. */

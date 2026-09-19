@@ -24,7 +24,7 @@ export function TicketErklaerung({
   const erstes = grund + zusatz;
 
   return (
-    <section className={`card p-4 sm:p-5 ${className}`}>
+    <section className={`card flex flex-col p-4 sm:p-5 ${className}`}>
       <div className="text-sm text-tinte-matt">Abiballticket</div>
 
       <div className="mt-3 grid gap-2">
@@ -78,7 +78,7 @@ export function TicketErklaerung({
       </div>
 
       {!fuerEltern && (
-        <div className="mt-3 text-[12px] text-tinte-leise">
+        <div className="mt-auto pt-3 text-[12px] text-tinte-leise">
           Hat nichts mit dem offenen Stufenbeitrag zu tun.
         </div>
       )}

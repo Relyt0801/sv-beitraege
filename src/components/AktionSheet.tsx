@@ -1,10 +1,14 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTermine } from "../termine-store";
 import { Sheet } from "./Sheet";
 import {
-  WOCHENTAG_WAHL, heuteKey, plusTage, tagLang, wiederholungsTage,
+  WOCHENTAG_WAHL, heuteKey, plusTage, tagLang, uhr, wiederholungsTage,
   type Aktion, type NeuerTermin,
 } from "../lib/termine";
+
+/** Ohne Vorlage: ein ganzer Schultag. */
+const STANDARD_VON = "07:35";
+const STANDARD_BIS = "16:15";
 
 const ICONS = ["🧇", "🍰", "🥣", "☕", "🍪", "🎪", "🧹", "📦", "🎨", "🎵", "📣", "📌"];
 
@@ -18,7 +22,7 @@ const ICONS = ["🧇", "🍰", "🥣", "☕", "🍪", "🎪", "🧹", "📦", "�
  * ohne dass die ganze Reihe auseinanderfällt.
  */
 export function AktionSheet({ offen, onSchliessen }: { offen: boolean; onSchliessen: () => void }) {
-  const { aktionen, aktionAnlegen, anlegenViele } = useTermine();
+  const { aktionen, aktionAnlegen, aktionAendern, anlegenViele } = useTermine();
 
   const [aktionId, setAktionId] = useState<string>("");
   const [neuTitel, setNeuTitel] = useState("");
@@ -29,8 +33,10 @@ export function AktionSheet({ offen, onSchliessen }: { offen: boolean; onSchlies
   const [datum, setDatum] = useState(heuteKey());
   const [bis, setBis] = useState(plusTage(heuteKey(), 42));
   const [tage, setTage] = useState<Set<number>>(new Set([1, 4]));
-  const [von, setVon] = useState("09:35");
-  const [ende, setEnde] = useState("09:55");
+  const [ganztaegig, setGanztaegig] = useState(false);
+  const [von, setVon] = useState(STANDARD_VON);
+  const [ende, setEnde] = useState(STANDARD_BIS);
+  const [alsVorlage, setAlsVorlage] = useState(true);
   const [ort, setOrt] = useState("");
   const [plaetze, setPlaetze] = useState("2");
 
@@ -38,6 +44,20 @@ export function AktionSheet({ offen, onSchliessen }: { offen: boolean; onSchlies
   const [busy, setBusy] = useState(false);
 
   const gewaehlt = aktionen.find((a) => a.id === aktionId) || null;
+
+  // Aktion gewählt: ihre gespeicherten Zeiten, Ort und Plätze übernehmen.
+  // Keine Vorlage oder neue Aktion: ganzer Schultag 07:35–16:15.
+  useEffect(() => {
+    if (!offen) return;
+    const v = aktionen.find((x) => x.id === aktionId);
+    setGanztaegig(Boolean(v?.vorlage_ganztaegig));
+    setVon(v?.vorlage_von ? uhr(v.vorlage_von) : STANDARD_VON);
+    setEnde(v?.vorlage_bis ? uhr(v.vorlage_bis) : STANDARD_BIS);
+    setOrt(v?.vorlage_ort || "");
+    setPlaetze(String(v?.vorlage_plaetze || 2));
+    setAlsVorlage(!v?.vorlage_von && !v?.vorlage_ganztaegig);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [aktionId, offen]);
   const offeneAktionen = aktionen.filter((a) => !a.geschlossen);
 
   /** Die Tage, an denen tatsächlich eine Schicht entsteht. */
@@ -51,25 +71,34 @@ export function AktionSheet({ offen, onSchliessen }: { offen: boolean; onSchlies
     let id = aktionId;
 
     // Neue Aktion? Erst anlegen, dann die Schichten dranhängen.
+    if (!ganztaegig && von && ende && ende <= von) return setFehler("Die Endzeit liegt vor der Anfangszeit.");
+    const vorlage = {
+      vorlage_von: ganztaegig ? null : von || null,
+      vorlage_bis: ganztaegig ? null : ende || null,
+      vorlage_ganztaegig: ganztaegig,
+      vorlage_ort: ort.trim(),
+      vorlage_plaetze: Math.max(1, Math.min(50, Number(plaetze) || 1)),
+    };
+
     if (!id) {
       if (!neuTitel.trim()) return setFehler("Wähle eine Aktion oder gib ihr einen Namen.");
       setBusy(true);
+      // Kennung vorab festlegen – dann hängen die Schichten sicher an der
+      // richtigen Aktion, auch wenn die Liste noch nicht neu geladen ist.
+      id = crypto.randomUUID();
       const f = await aktionAnlegen({
+        id,
         titel: neuTitel.trim(),
         icon: neuIcon,
         beschreibung: "",
         prozent: Math.max(0, Math.min(100, Number(neuProzent) || 0)),
         geschlossen: false,
+        ...(alsVorlage ? vorlage : {}),
       });
       setBusy(false);
       if (f) return setFehler("Die Aktion konnte nicht angelegt werden: " + f);
-      // Nach dem Anlegen steht sie in der Liste – die neueste mit dem Titel.
-      const frisch = [...aktionen].reverse().find((a) => a.titel === neuTitel.trim());
-      id = frisch?.id ?? "";
-      if (!id) {
-        setFehler("Die Aktion wurde angelegt. Öffne das Fenster noch einmal für die Schichten.");
-        return;
-      }
+    } else if (alsVorlage) {
+      await aktionAendern(id, vorlage);
     }
 
     if (termine.length === 0) return setFehler("Kein Tag getroffen. Prüfe Zeitraum und Wochentage.");
@@ -81,8 +110,8 @@ export function AktionSheet({ offen, onSchliessen }: { offen: boolean; onSchlies
       ort: ort.trim(),
       datum: tag,
       bis_datum: null,
-      von: von || null,
-      bis: ende || null,
+      von: ganztaegig ? null : von || null,
+      bis: ganztaegig ? null : ende || null,
       sichtbar: "alle",
       fuer_eltern: false,
       tags: [],
@@ -125,6 +154,11 @@ export function AktionSheet({ offen, onSchliessen }: { offen: boolean; onSchlies
           >
             <span>{a.icon}</span>
             {a.titel}
+            {(a.vorlage_von || a.vorlage_ganztaegig) && (
+              <span className={a.id === aktionId ? "text-white/70" : "text-tinte-leise"}>
+                {a.vorlage_ganztaegig ? "ganztägig" : uhr(a.vorlage_von ?? null)}
+              </span>
+            )}
             <span className={a.id === aktionId ? "text-white/70" : "text-brand"}>+{a.prozent} %</span>
           </button>
         ))}
@@ -245,6 +279,17 @@ export function AktionSheet({ offen, onSchliessen }: { offen: boolean; onSchlies
           </div>
         )}
 
+        <label className="mb-2 flex w-fit cursor-pointer items-center gap-2 text-[13px] font-semibold text-tinte-matt dark:text-slate-300">
+          <input
+            type="checkbox"
+            className="h-4 w-4 accent-brand"
+            checked={ganztaegig}
+            onChange={(e) => setGanztaegig(e.target.checked)}
+          />
+          ganztägig
+        </label>
+
+        {!ganztaegig && (
         <div className="flex flex-wrap items-center gap-2">
           <label className="flex min-w-0 flex-1 items-center gap-2">
             <span className="shrink-0 text-[12px] font-semibold text-tinte-leise">Von</span>
@@ -265,6 +310,7 @@ export function AktionSheet({ offen, onSchliessen }: { offen: boolean; onSchlies
             />
           </label>
         </div>
+        )}
       </div>
 
       <div className="mb-3 flex flex-wrap items-center gap-2">
@@ -290,6 +336,16 @@ export function AktionSheet({ offen, onSchliessen }: { offen: boolean; onSchlies
         </label>
       </div>
 
+      <label className="mb-3 flex cursor-pointer items-center gap-2 text-[12px] text-tinte-matt dark:text-slate-300">
+        <input
+          type="checkbox"
+          className="h-4 w-4 accent-brand"
+          checked={alsVorlage}
+          onChange={(e) => setAlsVorlage(e.target.checked)}
+        />
+        Zeit, Ort und Plätze für „{gewaehlt?.titel || neuTitel.trim() || "diese Aktion"}“ merken
+      </label>
+
       {/* ------------------------------------------------ Vorschau */}
       <div className="mb-3 rounded-xl bg-papier-matt p-3 text-[12px] leading-relaxed text-tinte-matt dark:bg-slate-800 dark:text-slate-300">
         {termine.length === 0 ? (
@@ -297,7 +353,7 @@ export function AktionSheet({ offen, onSchliessen }: { offen: boolean; onSchlies
         ) : (
           <>
             Das ergibt <b>{termine.length}</b> {termine.length === 1 ? "Schicht" : "Schichten"} mit je{" "}
-            <b>{Math.max(1, Number(plaetze) || 1)}</b> Plätzen:
+            <b>{Math.max(1, Number(plaetze) || 1)}</b> Plätzen, {ganztaegig ? "ganztägig" : `${von}–${ende}`}:
             <br />
             <span className="text-tinte-leise">
               {termine.slice(0, 3).map((t) => tagLang(t)).join(" · ")}

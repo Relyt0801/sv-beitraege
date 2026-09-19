@@ -51,8 +51,8 @@ export function TerminSheet({
   const [mehrtaegig, setMehrtaegig] = useState(false);
   const [bisDatum, setBisDatum] = useState("");
   const [ganztaegig, setGanztaegig] = useState(false);
-  const [von, setVon] = useState("14:00");
-  const [bis, setBis] = useState("15:00");
+  const [von, setVon] = useState("07:35");
+  const [bis, setBis] = useState("16:15");
   const [sichtbar, setSichtbar] = useState<Sichtbarkeit>("alle");
   const [fuerEltern, setFuerEltern] = useState(false);
   const [tags, setTags] = useState<Set<string>>(new Set());
@@ -76,8 +76,8 @@ export function TerminSheet({
       setMehrtaegig(Boolean(termin.bis_datum && termin.bis_datum !== termin.datum));
       setBisDatum(termin.bis_datum || "");
       setGanztaegig(!termin.von);
-      setVon(uhr(termin.von) || "14:00");
-      setBis(uhr(termin.bis) || "15:00");
+      setVon(uhr(termin.von) || "07:35");
+      setBis(uhr(termin.bis) || "16:15");
       setSichtbar(termin.sichtbar);
       setFuerEltern(termin.fuer_eltern);
       setTags(new Set(termin.tags));
@@ -92,8 +92,8 @@ export function TerminSheet({
       setMehrtaegig(Boolean(entwurf.bis_datum && entwurf.bis_datum !== entwurf.datum));
       setBisDatum(entwurf.bis_datum || "");
       setGanztaegig(!entwurf.von);
-      setVon(entwurf.von || "14:00");
-      setBis(entwurf.bis || "15:00");
+      setVon(entwurf.von || "07:35");
+      setBis(entwurf.bis || "16:15");
       setSichtbar(entwurf.sichtbar);
       setFuerEltern(entwurf.fuer_eltern);
       setTags(new Set(entwurf.tags));
@@ -106,8 +106,8 @@ export function TerminSheet({
       setMehrtaegig(false);
       setBisDatum("");
       setGanztaegig(false);
-      setVon("14:00");
-      setBis("15:00");
+      setVon("07:35");
+      setBis("16:15");
       setSichtbar("alle");
       setFuerEltern(false);
       setTags(new Set());

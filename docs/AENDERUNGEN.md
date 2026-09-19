@@ -315,3 +315,17 @@ im Repo, damit ein Neuaufbau funktioniert:
 - Die Edge Function `person-anlegen` kann mit `eltern_fuer` auch nachträglich
   einen Elternzugang zu einer vorhandenen Person anlegen.
 - Zugangslisten bleiben in `privat/` (von Git ausgeschlossen).
+
+## 16. Aktionen mit Zeit-Vorlagen, Kasse bündig
+
+- **Aktion ausschreiben** (Events → ＋ → 🧇 Vorlagen): „ganztägig“ wählbar.
+  Ohne gespeicherte Vorlage stehen 07:35–16:15 drin (ganzer Schultag), auch
+  im normalen Termin-Fenster.
+- **Vorlagen merken sich Zeit, Ort und Plätze** (Häkchen „… merken“; bei neuen
+  Aktionen und Aktionen ohne Vorlage automatisch an). Waffelverkauf 1. große
+  Pause ist mit 09:10–09:30 vorbelegt, 2. große Pause mit 11:05–11:20. Die Zeit
+  steht direkt am Aktions-Knopf.
+- Neue Aktionen bekommen ihre Kennung vorab – die Meldung „Öffne das Fenster
+  noch einmal für die Schichten“ ist weg.
+- Migration: `supabase/aktion-vorlagen.sql` (eingespielt).
+- **Meine Kasse**: linke und rechte Spalte enden am Rechner auf einer Höhe.
