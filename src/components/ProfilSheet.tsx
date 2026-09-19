@@ -69,6 +69,13 @@ export function ProfilSheet({
       setPwInfo("Hat nicht geklappt: " + error.message);
       return;
     }
+    // Der graue Punkt in den Listen bedeutet "nutzt noch das Startpasswort".
+    // Wer hier ein eigenes setzt, hat genau das hinter sich – ohne diese Zeile
+    // blieb die Markierung fuer immer stehen und log ueber den Kontostand.
+    const { data: s } = await supabase!.auth.getSession();
+    const uid = s.session?.user.id;
+    if (uid) await supabase!.from("profiles").update({ must_change_password: false }).eq("user_id", uid);
+
     setPw1("");
     setPw2("");
     setPwOffen(false);

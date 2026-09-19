@@ -70,7 +70,16 @@ function LoginForm() {
 
   return (
     <div className="flex min-h-full items-center justify-center p-6">
-      <div className="card w-full max-w-sm p-6">
+      {/* Ein echtes <form> mit Submit. Browser erkennen ein Anmeldeformular
+          daran – ohne das fragt der Passwortmanager an unpassenden Stellen
+          nach und zeigt Hinweise, die nichts mit dieser App zu tun haben. */}
+      <form
+        className="card w-full max-w-sm p-6"
+        onSubmit={(e) => {
+          e.preventDefault();
+          void submit();
+        }}
+      >
         <div className="mb-1 text-center text-2xl font-bold">Stufenkasse</div>
         <div className="mb-6 text-center text-sm text-tinte-matt">
           Anmelden
@@ -99,7 +108,6 @@ function LoginForm() {
           placeholder="Passwort"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && submit()}
         />
         {pushSupported && pushConfigured() && (
           <label className="mb-3 flex cursor-pointer items-start gap-2.5 rounded-xl bg-papier-matt p-3 dark:bg-slate-800">
@@ -117,7 +125,7 @@ function LoginForm() {
 
         {err && <div className="mb-3 text-sm font-medium text-red-500">{err}</div>}
 
-        <button className="btn-primary" disabled={busy} onClick={submit}>
+        <button className="btn-primary" type="submit" disabled={busy}>
           {busy ? "…" : "Anmelden"}
         </button>
 
@@ -126,7 +134,7 @@ function LoginForm() {
           <br />
           Passwort vergessen? Meld dich dort, sie setzen es zurück.
         </p>
-      </div>
+      </form>
     </div>
   );
 }

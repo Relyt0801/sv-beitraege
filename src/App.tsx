@@ -30,6 +30,7 @@ import { EventsTab } from "./components/EventsTab";
 import { BeitraegeTab } from "./components/BeitraegeTab";
 import { KassenKopf } from "./components/KassenKopf";
 import { EventComposer } from "./components/EventComposer";
+import { AktionSheet } from "./components/AktionSheet";
 import { ElternProvider } from "./eltern-store";
 import { ElternApp } from "./components/ElternApp";
 import { Icon, type IconName } from "./components/Icon";
@@ -148,6 +149,7 @@ function Main() {
   const unread = allEvents.filter((e) => !reads.has(e.id)).length;
   const [tab, setTab] = useState<Tab>("kasse");
   const [showComposer, setShowComposer] = useState(false);
+  const [showAktion, setShowAktion] = useState(false);
   const [query, setQuery] = useState("");
   const [showFilter, setShowFilter] = useState(false);
   const [min, setMin] = useState("");
@@ -658,7 +660,15 @@ function Main() {
 
       <StudentSheet student={openStudent} punkte={punkte[openStudent?.id ?? ""] || 0} onClose={() => setOpenId(null)} />
       <AddSheet open={showAdd} onClose={() => setShowAdd(false)} />
-      <EventComposer open={showComposer} onClose={() => setShowComposer(false)} />
+      <EventComposer
+        open={showComposer}
+        onClose={() => setShowComposer(false)}
+        onVorlagen={() => {
+          setShowComposer(false);
+          setShowAktion(true);
+        }}
+      />
+      <AktionSheet offen={showAktion} onSchliessen={() => setShowAktion(false)} />
       <ProfilSheet
         open={showSettings}
         onClose={() => setShowSettings(false)}

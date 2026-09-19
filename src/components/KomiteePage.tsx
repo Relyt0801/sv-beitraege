@@ -6,6 +6,7 @@ import { committeeIcon, committeeLabel } from "../lib/committees";
 import { Avatar, PersonName } from "./Avatar";
 import { BannHinweis } from "./BannHinweis";
 import { Sheet } from "./Sheet";
+import { VorsitzZeile } from "./VorsitzSheet";
 
 type Neu = "pin" | "umfrage" | "todo" | null;
 
@@ -66,6 +67,9 @@ export function KomiteePage({ topic, onBack }: { topic: Topic; onBack: () => voi
 
       {tab === "uebersicht" ? (
         <div className="mt-3 space-y-5 pb-28">
+          {/* Wer hier den Vorsitz hat, darf Termine anfragen. */}
+          {topic.tag && <VorsitzZeile tag={topic.tag} />}
+
           <Abschnitt titel="Angepinnt" icon="📌" leer="Nichts angepinnt.">
             {pins.map((p) => (
               <div key={p.id} className="card flex items-start gap-2 p-3">

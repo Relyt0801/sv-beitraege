@@ -8,7 +8,10 @@ import { enablePush, pushConfigured, pushPermission } from "../lib/push";
 import { Wochenstreifen } from "./Wochenstreifen";
 import { Kalender } from "./Kalender";
 import { TerminSheet, TerminAnsehen } from "./TerminSheet";
-import { heuteKey, type Termin } from "../lib/termine";
+import { anfrageAlsEntwurf, heuteKey, type NeuerTermin, type Termin, type TerminAnfrage } from "../lib/termine";
+import { AktionenListe } from "./AktionenListe";
+import { AnfragenFuerTeam, MeineAnfragen } from "./TerminAnfragen";
+import { useTermine } from "../termine-store";
 
 function PushBanner() {
   const [perm, setPerm] = useState(pushPermission());
@@ -39,6 +42,7 @@ function PushBanner() {
 export function EventsTab() {
   const { events, ready, myVotes, voteCounts, voters, reads, vote, deleteEvent, markRead } = useEvents();
   const { canEditData, isStaff, can } = useRole();
+  const { anfrageEntscheiden } = useTermine();
 
   // Kalender und Terminformular liegen ueber dem Reiter, nicht darin.
   const [kalenderOffen, setKalenderOffen] = useState(false);
@@ -47,11 +51,25 @@ export function EventsTab() {
   const [angesehen, setAngesehen] = useState<Termin | null>(null);
   const [startDatum, setStartDatum] = useState(heuteKey());
   const [kalenderTag, setKalenderTag] = useState(heuteKey());
+  // Aus einer übernommenen Anfrage vorausgefüllt – und die Anfrage, die
+  // danach abgehakt wird.
+  const [entwurf, setEntwurf] = useState<NeuerTermin | null>(null);
+  const [ausAnfrage, setAusAnfrage] = useState<string | null>(null);
   const darfTermine = isStaff || can("termine.manage");
 
   const terminNeu = (datum: string) => {
     setBearbeite(null);
+    setEntwurf(null);
+    setAusAnfrage(null);
     setStartDatum(datum);
+    setFormOffen(true);
+  };
+
+  const anfrageUebernehmen = (a: TerminAnfrage) => {
+    setBearbeite(null);
+    setEntwurf(anfrageAlsEntwurf(a));
+    setAusAnfrage(a.id);
+    setStartDatum(a.datum);
     setFormOffen(true);
   };
 
@@ -70,6 +88,12 @@ export function EventsTab() {
           setKalenderOffen(true);
         }}
       />
+
+      <MeineAnfragen />
+      <AnfragenFuerTeam onUebernehmen={anfrageUebernehmen} />
+
+      <AktionenListe />
+
       {inhalt}
 
       {kalenderOffen && (
@@ -85,9 +109,16 @@ export function EventsTab() {
         offen={formOffen}
         termin={bearbeite}
         startDatum={startDatum}
+        entwurf={entwurf}
+        onGespeichert={() => {
+          // Erst wenn der Termin wirklich steht, gilt die Anfrage als erledigt.
+          if (ausAnfrage) void anfrageEntscheiden(ausAnfrage, "angenommen");
+        }}
         onSchliessen={() => {
           setFormOffen(false);
           setBearbeite(null);
+          setEntwurf(null);
+          setAusAnfrage(null);
         }}
       />
 
@@ -99,6 +130,8 @@ export function EventsTab() {
             darfTermine
               ? () => {
                   setBearbeite(angesehen);
+                  setEntwurf(null);
+                  setAusAnfrage(null);
                   setStartDatum(angesehen.datum);
                   setAngesehen(null);
                   setFormOffen(true);

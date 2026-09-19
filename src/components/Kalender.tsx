@@ -256,7 +256,7 @@ function MonatsAnsicht({
                             : "bg-papier-matt text-tinte-matt dark:bg-slate-800 dark:text-slate-300"
                         }`}
                       >
-                        {t.von ? `${uhr(t.von)} ` : ""}
+                        {t.icon ? `${t.icon} ` : t.von ? `${uhr(t.von)} ` : ""}
                         {t.titel}
                       </span>
                     ))}
@@ -335,7 +335,10 @@ function WochenAnsicht({
                         : "bg-papier-matt text-tinte dark:bg-slate-800 dark:text-slate-200"
                     }`}
                   >
-                    <span className="block truncate text-[11px] font-bold leading-tight">{t.titel}</span>
+                    <span className="block truncate text-[11px] font-bold leading-tight">
+                      {t.icon ? `${t.icon} ` : ""}
+                      {t.titel}
+                    </span>
                     <span
                       className={`block truncate text-[10px] ${
                         meins(t) ? "text-white/70" : "text-tinte-leise"
@@ -396,13 +399,22 @@ function TagesAnsicht({
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="block text-[15px] font-bold leading-tight">
-                    {t.sichtbar === "komitee" && t.tags[0] && (
-                      <span className="mr-1">{committeeIcon(t.tags[0])}</span>
+                    {t.icon ? (
+                      <span className="mr-1">{t.icon}</span>
+                    ) : (
+                      t.sichtbar === "komitee" && t.tags[0] && (
+                        <span className="mr-1">{committeeIcon(t.tags[0])}</span>
+                      )
                     )}
                     {t.titel}
                   </span>
                   <span className="mt-0.5 block text-[12px] text-tinte-matt">
-                    {[t.ort, umfangText(t, committeeLabel)].filter(Boolean).join(" · ")}
+                    {[
+                      t.ort,
+                      t.plaetze ? `${t.personen.length}/${t.plaetze} eingeteilt` : umfangText(t, committeeLabel),
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
                   </span>
                   {t.beschreibung && (
                     <span className="mt-1 block line-clamp-2 text-[12px] leading-relaxed text-tinte-leise">

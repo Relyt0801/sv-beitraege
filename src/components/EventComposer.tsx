@@ -7,7 +7,16 @@ import { useEvents } from "../events-store";
 import { normalize, offenGesamt, sortStudents } from "../lib/logic";
 import { TYPE_META, type EventType } from "../lib/events";
 
-export function EventComposer({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function EventComposer({
+  open,
+  onClose,
+  onVorlagen,
+}: {
+  open: boolean;
+  onClose: () => void;
+  /** Wechsel zum Ausschreiben einer Aktion (Waffelverkauf & Co.). */
+  onVorlagen?: () => void;
+}) {
   const { students, settings, punkte } = useStore();
   const { canEditBeitrag } = useRole();
   const { createEvent } = useEvents();
@@ -75,8 +84,9 @@ export function EventComposer({ open, onClose }: { open: boolean; onClose: () =>
         <button className="iconbtn" onClick={onClose} aria-label="Schließen">✕</button>
       </div>
 
-      {/* Typ */}
-      <div className="mb-4 flex gap-1.5 rounded-xl bg-papier-matt p-1 dark:bg-slate-800">
+      {/* Typ – Vorlagen stehen gleichberechtigt daneben, fuehren aber in ein
+          eigenes Fenster: eine Aktion hat Schichten statt Antwortmoeglichkeiten. */}
+      <div className="mb-4 grid grid-cols-2 gap-1.5 rounded-xl bg-papier-matt p-1 dark:bg-slate-800 sm:grid-cols-4">
         {(Object.keys(TYPE_META) as EventType[]).map((t) => (
           <button
             key={t}
@@ -86,6 +96,11 @@ export function EventComposer({ open, onClose }: { open: boolean; onClose: () =>
             {TYPE_META[t].icon} {TYPE_META[t].label}
           </button>
         ))}
+        {onVorlagen && (
+          <button onClick={onVorlagen} className={`${seg} text-tinte-matt`}>
+            🧇 Vorlagen
+          </button>
+        )}
       </div>
 
       <input className="field mb-3" placeholder="Überschrift" value={title} onChange={(e) => setTitle(e.target.value)} />

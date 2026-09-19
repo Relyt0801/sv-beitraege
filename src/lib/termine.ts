@@ -9,6 +9,56 @@
 
 export type Sichtbarkeit = "alle" | "komitee" | "personen";
 
+export interface Aktion {
+  id: string;
+  titel: string;
+  icon: string;
+  beschreibung: string;
+  /** Wie viel Prozent die Mithilfe zaehlt. */
+  prozent: number;
+  geschlossen: boolean;
+  created_at: string;
+}
+
+/**
+ * Eine Terminanfrage eines Komiteevorsitzes.
+ *
+ * Bewusst KEIN Termin mit Status: eine Anfrage steht nirgends im Kalender,
+ * auch nicht grau. Erst wenn das Stufenteam sie uebernimmt, entsteht ein
+ * echter Termin – im ganz normalen Formular, mit allen Einstellungen.
+ */
+export interface TerminAnfrage {
+  id: string;
+  /** Komitee, fuer das angefragt wird – das eigene. */
+  tag: string;
+  titel: string;
+  ort: string;
+  /** Begruendung an das Stufenteam. */
+  nachricht: string;
+  datum: string;
+  bis_datum: string | null;
+  von: string | null;
+  bis: string | null;
+  status: "offen" | "angenommen" | "abgelehnt";
+  created_by: string;
+  created_at: string;
+  decided_by: string | null;
+  decided_at: string | null;
+  /** Antwort des Stufenteams, vor allem beim Ablehnen. */
+  antwort: string;
+}
+
+export interface NeueAnfrage {
+  tag: string;
+  titel: string;
+  ort: string;
+  nachricht: string;
+  datum: string;
+  bis_datum: string | null;
+  von: string | null;
+  bis: string | null;
+}
+
 export interface Termin {
   id: string;
   titel: string;
@@ -27,8 +77,14 @@ export interface Termin {
   created_at: string;
   /** Komitee-Slugs bei sichtbar = "komitee" */
   tags: string[];
-  /** student_ids bei sichtbar = "personen" */
+  /** student_ids bei sichtbar = "personen", oder die zugeteilten Schichtleute */
   personen: string[];
+  /** gesetzt, wenn dieser Termin eine Schicht einer Aktion ist */
+  aktion_id: string | null;
+  /** wie viele Leute fuer diese Schicht gebraucht werden */
+  plaetze: number | null;
+  /** eigenes Zeichen im Kalender, z. B. 🧇 */
+  icon: string | null;
 }
 
 export interface NeuerTermin {
@@ -43,6 +99,9 @@ export interface NeuerTermin {
   fuer_eltern: boolean;
   tags: string[];
   personen: string[];
+  aktion_id?: string | null;
+  plaetze?: number | null;
+  icon?: string | null;
 }
 
 // ---------------------------------------------------------------- Datum
@@ -154,8 +213,11 @@ export function betrifftMich(
   meineKomitees: string[],
   meineStudentIds: string[],
 ): boolean {
+  // Namentlich eingetragen heisst immer "fuer dich" – auch wenn der Termin
+  // sonst fuer alle sichtbar ist. Genau das ist der Fall bei einer Schicht:
+  // die ganze Stufe sieht den Waffelverkauf, eingeteilt bist aber du.
+  if (t.personen.some((id) => meineStudentIds.includes(id))) return true;
   if (t.sichtbar === "komitee") return t.tags.some((tag) => meineKomitees.includes(tag));
-  if (t.sichtbar === "personen") return t.personen.some((id) => meineStudentIds.includes(id));
   return false;
 }
 
@@ -164,4 +226,79 @@ export function umfangText(t: Termin, komiteeName: (slug: string) => string): st
   if (t.sichtbar === "alle") return t.fuer_eltern ? "ganze Stufe · auch Eltern" : "ganze Stufe";
   if (t.sichtbar === "komitee") return t.tags.map(komiteeName).join(", ") || "Komitee";
   return t.personen.length === 1 ? "1 Person" : `${t.personen.length} Personen`;
+}
+
+// ---------------------------------------------------------------- Schichten
+
+/** Ist dieser Termin eine Schicht einer Aktion? */
+export function istSchicht(t: Termin): boolean {
+  return Boolean(t.aktion_id);
+}
+
+/** Das Zeichen, das im Kalender vor dem Titel steht. */
+export function terminIcon(t: Termin, aktionIcon?: string): string {
+  return t.icon || aktionIcon || "";
+}
+
+/** Die Wochentage, an denen sich eine Aktion wiederholt. Mo = 1 … So = 7. */
+export const WOCHENTAG_WAHL: { nr: number; kurz: string; lang: string }[] = [
+  { nr: 1, kurz: "Mo", lang: "Montag" },
+  { nr: 2, kurz: "Di", lang: "Dienstag" },
+  { nr: 3, kurz: "Mi", lang: "Mittwoch" },
+  { nr: 4, kurz: "Do", lang: "Donnerstag" },
+  { nr: 5, kurz: "Fr", lang: "Freitag" },
+  { nr: 6, kurz: "Sa", lang: "Samstag" },
+  { nr: 7, kurz: "So", lang: "Sonntag" },
+];
+
+/** Mo = 1 … So = 7, so wie die Leute zaehlen. */
+export function wochentagNr(key: string): number {
+  const d = ausKey(key);
+  return ((d.getDay() + 6) % 7) + 1;
+}
+
+/**
+ * Welche Tage zwischen zwei Daten auf die gewaehlten Wochentage fallen.
+ *
+ * Daraus werden beim Anlegen einzelne Schichten. Die Obergrenze verhindert,
+ * dass ein vertipptes Enddatum tausend Zeilen erzeugt.
+ */
+export function wiederholungsTage(
+  von: string,
+  bis: string,
+  wochentage: number[],
+  grenze = 60,
+): string[] {
+  if (!von || !bis || bis < von || wochentage.length === 0) return [];
+  const tage: string[] = [];
+  let k = von;
+  for (let i = 0; i < 400 && k <= bis && tage.length < grenze; i++) {
+    if (wochentage.includes(wochentagNr(k))) tage.push(k);
+    k = plusTage(k, 1);
+  }
+  return tage;
+}
+
+// ---------------------------------------------------------------- Anfragen
+
+/**
+ * Aus einer Anfrage den Entwurf fuer das Terminformular machen.
+ *
+ * Die Sichtbarkeit steht dabei schon auf dem anfragenden Komitee – das ist
+ * fast immer richtig und laesst sich im Formular mit einem Griff aendern.
+ */
+export function anfrageAlsEntwurf(a: TerminAnfrage): NeuerTermin {
+  return {
+    titel: a.titel,
+    beschreibung: a.nachricht,
+    ort: a.ort,
+    datum: a.datum,
+    bis_datum: a.bis_datum,
+    von: a.von ? uhr(a.von) : null,
+    bis: a.bis ? uhr(a.bis) : null,
+    sichtbar: "komitee",
+    fuer_eltern: false,
+    tags: [a.tag],
+    personen: [],
+  };
 }

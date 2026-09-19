@@ -5,7 +5,10 @@ import { useStore } from "../store";
 import { useTermine } from "../termine-store";
 import { useRole } from "../auth/RoleProvider";
 import { Sheet } from "./Sheet";
-import { heuteKey, tagLang, uhr, zeitText, type NeuerTermin, type Sichtbarkeit, type Termin } from "../lib/termine";
+import {
+  WOCHENTAG_WAHL, heuteKey, plusTage, tagLang, uhr, wiederholungsTage, zeitText,
+  type NeuerTermin, type Sichtbarkeit, type Termin,
+} from "../lib/termine";
 import { committeeLabel } from "../lib/committees";
 import { umfangText } from "../lib/termine";
 
@@ -21,15 +24,22 @@ export function TerminSheet({
   offen,
   termin,
   startDatum,
+  entwurf,
   onSchliessen,
+  onGespeichert,
 }: {
   offen: boolean;
   /** gesetzt = bearbeiten, null = neu */
   termin: Termin | null;
   startDatum: string;
+  /** Vorausgefüllt – kommt aus einer übernommenen Terminanfrage. */
+  entwurf?: NeuerTermin | null;
   onSchliessen: () => void;
+  /** Läuft nach dem erfolgreichen Speichern – damit die Anfrage, aus der
+   *  dieser Termin entstanden ist, danach als erledigt abgehakt wird. */
+  onGespeichert?: () => void;
 }) {
-  const { anlegen, aendern, loeschen } = useTermine();
+  const { anlegen, anlegenViele, aendern, loeschen } = useTermine();
   const { students } = useStore();
   const { can, isStaff } = useRole();
   const darf = isStaff || can("termine.manage");
@@ -48,6 +58,9 @@ export function TerminSheet({
   const [tags, setTags] = useState<Set<string>>(new Set());
   const [personen, setPersonen] = useState<Set<string>>(new Set());
   const [q, setQ] = useState("");
+  const [wiederholt, setWiederholt] = useState(false);
+  const [wdhBis, setWdhBis] = useState("");
+  const [wochentage, setWochentage] = useState<Set<number>>(new Set());
   const [fehler, setFehler] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -69,6 +82,22 @@ export function TerminSheet({
       setFuerEltern(termin.fuer_eltern);
       setTags(new Set(termin.tags));
       setPersonen(new Set(termin.personen));
+    } else if (entwurf) {
+      // Aus einer Anfrage übernommen: alles steht schon drin, das Team
+      // muss nur noch prüfen und auf "Eintragen" drücken.
+      setTitel(entwurf.titel);
+      setOrt(entwurf.ort);
+      setBeschreibung(entwurf.beschreibung);
+      setDatum(entwurf.datum);
+      setMehrtaegig(Boolean(entwurf.bis_datum && entwurf.bis_datum !== entwurf.datum));
+      setBisDatum(entwurf.bis_datum || "");
+      setGanztaegig(!entwurf.von);
+      setVon(entwurf.von || "14:00");
+      setBis(entwurf.bis || "15:00");
+      setSichtbar(entwurf.sichtbar);
+      setFuerEltern(entwurf.fuer_eltern);
+      setTags(new Set(entwurf.tags));
+      setPersonen(new Set(entwurf.personen));
     } else {
       setTitel("");
       setOrt("");
@@ -84,8 +113,18 @@ export function TerminSheet({
       setTags(new Set());
       setPersonen(new Set());
     }
+    setWiederholt(false);
+    setWdhBis("");
+    setWochentage(new Set());
     setQ("");
-  }, [offen, termin, startDatum]);
+  }, [offen, termin, startDatum, entwurf]);
+
+  /** Die Tage, an denen der Termin tatsächlich entsteht. Nur bei
+   *  "wiederholt sich" – sonst ist es genau der eine gewählte Tag. */
+  const wdhTage = useMemo(
+    () => (wiederholt ? wiederholungsTage(datum, wdhBis, [...wochentage]) : []),
+    [wiederholt, datum, wdhBis, wochentage],
+  );
 
   const liste = useMemo(() => {
     const n = normalize(q);
@@ -100,6 +139,11 @@ export function TerminSheet({
     if (!titel.trim()) return setFehler("Gib dem Termin eine Bezeichnung.");
     if (!datum) return setFehler("Wähle ein Datum.");
     if (mehrtaegig && bisDatum && bisDatum < datum) return setFehler("Das Ende liegt vor dem Anfang.");
+    if (wiederholt) {
+      if (wochentage.size === 0) return setFehler("Wähle mindestens einen Wochentag.");
+      if (!wdhBis) return setFehler("Bis wann soll sich der Termin wiederholen?");
+      if (wdhTage.length === 0) return setFehler("In diesem Zeitraum liegt keiner der gewählten Wochentage.");
+    }
     if (!ganztaegig && von && bis && bis <= von && !mehrtaegig)
       return setFehler("Die Endzeit liegt vor der Anfangszeit.");
     if (sichtbar === "komitee" && tags.size === 0) return setFehler("Wähle mindestens ein Komitee.");
@@ -120,10 +164,19 @@ export function TerminSheet({
     };
 
     setBusy(true);
-    const f = termin ? await aendern(termin.id, daten) : await anlegen(daten);
+    // Wiederholung heißt: echte Einzeltermine, sofort ausgerechnet. Fällt
+    // eine Woche aus, löscht man diesen einen Tag – der Rest bleibt stehen.
+    const f = termin
+      ? await aendern(termin.id, daten)
+      : wiederholt
+        ? await anlegenViele(wdhTage.map((tag) => ({ ...daten, datum: tag, bis_datum: null })))
+        : await anlegen(daten);
     setBusy(false);
     if (f) setFehler("Speichern hat nicht geklappt: " + f);
-    else onSchliessen();
+    else {
+      onGespeichert?.();
+      onSchliessen();
+    }
   }
 
   return (
@@ -163,7 +216,9 @@ export function TerminSheet({
       <div className="mb-3 rounded-2xl border border-papier-linie p-3 dark:border-slate-700">
         <div className="mb-2 flex flex-wrap items-center gap-2">
           <label className="flex min-w-0 flex-1 items-center gap-2">
-            <span className="shrink-0 text-[12px] font-semibold text-tinte-leise">Am</span>
+            <span className="shrink-0 text-[12px] font-semibold text-tinte-leise">
+              {wiederholt ? "Ab" : "Am"}
+            </span>
             <input
               type="date"
               className="min-w-0 flex-1 rounded-lg border border-papier-linie bg-white px-2.5 py-2 text-[14px] dark:border-slate-700 dark:bg-slate-800"
@@ -175,10 +230,69 @@ export function TerminSheet({
 
         <div className="mb-2 flex flex-wrap gap-x-4 gap-y-1.5">
           <Haken an={ganztaegig} setzen={setGanztaegig} text="ganztägig" />
-          <Haken an={mehrtaegig} setzen={setMehrtaegig} text="über mehrere Tage" />
+          {!wiederholt && <Haken an={mehrtaegig} setzen={setMehrtaegig} text="über mehrere Tage" />}
+          {/* Beim Ändern nicht anbieten: sonst würde aus einem Termin
+              plötzlich eine ganze Reihe und der alte bliebe stehen. */}
+          {!termin && (
+            <Haken
+              an={wiederholt}
+              setzen={(v) => {
+                setWiederholt(v);
+                if (v) {
+                  setMehrtaegig(false);
+                  if (!wdhBis) setWdhBis(plusTage(datum || heuteKey(), 42));
+                }
+              }}
+              text="wiederholt sich"
+            />
+          )}
         </div>
 
-        {mehrtaegig && (
+        {wiederholt && (
+          <div className="mb-2 rounded-xl bg-papier-matt p-2.5 dark:bg-slate-800">
+            <label className="mb-2 flex items-center gap-2">
+              <span className="shrink-0 text-[12px] font-semibold text-tinte-leise">Bis</span>
+              <input
+                type="date"
+                min={datum}
+                className="min-w-0 flex-1 rounded-lg border border-papier-linie bg-white px-2.5 py-2 text-[14px] dark:border-slate-700 dark:bg-slate-900"
+                value={wdhBis}
+                onChange={(e) => setWdhBis(e.target.value)}
+              />
+            </label>
+            <div className="mb-2 flex flex-wrap gap-1">
+              {WOCHENTAG_WAHL.map((w) => {
+                const an = wochentage.has(w.nr);
+                return (
+                  <button
+                    key={w.nr}
+                    onClick={() =>
+                      setWochentage((prev) => {
+                        const n = new Set(prev);
+                        if (an) n.delete(w.nr);
+                        else n.add(w.nr);
+                        return n;
+                      })
+                    }
+                    aria-label={w.lang}
+                    className={`h-9 w-10 rounded-lg text-[12px] font-bold transition ${
+                      an ? "bg-brand text-white" : "bg-white text-tinte-matt dark:bg-slate-900 dark:text-slate-300"
+                    }`}
+                  >
+                    {w.kurz}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-[11px] leading-relaxed text-tinte-leise">
+              {wdhTage.length === 0
+                ? "Wähle Wochentage und einen Zeitraum."
+                : `Das ergibt ${wdhTage.length} Termin${wdhTage.length === 1 ? "" : "e"} – vom ${tagLang(wdhTage[0])} bis ${tagLang(wdhTage[wdhTage.length - 1])}. Jeder steht einzeln im Kalender und lässt sich einzeln absagen.`}
+            </p>
+          </div>
+        )}
+
+        {mehrtaegig && !wiederholt && (
           <label className="mb-2 flex items-center gap-2">
             <span className="shrink-0 text-[12px] font-semibold text-tinte-leise">Bis</span>
             <input
@@ -345,7 +459,13 @@ export function TerminSheet({
 
       <div className="flex gap-2">
         <button disabled={busy} onClick={speichern} className="btn-primary min-w-0 flex-1 disabled:opacity-50">
-          {busy ? "…" : termin ? "Speichern" : "Eintragen"}
+          {busy
+            ? "…"
+            : termin
+              ? "Speichern"
+              : wiederholt && wdhTage.length > 0
+                ? `${wdhTage.length} Termine eintragen`
+                : "Eintragen"}
         </button>
         {termin && (
           <button

@@ -168,13 +168,22 @@ export function TerminZeile({ t, meins, onClick }: { t: Termin; meins: boolean; 
       </span>
       <span className="min-w-0 flex-1">
         <span className="block truncate text-[13px] font-semibold">
-          {t.sichtbar === "komitee" && t.tags[0] && (
-            <span className="mr-1">{committeeIcon(t.tags[0])}</span>
+          {t.icon ? (
+            <span className="mr-1">{t.icon}</span>
+          ) : (
+            t.sichtbar === "komitee" && t.tags[0] && (
+              <span className="mr-1">{committeeIcon(t.tags[0])}</span>
+            )
           )}
           {t.titel}
         </span>
         <span className="block truncate text-[11px] text-tinte-leise">
-          {[t.ort, umfangText(t, committeeLabel)].filter(Boolean).join(" · ")}
+          {[
+            t.ort,
+            t.plaetze ? `${t.personen.length}/${t.plaetze} eingeteilt` : umfangText(t, committeeLabel),
+          ]
+            .filter(Boolean)
+            .join(" · ")}
         </span>
       </span>
       {meins && (
