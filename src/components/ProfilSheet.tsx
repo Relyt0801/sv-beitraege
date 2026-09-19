@@ -11,7 +11,7 @@ import { passwortProblem } from "../lib/passwort";
 import { SELECTABLE_COMMITTEES, committeeIcon, committeeLabel, rolleUndKomitees } from "../lib/committees";
 import { ladeKomiteeAntraege, stelleKomiteeAntrag } from "../lib/komitee-antrag";
 import { useTheme } from "../lib/theme";
-import { enablePush, pushConfigured, pushPermission } from "../lib/push";
+import { abmelden, enablePush, pushConfigured, pushPermission } from "../lib/push";
 
 /** Das eigene Profil: Bild, Namensfarbe, Passwort, Komitee-Wechsel, Hilfe. */
 export function ProfilSheet({
@@ -346,7 +346,7 @@ export function ProfilSheet({
         {hasSupabase && (
           <button
             className={`${row} text-red-500`}
-            onClick={() => confirm("Wirklich abmelden?") && void supabase!.auth.signOut()}
+            onClick={() => confirm("Wirklich abmelden?") && void abmelden()}
           >
             <span>↩</span> Abmelden
           </button>

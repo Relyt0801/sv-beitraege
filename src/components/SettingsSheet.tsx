@@ -1,4 +1,5 @@
 import { hasSupabase, supabase } from "../lib/supabase";
+import { abmelden } from "../lib/push";
 import { useTopics } from "../topics-store";
 import { committeeLabel } from "../lib/committees";
 import { Sheet } from "./Sheet";
@@ -62,7 +63,7 @@ export function SettingsSheet({
             <button
               className={`${row} text-red-500`}
               onClick={() => {
-                if (confirm("Wirklich abmelden?")) void supabase!.auth.signOut();
+                if (confirm("Wirklich abmelden?")) void abmelden();
               }}
             >
               <span>↩</span> Abmelden

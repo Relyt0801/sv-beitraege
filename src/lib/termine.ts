@@ -149,6 +149,14 @@ export function tagLang(key: string): string {
   return `${WOCHENTAGE[(d.getDay() + 6) % 7]}, ${d.getDate()}. ${MONATE[d.getMonth()]}`;
 }
 
+/** "Mo, 12.10.26" – kurz genug für eine Benachrichtigung. */
+export function kurzDatum(key: string): string {
+  const d = ausKey(key);
+  const tt = String(d.getDate()).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  return `${WOCHENTAGE[(d.getDay() + 6) % 7]}, ${tt}.${mm}.${String(d.getFullYear()).slice(2)}`;
+}
+
 export function monatLang(key: string): string {
   const d = ausKey(key);
   return `${MONATE[d.getMonth()]} ${d.getFullYear()}`;

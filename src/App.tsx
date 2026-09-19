@@ -9,7 +9,7 @@ import { Tour, tourSteps } from "./components/Tour";
 import { useTheme } from "./lib/theme";
 import { useVerzoegert } from "./lib/entwurf";
 import { hasSupabase, supabase } from "./lib/supabase";
-import { appZaehler } from "./lib/push";
+import { abmelden, appZaehler } from "./lib/push";
 import { PushHinweis, usePushAuffrischen } from "./components/PushHinweis";
 import { useStore } from "./store";
 import { AuthGate } from "./auth/AuthGate";
@@ -18,7 +18,7 @@ import { RoleProvider, useRole } from "./auth/RoleProvider";
 import { Sheet } from "./components/Sheet";
 import { ProfilesProvider, useProfiles } from "./profiles-store";
 import { EventsProvider, useEvents } from "./events-store";
-import { TermineProvider } from "./termine-store";
+import { TermineProvider, useTermine } from "./termine-store";
 import { TopicsProvider, useTopics } from "./topics-store";
 import { ChatsTab } from "./components/ChatsTab";
 import { StudentCard, nextStatus } from "./components/StudentCard";
@@ -32,7 +32,7 @@ import { BeitraegeTab } from "./components/BeitraegeTab";
 import { KassenKopf } from "./components/KassenKopf";
 import { EventComposer } from "./components/EventComposer";
 import { AktionSheet } from "./components/AktionSheet";
-import { ElternProvider } from "./eltern-store";
+import { ElternProvider, useEltern } from "./eltern-store";
 import { ElternApp } from "./components/ElternApp";
 import { Icon, type IconName } from "./components/Icon";
 
@@ -89,6 +89,15 @@ function NachRolle() {
 
 type Tab = "kasse" | "events" | "themen" | "beitraege" | "rollen" | "rechte";
 
+/** "#events" -> Events, "#chats" -> Chats. Danach wird die Marke entfernt,
+ *  damit ein Neuladen nicht wieder dorthin springt. */
+function tabAusAdresse(): Tab | null {
+  const h = window.location.hash.replace("#", "");
+  const t: Tab | null = h === "events" ? "events" : h === "chats" ? "themen" : h === "kasse" ? "kasse" : null;
+  if (t) history.replaceState(null, "", window.location.pathname + window.location.search);
+  return t;
+}
+
 /** Wie viele Personenzeilen auf einmal dazukommen. */
 const SCHRITT_LISTE = 40;
 
@@ -113,7 +122,7 @@ function Main() {
   const { theme, toggle } = useTheme();
 
   const showTopicsTab = true;
-  const topicsUnread = topics.reduce((s, t) => s + unreadCount(t.id), 0);
+  const topicsUnreadChats = topics.reduce((s, t) => s + unreadCount(t.id), 0);
 
   // Abo beim Öffnen still auffrischen (fragt nie selbst nach Erlaubnis).
   usePushAuffrischen();
@@ -137,10 +146,26 @@ function Main() {
     return () => clearTimeout(t);
   }, [roleReady, ready, isStaff, tourResetAt]);
 
-  const unread = allEvents.filter((e) => !reads.has(e.id)).length;
+  // Rote Zahlen auf den Reitern: alles, was dort auf einen wartet.
+  const { neueTermine, anfragen } = useTermine();
+  const { ungelesen: elternUngelesen } = useEltern();
+  const offeneAnfragen = isStaff || can("termine.manage") ? anfragen.filter((a) => a.status === "offen").length : 0;
+  const unread = allEvents.filter((e) => !reads.has(e.id)).length + neueTermine.size + offeneAnfragen;
+  // Beim Team zählen offene Elterngespräche mit zu den Chats.
+  const topicsUnread = topicsUnreadChats + (isStaff ? elternUngelesen : 0);
   // Roter Zähler am App-Symbol: ungelesene Chats und Events zusammen.
   useEffect(() => appZaehler(topicsUnread + unread), [topicsUnread, unread]);
-  const [tab, setTab] = useState<Tab>("kasse");
+  // Ein Tippen auf eine Benachrichtigung öffnet die App mit #events oder
+  // #chats – dann direkt dort landen statt auf der Kasse.
+  const [tab, setTab] = useState<Tab>(() => tabAusAdresse() || "kasse");
+  useEffect(() => {
+    const neu = () => {
+      const t = tabAusAdresse();
+      if (t) setTab(t);
+    };
+    window.addEventListener("hashchange", neu);
+    return () => window.removeEventListener("hashchange", neu);
+  }, []);
   const [showComposer, setShowComposer] = useState(false);
   const [showAktion, setShowAktion] = useState(false);
   const [query, setQuery] = useState("");
@@ -447,7 +472,7 @@ function Main() {
                     <button onClick={changePassword} className="ml-auto rounded-lg border border-papier-linie px-3 py-1.5 text-sm font-semibold dark:border-slate-700">
                       Passwort ändern
                     </button>
-                    <button onClick={() => supabase!.auth.signOut()} className="rounded-lg border border-papier-linie px-3 py-1.5 text-sm font-semibold text-tinte-matt dark:border-slate-700">
+                    <button onClick={() => void abmelden()} className="rounded-lg border border-papier-linie px-3 py-1.5 text-sm font-semibold text-tinte-matt dark:border-slate-700">
                       Logout
                     </button>
                   </>

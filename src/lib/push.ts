@@ -73,11 +73,31 @@ function urlBase64ToUint8Array(base64: string): Uint8Array {
   return arr;
 }
 
+/** Push an das Stufenteam (z. B. neue Terminanfrage). */
+export async function pushAnTeam(title: string, body: string, url = "./#events"): Promise<void> {
+  if (!hasSupabase) return;
+  try {
+    await supabase!.functions.invoke("send-push", { body: { an_team: true, title, body, url } });
+  } catch {
+    /* Benachrichtigung ist optional */
+  }
+}
+
+/** Push zu einem Termin an alle, die ihn sehen dürfen. */
+export async function pushZuTermin(termin_id: string, title?: string, body?: string): Promise<void> {
+  if (!hasSupabase) return;
+  try {
+    await supabase!.functions.invoke("send-push", { body: { termin_id, title, body, url: "./#events" } });
+  } catch {
+    /* Benachrichtigung ist optional */
+  }
+}
+
 /** Push direkt an bestimmte Nutzer senden (via Edge Function, best effort). */
-export async function pushToUsers(user_ids: string[], title: string, body: string): Promise<void> {
+export async function pushToUsers(user_ids: string[], title: string, body: string, url = "./"): Promise<void> {
   if (!hasSupabase || !user_ids.length) return;
   try {
-    await supabase!.functions.invoke("send-push", { body: { user_ids, title, body } });
+    await supabase!.functions.invoke("send-push", { body: { user_ids, title, body, url } });
   } catch {
     /* Function evtl. nicht deployt – Benachrichtigung ist optional */
   }
@@ -102,6 +122,31 @@ function erlaubnisSofort(): Promise<NotificationPermission> {
   }
 }
 
+/**
+ * Jeder Anmeldeversuch landet mit Browser-Kennung in der Datenbank.
+ * Grund: Firefox verhält sich anders, und ohne diese Zeilen sieht man auf
+ * dem Server nur "es kam kein Abo an" – nicht, woran es scheiterte.
+ */
+function diagnose(schritt: string, fehler = ""): void {
+  if (!hasSupabase) return;
+  void (async () => {
+    try {
+      const { data } = await supabase!.auth.getSession();
+      const uid = data.session?.user.id;
+      if (!uid) return;
+      await supabase!.from("push_diagnose").insert({
+        user_id: uid,
+        ua: navigator.userAgent.slice(0, 300),
+        schritt,
+        fehler: fehler.slice(0, 500),
+        erlaubnis: pushPermission(),
+      });
+    } catch {
+      /* Diagnose darf nie selbst stören */
+    }
+  })();
+}
+
 /** Benachrichtigungen aktivieren: Erlaubnis holen, Abo anlegen, in Supabase speichern.
  *  MUSS direkt aus einem Klick/Tippen aufgerufen werden, wenn noch nicht erlaubt. */
 export async function enablePush(): Promise<{ ok: boolean; error?: string }> {
@@ -109,8 +154,13 @@ export async function enablePush(): Promise<{ ok: boolean; error?: string }> {
   // Zuerst fragen, dann erst Netzwerk – siehe erlaubnisSofort().
   const erlaubnis = erlaubnisSofort();
   const [perm, VAPID] = await Promise.all([erlaubnis, schluessel()]);
-  if (perm !== "granted") return { ok: false, error: perm === "denied" ? "blockiert" : "keine Erlaubnis" };
-  return aboAnlegen(VAPID);
+  if (perm !== "granted") {
+    diagnose("einschalten", "Erlaubnis: " + perm);
+    return { ok: false, error: perm === "denied" ? "blockiert" : "keine Erlaubnis" };
+  }
+  const r = await aboAnlegen(VAPID);
+  diagnose("einschalten", r.ok ? "" : r.error || "?");
+  return r;
 }
 
 /**
@@ -123,8 +173,13 @@ export async function pushAuffrischen(): Promise<void> {
   if (!pushSupported || pushPermission() !== "granted") return;
   const VAPID = await schluessel();
   const r = await aboAnlegen(VAPID);
-  if (!r.ok) console.warn("[push] Auffrischen fehlgeschlagen:", r.error);
+  if (!r.ok) {
+    console.warn("[push] Auffrischen fehlgeschlagen:", r.error);
+    diagnose("auffrischen", r.error || "?");
+  }
 }
+
+const ABO_KEY = "sv:push-endpoint";
 
 async function aboAnlegen(VAPID: string): Promise<{ ok: boolean; error?: string }> {
   try {
@@ -152,6 +207,31 @@ async function aboAnlegen(VAPID: string): Promise<{ ok: boolean; error?: string 
         sub = null;
       }
     }
+    // Hat der Server "unser" Abo als tot weggeräumt? Dann liefert der Browser
+    // es trotzdem noch – Firefox tut das nachweislich. Wir merken uns deshalb
+    // das zuletzt gemeldete Abo: steht es nicht mehr in der Datenbank, wird es
+    // hier gekündigt und frisch angelegt, statt die tote Adresse erneut
+    // einzutragen.
+    if (sub) {
+      let gemerkt = "";
+      try {
+        gemerkt = localStorage.getItem(ABO_KEY) || "";
+      } catch {
+        /* egal */
+      }
+      if (gemerkt === sub.endpoint) {
+        const { data: da } = await supabase!
+          .from("push_subscriptions")
+          .select("endpoint")
+          .eq("endpoint", sub.endpoint)
+          .maybeSingle();
+        if (!da) {
+          console.log("[push] Server hatte das Abo als tot entfernt – wird erneuert");
+          await sub.unsubscribe().catch(() => {});
+          sub = null;
+        }
+      }
+    }
     if (!sub) {
       // Neu anlegen NUR mit dem Schlüssel des Servers. Der Notnagel aus der
       // Build-Umgebung passt nachweislich nicht mehr zum Server – ein Abo damit
@@ -165,10 +245,18 @@ async function aboAnlegen(VAPID: string): Promise<{ ok: boolean; error?: string 
       });
     }
 
-    const { error } = await supabase!
-      .from("push_subscriptions")
-      .upsert({ user_id: uid, endpoint: sub.endpoint, subscription: sub.toJSON() }, { onConflict: "endpoint" });
+    // Über die Datenbank-Funktion statt direkt: gehört dieses Gerät noch zu
+    // einem anderen Konto (jemand hat sich umgemeldet), wird es übernommen.
+    const { error } = await supabase!.rpc("push_abo_uebernehmen", {
+      p_endpoint: sub.endpoint,
+      p_subscription: sub.toJSON(),
+    });
     if (error) return { ok: false, error: error.message };
+    try {
+      localStorage.setItem(ABO_KEY, sub.endpoint);
+    } catch {
+      /* egal */
+    }
     console.log("[push] Abo registriert für", uid);
     return { ok: true };
   } catch (e) {
@@ -203,4 +291,23 @@ export function appZaehler(n: number): void {
   } catch {
     /* nicht unterstützt – dann eben ohne */
   }
+}
+
+// ---------------------------------------------------------------- Abmelden
+
+/**
+ * Abmelden MIT Abmeldung des Geräts von den Benachrichtigungen. Sonst bekäme
+ * das alte Konto auf einem geteilten oder weitergegebenen Handy weiter alles.
+ */
+export async function abmelden(): Promise<void> {
+  if (!hasSupabase) return;
+  try {
+    const reg = await navigator.serviceWorker?.getRegistration();
+    const sub = await reg?.pushManager.getSubscription();
+    if (sub) await supabase!.from("push_subscriptions").delete().eq("endpoint", sub.endpoint);
+    localStorage.removeItem(ABO_KEY);
+  } catch {
+    /* Abmelden soll nie daran scheitern */
+  }
+  await supabase!.auth.signOut();
 }

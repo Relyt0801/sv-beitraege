@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useEltern } from "../eltern-store";
 import { useRole } from "../auth/RoleProvider";
+import { useStore } from "../store";
 
 /**
  * IBAN in Viererblöcken, so wie man sie auf Papier schreibt.
@@ -26,6 +27,8 @@ export function jahrgangKurz(halbjahr: string): string {
 export function KontoTab() {
   const { konto, kontoSpeichern } = useEltern();
   const { role } = useRole();
+  // Eltern sehen hier nur die eigenen Kinder – dafür sorgt die Datenbank.
+  const { students: kinder, settings } = useStore();
   const [kopiert, setKopiert] = useState<string | null>(null);
   const darfAendern = role === "admin" || role === "kassenwart";
 
@@ -58,7 +61,8 @@ export function KontoTab() {
       <section className="card p-5">
         <h2 className="text-lg font-bold">So überweisen Sie</h2>
         <p className="mt-0.5 text-[13px] leading-relaxed text-tinte-matt dark:text-slate-400">
-          Bei mehreren Kindern bitte für jedes Kind einzeln überweisen.
+          Bitte immer den Verwendungszweck angeben – sonst können wir das Geld nicht zuordnen. Bei
+          mehreren Kindern bitte für jedes Kind einzeln überweisen.
         </p>
 
         <dl className="mt-4 grid gap-2">
@@ -73,6 +77,27 @@ export function KontoTab() {
           <Zeile label="BIC" wert={konto.bic} onKopieren={() => kopieren(konto.bic, "bic")} kopiert={kopiert === "bic"} />
           <Zeile label="Bank" wert={konto.bank} />
         </dl>
+
+        {/* Verwendungszweck zum Kopieren – je Kind eine Zeile */}
+        <ul className="mt-2 grid gap-2">
+          {(kinder.length ? kinder : [null]).map((k) => {
+            const jahr = jahrgangKurz(settings.aktuelles_halbjahr);
+            // Kein Komma vor der Stufe: "Adams, Tyler Q2"
+            const zweck = k ? `${k.nachname}, ${k.vorname} ${jahr}` : `Nachname, Vorname ${jahr}`;
+            const id = k ? `zweck-${k.id}` : "zweck";
+            return (
+              <li key={id}>
+                <Zeile
+                  label={kinder.length > 1 && k ? `Für ${k.vorname}` : "Verwendungszweck"}
+                  gross
+                  wert={zweck}
+                  onKopieren={() => kopieren(zweck, id)}
+                  kopiert={kopiert === id}
+                />
+              </li>
+            );
+          })}
+        </ul>
 
         {konto.hinweis && (
           <p className="mt-3 rounded-xl bg-amber-50 p-3 text-[12px] leading-relaxed text-amber-900 dark:bg-amber-500/10 dark:text-amber-200">
@@ -99,20 +124,33 @@ function Zeile({
   onKopieren?: () => void;
   kopiert?: boolean;
 }) {
+  const knopf = onKopieren && (
+    <button
+      onClick={onKopieren}
+      className="shrink-0 rounded-lg bg-white px-2.5 py-1.5 text-[12px] font-bold text-brand transition active:scale-95 dark:bg-slate-900"
+    >
+      {kopiert ? "kopiert ✓" : "kopieren"}
+    </button>
+  );
+  // Die IBAN bekommt die ganze Breite: Beschriftung darüber, Nummer in EINER
+  // Zeile. Vorher stand sie neben der Beschriftung und brach mitten im Block um.
+  if (gross)
+    return (
+      <div className="rounded-xl bg-papier-matt px-3 py-2.5 dark:bg-slate-800">
+        <div className="flex items-center gap-2">
+          <dt className="min-w-0 flex-1 text-[12px] font-semibold text-tinte-leise">{label}</dt>
+          {knopf}
+        </div>
+        <dd className="mt-1 whitespace-nowrap font-mono text-[clamp(12px,3.9vw,17px)] font-bold tracking-tight">
+          {wert}
+        </dd>
+      </div>
+    );
   return (
     <div className="flex items-center gap-2 rounded-xl bg-papier-matt px-3 py-2.5 dark:bg-slate-800">
       <dt className="w-20 shrink-0 text-[12px] font-semibold text-tinte-leise">{label}</dt>
-      <dd className={`min-w-0 flex-1 break-all font-semibold ${gross ? "text-[15px] tracking-wide" : "text-[14px]"}`}>
-        {wert}
-      </dd>
-      {onKopieren && (
-        <button
-          onClick={onKopieren}
-          className="shrink-0 rounded-lg bg-white px-2.5 py-1.5 text-[12px] font-bold text-brand transition active:scale-95 dark:bg-slate-900"
-        >
-          {kopiert ? "kopiert ✓" : "kopieren"}
-        </button>
-      )}
+      <dd className="min-w-0 flex-1 break-words text-[14px] font-semibold">{wert}</dd>
+      {knopf}
     </div>
   );
 }

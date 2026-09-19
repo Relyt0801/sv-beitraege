@@ -26,7 +26,14 @@ type Reiter = "uebersicht" | "infos" | "konto";
  * die Datenbank selbst, nicht nur diese Oberflaeche.
  */
 export function ElternApp() {
-  const [reiter, setReiter] = useState<Reiter>("uebersicht");
+  // Benachrichtigung angetippt? Dann gleich in die Infos.
+  const [reiter, setReiter] = useState<Reiter>(() => {
+    if (window.location.hash === "#infos") {
+      history.replaceState(null, "", window.location.pathname + window.location.search);
+      return "infos";
+    }
+    return "uebersicht";
+  });
   const [profilOffen, setProfilOffen] = useState(false);
   const { theme, toggle } = useTheme();
   const { students, contributions, settings, ready } = useStore();

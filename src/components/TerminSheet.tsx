@@ -506,16 +506,36 @@ function Haken({
 export function TerminAnsehen({
   termin, onSchliessen, onBearbeiten,
 }: { termin: Termin | null; onSchliessen: () => void; onBearbeiten?: () => void }) {
-  if (!termin) return null;
+  const { termine, loeschen, loeschenViele, zuteilen } = useTermine();
+  const { students } = useStore();
+  const { isStaff, can } = useRole();
+  const darf = isStaff || can("termine.manage");
+  // Immer den frischen Stand zeigen (z. B. nach dem Austragen einer Person)
+  const t = termin ? termine.find((x) => x.id === termin.id) ?? termin : null;
+
+  /** Die "Reihe": gleicher Titel, gleiche Uhrzeit, gleiche Aktion, ab heute. */
+  const reihe = useMemo(() => {
+    if (!t) return [] as Termin[];
+    const heute = heuteKey();
+    return termine.filter(
+      (x) =>
+        x.titel === t.titel && x.von === t.von && x.bis === t.bis &&
+        (x.aktion_id || null) === (t.aktion_id || null) && x.datum >= heute,
+    );
+  }, [termine, t]);
+
+  if (!t) return null;
+  const termin_ = t;
+  const namen = new Map(students.map((s) => [s.id, `${s.vorname} ${s.nachname}`]));
   return (
     <Sheet open onClose={onSchliessen}>
       <div className="mb-3 flex items-start gap-3">
         <span className="min-w-0 flex-1">
           <span className="block font-zahl text-[1.25rem] font-extrabold leading-tight tracking-[-0.02em]">
-            {termin.titel}
+            {termin_.titel}
           </span>
           <span className="mt-0.5 block text-[12px] text-tinte-leise">
-            {umfangText(termin, committeeLabel)}
+            {umfangText(termin_, committeeLabel)}
           </span>
         </span>
         <button className="iconbtn shrink-0" onClick={onSchliessen} aria-label="Schließen">
@@ -524,15 +544,71 @@ export function TerminAnsehen({
       </div>
 
       <dl className="grid gap-2">
-        <Zeile label="Wann" wert={`${tagLang(termin.datum)}${termin.bis_datum && termin.bis_datum !== termin.datum ? ` bis ${tagLang(termin.bis_datum)}` : ""}`} />
-        <Zeile label="Uhrzeit" wert={zeitText(termin)} />
-        {termin.ort && <Zeile label="Ort" wert={termin.ort} />}
+        <Zeile label="Wann" wert={`${tagLang(termin_.datum)}${termin_.bis_datum && termin_.bis_datum !== termin_.datum ? ` bis ${tagLang(termin_.bis_datum)}` : ""}`} />
+        <Zeile label="Uhrzeit" wert={zeitText(termin_)} />
+        {termin_.ort && <Zeile label="Ort" wert={termin_.ort} />}
       </dl>
 
-      {termin.beschreibung && (
+      {termin_.beschreibung && (
         <p className="mt-3 whitespace-pre-wrap rounded-xl bg-papier-matt p-3 text-[13px] leading-relaxed text-tinte-matt dark:bg-slate-800 dark:text-slate-300">
-          {termin.beschreibung}
+          {termin_.beschreibung}
         </p>
+      )}
+
+      {termin_.personen.length > 0 && (termin_.aktion_id || darf) && (
+        <div className="mt-3">
+          <div className="mb-1 text-[12px] font-semibold text-tinte-leise">
+            {termin_.aktion_id ? "Eingeteilt" : "Für diese Personen"}
+          </div>
+          <ul className="grid gap-1">
+            {termin_.personen.map((sid) => (
+              <li key={sid} className="flex items-center gap-2 rounded-lg bg-papier-matt px-2.5 py-1.5 text-[13px] dark:bg-slate-800">
+                <span className="min-w-0 flex-1 truncate font-semibold">{namen.get(sid) || "Unbekannt"}</span>
+                {darf && termin_.aktion_id && (
+                  <button
+                    onClick={() => {
+                      if (confirm(`${namen.get(sid) || "Diese Person"} aus der Schicht nehmen? Sie bekommt Bescheid.`))
+                        void zuteilen(termin_.id, sid, false);
+                    }}
+                    className="shrink-0 rounded-md px-2 py-0.5 text-[12px] font-bold text-red-500"
+                    aria-label="Austragen"
+                  >
+                    austragen
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {darf && (
+        <div className="mt-4 grid gap-1.5 rounded-xl border border-red-200 p-2.5 dark:border-red-500/30">
+          <button
+            onClick={() => {
+              if (confirm(`„${termin_.titel}" am ${tagLang(termin_.datum)} löschen?`)) {
+                void loeschen(termin_.id);
+                onSchliessen();
+              }
+            }}
+            className="w-full rounded-lg py-2 text-[13px] font-bold text-red-500"
+          >
+            Nur diesen Termin löschen
+          </button>
+          {reihe.length > 1 && (
+            <button
+              onClick={() => {
+                if (confirm(`Alle ${reihe.length} kommenden Termine „${termin_.titel}" löschen?`)) {
+                  void loeschenViele(reihe.map((x) => x.id));
+                  onSchliessen();
+                }
+              }}
+              className="w-full rounded-lg bg-red-500 py-2 text-[13px] font-bold text-white"
+            >
+              Alle {reihe.length} kommenden „{termin_.titel}" löschen
+            </button>
+          )}
+        </div>
       )}
 
       <div className="mt-4 flex gap-2">

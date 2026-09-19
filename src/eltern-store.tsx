@@ -243,10 +243,13 @@ export function ElternProvider({ children }: { children: ReactNode }) {
     if (t) {
       const anTeam = t.user_id === uid.current;
       const ziel = anTeam ? teamIds.current : [t.user_id];
+      // Titel = Betreff des Gesprächs, damit man in der Mitteilung sofort sieht,
+      // worum es geht.
       void pushToUsers(
         ziel.filter((z) => z !== uid.current),
-        anTeam ? "Neue Frage von Eltern" : "Antwort vom Stufenteam",
-        `${t.betreff}: ${text.trim().slice(0, 80)}`,
+        anTeam ? `Eltern: ${t.betreff}` : t.betreff,
+        anTeam ? text.trim().slice(0, 110) : `Antwort vom Stufenteam: ${text.trim().slice(0, 90)}`,
+        anTeam ? "./#chats" : "./#infos",
       );
     }
   }, [tickets]);
@@ -266,7 +269,7 @@ export function ElternProvider({ children }: { children: ReactNode }) {
       .from("eltern_ticket_nachrichten")
       .insert({ ticket_id: ticket.id, user_id: uid.current, text: text.trim() });
     if (e2) return e2.message;
-    void pushToUsers([userId], "Nachricht vom Stufenteam", `${betreff.trim()}: ${text.trim().slice(0, 80)}`);
+    void pushToUsers([userId], betreff.trim(), `Das Stufenteam schreibt: ${text.trim().slice(0, 90)}`, "./#infos");
     void laden();
     return null;
   }, [laden]);

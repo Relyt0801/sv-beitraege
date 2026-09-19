@@ -15,7 +15,7 @@ import { useTermine } from "../termine-store";
 export function EventsTab() {
   const { events, ready, myVotes, voteCounts, voters, reads, vote, deleteEvent, markRead } = useEvents();
   const { canEditData, isStaff, can } = useRole();
-  const { anfrageEntscheiden } = useTermine();
+  const { anfrageEntscheiden, termineGesehen } = useTermine();
 
   // Kalender und Terminformular liegen ueber dem Reiter, nicht darin.
   const [kalenderOffen, setKalenderOffen] = useState(false);
@@ -59,7 +59,9 @@ export function EventsTab() {
         onKalender={(tag) => {
           setKalenderTag(tag);
           setKalenderOffen(true);
+          termineGesehen();
         }}
+        onOeffnen={(t) => setAngesehen(t)}
       />
 
       <MeineAnfragen />
@@ -190,8 +192,12 @@ function EventCard({
         {e.audience === "komitee" && <span>· {(e.tags || []).map(committeeLabel).join(", ") || "Komitees"}</span>}
         <span className="ml-auto">{date}</span>
         {canDelete && (
-          <button onClick={onDelete} className="ml-1 text-tinte-leise hover:text-red-500" aria-label="Löschen">
-            🗑
+          <button
+            onClick={onDelete}
+            className="ml-1 rounded-md border border-red-200 px-2 py-0.5 text-[11px] font-bold text-red-500 dark:border-red-500/30"
+            aria-label="Löschen"
+          >
+            Löschen
           </button>
         )}
       </div>

@@ -15,11 +15,14 @@ type Neu = "pin" | "umfrage" | "todo" | null;
  * unten an fester Stelle der Chat.
  */
 export function KomiteePage({ topic, onBack }: { topic: Topic; onBack: () => void }) {
-  const { items, postItem, updateItem, deleteItem, markRead, uid, committeesOf } = useTopics();
+  const { items, postItem, updateItem, deleteItem, markRead, uid, committeesOf, unreadCount } = useTopics();
   const { role, can, banned } = useRole();
   const darfLoeschen = can("chats.delete_messages");
   const [neu, setNeu] = useState<Neu>(null);
   const [tab, setTab] = useState<"uebersicht" | "chat">("uebersicht");
+  // Wie viel im Chat neu ist – gemerkt beim Öffnen, denn "gelesen" wird die
+  // Seite sofort. Sonst sähe man auf der Übersicht nicht, dass im Chat etwas wartet.
+  const [chatNeu, setChatNeu] = useState(() => unreadCount(topic.id));
 
   const alle = useMemo(
     () => items.filter((i) => i.topic_id === topic.id).sort((a, b) => (a.created_at < b.created_at ? -1 : 1)),
@@ -29,6 +32,15 @@ export function KomiteePage({ topic, onBack }: { topic: Topic; onBack: () => voi
   const umfragen = alle.filter((i) => i.type === "umfrage");
   const todos = alle.filter((i) => i.type === "todo");
   const chat = alle.filter((i) => i.type === "nachricht" && !i.pinned);
+
+  // Kommt eine fremde Nachricht, während man auf der Übersicht ist: mitzählen.
+  const bisher = useRef(0);
+  useEffect(() => {
+    const fremde = chat.filter((i) => i.created_by !== uid).length;
+    if (bisher.current && fremde > bisher.current && tab === "uebersicht") setChatNeu((n) => n + (fremde - bisher.current));
+    bisher.current = fremde;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chat.length]);
 
   useEffect(() => {
     markRead(topic.id);
@@ -51,10 +63,18 @@ export function KomiteePage({ topic, onBack }: { topic: Topic; onBack: () => voi
             Übersicht
           </button>
           <button
-            onClick={() => setTab("chat")}
-            className={`rounded-lg px-2.5 py-1 text-xs font-bold ${tab === "chat" ? "bg-white text-brand shadow-card dark:bg-slate-900" : "text-tinte-matt"}`}
+            onClick={() => {
+              setTab("chat");
+              setChatNeu(0);
+            }}
+            className={`flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-bold ${tab === "chat" ? "bg-white text-brand shadow-card dark:bg-slate-900" : "text-tinte-matt"}`}
           >
             Chat
+            {chatNeu > 0 && tab !== "chat" && (
+              <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+                {chatNeu > 9 ? "9+" : chatNeu}
+              </span>
+            )}
           </button>
         </div>
       </div>

@@ -2,7 +2,9 @@ import {
   createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode,
 } from "react";
 import { hasSupabase, supabase } from "./lib/supabase";
-import type { Aktion, NeueAnfrage, NeuerTermin, Termin, TerminAnfrage } from "./lib/termine";
+import { kurzDatum, uhr, type Aktion, type NeueAnfrage, type NeuerTermin, type Termin, type TerminAnfrage } from "./lib/termine";
+import { pushAnTeam, pushToUsers, pushZuTermin } from "./lib/push";
+import { committeeIcon, committeeLabel } from "./lib/committees";
 
 const LS = "sv-beitraege:termine";
 const LOCAL_UID = "local-user";
@@ -30,6 +32,10 @@ interface TermineValue {
   bewerben: (terminId: string, an: boolean) => Promise<void>;
   /** Person der Schicht zuteilen oder wieder herausnehmen. */
   zuteilen: (terminId: string, studentId: string, an: boolean) => Promise<void>;
+  /** Stufenteam: eine Meldung zur Schicht wieder herausnehmen. */
+  bewerbungEntfernen: (terminId: string, userId: string) => Promise<void>;
+  /** Stufenteam: viele Termine auf einmal löschen (z. B. eine ganze Reihe). */
+  loeschenViele: (ids: string[]) => Promise<void>;
   /** Wer bin ich? Fuer "habe ich mich schon eingetragen". */
   meineUid: string | null;
 
@@ -50,6 +56,19 @@ interface TermineValue {
     antwort?: string,
   ) => Promise<string | null>;
   anfrageLoeschen: (id: string) => Promise<void>;
+
+  // -------------------------------------------------- Neu für mich
+  /** Termine, die seit dem letzten Blick in den Kalender dazugekommen sind –
+   *  und Schichten, in die man neu eingeteilt wurde. */
+  neueTermine: Set<string>;
+  /** Alles bisher Neue als gesehen merken (beim Öffnen des Kalenders). */
+  termineGesehen: () => void;
+}
+
+/** "Mo, 12.10.26 · 14:00–15:00 · Raum 204" – für die Benachrichtigung. */
+function terminZeile(t: NeuerTermin): string {
+  const zeit = t.von ? `${t.von.slice(0, 5)}${t.bis ? `–${t.bis.slice(0, 5)}` : ""}` : "ganztägig";
+  return [kurzDatum(t.datum), zeit, t.ort.trim()].filter(Boolean).join(" · ");
 }
 
 const Ctx = createContext<TermineValue | null>(null);
@@ -67,6 +86,10 @@ export function TermineProvider({ children }: { children: ReactNode }) {
   const [bewerbungen, setBewerbungen] = useState<Record<string, string[]>>({});
   const [vorsitz, setVorsitz] = useState<Record<string, string[]>>({});
   const [anfragen, setAnfragen] = useState<TerminAnfrage[]>([]);
+  // Für Rückrufe, die den aktuellen Stand brauchen, ohne neu gebaut zu werden
+  const termineRef = useRef<Termin[]>([]);
+  const vorsitzRef = useRef<Record<string, string[]>>({});
+  const anfragenRef = useRef<TerminAnfrage[]>([]);
   const [meineKomitees, setMeineKomitees] = useState<string[]>([]);
   const [meineStudentIds, setMeineStudentIds] = useState<string[]>([]);
   const [ready, setReady] = useState(!hasSupabase);
@@ -271,6 +294,7 @@ export function TermineProvider({ children }: { children: ReactNode }) {
       if (error) return error.message;
       await zuordnungSchreiben(data.id, t);
       await laden();
+      void pushZuTermin(data.id, undefined, terminZeile(t));
       return null;
     },
     [laden, lokalSpeichern, zuordnungSchreiben],
@@ -359,11 +383,35 @@ export function TermineProvider({ children }: { children: ReactNode }) {
         for (const t of liste) await anlegen(t);
         return null;
       }
-      const { error } = await supabase!
+      const { data, error } = await supabase!
         .from("termine")
-        .insert(liste.map((t) => ({ ...felder(t), created_by: uidRef.current })));
+        .insert(liste.map((t) => ({ ...felder(t), created_by: uidRef.current })))
+        .select("id");
       if (error) return error.message;
+      const ids = (data || []).map((r: { id: string }) => r.id);
+      // Wer sieht die Reihe? Ohne diese Zeilen stand eine Reihe "nur fürs
+      // Komitee" für niemanden im Kalender – die Zuordnung fehlte.
+      const erster = liste[0];
+      if (erster.sichtbar === "komitee" && erster.tags.length)
+        await supabase!
+          .from("termin_komitees")
+          .insert(ids.flatMap((id) => erster.tags.map((tag) => ({ termin_id: id, tag }))));
+      if (erster.sichtbar === "personen" && erster.personen.length)
+        await supabase!
+          .from("termin_personen")
+          .insert(ids.flatMap((id) => erster.personen.map((student_id) => ({ termin_id: id, student_id }))));
       await laden();
+      // EINE Meldung für die ganze Reihe, nicht zwölf.
+      if (ids.length) {
+        const letzter = liste[liste.length - 1];
+        const schicht = Boolean(erster.aktion_id);
+        const text = schicht
+          ? `${ids.length} ${ids.length === 1 ? "Schicht" : "Schichten"} von ${kurzDatum(erster.datum)} bis ${kurzDatum(letzter.datum)} – jetzt eintragen!`
+          : ids.length === 1
+            ? terminZeile(erster)
+            : `${ids.length} Termine von ${kurzDatum(erster.datum)} bis ${kurzDatum(letzter.datum)}`;
+        void pushZuTermin(ids[0], undefined, text);
+      }
       return null;
     },
     [anlegen, laden],
@@ -418,6 +466,54 @@ export function TermineProvider({ children }: { children: ReactNode }) {
       if (error) {
         void laden();
         alert("Die Zuteilung hat nicht geklappt: " + error.message);
+        return;
+      }
+      // Die Person bekommt Bescheid – mit dem Termin als Betreff:
+      // "🧇 Waffelverkauf 1. große Pause · Das Stufenteam hat dich für Mo, 12.10.26 eingeteilt."
+      const t = termineRef.current.find((x) => x.id === terminId);
+      const { data: p } = await supabase!.from("profiles").select("user_id").eq("student_id", studentId);
+      const empfaenger = (p || []).map((x: { user_id: string }) => x.user_id);
+      if (t && empfaenger.length) {
+        const wann = `${kurzDatum(t.datum)}${t.von ? ` (${uhr(t.von)}${t.bis ? `–${uhr(t.bis)}` : ""})` : ""}`;
+        void pushToUsers(
+          empfaenger,
+          `${t.icon ? t.icon + " " : ""}${t.titel}`,
+          an
+            ? `Das Stufenteam hat dich für ${wann} eingeteilt.`
+            : `Das Stufenteam hat dich für ${wann} wieder ausgetragen.`,
+          "./#events",
+        );
+      }
+    },
+    [laden],
+  );
+
+  const bewerbungEntfernen = useCallback<TermineValue["bewerbungEntfernen"]>(
+    async (terminId, userId) => {
+      if (!hasSupabase) return;
+      setBewerbungen((prev) => ({ ...prev, [terminId]: (prev[terminId] || []).filter((u) => u !== userId) }));
+      const { error } = await supabase!
+        .from("aktion_bewerbungen")
+        .delete()
+        .eq("termin_id", terminId)
+        .eq("user_id", userId);
+      if (error) {
+        void laden();
+        alert("Das hat nicht geklappt: " + error.message);
+      }
+    },
+    [laden],
+  );
+
+  const loeschenViele = useCallback<TermineValue["loeschenViele"]>(
+    async (ids) => {
+      if (!hasSupabase || !ids.length) return;
+      const weg = new Set(ids);
+      setTermine((prev) => prev.filter((t) => !weg.has(t.id)));
+      const { error } = await supabase!.from("termine").delete().in("id", ids);
+      if (error) {
+        void laden();
+        alert("Löschen hat nicht geklappt: " + error.message);
       }
     },
     [laden],
@@ -433,6 +529,7 @@ export function TermineProvider({ children }: { children: ReactNode }) {
       const weg = await supabase!.from("komitee_vorsitz").delete().eq("tag", tag);
       if (weg.error) return weg.error.message;
       if (zwei.length) {
+        const vorher = vorsitzRef.current[tag] || [];
         const { error } = await supabase!
           .from("komitee_vorsitz")
           .insert(zwei.map((user_id) => ({ tag, user_id, gesetzt_von: uidRef.current })));
@@ -440,6 +537,14 @@ export function TermineProvider({ children }: { children: ReactNode }) {
           await laden();
           return error.message;
         }
+        const neu = zwei.filter((u) => !vorher.includes(u));
+        if (neu.length)
+          void pushToUsers(
+            neu,
+            `${committeeIcon(tag)} Vorsitz ${committeeLabel(tag)}`,
+            "Du hast jetzt den Vorsitz. Termine kannst du im Reiter Events anfragen.",
+            "./#events",
+          );
       }
       await laden();
       return null;
@@ -464,6 +569,10 @@ export function TermineProvider({ children }: { children: ReactNode }) {
       });
       if (error) return error.message;
       await laden();
+      void pushAnTeam(
+        `Terminanfrage ${committeeIcon(a.tag)} ${committeeLabel(a.tag)}`,
+        `${a.titel.trim()} · ${kurzDatum(a.datum)}${a.von ? ` ${a.von}` : ""}`,
+      );
       return null;
     },
     [laden],
@@ -482,6 +591,18 @@ export function TermineProvider({ children }: { children: ReactNode }) {
         })
         .eq("id", id);
       if (error) return error.message;
+      const a = anfragenRef.current.find((x) => x.id === id);
+      if (a)
+        void pushToUsers(
+          [a.created_by],
+          `${a.titel} – ${status === "angenommen" ? "steht im Kalender" : "abgelehnt"}`,
+          status === "angenommen"
+            ? `Eure Terminanfrage für ${kurzDatum(a.datum)} wurde übernommen.`
+            : antwort.trim()
+              ? `Das Stufenteam: ${antwort.trim().slice(0, 90)}`
+              : `Eure Terminanfrage für ${kurzDatum(a.datum)} wurde abgelehnt.`,
+          "./#events",
+        );
       await laden();
       return null;
     },
@@ -500,6 +621,56 @@ export function TermineProvider({ children }: { children: ReactNode }) {
     },
     [laden],
   );
+
+  // ---------------------------------------------------------- Neu für mich
+  // Gemerkt wird pro Gerät und Konto: wann zuletzt in den Kalender geschaut,
+  // und in welche Schichten man schon eingeteilt war.
+  const gesehenKey = meineUid ? `sv:termine-gesehen:${meineUid}` : "";
+  const [gesehen, setGesehen] = useState<{ bis: string; zuteilungen: string[] }>({ bis: "", zuteilungen: [] });
+  useEffect(() => {
+    if (!gesehenKey) return;
+    try {
+      const roh = JSON.parse(localStorage.getItem(gesehenKey) || "null");
+      // Beim allerersten Mal ist nichts "neu" – sonst leuchtet der ganze Kalender.
+      setGesehen(roh && typeof roh.bis === "string" ? roh : { bis: new Date().toISOString(), zuteilungen: [] });
+    } catch {
+      setGesehen({ bis: new Date().toISOString(), zuteilungen: [] });
+    }
+  }, [gesehenKey]);
+
+  const neueTermine = useMemo(() => {
+    const neu = new Set<string>();
+    if (!gesehen.bis) return neu;
+    const heute = new Date().toISOString().slice(0, 10);
+    for (const t of termine) {
+      if ((t.bis_datum || t.datum) < heute) continue;
+      if (t.created_by === meineUid) continue;
+      const eingeteilt = t.personen.some((sid) => meineStudentIds.includes(sid));
+      if (t.created_at > gesehen.bis) neu.add(t.id);
+      else if (eingeteilt && t.aktion_id && !gesehen.zuteilungen.includes(t.id)) neu.add(t.id);
+    }
+    return neu;
+  }, [termine, gesehen, meineUid, meineStudentIds]);
+
+  const termineGesehen = useCallback(() => {
+    if (!gesehenKey) return;
+    const jetzt = {
+      bis: new Date().toISOString(),
+      zuteilungen: termineRef.current
+        .filter((t) => t.aktion_id && t.personen.some((sid) => meineStudentIds.includes(sid)))
+        .map((t) => t.id),
+    };
+    setGesehen(jetzt);
+    try {
+      localStorage.setItem(gesehenKey, JSON.stringify(jetzt));
+    } catch {
+      /* egal */
+    }
+  }, [gesehenKey, meineStudentIds]);
+
+  termineRef.current = termine;
+  vorsitzRef.current = vorsitz;
+  anfragenRef.current = anfragen;
 
   const meineVorsitze = useMemo(
     () =>
@@ -529,6 +700,8 @@ export function TermineProvider({ children }: { children: ReactNode }) {
         aktionLoeschen,
         bewerben,
         zuteilen,
+        bewerbungEntfernen,
+        loeschenViele,
         meineUid,
         vorsitz,
         meineVorsitze,
@@ -537,6 +710,8 @@ export function TermineProvider({ children }: { children: ReactNode }) {
         anfrageStellen,
         anfrageEntscheiden,
         anfrageLoeschen,
+        neueTermine,
+        termineGesehen,
       }}
     >
       {children}

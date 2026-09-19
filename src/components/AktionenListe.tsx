@@ -16,7 +16,7 @@ import { abHeute, tagLang, uhr, zeitText, type Aktion, type Termin } from "../li
  * die Schichten dahin gehen, wo noch wenig zusammengekommen ist.
  */
 export function AktionenListe() {
-  const { termine, aktionen, bewerbungen, bewerben, meineUid } = useTermine();
+  const { termine, aktionen, bewerbungen, bewerben, meineUid, meineStudentIds } = useTermine();
   const { isStaff, can } = useRole();
   const darfVerteilen = isStaff || can("termine.manage");
   const [schicht, setSchicht] = useState<Termin | null>(null);
@@ -49,10 +49,11 @@ export function AktionenListe() {
             <AktionKarte
               key={a.id}
               aktion={a}
-              schichten={(nachAktion.get(a.id) || []).slice(0, 4)}
+              schichten={nachAktion.get(a.id) || []}
               gesamt={(nachAktion.get(a.id) || []).length}
               bewerbungen={bewerbungen}
               meineUid={meineUid}
+              meineStudentIds={meineStudentIds}
               darfVerteilen={darfVerteilen}
               onEintragen={bewerben}
               onOeffnen={setSchicht}
@@ -73,8 +74,9 @@ export function AktionenListe() {
 }
 
 function AktionKarte({
-  aktion, schichten, gesamt, bewerbungen, meineUid, darfVerteilen, onEintragen, onOeffnen,
+  aktion, schichten, gesamt, bewerbungen, meineUid, meineStudentIds, darfVerteilen, onEintragen, onOeffnen,
 }: {
+  meineStudentIds: string[];
   aktion: Aktion;
   schichten: Termin[];
   gesamt: number;
@@ -84,6 +86,8 @@ function AktionKarte({
   onEintragen: (id: string, an: boolean) => void;
   onOeffnen: (t: Termin) => void;
 }) {
+  const [alle, setAlle] = useState(false);
+  const sichtbar = alle ? schichten : schichten.slice(0, 4);
   return (
     <div className="card p-4 sm:p-5">
       <div className="flex items-start gap-3">
@@ -92,13 +96,13 @@ function AktionKarte({
           <div className="text-[15px] font-bold leading-tight">{aktion.titel}</div>
           <div className="mt-0.5 text-[12px] text-tinte-leise">
             zählt als <span className="font-semibold text-brand">+{aktion.prozent} %</span> Mithilfe
-            {gesamt > schichten.length && ` · ${gesamt} Termine`}
+            {gesamt > 4 && ` · ${gesamt} Termine`}
           </div>
         </div>
       </div>
 
       <ul className="mt-3 grid gap-1.5">
-        {schichten.map((t) => {
+        {sichtbar.map((t) => {
           const gemeldet = bewerbungen[t.id] || [];
           const ich = Boolean(meineUid && gemeldet.includes(meineUid));
           const belegt = t.personen.length;
@@ -134,6 +138,10 @@ function AktionKarte({
                 >
                   {gemeldet.length > 0 ? `${gemeldet.length} gemeldet` : "verteilen"}
                 </button>
+              ) : t.personen.some((sid) => meineStudentIds.includes(sid)) ? (
+                <span className="shrink-0 rounded-lg bg-bezahlt-grund px-2.5 py-1.5 text-[12px] font-bold text-bezahlt dark:bg-emerald-500/20 dark:text-emerald-300">
+                  du bist eingeteilt ✓
+                </span>
               ) : (
                 <button
                   onClick={() => onEintragen(t.id, !ich)}
@@ -150,6 +158,14 @@ function AktionKarte({
           );
         })}
       </ul>
+      {schichten.length > 4 && (
+        <button
+          onClick={() => setAlle(!alle)}
+          className="mt-2 w-full rounded-lg py-1.5 text-[12px] font-bold text-brand"
+        >
+          {alle ? "weniger anzeigen" : `alle ${schichten.length} Termine anzeigen`}
+        </button>
+      )}
     </div>
   );
 }
@@ -168,7 +184,8 @@ function SchichtSheet({
   aktion: Aktion | null;
   onSchliessen: () => void;
 }) {
-  const { bewerbungen, zuteilen, bewerben } = useTermine();
+  const { bewerbungen, zuteilen, bewerben, bewerbungEntfernen, loeschen } = useTermine();
+  const [suche, setSuche] = useState("");
   const { profiles } = useRole();
   const { students, punkte, settings } = useStore();
   const { profile } = useProfiles();
@@ -264,6 +281,18 @@ function SchichtSheet({
                 >
                   {z.zugeteilt ? "eingeteilt ✓" : "einteilen"}
                 </button>
+                <button
+                  onClick={() => {
+                    if (!confirm(`${z.name} von der Meldung für diese Schicht streichen?`)) return;
+                    if (z.zugeteilt && z.sid) void zuteilen(schicht.id, z.sid, false);
+                    void bewerbungEntfernen(schicht.id, z.uid);
+                  }}
+                  className="shrink-0 rounded-lg px-1.5 py-1 text-[15px] leading-none text-tinte-leise hover:text-red-500"
+                  aria-label="Meldung streichen"
+                  title="Meldung streichen"
+                >
+                  ✕
+                </button>
               </li>
             ))}
           </ul>
@@ -271,10 +300,69 @@ function SchichtSheet({
       )}
 
       {ohneMeldung.length > 0 && (
-        <p className="mt-3 text-[11px] leading-relaxed text-tinte-leise">
-          Dazu {ohneMeldung.length} Person(en), die ohne Meldung eingeteilt wurden. Die stehen im
-          Termin selbst.
-        </p>
+        <div className="mt-3">
+          <h3 className="mb-1.5 text-[13px] font-semibold text-tinte-matt">Direkt eingeteilt</h3>
+          <ul className="grid gap-1.5">
+            {ohneMeldung.map((sid) => {
+              const st = nachId.get(sid);
+              return (
+                <li key={sid} className="flex items-center gap-2.5 rounded-xl bg-brand/10 px-2.5 py-2 dark:bg-brand/20">
+                  <span className="min-w-0 flex-1 truncate text-[13px] font-semibold">
+                    {st ? `${st.nachname}, ${st.vorname}` : "Unbekannt"}
+                  </span>
+                  <button
+                    onClick={() => void zuteilen(schicht.id, sid, false)}
+                    className="shrink-0 rounded-lg border border-red-300 px-2.5 py-1 text-[12px] font-bold text-red-500 dark:border-red-500/40"
+                  >
+                    austragen
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+
+      {/* Jemanden einteilen, der sich nicht gemeldet hat */}
+      {schicht.personen.length < plaetze && (
+        <div className="mt-3">
+          <input
+            className="field"
+            placeholder="Jemanden direkt einteilen – Name suchen …"
+            value={suche}
+            onChange={(e) => setSuche(e.target.value)}
+          />
+          {suche.trim().length >= 2 && (
+            <ul className="mt-1.5 grid max-h-44 gap-1 overflow-y-auto">
+              {students
+                .filter(
+                  (st) =>
+                    !schicht.personen.includes(st.id) &&
+                    `${st.vorname} ${st.nachname}`.toLowerCase().includes(suche.trim().toLowerCase()),
+                )
+                .slice(0, 8)
+                .map((st) => (
+                  <li key={st.id}>
+                    <button
+                      onClick={() => {
+                        void zuteilen(schicht.id, st.id, true);
+                        setSuche("");
+                      }}
+                      className="flex w-full items-center gap-2 rounded-lg bg-papier-matt px-2.5 py-2 text-left text-[13px] font-semibold dark:bg-slate-800"
+                    >
+                      <span className="min-w-0 flex-1 truncate">
+                        {st.nachname}, {st.vorname}
+                      </span>
+                      <span className="zahl shrink-0 text-[11px] text-tinte-leise">
+                        {prozentVon(punkte[st.id] || 0, settings)} %
+                      </span>
+                      <span className="shrink-0 text-brand">+ einteilen</span>
+                    </button>
+                  </li>
+                ))}
+            </ul>
+          )}
+        </div>
       )}
 
       <p className="mt-3 text-[11px] leading-relaxed text-tinte-leise">
@@ -285,13 +373,25 @@ function SchichtSheet({
         Fertig
       </button>
 
-      {/* Damit bewerben nicht als ungenutzt gilt – das Team kann sich selbst melden */}
-      <button
-        onClick={() => bewerben(schicht.id, true)}
-        className="mt-2 w-full text-center text-[12px] font-semibold text-tinte-leise"
-      >
-        Mich selbst dazu melden
-      </button>
+      <div className="mt-2 flex items-center justify-between gap-2">
+        <button
+          onClick={() => bewerben(schicht.id, true)}
+          className="text-[12px] font-semibold text-tinte-leise"
+        >
+          Mich selbst dazu melden
+        </button>
+        <button
+          onClick={() => {
+            if (confirm(`Diese Schicht am ${tagLang(schicht.datum)} ganz löschen? Eingeteilte verlieren sie aus dem Kalender.`)) {
+              void loeschen(schicht.id);
+              onSchliessen();
+            }
+          }}
+          className="text-[12px] font-bold text-red-500"
+        >
+          Schicht löschen
+        </button>
+      </div>
     </Sheet>
   );
 }

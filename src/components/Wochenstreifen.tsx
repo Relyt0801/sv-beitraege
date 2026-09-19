@@ -14,8 +14,20 @@ import { Icon } from "./Icon";
  * angetippte Tag ausgeschrieben. Gedacht für den Blick zwischendurch:
  * "wann ist was und wo" – ohne den großen Kalender zu öffnen.
  */
-export function Wochenstreifen({ onKalender }: { onKalender: (tag: string) => void }) {
-  const { termine, meineKomitees, meineStudentIds, ready } = useTermine();
+export function Wochenstreifen({
+  onKalender,
+  onOeffnen,
+}: {
+  onKalender: (tag: string) => void;
+  /** Termin antippen: ansehen – und fürs Team ändern oder löschen */
+  onOeffnen?: (t: Termin) => void;
+}) {
+  const { termine, meineKomitees, meineStudentIds, ready, neueTermine } = useTermine();
+  // Das früheste Neue – dorthin springt der Hinweis
+  const erstesNeues = useMemo(
+    () => termine.filter((t) => neueTermine.has(t.id)).sort((a, b) => a.datum.localeCompare(b.datum))[0] || null,
+    [termine, neueTermine],
+  );
   const heute = heuteKey();
   const [woStart, setWoStart] = useState(() => montagVon(heute));
   const [gewaehlt, setGewaehlt] = useState(heute);
@@ -76,8 +88,29 @@ export function Wochenstreifen({ onKalender }: { onKalender: (tag: string) => vo
         >
           <Icon name="kalender" size={15} />
           Kalender
+          {neueTermine.size > 0 && (
+            <span className="flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+              {neueTermine.size > 9 ? "9+" : neueTermine.size}
+            </span>
+          )}
         </button>
       </div>
+
+      {/* Neu dazugekommen? Dann ein Tipp direkt dorthin. */}
+      {erstesNeues && (
+        <button
+          onClick={() => onKalender(erstesNeues.datum)}
+          className="mb-2.5 flex w-full items-center gap-2 rounded-xl bg-red-50 px-3 py-2 text-left text-[12px] font-semibold text-red-700 transition active:scale-[0.99] dark:bg-red-500/10 dark:text-red-300"
+        >
+          <span className="h-2 w-2 shrink-0 rounded-full bg-red-500" />
+          <span className="min-w-0 flex-1 truncate">
+            {neueTermine.size === 1
+              ? `Neu: ${erstesNeues.icon ? erstesNeues.icon + " " : ""}${erstesNeues.titel} · ${tagLang(erstesNeues.datum)}`
+              : `${neueTermine.size} neue Termine – ab ${tagLang(erstesNeues.datum)}`}
+          </span>
+          <span className="shrink-0">ansehen ›</span>
+        </button>
+      )}
 
       {/* ------------------------------------------------ sieben Tage */}
       <div className="grid grid-cols-7 gap-1">
@@ -111,7 +144,7 @@ export function Wochenstreifen({ onKalender }: { onKalender: (tag: string) => vo
                   <span
                     key={t.id}
                     className={`h-1.5 w-1.5 rounded-full ${
-                      aktiv ? "bg-white/80" : meins(t) ? "bg-brand" : "bg-tinte-leise/50"
+                      neueTermine.has(t.id) ? "bg-red-500" : aktiv ? "bg-white/80" : meins(t) ? "bg-brand" : "bg-tinte-leise/50"
                     }`}
                   />
                 ))}
@@ -148,7 +181,7 @@ export function Wochenstreifen({ onKalender }: { onKalender: (tag: string) => vo
         ) : (
           <ul className="grid gap-1.5">
             {desTages.map((t) => (
-              <TerminZeile key={t.id} t={t} meins={meins(t)} />
+              <TerminZeile key={t.id} t={t} meins={meins(t)} onClick={onOeffnen ? () => onOeffnen(t) : undefined} />
             ))}
           </ul>
         )}

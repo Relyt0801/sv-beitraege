@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState, ty
 import { hasSupabase, supabase } from "./lib/supabase";
 import { pushToUsers } from "./lib/push";
 import { lesbarerName } from "./lib/profil";
+import { committeeIcon, committeeLabel } from "./lib/committees";
 
 export type TopicItemType = "nachricht" | "todo" | "umfrage";
 
@@ -308,7 +309,7 @@ export function TopicsProvider({ children }: { children: ReactNode }) {
     if (nt.komiteeSlugs.length) {
       const s = stateRef.current;
       const recip = [...new Set(nt.komiteeSlugs.flatMap((slug) => s.tagMembers[slug] || []))].filter((u) => u !== uidRef.current);
-      if (recip.length) void pushToUsers(recip, "Neuer Ordner für dich", `„${topic.title}" wurde für dein Komitee freigegeben.`);
+      if (recip.length) void pushToUsers(recip, "Neuer Ordner für dich", `„${topic.title}" wurde für dein Komitee freigegeben.`, "./#chats");
     }
     await loadAll();
     return id;
@@ -334,7 +335,7 @@ export function TopicsProvider({ children }: { children: ReactNode }) {
       if (userIds.length)
         await supabase!.from("topic_members").insert(userIds.map((user_id) => ({ topic_id: topicId, user_id })));
       if (added.length)
-        void pushToUsers(added, "Neues Thema für dich", `Du wurdest zu „${topicTitle}" hinzugefügt.`);
+        void pushToUsers(added, "Neues Thema für dich", `Du wurdest zu „${topicTitle}" hinzugefügt.`, "./#chats");
     }
   }, []);
 
@@ -347,7 +348,7 @@ export function TopicsProvider({ children }: { children: ReactNode }) {
       if (userIds.length)
         await supabase!.from("tag_members").insert(userIds.map((user_id) => ({ tag, user_id })));
       if (added.length)
-        void pushToUsers(added, `Komitee #${tag}`, "Du wurdest zum Komitee hinzugefügt – schau in die Übersicht!");
+        void pushToUsers(added, `${committeeIcon(tag)} Komitee ${committeeLabel(tag)}`, "Du bist jetzt dabei – schau in die Übersicht!", "./#chats");
     }
   }, []);
 
@@ -360,7 +361,7 @@ export function TopicsProvider({ children }: { children: ReactNode }) {
     if (hasSupabase) {
       if (on) {
         await supabase!.from("tag_members").upsert({ tag: slug, user_id: userId });
-        void pushToUsers([userId], `Komitee`, "Du wurdest einem Komitee hinzugefügt – schau in die Übersicht!");
+        void pushToUsers([userId], `${committeeIcon(slug)} Komitee ${committeeLabel(slug)}`, "Das Stufenteam hat dich hinzugefügt – schau in die Übersicht!", "./#chats");
       } else {
         await supabase!.from("tag_members").delete().eq("tag", slug).eq("user_id", userId);
       }
@@ -434,7 +435,7 @@ export function TopicsProvider({ children }: { children: ReactNode }) {
         );
         recipients = recipients.filter((u) => !aus.has(u));
       }
-      await pushToUsers(recipients, `Neues in „${topic.title}"`, (item.title ? item.title + ": " : "") + body.slice(0, 100));
+      await pushToUsers(recipients, `Neues in „${topic.title}"`, (item.title ? item.title + ": " : "") + body.slice(0, 100), "./#chats");
     })();
   }, []);
 

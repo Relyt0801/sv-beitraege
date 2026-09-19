@@ -139,6 +139,11 @@ export function ElternTeamTab() {
         <div className="flex items-center gap-2">
           <h2 className="min-w-0 flex-1 text-lg font-bold">
             Gespräche mit Eltern{offeneTickets.length > 0 && ` (${offeneTickets.length} offen)`}
+            {tickets.filter(neu).length > 0 && (
+              <span className="ml-2 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 align-middle text-[11px] font-bold text-white">
+                {tickets.filter(neu).length} neu
+              </span>
+            )}
           </h2>
           <button
             onClick={() => setSchreibOffen((v) => !v)}
