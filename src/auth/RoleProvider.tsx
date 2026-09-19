@@ -154,7 +154,7 @@ export function RoleProvider({ children }: { children: ReactNode }) {
       }
       const { data: me } = await supabase!
         .from("profiles")
-        .select("role, student_id, chat_banned_until, chat_ban_permanent, is_op, tour_reset_at")
+        .select("role, student_id, chat_banned_until, chat_ban_permanent, is_op, tour_reset_at, has_logged_in")
         .eq("user_id", uid)
         .maybeSingle();
       const r = (me?.role as Role) || "schueler";
@@ -167,7 +167,12 @@ export function RoleProvider({ children }: { children: ReactNode }) {
       setTourResetAt(((me as { tour_reset_at?: string | null } | null)?.tour_reset_at) ?? null);
       await loadPerms(r, uid);
       setReady(true);
-      void supabase!.from("profiles").update({ has_logged_in: true }).eq("user_id", uid);
+      // Nur einmal setzen – jede Änderung an profiles löst bei allen im Team
+      // ein Nachladen aus. Und: .then() ist nötig, sonst geht die Abfrage nie raus.
+      if (!(me as { has_logged_in?: boolean } | null)?.has_logged_in)
+        supabase!.from("profiles").update({ has_logged_in: true }).eq("user_id", uid).then(({ error }) => {
+          if (error) console.warn("[speichern]", error.message);
+        });
       void loadProfiles(STAFF.includes(r));
       subscribe();
     };

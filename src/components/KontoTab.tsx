@@ -124,32 +124,39 @@ function Zeile({
   onKopieren?: () => void;
   kopiert?: boolean;
 }) {
+  // Alle Zeilen gleich gebaut: kleine Beschriftung oben, Wert darunter,
+  // Kopieren rechts. Die IBAN bekommt dieselbe Schrift wie der Rest (keine
+  // Schreibmaschinenschrift), steht aber immer in EINER Zeile.
   const knopf = onKopieren && (
     <button
       onClick={onKopieren}
-      className="shrink-0 rounded-lg bg-white px-2.5 py-1.5 text-[12px] font-bold text-brand transition active:scale-95 dark:bg-slate-900"
+      className={`shrink-0 rounded-lg px-3 py-2 text-[12px] font-bold transition active:scale-95 ${
+        kopiert ? "bg-emerald-500 text-white" : "bg-white text-brand shadow-sm dark:bg-slate-900 dark:text-brand-soft"
+      }`}
     >
-      {kopiert ? "kopiert ✓" : "kopieren"}
+      {kopiert ? "✓ kopiert" : "kopieren"}
     </button>
   );
-  // Die IBAN bekommt die ganze Breite: Beschriftung darüber, Nummer in EINER
-  // Zeile. Vorher stand sie neben der Beschriftung und brach mitten im Block um.
+  // Lange Werte (IBAN, Verwendungszweck): Knopf in die Kopfzeile, damit der
+  // Wert die volle Breite hat und nie umbricht.
   if (gross)
     return (
-      <div className="rounded-xl bg-papier-matt px-3 py-2.5 dark:bg-slate-800">
-        <div className="flex items-center gap-2">
-          <dt className="min-w-0 flex-1 text-[12px] font-semibold text-tinte-leise">{label}</dt>
+      <div className="rounded-xl bg-papier-matt px-3.5 py-2.5 dark:bg-slate-800">
+        <div className="flex items-center gap-3">
+          <dt className="min-w-0 flex-1 text-[11px] font-semibold uppercase tracking-wide text-tinte-leise">{label}</dt>
           {knopf}
         </div>
-        <dd className="mt-1 whitespace-nowrap font-mono text-[clamp(12px,3.9vw,17px)] font-bold tracking-tight">
+        <dd className="mt-1 whitespace-nowrap text-[clamp(14px,4.3vw,18px)] font-semibold tabular-nums tracking-[0.03em] text-tinte dark:text-slate-100">
           {wert}
         </dd>
       </div>
     );
   return (
-    <div className="flex items-center gap-2 rounded-xl bg-papier-matt px-3 py-2.5 dark:bg-slate-800">
-      <dt className="w-20 shrink-0 text-[12px] font-semibold text-tinte-leise">{label}</dt>
-      <dd className="min-w-0 flex-1 break-words text-[14px] font-semibold">{wert}</dd>
+    <div className="flex items-center gap-3 rounded-xl bg-papier-matt px-3.5 py-2.5 dark:bg-slate-800">
+      <div className="min-w-0 flex-1">
+        <dt className="text-[11px] font-semibold uppercase tracking-wide text-tinte-leise">{label}</dt>
+        <dd className="mt-0.5 break-words text-[15px] font-semibold text-tinte dark:text-slate-100">{wert}</dd>
+      </div>
       {knopf}
     </div>
   );

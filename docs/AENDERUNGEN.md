@@ -174,3 +174,27 @@ im Repo, damit ein Neuaufbau funktioniert:
 - Supabase-Dashboard: „Allow new users to sign up“ ausschalten.
 - Jeder angemeldete Nutzer kann über `send-push` an jeden senden – ggf. auf
   Team bzw. gemeinsame Chats einschränken.
+
+---
+
+## 9. Nachtrag: Lesebestätigung, Chat-Leiste, Eltern in Komitees
+
+- **Gelesen-Stand wurde nie gespeichert.** Fünf Stellen schrieben mit
+  `void supabase.from(...).update(...)`. Supabase-Abfragen laufen aber erst los,
+  wenn jemand `.then()`/`await` aufruft – `void` allein schickte nie etwas ab.
+  Folge: `topic_reads`, `event_reads`, `gelesen_team/_eltern` und
+  `has_logged_in` waren für alle leer, nach jedem Neuladen stand wieder
+  „5 neue Nachrichten“ da. Jetzt mit `.then()` (Dateien: `topics-store.tsx`,
+  `events-store.tsx`, `eltern-store.tsx`, `auth/RoleProvider.tsx`).
+  **Regel für neuen Code: nie `void supabase…` ohne `.then()`.**
+- `has_logged_in` wird nur noch einmal gesetzt (jede Änderung an `profiles`
+  lässt sonst das ganze Team neu laden).
+- **Chat-Eingabe am Rechner:** Die Leiste saß 3,6 rem über dem Rand (Platz für
+  die Handy-Navigation, die am Rechner fehlt); darunter liefen Nachrichten
+  durch. Jetzt ab `lg` ganz unten (`KomiteePage.tsx`, `ChatBlasen.tsx`).
+- **Eltern in Komitees** (`supabase/eltern-ohne-komitee.sql`, eingespielt):
+  Ein Elternzugang stand in „abizeitung“ und bekam Komitee-Nachrichten.
+  Aufgeräumt; Trigger verhindert das künftig; wird ein Konto zu „eltern“, fliegt
+  es aus allen Komitees; `can_access_topic()` sperrt Chats für Eltern zusätzlich.
+- **Kontodaten:** einheitliche Zeilen (Beschriftung oben, Wert darunter),
+  IBAN in normaler Schrift statt Schreibmaschinenschrift.

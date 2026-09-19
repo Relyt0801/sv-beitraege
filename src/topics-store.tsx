@@ -507,7 +507,7 @@ export function TopicsProvider({ children }: { children: ReactNode }) {
     const now = new Date().toISOString();
     setReads((p) => ({ ...p, [topicId]: now }));
     if (hasSupabase)
-      void supabase!.from("topic_reads").upsert({ topic_id: topicId, user_id: uidRef.current, last_read: now });
+      supabase!.from("topic_reads").upsert({ topic_id: topicId, user_id: uidRef.current, last_read: now }).then(({ error }) => { if (error) console.warn("[speichern]", error.message); }); // then() nötig, sonst wird nie gesendet
   }, []);
 
   const unreadCount: TopicsValue["unreadCount"] = useCallback(

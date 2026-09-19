@@ -141,7 +141,7 @@ export function KomiteePage({ topic, onBack }: { topic: Topic; onBack: () => voi
       )}
 
       {tab === "uebersicht" && !banned && (
-        <div className="fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+3.6rem)] z-30 border-t border-papier-linie bg-papier-matt/95 px-3 py-2 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95 sm:px-5">
+        <div className="fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+3.6rem)] lg:bottom-0 lg:pb-[calc(env(safe-area-inset-bottom)+0.75rem)] z-30 border-t border-papier-linie bg-papier-matt/95 px-3 py-2 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95 sm:px-5">
           <div className="mx-auto grid max-w-5xl grid-cols-3 gap-2">
             <NeuKnopf icon="📌" label="Anpinnen" onClick={() => setNeu("pin")} />
             <NeuKnopf icon="🗳️" label="Abstimmung" onClick={() => setNeu("umfrage")} />
@@ -355,7 +355,7 @@ function ChatBereich({
       </div>
 
       {!banned && (
-        <div className="fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+3.6rem)] z-30 flex items-end gap-2 border-t border-papier-linie bg-papier-matt/95 px-3 py-2 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95 sm:px-5">
+        <div className="fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+3.6rem)] lg:bottom-0 lg:pb-[calc(env(safe-area-inset-bottom)+0.75rem)] z-30 flex items-end gap-2 border-t border-papier-linie bg-papier-matt/95 px-3 py-2 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95 sm:px-5">
           <textarea
             rows={1}
             className="field max-h-28 flex-1 resize-none py-2.5"

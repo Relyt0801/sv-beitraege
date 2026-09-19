@@ -236,7 +236,7 @@ export function ElternProvider({ children }: { children: ReactNode }) {
       alert("Die Nachricht ging nicht raus: " + error.message);
       return;
     }
-    void supabase!.from("eltern_tickets").update({ updated_at: new Date().toISOString() }).eq("id", ticketId);
+    supabase!.from("eltern_tickets").update({ updated_at: new Date().toISOString() }).eq("id", ticketId).then(({ error }) => { if (error) console.warn("[speichern]", error.message); }); // then() nötig, sonst wird nie gesendet
 
     // Die Gegenseite benachrichtigen.
     const t = tickets.find((x) => x.id === ticketId);
@@ -280,7 +280,7 @@ export function ElternProvider({ children }: { children: ReactNode }) {
     const jetzt = new Date().toISOString();
     const feld = istTeam.current ? "gelesen_team" : "gelesen_eltern";
     setTickets((prev) => prev.map((t) => (t.id === ticketId ? { ...t, [feld]: jetzt } : t)));
-    void supabase!.from("eltern_tickets").update({ [feld]: jetzt }).eq("id", ticketId);
+    supabase!.from("eltern_tickets").update({ [feld]: jetzt }).eq("id", ticketId).then(({ error }) => { if (error) console.warn("[speichern]", error.message); }); // then() nötig, sonst wird nie gesendet
   }, []);
 
   const ticketSchliessen = useCallback<ElternCtx["ticketSchliessen"]>(async (ticketId, erledigt) => {

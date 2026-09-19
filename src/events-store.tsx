@@ -299,7 +299,7 @@ export function EventsProvider({ children }: { children: ReactNode }) {
         if (!hasSupabase) saveLocal(events, myVotes, next);
         return next;
       });
-      if (hasSupabase) void supabase!.from("event_reads").upsert({ event_id: eventId, user_id: uidRef.current });
+      if (hasSupabase) supabase!.from("event_reads").upsert({ event_id: eventId, user_id: uidRef.current }).then(({ error }) => { if (error) console.warn("[speichern]", error.message); }); // then() nötig, sonst wird nie gesendet
     },
     [events, myVotes, reads, saveLocal],
   );
