@@ -17,6 +17,30 @@
   </head>
   <body>
     <div id="root"></div>
+    <!--
+      Notausgang gegen die weiße Seite: Ist nach 8 Sekunden noch nichts zu sehen
+      (meist hängt ein alter Zwischenspeicher nach einem Update), erscheint ein
+      Knopf, der den Speicher der App leert und neu lädt. Anmeldung und Daten
+      bleiben dabei erhalten – es werden nur die Programmdateien neu geholt.
+    -->
+    <script>
+      setTimeout(function () {
+        var root = document.getElementById("root");
+        if (!root || root.children.length) return;
+        root.innerHTML =
+          '<div style="font-family:system-ui,sans-serif;max-width:22rem;margin:18vh auto;padding:1.5rem;text-align:center">' +
+          '<div style="font-size:2rem">🔄</div>' +
+          '<p style="font-weight:700;margin:.5rem 0">Die App lädt nicht richtig.</p>' +
+          '<p style="font-size:.9rem;color:#666;margin:0 0 1rem">Meist hängt noch eine alte Version im Speicher. Ein Tipp behebt das.</p>' +
+          '<button id="sv-rettung" style="background:#4f46e5;color:#fff;border:0;border-radius:.75rem;padding:.8rem 1.2rem;font-weight:700;font-size:1rem">Neu laden</button></div>';
+        document.getElementById("sv-rettung").onclick = function () {
+          var fertig = function () { location.reload(); };
+          var sw = navigator.serviceWorker ? navigator.serviceWorker.getRegistrations().then(function (r) { return Promise.all(r.map(function (x) { return x.unregister(); })); }) : Promise.resolve();
+          var cs = window.caches ? caches.keys().then(function (k) { return Promise.all(k.map(function (x) { return caches.delete(x); })); }) : Promise.resolve();
+          Promise.all([sw, cs]).then(fertig, fertig);
+        };
+      }, 8000);
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
