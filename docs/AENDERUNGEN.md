@@ -281,7 +281,7 @@ im Repo, damit ein Neuaufbau funktioniert:
   Nachricht). Schüler finden es unter „Frag das Stufenteam“.
 - **Events nie für Eltern**, auch nicht über die API (`can_see_event`).
   Knopf im Event-Fenster heißt „Alle Schüler“.
-- **Neues Recht „Beitragshilfen eintragen“** (`hilfen.edit`) im Rechte-Reiter
+- **Neues Recht „Beteiligungen eintragen“** (`hilfen.edit`) im Rechte-Reiter
   unter Daten, getrennt von „Daten bearbeiten“. Wer data.edit hatte, hat es
   automatisch bekommen.
 - **Elternansicht**: kürzere Texte, kein Chat-Schalter im Profil.

@@ -46,7 +46,7 @@ export const PERM_CATEGORIES: PermCategory[] = [
   {
     label: "Daten", icon: "🗂️", perms: [
       { key: "data.edit", label: "Daten bearbeiten", desc: "Namen, Personen, Halbjahr, Import/Export." },
-      { key: "hilfen.edit", label: "Beitragshilfen eintragen", desc: "Mithilfe (Prozent) bei Personen eintragen – einzeln oder für mehrere auf einmal." },
+      { key: "hilfen.edit", label: "Beteiligungen eintragen", desc: "Mithilfe/Beitragshilfen (Prozent) bei Personen eintragen – einzeln oder für mehrere auf einmal." },
       { key: "beitraege.manage", label: "Beiträge-Reiter", desc: "Halbjahresbeiträge, Möglichkeiten zum Prozentsammeln und die Abiball-Staffel festlegen." },
     ],
   },
