@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { hasSupabase, supabase } from "../lib/supabase";
 import { useRole } from "../auth/RoleProvider";
 import { useProfiles } from "../profiles-store";
 import { Avatar } from "./Avatar";
@@ -15,8 +16,18 @@ export function KomiteeRequests() {
   const laden = () => void ladeKomiteeAntraege().then(setListe);
   useEffect(() => {
     laden();
-    const t = setInterval(laden, 30000);
-    return () => clearInterval(t);
+    // Live: entscheidet jemand anderes, verschwindet der Antrag sofort
+    const kanal = hasSupabase
+      ? supabase!
+          .channel("sv-komitee-antraege")
+          .on("postgres_changes", { event: "*", schema: "public", table: "komitee_requests" }, () => laden())
+          .subscribe()
+      : null;
+    const t = setInterval(laden, 60000); // Rückfall, falls die Verbindung hängt
+    return () => {
+      clearInterval(t);
+      if (kanal) void supabase!.removeChannel(kanal);
+    };
   }, []);
 
   if (!can("komitees.assign") || liste.length === 0) return null;

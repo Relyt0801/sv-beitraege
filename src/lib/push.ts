@@ -83,6 +83,22 @@ export async function pushAnTeam(title: string, body: string, url = "./#events")
   }
 }
 
+/**
+ * Meldung an Schüler UND ihre Eltern, z. B. "Q1.1 bezahlt" oder "Mithilfe
+ * eingetragen". Je Person eigener Text; der Server sucht Konten und Eltern.
+ */
+export async function pushAnPersonen(
+  liste: { student_id: string; title: string; body: string }[],
+  url = "./#kasse",
+): Promise<void> {
+  if (!hasSupabase || !liste.length) return;
+  try {
+    await supabase!.functions.invoke("send-push", { body: { an_personen: liste, url } });
+  } catch {
+    /* Benachrichtigung ist optional */
+  }
+}
+
 /** Push zu einem Termin an alle, die ihn sehen dürfen. */
 export async function pushZuTermin(termin_id: string, title?: string, body?: string): Promise<void> {
   if (!hasSupabase) return;

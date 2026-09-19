@@ -97,13 +97,13 @@ export function MyKasse({
           <Legende farbe="bg-bezahlt" text="bezahlt" />
           <Legende farbe="bg-amber-400" text="noch offen" />
           <Legende farbe="bg-erlassen" text="erlassen" />
-          <Legende farbe="bg-papier-linie" text="noch nicht dabei" />
+          <Legende farbe="bg-papier-linie dark:bg-slate-600" text="noch nicht dabei" />
         </div>
       </section>
 
       {/* ------------------------------------------ Prozentstand */}
       <section className="card p-4 sm:p-5" data-tour="meine-punkte">
-        <h2 className="text-[13px] font-semibold text-tinte-matt">Wobei du geholfen hast</h2>
+        <h2 className="text-[13px] font-semibold text-tinte-matt">Mithelfen beim Abiball</h2>
 
         <div className="mt-3 flex items-center gap-4">
           <Ring pct={pct} />
@@ -111,7 +111,7 @@ export function MyKasse({
             <div className="text-[13px] font-semibold leading-snug">
               {pct >= 100
                 ? "Geschafft. Auf dein erstes Abiballticket kommt nichts mehr drauf."
-                : "Je mehr Prozent du sammelst, desto günstiger wird dein erstes Abiballticket."}
+                : "Mehr Prozent = günstigeres erstes Abiballticket."}
             </div>
             {next && (
               <div className="mt-1.5 text-[12px] leading-relaxed text-tinte-matt">
@@ -146,14 +146,20 @@ export function MyKasse({
       </section>
 
       {/* ------------------------------------------ Abiballticket */}
-      <TicketErklaerung settings={settings} zusatz={ticketBetrag(pct, settings)} prozent={pct} />
+      {/* Am Rechner rechts über zwei Zeilen – links stehen Prozente und Liste */}
+      <TicketErklaerung
+        settings={settings}
+        zusatz={ticketBetrag(pct, settings)}
+        prozent={pct}
+        className="lg:row-span-2"
+      />
 
       {/* ------------------------------------------ meine Beiträge */}
-      <section className="card p-4 sm:p-5 lg:col-span-2">
-        <h2 className="text-[13px] font-semibold text-tinte-matt">Das hast du bisher gemacht</h2>
+      <section className="card p-4 sm:p-5">
+        <h2 className="text-[13px] font-semibold text-tinte-matt">Wobei du geholfen hast</h2>
         <BeitragsListe
           eintraege={meine}
-          leerText="Hier steht noch nichts. Sobald du mithilfst, trägt das Stufenteam es ein."
+          leerText="Noch nichts eingetragen. Wenn du mithilfst, trägt das Stufenteam es hier ein."
         />
       </section>
     </div>

@@ -1,4 +1,6 @@
 import { hasSupabase, supabase } from "./supabase";
+import { pushAnTeam, pushToUsers } from "./push";
+import { committeeLabel } from "./committees";
 
 export interface KomiteeRequest {
   id: string;
@@ -34,6 +36,7 @@ export async function stelleKomiteeAntrag(tag: string, nachricht: string): Promi
         ? "Du hast schon einen offenen Antrag."
         : error.message,
     };
+  void pushAnTeam("Komitee-Wunsch", `Jemand möchte zu ${committeeLabel(tag)}. Tippen zum Entscheiden.`, "./#chats");
   return { ok: true };
 }
 
@@ -57,5 +60,14 @@ export async function entscheideKomitee(
       decided_at: new Date().toISOString(),
     })
     .eq("id", req.id);
-  return error ? { ok: false, error: error.message } : { ok: true };
+  if (error) return { ok: false, error: error.message };
+  void pushToUsers(
+    [req.user_id],
+    annehmen ? `Komitee-Wechsel angenommen ✓` : "Komitee-Wechsel abgelehnt",
+    annehmen
+      ? `Du bist jetzt im Komitee ${committeeLabel(req.wunsch_tag)}.`
+      : `Dein Wunsch (${committeeLabel(req.wunsch_tag)}) wurde abgelehnt. Frag beim Stufenteam nach, wenn du Fragen hast.`,
+    "./#chats",
+  );
+  return { ok: true };
 }

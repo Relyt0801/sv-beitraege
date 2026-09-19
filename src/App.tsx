@@ -307,6 +307,13 @@ function Main() {
     { key: "rechte", icon: "rechte", label: "Rechte", show: can("perms.manage") },
   ];
 
+  // Über eine Adresse wie #finanzen darf niemand in einen Reiter, der für ihn
+  // nicht vorgesehen ist – dann zurück zur Kasse.
+  const reiterErlaubt = navItems.find((n) => n.key === tab)?.show ?? true;
+  useEffect(() => {
+    if (roleReady && !reiterErlaubt) setTab("kasse");
+  }, [roleReady, reiterErlaubt]);
+
   return (
     <div className="mx-auto max-w-5xl px-3 pb-36 sm:px-5 lg:pb-12">
       <header className="sticky top-0 z-20 -mx-3 border-b border-papier-linie bg-papier/90 px-3 pb-3 pt-[calc(env(safe-area-inset-top)+0.7rem)] backdrop-blur dark:border-slate-800 dark:bg-slate-950/90 sm:-mx-5 sm:px-5">

@@ -10,19 +10,21 @@ export function TicketErklaerung({
   zusatz,
   prozent,
   fuerEltern,
+  className = "",
 }: {
   settings: Settings;
   zusatz: number;
   prozent: number;
   /** In der Elternansicht wird von "Ihr Kind" statt von "du" gesprochen. */
   fuerEltern?: boolean;
+  className?: string;
 }) {
   const grund = settings.ticket_preis || 0;
   const preisSteht = grund > 0;
   const erstes = grund + zusatz;
 
   return (
-    <section className="card p-5">
+    <section className={`card p-4 sm:p-5 ${className}`}>
       <div className="text-sm text-tinte-matt">Abiballticket</div>
 
       <div className="mt-3 grid gap-2">
@@ -46,16 +48,13 @@ export function TicketErklaerung({
                 </>
               )
             ) : (
-              <>
-                So viel kommt bei {prozent} % auf den Ticketpreis drauf. Was das Ticket selbst kostet,
-                steht noch nicht fest.
-              </>
+              <>Aufschlag bei {prozent} %. Der Ticketpreis selbst steht noch nicht fest.</>
             )}
           </div>
           <div className="mt-2 rounded-lg bg-white/70 px-2.5 py-1.5 text-[12px] font-semibold text-brand-dark dark:bg-slate-900/60 dark:text-brand-soft">
             {fuerEltern
               ? "Nur dieses Ticket – nicht Ihre Karten."
-              : "Der Zusatzbeitrag fällt nur auf dein eigenes Ticket – nicht auf Karten für Eltern oder Gäste."}
+              : "Nur dein eigenes Ticket – nicht Karten für Eltern oder Gäste."}
           </div>
         </div>
 
@@ -72,16 +71,15 @@ export function TicketErklaerung({
                 ? "Normaler Preis, ohne Zusatzbeitrag."
                 : "Noch nicht festgelegt. Normaler Preis, ohne Zusatzbeitrag."
               : preisSteht
-                ? "Karten für Eltern, Geschwister oder Gäste kosten den normalen Ticketpreis – ohne Zusatzbeitrag."
-                : "Der Ticketpreis wurde noch nicht festgelegt. Karten für Eltern, Geschwister oder Gäste kosten dann den normalen Preis – ohne Zusatzbeitrag."}
+                ? "Karten für Eltern, Geschwister oder Gäste: normaler Preis, ohne Aufschlag."
+                : "Noch nicht festgelegt. Karten für Eltern und Gäste: normaler Preis, ohne Aufschlag."}
           </div>
         </div>
       </div>
 
       {!fuerEltern && (
-        <div className="mt-3 text-[12px] leading-relaxed text-tinte-leise">
-          Der Ticketpreis hat mit dem offenen Betrag der Stufenkasse nichts zu tun. Das sind zwei
-          getrennte Sachen.
+        <div className="mt-3 text-[12px] text-tinte-leise">
+          Hat nichts mit dem offenen Stufenbeitrag zu tun.
         </div>
       )}
     </section>

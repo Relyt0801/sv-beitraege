@@ -43,8 +43,9 @@ Deno.serve(async (req) => {
       return json({ passt });
     }
 
-    const { probe, event_id, termin_id, an_team, user_ids, chat_item_id, angepinnt, title: directTitle, body: directBody, url: wunschUrl } = koerper as {
+    const { probe, event_id, termin_id, an_team, user_ids, chat_item_id, angepinnt, an_personen, title: directTitle, body: directBody, url: wunschUrl } = koerper as {
       probe?: boolean;
+      an_personen?: { student_id: string; title: string; body: string }[];
       chat_item_id?: string;
       angepinnt?: boolean;
       event_id?: string;
@@ -80,6 +81,8 @@ Deno.serve(async (req) => {
     let userIds: string[] = [];
     let title = "";
     let body = "";
+    // Mehrere unterschiedliche Meldungen in einem Aufruf (z. B. Zahlungen für 20 Personen)
+    let einzeln: { ids: string[]; title: string; body: string }[] | null = null;
 
     const TEAM = ["stufenteam", "kassenwart", "admin", "sprecher", "stv_sprecher"];
 
@@ -94,6 +97,30 @@ Deno.serve(async (req) => {
       userIds = (data || []).map((p: { user_id: string }) => p.user_id);
       title = String(directTitle || "Stufenkasse");
       body = String(directBody || "");
+    } else if (Array.isArray(an_personen) && an_personen.length) {
+      // Zahlung / Beitragshilfe eingetragen: an die Person selbst und ihre Eltern.
+      // Auslösen darf nur das Team oder wer die passende Befugnis hat.
+      const { data: ich } = await supabase.from("profiles").select("role, is_op").eq("user_id", selbst).maybeSingle();
+      let darf = Boolean(ich?.is_op) || TEAM.includes(ich?.role || "");
+      if (!darf) {
+        const { data: up } = await supabase.from("user_permissions").select("perm")
+          .eq("user_id", selbst).eq("allowed", true).in("perm", ["kasse.edit", "hilfen.edit"]);
+        darf = Boolean(up && up.length);
+      }
+      if (!darf) return json({ error: "nicht erlaubt" }, 403);
+      const liste = an_personen.slice(0, 300);
+      const sids = [...new Set(liste.map((x) => String(x.student_id)))];
+      const { data: pr } = await supabase.from("profiles").select("user_id, student_id").in("student_id", sids);
+      const { data: pc } = await supabase.from("parent_children").select("user_id, student_id").in("student_id", sids);
+      const wer = (sid: string) => [
+        ...(pr || []).filter((x: { student_id: string }) => x.student_id === sid),
+        ...(pc || []).filter((x: { student_id: string }) => x.student_id === sid),
+      ].map((x: { user_id: string }) => x.user_id);
+      einzeln = liste.map((x) => ({
+        ids: wer(String(x.student_id)).filter((u) => u !== selbst),
+        title: String(x.title || "Stufenkasse").slice(0, 80),
+        body: String(x.body || "").slice(0, 160),
+      }));
     } else if (chat_item_id) {
       // Chat-Nachricht: Empfänger rechnet der Server aus. Im Browser sieht ein
       // Schüler nur seine eigene Komitee-Zeile – dort kam deshalb nie jemand an.
@@ -221,48 +248,54 @@ Deno.serve(async (req) => {
 
     // Niemand bekommt eine Benachrichtigung über die eigene Nachricht.
     userIds = userIds.filter((u) => u !== selbst);
+    const pakete = einzeln ?? [{ ids: userIds, title, body }];
+    const alleIds = [...new Set(pakete.flatMap((p) => p.ids))];
 
-    console.log("Empfänger (userIds):", userIds.length);
+    console.log("Empfänger (userIds):", alleIds.length, "| Meldungen:", pakete.length);
     // Probelauf: nur zählen, nichts verschicken (zum Testen).
-    if (probe) return json({ probe: true, empfaenger: userIds.length, title, body, url: ziel });
-    if (!userIds.length) return json({ sent: 0 });
+    if (probe) return json({ probe: true, empfaenger: alleIds.length, meldungen: pakete.length, title: pakete[0]?.title, body: pakete[0]?.body, url: ziel });
+    if (!alleIds.length) return json({ sent: 0 });
 
-    const { data: subs, error: subErr } = await supabase.from("push_subscriptions").select("*").in("user_id", userIds);
+    const { data: subs, error: subErr } = await supabase.from("push_subscriptions").select("*").in("user_id", alleIds);
     console.log("Push-Abos gefunden:", subs?.length || 0, subErr ? "Fehler: " + subErr.message : "");
-    // tag: Meldungen zum selben Event ersetzen sich, statt sich zu stapeln.
-    const payload = JSON.stringify({
-      title,
-      body: body.slice(0, 120),
-      url: ziel,
-      tag: event_id ? `event-${event_id}` : termin_id ? `termin-${termin_id}` : undefined,
-    });
 
     let sent = 0;
     let entfernt = 0;
-    await Promise.all(
-      (subs || []).map(async (s: { endpoint: string; subscription: unknown }) => {
-        try {
-          // urgency high: Android stellt die Meldung sofort zu, auch im Energiesparmodus.
-          // TTL 1 Tag: ist das Handy länger aus, ist die Meldung ohnehin veraltet.
-          await webpush.sendNotification(s.subscription as webpush.PushSubscription, payload, {
-            TTL: 86400,
-            urgency: "high",
-          });
-          sent++;
-        } catch (err) {
-          const code = (err as { statusCode?: number })?.statusCode;
-          console.log("Versand-Fehler:", code, (err as Error)?.message, "endpoint:", s.endpoint.slice(0, 60));
-          // 404/410: Gerät hat das Abo weggeworfen.
-          // 403: Abo gehört zu einem alten Schlüsselpaar und ist damit tot.
-          // In beiden Fällen wegräumen, dann meldet sich das Gerät beim nächsten
-          // Öffnen von selbst neu an.
-          if (code === 403 || code === 404 || code === 410) {
-            await supabase.from("push_subscriptions").delete().eq("endpoint", s.endpoint);
-            entfernt++;
-          }
-        }
-      }),
-    );
+    const weg = new Set<string>();
+    for (const paket of pakete) {
+      // tag: Meldungen zum selben Event ersetzen sich, statt sich zu stapeln.
+      const payload = JSON.stringify({
+        title: paket.title,
+        body: paket.body.slice(0, 120),
+        url: ziel,
+        tag: event_id ? `event-${event_id}` : termin_id ? `termin-${termin_id}` : undefined,
+      });
+      await Promise.all(
+        (subs || [])
+          .filter((s: { user_id: string; endpoint: string }) => paket.ids.includes(s.user_id) && !weg.has(s.endpoint))
+          .map(async (s: { endpoint: string; subscription: unknown }) => {
+            try {
+              // urgency high: Android stellt die Meldung sofort zu, auch im Energiesparmodus.
+              // TTL 1 Tag: ist das Handy länger aus, ist die Meldung ohnehin veraltet.
+              await webpush.sendNotification(s.subscription as webpush.PushSubscription, payload, {
+                TTL: 86400,
+                urgency: "high",
+              });
+              sent++;
+            } catch (err) {
+              const code = (err as { statusCode?: number })?.statusCode;
+              console.log("Versand-Fehler:", code, (err as Error)?.message, "endpoint:", s.endpoint.slice(0, 60));
+              // 404/410: Gerät hat das Abo weggeworfen. 403: altes Schlüsselpaar.
+              // Wegräumen – das Gerät meldet sich beim nächsten Öffnen neu an.
+              if (code === 403 || code === 404 || code === 410) {
+                weg.add(s.endpoint);
+                await supabase.from("push_subscriptions").delete().eq("endpoint", s.endpoint);
+                entfernt++;
+              }
+            }
+          }),
+      );
+    }
     console.log("Gesendet:", sent, "| veraltete Abos entfernt:", entfernt);
     return json({ sent, entfernt });
   } catch (e) {

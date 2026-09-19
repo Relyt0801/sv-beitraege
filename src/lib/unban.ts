@@ -1,4 +1,5 @@
 import { hasSupabase, supabase } from "./supabase";
+import { pushAnTeam, pushToUsers } from "./push";
 
 export interface UnbanRequest {
   id: string;
@@ -35,6 +36,7 @@ export async function stelleAnfrage(nachricht: string): Promise<{ ok: boolean; e
         ? "Du hast für diese Sperre schon eine Anfrage gestellt."
         : error.message,
     };
+  void pushAnTeam("Entsperr-Anfrage", "Jemand bittet darum, wieder schreiben zu dürfen.", "./#chats");
   return { ok: true };
 }
 
@@ -60,7 +62,14 @@ export async function entscheide(
       decided_at: new Date().toISOString(),
     })
     .eq("id", req.id);
-  return error ? { ok: false, error: error.message } : { ok: true };
+  if (error) return { ok: false, error: error.message };
+  void pushToUsers(
+    [req.user_id],
+    annehmen ? "Du bist entsperrt ✓" : "Anfrage abgelehnt",
+    annehmen ? "Du kannst in den Chats wieder schreiben." : "Die Chat-Sperre bleibt vorerst bestehen.",
+    "./#chats",
+  );
+  return { ok: true };
 }
 
 /** Text für die Sperr-Anzeige: "noch 42 Minuten" statt Datum im Jahr 2099. */

@@ -286,3 +286,22 @@ im Repo, damit ein Neuaufbau funktioniert:
   automatisch bekommen.
 - **Elternansicht**: kürzere Texte, kein Chat-Schalter im Profil.
 - Migration: `supabase/chats-push-und-rechte.sql` (eingespielt), send-push v17.
+
+## 14. Meldungen für Zahlungen, Beteiligungen und Anträge; Live-Aktualisierung; Kasse aufgeräumt
+
+- **Pop-ups an Schüler UND Eltern**, wenn ein Halbjahr als bezahlt oder
+  erlassen eingetragen wird (auch per Mehrfachauswahl) und wenn eine
+  Beteiligung/Mithilfe eingetragen wird. Neuer Modus `an_personen` in
+  `send-push`: der Server sucht Schülerkonto und Elternkonten selbst;
+  auslösen darf nur das Team bzw. wer kasse.edit / hilfen.edit hat.
+- **Anträge**: Komitee-Wunsch und Entsperr-Anfrage melden sich beim Team;
+  die Entscheidung (angenommen/abgelehnt) geht per Pop-up an die Person.
+  Kosten- und Terminanfragen hatten das schon.
+- **Keine Meldung** bei Rollen, Rechten, Halbjahr und anderen Verwaltungssachen.
+- **Live statt Neuladen**: Komitee- und Entsperr-Anträge verschwinden bei allen
+  sofort, wenn jemand entschieden hat (Realtime statt 30-s-Abfrage).
+- **Reiter-Schutz**: Über eine Adresse wie `#finanzen` kommt niemand mehr in
+  einen Reiter, der für ihn nicht vorgesehen ist.
+- **Meine Kasse**: Am Rechner links „Mithelfen beim Abiball“ und die Liste
+  „Wobei du geholfen hast“, rechts das Abiballticket – keine Lücke mehr.
+  Kürzere Ticket-Texte; Legende „noch nicht dabei“ im Dunkelmodus sichtbar.

@@ -2,6 +2,23 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState, ty
 import { HY, type ContribTemplate, type Contribution, type Halbjahr, type Settings, type Status, type Student, type Beitraege, newStudent, STAFFEL_STANDARD, BEITRAEGE_STANDARD } from "./lib/types";
 import { hasSupabase, supabase } from "./lib/supabase";
 import { istEigenesEcho, merkeEigeneAenderung } from "./lib/echo";
+import { pushAnPersonen } from "./lib/push";
+
+/** Text zu einem geänderten Halbjahr – nur bezahlt/erlassen wird gemeldet. */
+function zahlText(vorname: string, h: string, status: string): { title: string; body: string } | null {
+  if (status === "bezahlt") return { title: `✓ ${h} bezahlt`, body: `Der Stufenbeitrag für ${h} (${vorname}) ist als bezahlt eingetragen. Danke!` };
+  if (status === "erlassen") return { title: `${h} erlassen`, body: `Der Stufenbeitrag für ${h} (${vorname}) wurde erlassen.` };
+  return null;
+}
+
+function hilfeText(c: Contribution, alle: Student[]): { student_id: string; title: string; body: string } {
+  const v = alle.find((s) => s.id === c.student_id)?.vorname || "";
+  return {
+    student_id: c.student_id,
+    title: `🙌 Mithilfe eingetragen${c.punkte ? ` (+${c.punkte} Punkte)` : ""}`,
+    body: `${c.titel}${v ? ` – ${v}` : ""}. Danke fürs Mithelfen!`,
+  };
+}
 
 const LS_STUDENTS = "sv-beitraege:students";
 const LS_SETTINGS = "sv-beitraege:settings";
@@ -397,13 +414,18 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   );
 
   const setTerm: StoreValue["setTerm"] = useCallback(
-    (id, h, status) =>
+    (id, h, status) => {
+      const vorher = studentsRef.current.find((s) => s.id === id);
       mutate(
         id,
         (s) => ({ ...s, terms: { ...s.terms, [h]: { status } } }),
         (s) => ({ terms: s.terms }),
-      ),
-    [mutate],
+      );
+      // Schüler und Eltern bekommen Bescheid, wenn eine Zahlung eingetragen wird
+      const t = vorher && vorher.terms?.[h]?.status !== status ? zahlText(vorher.vorname, h, status) : null;
+      if (t && mode === "supabase") void pushAnPersonen([{ student_id: id, ...t }]);
+    },
+    [mutate, mode],
   );
 
   const addContribution: StoreValue["addContribution"] = useCallback(
@@ -416,12 +438,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         datum: datum || new Date().toISOString().slice(0, 10),
       };
       setContributions((prev) => [c, ...prev]);
-      if (mode === "supabase")
+      if (mode === "supabase") {
         void run(
           supabase!.from("contributions").insert({
             id: c.id, student_id: c.student_id, titel: c.titel, punkte: c.punkte, datum: c.datum,
           }),
         );
+        void pushAnPersonen([hilfeText(c, studentsRef.current)]);
+      }
     },
     [mode],
   );
@@ -438,12 +462,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       }));
       if (!neu.length) return;
       setContributions((prev) => [...neu, ...prev]);
-      if (mode === "supabase")
+      if (mode === "supabase") {
         void run(
           supabase!.from("contributions").insert(
             neu.map((c) => ({ id: c.id, student_id: c.student_id, titel: c.titel, punkte: c.punkte, datum: c.datum })),
           ),
         );
+        void pushAnPersonen(neu.map((c) => hilfeText(c, studentsRef.current)));
+      }
     },
     [mode],
   );
@@ -540,8 +566,18 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const map = new Map(updates);
       setStudents((prev) => prev.map((s) => (map.has(s.id) ? { ...s, ...map.get(s.id) } : s)));
       updates.forEach(([id, cols]) => patchCols(id, cols));
+      if (mode === "supabase") {
+        const meldungen = studentsRef.current
+          .filter((s) => map.has(s.id) && s.terms?.[h]?.status !== action)
+          .map((s) => {
+            const t = zahlText(s.vorname, h, action);
+            return t ? { student_id: s.id, ...t } : null;
+          })
+          .filter((x): x is { student_id: string; title: string; body: string } => Boolean(x));
+        void pushAnPersonen(meldungen);
+      }
     },
-    [patchCols],
+    [patchCols, mode],
   );
 
   const exportData: StoreValue["exportData"] = useCallback(() => {
