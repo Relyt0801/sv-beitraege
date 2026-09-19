@@ -182,9 +182,21 @@ export function TopicsProvider({ children }: { children: ReactNode }) {
     const mine: Record<string, string[]> = {};
     const counts: Record<string, Record<string, number>> = {};
     const roh: Record<string, { user_id: string; option_id: string }[]> = {};
+    // Zahlen vom Server ohne Namen – anonyme Stimmen anderer sind per RLS unsichtbar.
+    const umfragen = ((it as TopicItem[]) || [])
+      .filter((x) => Array.isArray(x.options) && x.options.length > 0)
+      .map((x) => x.id);
+    const { data: zahl } = umfragen.length
+      ? await supabase!.rpc("stimmen_topics", { p_ids: umfragen })
+      : { data: [] as { item_id: string; option_id: string; n: number }[] };
+    for (const z of (zahl as { item_id: string; option_id: string; n: number }[] | null) || []) {
+      (counts[z.item_id] ||= {})[z.option_id] = z.n;
+    }
     for (const row of v || []) {
-      counts[row.item_id] ||= {};
-      counts[row.item_id][row.option_id] = (counts[row.item_id][row.option_id] || 0) + 1;
+      if (!zahl) {
+        counts[row.item_id] ||= {};
+        counts[row.item_id][row.option_id] = (counts[row.item_id][row.option_id] || 0) + 1;
+      }
       (roh[row.item_id] ||= []).push({ user_id: row.user_id, option_id: row.option_id });
       if (row.user_id === uidRef.current) (mine[row.item_id] ||= []).push(row.option_id);
     }

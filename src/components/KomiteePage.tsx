@@ -3,6 +3,7 @@ import { useTopics, type Topic, type TopicItem } from "../topics-store";
 import { useRole } from "../auth/RoleProvider";
 import { useStore } from "../store";
 import { committeeIcon, committeeLabel } from "../lib/committees";
+import { WerHatGestimmt } from "./WerHatGestimmt";
 import { Avatar, PersonName } from "./Avatar";
 import { BannHinweis } from "./BannHinweis";
 import { Sheet } from "./Sheet";
@@ -297,6 +298,12 @@ function UmfrageKarte({
         })}
       </div>
       <div className="mt-1.5 text-[11px] text-tinte-leise">{gesamt} Stimme{gesamt === 1 ? "" : "n"}</div>
+      {zeigeWaehler && (
+        <WerHatGestimmt
+          optionen={Array.isArray(item.options) ? item.options : []}
+          stimmen={voters[item.id] || []}
+        />
+      )}
     </div>
   );
 }

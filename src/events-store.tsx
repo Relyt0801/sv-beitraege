@@ -97,9 +97,20 @@ export function EventsProvider({ children }: { children: ReactNode }) {
     const mine: Record<string, string[]> = {};
     const counts: Record<string, Record<string, number>> = {};
     const vs: Record<string, { option_id: string; user_id: string }[]> = {};
+    // Zahlen kommen vom Server ohne Namen – bei anonymen Umfragen sieht man
+    // fremde Stimmen nicht mehr einzeln (RLS), die Summe aber schon.
+    const umfragen = (evs || []).filter((e: any) => e.type === "umfrage").map((e: any) => e.id);
+    const { data: zahl } = umfragen.length
+      ? await supabase!.rpc("stimmen_events", { p_ids: umfragen })
+      : { data: [] as { event_id: string; option_id: string; n: number }[] };
+    for (const z of (zahl as { event_id: string; option_id: string; n: number }[] | null) || []) {
+      (counts[z.event_id] ||= {})[z.option_id] = z.n;
+    }
     for (const v of votes || []) {
-      counts[v.event_id] ||= {};
-      counts[v.event_id][v.option_id] = (counts[v.event_id][v.option_id] || 0) + 1;
+      if (!zahl) {
+        counts[v.event_id] ||= {};
+        counts[v.event_id][v.option_id] = (counts[v.event_id][v.option_id] || 0) + 1;
+      }
       (vs[v.event_id] ||= []).push({ option_id: v.option_id, user_id: v.user_id });
       if (v.user_id === uid) (mine[v.event_id] ||= []).push(v.option_id);
     }

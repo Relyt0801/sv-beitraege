@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useEvents } from "../events-store";
 import { useRole } from "../auth/RoleProvider";
+import { WerHatGestimmt } from "./WerHatGestimmt";
 import { Avatar } from "./Avatar";
 import { committeeLabel } from "../lib/committees";
 import { TYPE_META, type EventItem } from "../lib/events";
@@ -260,6 +261,7 @@ function EventCard({
             );
           })}
           {canSeeResults && <div className="text-xs text-tinte-leise">{total} Stimme{total === 1 ? "" : "n"}</div>}
+          {canSeeResults && zeigeWaehler && <WerHatGestimmt optionen={e.options} stimmen={stimmen} />}
         </div>
       )}
     </div>

@@ -349,17 +349,24 @@ function BuchungSheet({
     onClose();
   }
 
-  const seg = "flex-1 rounded-lg py-2.5 text-[14px] font-bold transition";
+  const seg = "rounded-xl border py-2.5 text-[14px] font-bold transition";
   const aus = typ === "aus";
   return (
     <Sheet open={art !== null} onClose={onClose}>
       <h2 className="mb-3 text-xl font-extrabold">Buchung</h2>
 
-      <div className="flex gap-1.5 rounded-xl bg-papier-matt p-1 dark:bg-slate-800">
-        <button onClick={() => setTyp("ein")} className={`${seg} ${!aus ? "bg-emerald-600 text-white" : "text-tinte-matt"}`}>
+      {/* Gleiches Raster wie Datum | Wofür darunter – die Kanten fluchten */}
+      <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-2">
+        <button
+          onClick={() => setTyp("ein")}
+          className={`${seg} ${!aus ? "border-emerald-600 bg-emerald-600 text-white" : "border-papier-linie text-tinte-matt dark:border-slate-700"}`}
+        >
           + Einnahme
         </button>
-        <button onClick={() => setTyp("aus")} className={`${seg} ${aus ? "bg-red-600 text-white" : "text-tinte-matt"}`}>
+        <button
+          onClick={() => setTyp("aus")}
+          className={`${seg} ${aus ? "border-red-600 bg-red-600 text-white" : "border-papier-linie text-tinte-matt dark:border-slate-700"}`}
+        >
           − Ausgabe
         </button>
       </div>
@@ -380,11 +387,11 @@ function BuchungSheet({
       <div className="mt-3 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-2">
         <div className="min-w-0">
           <label className="block text-[12px] font-semibold text-tinte-leise">Datum</label>
-          <input type="date" className="field mt-1" value={datum} onChange={(e) => setDatum(e.target.value)} />
+          <input type="date" className="field mt-1 h-12" value={datum} onChange={(e) => setDatum(e.target.value)} />
         </div>
         <div className="min-w-0">
           <label className="block text-[12px] font-semibold text-tinte-leise">Wofür</label>
-          <select className="field mt-1" value={zu} onChange={(e) => setZu(e.target.value)}>
+          <select className="field mt-1 h-12" value={zu} onChange={(e) => setZu(e.target.value)}>
             <option value="">Bitte wählen …</option>
             {aktionen.length > 0 && (
               <optgroup label="Aktion">

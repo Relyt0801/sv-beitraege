@@ -251,3 +251,16 @@ im Repo, damit ein Neuaufbau funktioniert:
   nirgends gespeichert, muss beim ersten Login geändert werden). Nur Admin/OP.
   Der geheime Schlüssel bleibt auf dem Server.
 - Migration: `supabase/kostenanfragen.sql` (bereits eingespielt).
+
+## 12. Abstimmungen: Namen sichtbar, anonym wirklich anonym
+
+- Nicht-anonyme Abstimmungen (Events und Komitee-Chats): unter den Antworten
+  „Wer hat abgestimmt? (N)“ – aufklappbar, Namen je Antwort.
+- Sicherheitslücke geschlossen: Bei anonymen Abstimmungen konnte man per API
+  lesen, wer wie gestimmt hat (die App zeigte es nur nicht an). Jetzt per RLS
+  gesperrt; die Zahlen je Antwort kommen namenlos über `stimmen_events()` /
+  `stimmen_topics()`. Migration: `supabase/anonyme-abstimmungen.sql` (eingespielt).
+  Folge: Bei anonymen Abstimmungen aktualisieren sich fremde Stimmen erst beim
+  nächsten Nachladen, nicht mehr live.
+- Buchungsfenster: „Einnahme | Ausgabe“ steht im selben Raster wie
+  „Datum | Wofür“ darunter, Kanten fluchten.
