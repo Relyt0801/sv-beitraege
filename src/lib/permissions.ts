@@ -50,8 +50,8 @@ export const PERM_CATEGORIES: PermCategory[] = [
   },
   {
     label: "Finanzen", icon: "💰", perms: [
-      { key: "finanzen.view", label: "Finanzen ansehen", desc: "Den Reiter Finanzen lesen: Kontostand, Ziel, Einnahmen und Verlauf." },
-      { key: "finanzen.manage", label: "Kassenbuch führen", desc: "Buchungen eintragen und löschen, Ziel setzen, mit der Bank abgleichen." },
+      { key: "finanzen.view", label: "Finanzen ansehen", desc: "Den Reiter Finanzen lesen: Kontostand, Ziel, Einnahmen und Verlauf. (Der Aufsichtsrat darf das automatisch.)" },
+      { key: "finanzen.manage", label: "Kassenbuch führen", desc: "Buchungen eintragen und löschen, Kostenanfragen entscheiden, Ziel setzen, mit der Bank abgleichen." },
     ],
   },
   {

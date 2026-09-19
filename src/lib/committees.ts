@@ -12,6 +12,7 @@ export const COMMITTEES: { slug: string; label: string; icon: string; teamOnly?:
   { slug: "gottesdienst", label: "Gottesdienst", icon: "⛪" },
   { slug: "motto-pullis", label: "Motto & Pullis", icon: "👕" },
   { slug: "abizeitung", label: "Abizeitung", icon: "📰" },
+  { slug: "chaostag", label: "Chaostag", icon: "🤪" },
   // teamOnly: nicht selbst wählbar – nur das Stufenteam kann zuordnen.
   { slug: "aufsichtsrat", label: "Aufsichtsrat", icon: "🪑", teamOnly: true },
 ];

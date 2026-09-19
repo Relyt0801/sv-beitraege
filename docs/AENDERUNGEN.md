@@ -225,3 +225,29 @@ im Repo, damit ein Neuaufbau funktioniert:
   Durchgesetzt per RLS, nicht nur in der Oberfläche.
 - Beiträge-Reiter: drei Kacheln oben (Prozente · Halbjahre · Ticket) mit der
   wichtigsten Zahl; ein Bereich zur Zeit statt allem untereinander.
+
+## 11. Finanzen aufgeräumt, Kostenanfragen, Aufsichtsrat, Personen anlegen
+
+- **Finanzen-Reiter entschlackt**: oben eine Karte (Kontostand, Rein/Raus/
+  Noch offen, Ring mit Ziel), darunter zwei große Knöpfe „+ Einnahme“ und
+  „− Ausgabe“. Gebucht wird in einem Fenster mit nur vier Angaben:
+  Art, Betrag, Datum, Wofür (Aktion, Komitee, Spende oder Sonstiges);
+  Notiz freiwillig. Zielbetrag und Bankabgleich liegen hinter dem Zahnrad.
+  Verlauf: nur noch Alle / Rein / Raus + Suche, jede Zeile zeigt die Zuordnung.
+- **Kostenanfragen**: Komitee-Vorsitzende sehen den Reiter „Finanzen“ (nur mit
+  ihren Anfragen) und können Geld anfragen (Wofür, Betrag, bis wann,
+  Begründung). Kassenwart/Admin bekommen eine Benachrichtigung, genehmigen
+  oder lehnen ab. Genehmigen bucht die Ausgabe sofort (mit Komitee-Zuordnung),
+  der Vorsitz bekommt Bescheid. Rote Zahl am Reiter bei offenen Anfragen.
+  Entscheiden läuft über die DB-Funktion `kostenanfrage_entscheiden`
+  (Status und Buchung immer zusammen).
+- **Aufsichtsrat** (Komitee `aufsichtsrat`) sieht Finanzen und Anfragen,
+  kann aber nichts ändern – per RLS (`ist_aufsichtsrat()`), nicht nur in der
+  Oberfläche. Eltern zählen nie dazu.
+- **Neues Komitee „Chaostag“** in `src/lib/committees.ts`.
+- **Admin legt neue Personen an**: Rollen-Reiter → „+ Person hinzufügen“.
+  Die Edge Function `person-anlegen` legt Listen-Eintrag und Login an
+  (Nutzername nachname.vorname, Startpasswort wird genau einmal angezeigt,
+  nirgends gespeichert, muss beim ersten Login geändert werden). Nur Admin/OP.
+  Der geheime Schlüssel bleibt auf dem Server.
+- Migration: `supabase/kostenanfragen.sql` (bereits eingespielt).

@@ -2,12 +2,17 @@ import { useEffect, useMemo, useState } from "react";
 import { useStore } from "../store";
 import { useRole } from "../auth/RoleProvider";
 import { useTermine } from "../termine-store";
+import { useProfiles } from "../profiles-store";
 import { basisOffen } from "../lib/logic";
 import { useNachschub } from "../lib/liste";
+import { COMMITTEES, committeeIcon, committeeLabel } from "../lib/committees";
 import {
   EINNAHME_QUELLEN, QUELLE_NAME, centAus, euro, euroKurz, useFinanzen,
-  type Buchung, type Quelle,
+  type Buchung, type FinanzenValue, type Quelle,
 } from "../lib/finanzen";
+import type { KostenAnfrage, KostenValue } from "../lib/kosten";
+import { Sheet } from "./Sheet";
+import { Avatar } from "./Avatar";
 
 /** Folgt dem Hell/Dunkel-Schalter der App (Klasse "dark" am <html>). */
 function useDunkel(): boolean {
@@ -21,18 +26,36 @@ function useDunkel(): boolean {
 }
 
 const heute = () => new Date().toISOString().slice(0, 10);
+const kurzTag = (d: string) =>
+  new Date(d + "T12:00:00").toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "2-digit" });
+
+/** Wofür eine Buchung ist – in einem Wort. */
+function zuweisungText(b: Buchung, aktionName: (id: string) => string): string {
+  if (b.aktion_id && aktionName(b.aktion_id)) return aktionName(b.aktion_id);
+  if (b.komitee) return committeeLabel(b.komitee);
+  return QUELLE_NAME[b.quelle];
+}
 
 /**
- * Reiter "Finanzen": wie viel Geld die Stufe hat, woher es kommt und was noch
- * fehlt. Sehen dürfen Admin und Kassenwart – und wen der Admin im Rechte-Reiter
- * freischaltet (Recht "Finanzen ansehen"). Buchen nur mit "Kassenbuch führen".
+ * Reiter "Finanzen".
+ *
+ * Wer was sieht:
+ *  - Kassenwart/Admin ("Kassenbuch führen"): alles, bucht, entscheidet Kostenanfragen
+ *  - "Finanzen ansehen" (vom Admin freigeschaltet) und der Aufsichtsrat: alles, nur lesen
+ *  - Komitee-Vorsitzende: nur ihre Kostenanfragen
  */
-export function FinanzenTab() {
-  const { can } = useRole();
+export function FinanzenTab({ kosten }: { kosten: KostenValue }) {
+  const { can, isStaff } = useRole();
   const darfBuchen = can("finanzen.manage");
-  const fin = useFinanzen(true);
+  const darfSehen = darfBuchen || can("finanzen.view") || kosten.aufsichtsrat;
+  const nurLesen = darfSehen && !darfBuchen;
+  const fin = useFinanzen(darfSehen);
   const { students, settings } = useStore();
-  const { aktionen } = useTermine();
+  const { aktionen, meineVorsitze } = useTermine();
+  const [buchen, setBuchen] = useState<"ein" | "aus" | null>(null);
+  const [einstellungen, setEinstellungen] = useState(false);
+
+  const aktionName = (id: string) => aktionen.find((a) => a.id === id)?.titel || "";
 
   // ------------------------------------------------ Zahlen
   const zahlen = useMemo(() => {
@@ -40,7 +63,6 @@ export function FinanzenTab() {
     let ein = 0;
     let aus = 0;
     const jeQuelle: Record<string, number> = { beitrag: 0, aktion: 0, spende: 0, sonstiges: 0 };
-    const jeAktion = new Map<string, number>();
     let letzterAbgleich: string | null = null;
     for (const b of fin.buchungen) {
       stand += b.cent;
@@ -48,18 +70,14 @@ export function FinanzenTab() {
         if (!letzterAbgleich || b.datum > letzterAbgleich) letzterAbgleich = b.datum;
         continue;
       }
-      if (b.quelle === "ausgabe") {
+      if (b.cent < 0) {
         aus += -b.cent;
         continue;
       }
       ein += b.cent;
       jeQuelle[b.quelle] = (jeQuelle[b.quelle] || 0) + b.cent;
-      if (b.quelle === "aktion") {
-        const k = b.aktion_id || "";
-        jeAktion.set(k, (jeAktion.get(k) || 0) + b.cent);
-      }
     }
-    return { stand, ein, aus, jeQuelle, jeAktion, letzterAbgleich };
+    return { stand, ein, aus, jeQuelle, letzterAbgleich };
   }, [fin.buchungen]);
 
   const offen = useMemo(() => {
@@ -74,6 +92,15 @@ export function FinanzenTab() {
     }
     return { cent, personen };
   }, [students, settings]);
+
+  // Nur Vorsitz, keine Finanzrechte: nur die Kostenanfragen
+  if (!darfSehen) {
+    return (
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-3 pb-6">
+        <KostenKarte kosten={kosten} darfEntscheiden={false} vorsitze={meineVorsitze} />
+      </div>
+    );
+  }
 
   if (!fin.bereit)
     return (
@@ -90,208 +117,877 @@ export function FinanzenTab() {
       </div>
     );
 
+  const zeigeAnfragen = darfSehen || meineVorsitze.length > 0;
+
   return (
     <div className="grid grid-cols-[minmax(0,1fr)] gap-3 pb-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-start">
-      {/* ================================================ Kopf */}
-      <section className="card p-5 lg:col-span-2">
-        <div className="text-[12px] font-semibold uppercase tracking-wide text-tinte-leise">Kontostand</div>
-        <div className="mt-1 flex flex-wrap items-end gap-x-4 gap-y-1">
-          <span className={`zahl font-zahl text-[2.4rem] font-extrabold leading-none tracking-[-0.02em] ${zahlen.stand < 0 ? "text-red-600 dark:text-red-400" : ""}`}>
-            {euro(zahlen.stand)}
-          </span>
-          <span className="pb-1 text-[12px] text-tinte-leise">
-            laut Kassenbuch
-            {zahlen.letzterAbgleich
-              ? ` · zuletzt mit der Bank abgeglichen am ${new Date(zahlen.letzterAbgleich).toLocaleDateString("de-DE")}`
-              : " · noch nie mit der Bank abgeglichen"}
-          </span>
-        </div>
-
-        <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
-          <Kachel titel="Eingenommen" wert={euroKurz(zahlen.ein)} ton="plus" />
-          <Kachel titel="Ausgegeben" wert={euroKurz(zahlen.aus)} ton="minus" />
-          <Kachel
-            titel="Noch offen"
-            wert={euroKurz(offen.cent)}
-            unter={`${offen.personen} ${offen.personen === 1 ? "Person" : "Personen"} · bis ${settings.aktuelles_halbjahr}`}
-            breit
-          />
-        </div>
-      </section>
-
-      {/* ================================================ Ziel */}
-      <ZielKarte
-        zahlen={zahlen}
-        ziel={fin.ziel}
-        aktionName={(id) => aktionen.find((a) => a.id === id)?.titel || "Ohne Zuordnung"}
-        aktionIcon={(id) => aktionen.find((a) => a.id === id)?.icon || "📌"}
-        darf={darfBuchen}
-        onZiel={fin.zielSetzen}
-      />
-
-      {/* ================================================ Buchen */}
-      {darfBuchen && (
-        <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-3">
-          <BuchenKarte onBuchen={fin.buchen} aktionen={aktionen} />
-          <AbgleichKarte stand={zahlen.stand} onBuchen={fin.buchen} />
+      {nurLesen && (
+        <div className="rounded-xl bg-papier-matt px-4 py-2.5 text-[13px] text-tinte-matt dark:bg-slate-800 dark:text-slate-300 lg:col-span-2">
+          👁 Nur lesen{kosten.aufsichtsrat ? " – du siehst die Finanzen als Aufsichtsrat" : ""}. Buchen kann nur der Kassenwart.
         </div>
       )}
 
-      {/* ================================================ Verlauf */}
-      <VerlaufKarte
-        buchungen={fin.buchungen}
-        darf={darfBuchen}
-        onLoeschen={fin.loeschen}
-        aktionName={(id) => aktionen.find((a) => a.id === id)?.titel || ""}
-      />
-    </div>
-  );
-}
-
-function Kachel({
-  titel, wert, unter, ton, breit,
-}: { titel: string; wert: string; unter?: string; ton?: "plus" | "minus"; breit?: boolean }) {
-  return (
-    <div className={`rounded-xl bg-papier-matt px-3 py-2.5 dark:bg-slate-800 ${breit ? "col-span-2 sm:col-span-1" : ""}`}>
-      <div className="text-[11px] font-semibold uppercase tracking-wide text-tinte-leise">{titel}</div>
-      <div
-        className={`zahl mt-0.5 text-[1.2rem] font-extrabold leading-tight ${
-          ton === "plus" ? "text-bezahlt dark:text-emerald-400" : ton === "minus" ? "text-red-600 dark:text-red-400" : ""
-        }`}
-      >
-        {ton === "plus" ? "+ " : ton === "minus" ? "− " : ""}
-        {wert}
+      {/* ================================================ Übersicht */}
+      <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-3">
+        <UebersichtKarte
+          zahlen={zahlen}
+          offen={isStaff ? offen : null}
+          halbjahr={settings.aktuelles_halbjahr}
+          ziel={fin.ziel}
+          darf={darfBuchen}
+          onEinstellungen={() => setEinstellungen(true)}
+        />
+        {darfBuchen && (
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              onClick={() => setBuchen("ein")}
+              className="rounded-2xl bg-emerald-600 py-3.5 text-[15px] font-extrabold text-white shadow-sm active:scale-[0.98]"
+            >
+              + Einnahme
+            </button>
+            <button
+              onClick={() => setBuchen("aus")}
+              className="rounded-2xl bg-red-600 py-3.5 text-[15px] font-extrabold text-white shadow-sm active:scale-[0.98]"
+            >
+              − Ausgabe
+            </button>
+          </div>
+        )}
       </div>
-      {unter && <div className="text-[11px] text-tinte-leise">{unter}</div>}
+
+      {/* ================================================ Kostenanfragen */}
+      {zeigeAnfragen && (
+        <KostenKarte kosten={kosten} darfEntscheiden={darfBuchen} vorsitze={meineVorsitze} onEntschieden={fin.neuLaden} />
+      )}
+
+      {/* ================================================ Verlauf */}
+      <VerlaufKarte buchungen={fin.buchungen} darf={darfBuchen} onLoeschen={fin.loeschen} aktionName={aktionName} />
+
+      {darfBuchen && (
+        <>
+          <BuchungSheet
+            art={buchen}
+            onClose={() => setBuchen(null)}
+            onBuchen={fin.buchen}
+            aktionen={aktionen}
+          />
+          <EinstellungenSheet
+            open={einstellungen}
+            onClose={() => setEinstellungen(false)}
+            fin={fin}
+            stand={zahlen.stand}
+          />
+        </>
+      )}
     </div>
   );
 }
 
-// ==================================================================== Ziel
+// ==================================================================== Übersicht
 
-function ZielKarte({
-  zahlen, ziel, aktionName, aktionIcon, darf, onZiel,
+function UebersichtKarte({
+  zahlen, offen, halbjahr, ziel, darf, onEinstellungen,
 }: {
-  zahlen: { ein: number; stand: number; jeQuelle: Record<string, number>; jeAktion: Map<string, number> };
+  zahlen: { stand: number; ein: number; aus: number; jeQuelle: Record<string, number>; letzterAbgleich: string | null };
+  /** null: wer nicht alle Personen sieht, bekäme hier eine falsche Summe */
+  offen: { cent: number; personen: number } | null;
+  halbjahr: string;
   ziel: { ziel_cent: number; ziel_titel: string };
-  aktionName: (id: string) => string;
-  aktionIcon: (id: string) => string;
   darf: boolean;
-  onZiel: (z: { ziel_cent: number; ziel_titel: string }) => Promise<string | null>;
+  onEinstellungen: () => void;
 }) {
   const dunkel = useDunkel();
-  const [bearbeiten, setBearbeiten] = useState(false);
-  const [betrag, setBetrag] = useState("");
-  const [titel, setTitel] = useState("");
-
   const teile = EINNAHME_QUELLEN.map((q) => ({
     ...q,
     farbe: dunkel ? q.dunkel : q.hell,
     cent: Math.max(0, zahlen.jeQuelle[q.key] || 0),
   }));
   const summe = teile.reduce((n, t) => n + t.cent, 0);
-  // Mit Ziel: der Kreis steht für das Ziel, der Rest bleibt grau.
-  // Ohne Ziel: der Kreis zeigt nur die Aufteilung der Einnahmen.
   const ganz = ziel.ziel_cent > 0 ? Math.max(ziel.ziel_cent, summe) : summe;
   const prozent = ziel.ziel_cent > 0 ? Math.round((summe / ziel.ziel_cent) * 100) : null;
-
-  const aktionListe = [...zahlen.jeAktion.entries()].sort((a, b) => b[1] - a[1]);
 
   return (
     <section className="card p-5">
       <div className="flex items-start gap-3">
         <div className="min-w-0 flex-1">
-          <h2 className="text-lg font-bold">
-            {ziel.ziel_cent > 0 ? `Ziel: ${ziel.ziel_titel}` : "Woher das Geld kommt"}
-          </h2>
-          <p className="text-[12px] text-tinte-leise">
-            {ziel.ziel_cent > 0
-              ? `${euroKurz(summe)} von ${euroKurz(ziel.ziel_cent)} eingenommen`
-              : "Noch kein Zielbetrag gesetzt."}
-          </p>
+          <div className="text-[12px] font-semibold uppercase tracking-wide text-tinte-leise">Kontostand</div>
+          <div
+            className={`zahl mt-0.5 font-zahl text-[2.3rem] font-extrabold leading-none tracking-[-0.02em] ${
+              zahlen.stand < 0 ? "text-red-600 dark:text-red-400" : ""
+            }`}
+          >
+            {euro(zahlen.stand)}
+          </div>
+          <div className="mt-1 text-[11px] text-tinte-leise">
+            {zahlen.letzterAbgleich
+              ? `mit der Bank abgeglichen am ${new Date(zahlen.letzterAbgleich).toLocaleDateString("de-DE")}`
+              : "noch nicht mit der Bank abgeglichen"}
+          </div>
         </div>
         {darf && (
-          <button
-            onClick={() => {
-              setBetrag(ziel.ziel_cent ? String(ziel.ziel_cent / 100) : "");
-              setTitel(ziel.ziel_titel);
-              setBearbeiten(!bearbeiten);
-            }}
-            className="shrink-0 rounded-lg border border-papier-linie px-2.5 py-1.5 text-[12px] font-bold text-tinte-matt dark:border-slate-700 dark:text-slate-300"
-          >
-            {bearbeiten ? "Abbrechen" : "Ziel ändern"}
+          <button onClick={onEinstellungen} className="iconbtn shrink-0" aria-label="Ziel und Bankabgleich" title="Ziel und Bankabgleich">
+            ⚙︎
           </button>
         )}
       </div>
 
-      {bearbeiten && (
-        <div className="mt-3 grid gap-2 rounded-xl border border-dashed border-brand/50 p-3">
-          <input className="field" placeholder="Wofür? z. B. Abiball" value={titel} onChange={(e) => setTitel(e.target.value)} />
-          <div className="flex items-center gap-2">
+      {/* Drei Zahlen in einer Zeile */}
+      <dl className={`mt-4 grid gap-2 text-center ${offen ? "grid-cols-3" : "grid-cols-2"}`}>
+        <Zahl titel="Rein" wert={euroKurz(zahlen.ein)} ton="plus" />
+        <Zahl titel="Raus" wert={euroKurz(zahlen.aus)} ton="minus" />
+        {offen && <Zahl titel="Noch offen" wert={euroKurz(offen.cent)} unter={`${offen.personen} Pers. · ${halbjahr}`} />}
+      </dl>
+
+      {/* Kreis + Legende */}
+      <div className="mt-4 flex flex-col items-center gap-4 border-t border-papier-linie pt-4 dark:border-slate-800 sm:flex-row">
+        <Kreis teile={teile} ganz={ganz} prozent={prozent} summe={summe} dunkel={dunkel} />
+        <div className="w-full min-w-0 sm:flex-1">
+          <div className="mb-1.5 text-[13px] font-bold">
+            {ziel.ziel_cent > 0 ? `Ziel ${ziel.ziel_titel}: ${euroKurz(ziel.ziel_cent)}` : "Woher das Geld kommt"}
+          </div>
+          <ul className="grid grid-cols-[minmax(0,1fr)] gap-1.5">
+            {teile.map((t) => (
+              <li key={t.key} className="flex items-center gap-2.5 text-[13px]">
+                <span className="h-3 w-3 shrink-0 rounded-[3px]" style={{ background: t.farbe }} />
+                <span className="min-w-0 flex-1 truncate font-semibold">{t.label}</span>
+                <span className="zahl shrink-0 font-bold">{euroKurz(t.cent)}</span>
+              </li>
+            ))}
+            {ziel.ziel_cent > summe && (
+              <li className="flex items-center gap-2.5 text-[13px] text-tinte-leise">
+                <span className="h-3 w-3 shrink-0 rounded-[3px] bg-papier-linie dark:bg-slate-700" />
+                <span className="min-w-0 flex-1 truncate">Fehlt noch</span>
+                <span className="zahl shrink-0 font-bold">{euroKurz(ziel.ziel_cent - summe)}</span>
+              </li>
+            )}
+          </ul>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function Zahl({ titel, wert, unter, ton }: { titel: string; wert: string; unter?: string; ton?: "plus" | "minus" }) {
+  return (
+    <div className="min-w-0 rounded-xl bg-papier-matt px-1.5 py-2 dark:bg-slate-800">
+      <dt className="text-[10.5px] font-semibold uppercase tracking-wide text-tinte-leise">{titel}</dt>
+      <dd
+        className={`zahl truncate text-[15px] font-extrabold leading-tight ${
+          ton === "plus" ? "text-bezahlt dark:text-emerald-400" : ton === "minus" ? "text-red-600 dark:text-red-400" : ""
+        }`}
+      >
+        {wert}
+      </dd>
+      {unter && <dd className="truncate text-[10.5px] text-tinte-leise">{unter}</dd>}
+    </div>
+  );
+}
+
+// ==================================================================== Buchen
+
+/**
+ * Eine Buchung in vier Angaben: Art, Betrag, Datum, wofür.
+ * Die Beschreibung ist freiwillig – ohne steht dort die Zuordnung.
+ */
+function BuchungSheet({
+  art, onClose, onBuchen, aktionen,
+}: {
+  art: "ein" | "aus" | null;
+  onClose: () => void;
+  onBuchen: FinanzenValue["buchen"];
+  aktionen: { id: string; titel: string; icon: string }[];
+}) {
+  const [typ, setTyp] = useState<"ein" | "aus">("ein");
+  const [betrag, setBetrag] = useState("");
+  const [datum, setDatum] = useState(heute());
+  const [zu, setZu] = useState("");
+  const [titel, setTitel] = useState("");
+  const [fehler, setFehler] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (!art) return;
+    setTyp(art);
+    setBetrag("");
+    setDatum(heute());
+    setZu("");
+    setTitel("");
+    setFehler("");
+  }, [art]);
+
+  // Zuordnung als "aktion:<id>", "komitee:<slug>" oder eine Quelle
+  function aufloesen(): { quelle: Quelle; aktion_id: string | null; komitee: string | null; name: string } | null {
+    if (!zu) return null;
+    const [k, v] = zu.split(":");
+    if (k === "aktion") {
+      const a = aktionen.find((x) => x.id === v);
+      return { quelle: typ === "aus" ? "ausgabe" : "aktion", aktion_id: v, komitee: null, name: a?.titel || "Aktion" };
+    }
+    if (k === "komitee")
+      return { quelle: typ === "aus" ? "ausgabe" : "sonstiges", aktion_id: null, komitee: v, name: committeeLabel(v) };
+    if (k === "spende") return { quelle: "spende", aktion_id: null, komitee: null, name: "Spende" };
+    return { quelle: typ === "aus" ? "ausgabe" : "sonstiges", aktion_id: null, komitee: null, name: typ === "aus" ? "Ausgabe" : "Sonstiges" };
+  }
+
+  async function speichern() {
+    setFehler("");
+    const c = centAus(betrag);
+    if (!c || c <= 0) return setFehler("Bitte einen Betrag über 0 eingeben.");
+    const z = aufloesen();
+    if (!z) return setFehler("Wofür? Bitte eine Zuordnung wählen.");
+    setBusy(true);
+    const f = await onBuchen({
+      datum,
+      cent: typ === "aus" ? -c : c,
+      quelle: z.quelle,
+      titel: titel.trim() || z.name,
+      aktion_id: z.aktion_id,
+      komitee: z.komitee,
+    });
+    setBusy(false);
+    if (f) return setFehler("Hat nicht geklappt: " + f);
+    onClose();
+  }
+
+  const seg = "flex-1 rounded-lg py-2.5 text-[14px] font-bold transition";
+  const aus = typ === "aus";
+  return (
+    <Sheet open={art !== null} onClose={onClose}>
+      <h2 className="mb-3 text-xl font-extrabold">Buchung</h2>
+
+      <div className="flex gap-1.5 rounded-xl bg-papier-matt p-1 dark:bg-slate-800">
+        <button onClick={() => setTyp("ein")} className={`${seg} ${!aus ? "bg-emerald-600 text-white" : "text-tinte-matt"}`}>
+          + Einnahme
+        </button>
+        <button onClick={() => setTyp("aus")} className={`${seg} ${aus ? "bg-red-600 text-white" : "text-tinte-matt"}`}>
+          − Ausgabe
+        </button>
+      </div>
+
+      <label className="mt-4 block text-[12px] font-semibold text-tinte-leise">Betrag</label>
+      <div className="mt-1 flex items-center gap-1 rounded-xl bg-papier-matt px-4 dark:bg-slate-800">
+        <input
+          className="zahl min-w-0 flex-1 bg-transparent py-3 text-[1.6rem] font-extrabold outline-none"
+          inputMode="decimal"
+          placeholder="0,00"
+          value={betrag}
+          autoFocus
+          onChange={(e) => setBetrag(e.target.value)}
+        />
+        <span className="text-xl font-bold text-tinte-matt">€</span>
+      </div>
+
+      <div className="mt-3 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-2">
+        <div className="min-w-0">
+          <label className="block text-[12px] font-semibold text-tinte-leise">Datum</label>
+          <input type="date" className="field mt-1" value={datum} onChange={(e) => setDatum(e.target.value)} />
+        </div>
+        <div className="min-w-0">
+          <label className="block text-[12px] font-semibold text-tinte-leise">Wofür</label>
+          <select className="field mt-1" value={zu} onChange={(e) => setZu(e.target.value)}>
+            <option value="">Bitte wählen …</option>
+            {aktionen.length > 0 && (
+              <optgroup label="Aktion">
+                {aktionen.map((a) => (
+                  <option key={a.id} value={`aktion:${a.id}`}>
+                    {a.icon} {a.titel}
+                  </option>
+                ))}
+              </optgroup>
+            )}
+            <optgroup label="Komitee">
+              {COMMITTEES.map((k) => (
+                <option key={k.slug} value={`komitee:${k.slug}`}>
+                  {k.icon} {k.label}
+                </option>
+              ))}
+            </optgroup>
+            <optgroup label="Sonst">
+              {!aus && <option value="spende">🤝 Spende / Sponsor</option>}
+              <option value="sonstiges">📌 Sonstiges</option>
+            </optgroup>
+          </select>
+        </div>
+      </div>
+
+      <label className="mt-3 block text-[12px] font-semibold text-tinte-leise">Notiz (freiwillig)</label>
+      <input
+        className="field mt-1"
+        placeholder={aus ? "z. B. Waffelteig, Deko" : "z. B. Kuchenverkauf 2. Pause"}
+        value={titel}
+        onChange={(e) => setTitel(e.target.value)}
+        onKeyDown={(e) => e.key === "Enter" && void speichern()}
+      />
+
+      {fehler && <p className="mt-2 text-[13px] font-semibold text-amber-600">{fehler}</p>}
+      <button
+        disabled={busy}
+        onClick={speichern}
+        className={`mt-4 w-full rounded-2xl py-3.5 text-[15px] font-extrabold text-white disabled:opacity-50 ${
+          aus ? "bg-red-600" : "bg-emerald-600"
+        }`}
+      >
+        {busy ? "…" : aus ? "Ausgabe buchen" : "Einnahme buchen"}
+      </button>
+      <p className="mt-2 text-center text-[11px] text-tinte-leise">
+        Stufenbeiträge buchen sich von selbst, sobald sie auf „bezahlt“ stehen.
+      </p>
+    </Sheet>
+  );
+}
+
+// ==================================================================== Einstellungen
+
+/** Selten gebraucht, darum im Zahnrad: Zielbetrag und Abgleich mit der Bank. */
+function EinstellungenSheet({
+  open, onClose, fin, stand,
+}: {
+  open: boolean;
+  onClose: () => void;
+  fin: FinanzenValue;
+  stand: number;
+}) {
+  const [titel, setTitel] = useState("");
+  const [betrag, setBetrag] = useState("");
+  const [bank, setBank] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    setTitel(fin.ziel.ziel_titel);
+    setBetrag(fin.ziel.ziel_cent ? String(fin.ziel.ziel_cent / 100).replace(".", ",") : "");
+    setBank("");
+  }, [open, fin.ziel]);
+
+  const c = centAus(bank);
+  const diff = c === null ? null : c - stand;
+
+  return (
+    <Sheet open={open} onClose={onClose}>
+      <h2 className="text-xl font-extrabold">Ziel & Bank</h2>
+
+      <h3 className="mt-4 text-[13px] font-bold">Sparziel</h3>
+      <div className="mt-1.5 grid grid-cols-[minmax(0,1fr)_8rem] gap-2">
+        <input className="field" placeholder="Wofür? z. B. Abiball" value={titel} onChange={(e) => setTitel(e.target.value)} />
+        <input className="field text-right" inputMode="decimal" placeholder="Betrag €" value={betrag} onChange={(e) => setBetrag(e.target.value)} />
+      </div>
+      <button
+        disabled={busy}
+        onClick={async () => {
+          setBusy(true);
+          const f = await fin.zielSetzen({ ziel_cent: Math.max(0, centAus(betrag) ?? 0), ziel_titel: titel.trim() || "Abiball" });
+          setBusy(false);
+          if (f) alert("Hat nicht geklappt: " + f);
+          else onClose();
+        }}
+        className="btn-primary mt-2"
+      >
+        Ziel speichern
+      </button>
+
+      <h3 className="mt-6 text-[13px] font-bold">Mit der Bank abgleichen</h3>
+      <p className="text-[12px] text-tinte-leise">
+        Stand aus dem Online-Banking eintragen. Die Differenz wird als Abgleich gebucht.
+      </p>
+      <div className="mt-1.5 flex items-center gap-2">
+        <input
+          className="field min-w-0 flex-1"
+          inputMode="decimal"
+          placeholder="Stand laut Bank"
+          value={bank}
+          onChange={(e) => setBank(e.target.value)}
+        />
+        <button
+          disabled={busy || diff === null || diff === 0}
+          onClick={async () => {
+            if (diff === null || diff === 0) return;
+            if (!confirm(`Kontostand auf ${euro(c!)} setzen? Gebucht wird ${diff > 0 ? "+" : "−"} ${euro(Math.abs(diff))}.`)) return;
+            setBusy(true);
+            const f = await fin.buchen({ datum: heute(), cent: diff, quelle: "abgleich", titel: "Abgleich mit der Bank" });
+            setBusy(false);
+            if (f) alert("Hat nicht geklappt: " + f);
+            else onClose();
+          }}
+          className="btn-primary !w-auto shrink-0 px-4 disabled:opacity-40"
+        >
+          Abgleichen
+        </button>
+      </div>
+      {diff !== null && (
+        <p className="mt-1.5 text-[12px] text-tinte-matt dark:text-slate-400">
+          {diff === 0 ? "Stimmt genau mit dem Kassenbuch überein." : `Unterschied: ${diff > 0 ? "+" : "−"} ${euro(Math.abs(diff))}`}
+        </p>
+      )}
+    </Sheet>
+  );
+}
+
+// ==================================================================== Kostenanfragen
+
+const STATUS: Record<KostenAnfrage["status"], { text: string; klasse: string }> = {
+  offen: { text: "wartet", klasse: "bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300" },
+  genehmigt: { text: "genehmigt", klasse: "bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300" },
+  abgelehnt: { text: "abgelehnt", klasse: "bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300" },
+};
+
+function KostenKarte({
+  kosten, darfEntscheiden, vorsitze, onEntschieden,
+}: {
+  kosten: KostenValue;
+  darfEntscheiden: boolean;
+  vorsitze: string[];
+  onEntschieden?: () => void;
+}) {
+  const { profile } = useProfiles();
+  const [neu, setNeu] = useState(false);
+  const [auswahl, setAuswahl] = useState<KostenAnfrage | null>(null);
+  const [alle, setAlle] = useState(false);
+
+  const offene = kosten.anfragen.filter((a) => a.status === "offen");
+  const erledigte = kosten.anfragen.filter((a) => a.status !== "offen");
+  const sichtbarErledigt = alle ? erledigte : erledigte.slice(0, 3);
+
+  return (
+    <section className="card min-w-0 p-5">
+      <div className="flex items-start gap-3">
+        <div className="min-w-0 flex-1">
+          <h2 className="text-lg font-bold">Kostenanfragen</h2>
+          <p className="text-[12px] text-tinte-leise">
+            {vorsitze.length > 0
+              ? "Du brauchst Geld fürs Komitee? Hier anfragen – der Kassenwart entscheidet."
+              : darfEntscheiden
+                ? "Anfragen der Komitee-Vorsitzenden. Genehmigen bucht die Ausgabe sofort."
+                : "Anfragen der Komitee-Vorsitzenden an den Kassenwart."}
+          </p>
+        </div>
+        {vorsitze.length > 0 && (
+          <button onClick={() => setNeu(true)} className="btn-primary !w-auto shrink-0 px-3.5 text-[13px]">
+            + Anfragen
+          </button>
+        )}
+      </div>
+
+      {!kosten.bereit ? (
+        <p className="py-6 text-center text-[13px] text-tinte-leise">Lädt …</p>
+      ) : kosten.anfragen.length === 0 ? (
+        <p className="py-6 text-center text-[13px] text-tinte-leise">Keine Kostenanfragen.</p>
+      ) : (
+        <ul className="mt-3 grid grid-cols-[minmax(0,1fr)] gap-2">
+          {[...offene, ...sichtbarErledigt].map((a) => (
+            <li key={a.id}>
+              <button
+                onClick={() => setAuswahl(a)}
+                className={`flex w-full items-center gap-2.5 rounded-xl border px-3 py-2.5 text-left ${
+                  a.status === "offen" && darfEntscheiden
+                    ? "border-amber-300 bg-amber-50/60 dark:border-amber-500/40 dark:bg-amber-500/5"
+                    : "border-papier-linie dark:border-slate-800"
+                }`}
+              >
+                <span className="shrink-0 text-lg">{committeeIcon(a.tag)}</span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[14px] font-semibold">{a.titel}</span>
+                  <span className="block truncate text-[11px] text-tinte-leise">
+                    {committeeLabel(a.tag)} · {profile[a.created_by]?.anzeigename || "Vorsitz"}
+                    {a.benoetigt_am ? ` · bis ${kurzTag(a.benoetigt_am)}` : ""}
+                  </span>
+                </span>
+                <span className="flex shrink-0 flex-col items-end gap-0.5">
+                  <span className="zahl text-[14px] font-bold">{euro(a.cent)}</span>
+                  <span className={`rounded-full px-1.5 py-px text-[10.5px] font-bold ${STATUS[a.status].klasse}`}>
+                    {STATUS[a.status].text}
+                  </span>
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {erledigte.length > 3 && (
+        <button onClick={() => setAlle(!alle)} className="mt-2 w-full text-center text-[12px] font-bold text-brand">
+          {alle ? "Weniger anzeigen" : `Alle ${erledigte.length} erledigten anzeigen`}
+        </button>
+      )}
+
+      <KostenAnfrageSheet open={neu} onClose={() => setNeu(false)} vorsitze={vorsitze} onStellen={kosten.stellen} />
+      <AnfrageDetailSheet
+        anfrage={auswahl}
+        onClose={() => setAuswahl(null)}
+        darfEntscheiden={darfEntscheiden}
+        kosten={kosten}
+        onEntschieden={onEntschieden}
+        name={auswahl ? profile[auswahl.created_by]?.anzeigename || "Vorsitz" : ""}
+      />
+    </section>
+  );
+}
+
+function KostenAnfrageSheet({
+  open, onClose, vorsitze, onStellen,
+}: {
+  open: boolean;
+  onClose: () => void;
+  vorsitze: string[];
+  onStellen: KostenValue["stellen"];
+}) {
+  const [tag, setTag] = useState("");
+  const [titel, setTitel] = useState("");
+  const [betrag, setBetrag] = useState("");
+  const [bis, setBis] = useState("");
+  const [nachricht, setNachricht] = useState("");
+  const [fehler, setFehler] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    setTag(vorsitze[0] || "");
+    setTitel("");
+    setBetrag("");
+    setBis("");
+    setNachricht("");
+    setFehler("");
+  }, [open, vorsitze]);
+
+  async function senden() {
+    setFehler("");
+    const c = centAus(betrag);
+    if (!titel.trim()) return setFehler("Wofür brauchst du das Geld?");
+    if (!c || c <= 0) return setFehler("Bitte einen Betrag über 0 eingeben.");
+    setBusy(true);
+    const f = await onStellen({ tag, titel, nachricht, cent: c, benoetigt_am: bis || null });
+    setBusy(false);
+    if (f) return setFehler("Hat nicht geklappt: " + f);
+    onClose();
+  }
+
+  return (
+    <Sheet open={open} onClose={onClose}>
+      <h2 className="text-xl font-extrabold">Kosten anfragen</h2>
+      <p className="text-[12px] text-tinte-leise">Kassenwart und Admin bekommen eine Benachrichtigung.</p>
+
+      {vorsitze.length > 1 && (
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {vorsitze.map((k) => (
+            <button
+              key={k}
+              onClick={() => setTag(k)}
+              className={`rounded-lg border px-2.5 py-1.5 text-[12px] font-bold ${
+                tag === k ? "border-brand bg-brand/10 text-brand" : "border-papier-linie text-tinte-matt dark:border-slate-700"
+              }`}
+            >
+              {committeeIcon(k)} {committeeLabel(k)}
+            </button>
+          ))}
+        </div>
+      )}
+      {vorsitze.length === 1 && (
+        <div className="mt-3 text-[13px] font-semibold">
+          {committeeIcon(tag)} {committeeLabel(tag)}
+        </div>
+      )}
+
+      <label className="mt-3 block text-[12px] font-semibold text-tinte-leise">Wofür</label>
+      <input className="field mt-1" placeholder="z. B. Deko für den Abiball" value={titel} maxLength={120} onChange={(e) => setTitel(e.target.value)} />
+
+      <div className="mt-3 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-2">
+        <div className="min-w-0">
+          <label className="block text-[12px] font-semibold text-tinte-leise">Betrag</label>
+          <div className="mt-1 flex items-center gap-1 rounded-xl bg-papier-matt px-3 dark:bg-slate-800">
             <input
-              className="field min-w-0 flex-1"
+              className="zahl min-w-0 flex-1 bg-transparent py-2.5 text-[15px] font-bold outline-none"
               inputMode="decimal"
-              placeholder="Zielbetrag, z. B. 12000"
+              placeholder="0,00"
               value={betrag}
               onChange={(e) => setBetrag(e.target.value)}
             />
             <span className="font-bold text-tinte-matt">€</span>
+          </div>
+        </div>
+        <div className="min-w-0">
+          <label className="block text-[12px] font-semibold text-tinte-leise">Gebraucht bis (freiwillig)</label>
+          <input type="date" className="field mt-1" value={bis} onChange={(e) => setBis(e.target.value)} />
+        </div>
+      </div>
+
+      <label className="mt-3 block text-[12px] font-semibold text-tinte-leise">Begründung (freiwillig)</label>
+      <textarea
+        className="field mt-1 min-h-[4rem]"
+        placeholder="z. B. Angebot vom Baumarkt, 3 Rollen Lichterkette"
+        value={nachricht}
+        maxLength={1000}
+        onChange={(e) => setNachricht(e.target.value)}
+      />
+
+      {fehler && <p className="mt-2 text-[13px] font-semibold text-amber-600">{fehler}</p>}
+      <button disabled={busy} onClick={senden} className="btn-primary mt-4 disabled:opacity-50">
+        {busy ? "…" : "Anfrage senden"}
+      </button>
+    </Sheet>
+  );
+}
+
+function AnfrageDetailSheet({
+  anfrage, onClose, darfEntscheiden, kosten, name, onEntschieden,
+}: {
+  anfrage: KostenAnfrage | null;
+  onClose: () => void;
+  darfEntscheiden: boolean;
+  kosten: KostenValue;
+  name: string;
+  onEntschieden?: () => void;
+}) {
+  const { uid } = useRole();
+  const [antwort, setAntwort] = useState("");
+  const [datum, setDatum] = useState(heute());
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    setAntwort("");
+    setDatum(heute());
+  }, [anfrage]);
+
+  if (!anfrage) return null;
+  const a = anfrage;
+  const eigene = uid === a.created_by;
+
+  async function entscheiden(ja: boolean) {
+    setBusy(true);
+    const f = await kosten.entscheiden(a, ja, antwort, datum);
+    setBusy(false);
+    if (f) return alert("Hat nicht geklappt: " + f);
+    onEntschieden?.();
+    onClose();
+  }
+
+  return (
+    <Sheet open onClose={onClose}>
+      <div className="flex items-start gap-3">
+        <Avatar userId={a.created_by} size={40} />
+        <div className="min-w-0 flex-1">
+          <div className="text-[12px] font-semibold text-tinte-leise">
+            {committeeIcon(a.tag)} {committeeLabel(a.tag)} · {name}
+          </div>
+          <h2 className="text-xl font-extrabold leading-tight">{a.titel}</h2>
+        </div>
+        <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold ${STATUS[a.status].klasse}`}>
+          {STATUS[a.status].text}
+        </span>
+      </div>
+
+      <div className="zahl mt-4 text-[2rem] font-extrabold leading-none">{euro(a.cent)}</div>
+      <div className="mt-1 text-[12px] text-tinte-leise">
+        angefragt am {new Date(a.created_at).toLocaleDateString("de-DE")}
+        {a.benoetigt_am ? ` · gebraucht bis ${kurzTag(a.benoetigt_am)}` : ""}
+      </div>
+      {a.nachricht && (
+        <p className="mt-3 whitespace-pre-wrap rounded-xl bg-papier-matt p-3 text-[14px] dark:bg-slate-800">{a.nachricht}</p>
+      )}
+
+      {a.status !== "offen" && (
+        <div className="mt-3 text-[13px] text-tinte-matt dark:text-slate-300">
+          {a.status === "genehmigt" ? "✓ Genehmigt und als Ausgabe gebucht" : "✕ Abgelehnt"}
+          {a.decided_at ? ` am ${new Date(a.decided_at).toLocaleDateString("de-DE")}` : ""}
+          {a.antwort ? <span className="mt-1 block">„{a.antwort}“</span> : null}
+        </div>
+      )}
+
+      {a.status === "offen" && darfEntscheiden && (
+        <div className="mt-4 border-t border-papier-linie pt-4 dark:border-slate-800">
+          <label className="block text-[12px] font-semibold text-tinte-leise">Antwort (freiwillig)</label>
+          <input
+            className="field mt-1"
+            placeholder="z. B. Bitte Kassenbon abgeben"
+            value={antwort}
+            onChange={(e) => setAntwort(e.target.value)}
+          />
+          <label className="mt-2 block text-[12px] font-semibold text-tinte-leise">Buchungsdatum bei Genehmigung</label>
+          <input type="date" className="field mt-1" value={datum} onChange={(e) => setDatum(e.target.value)} />
+          <div className="mt-3 grid grid-cols-2 gap-2">
             <button
-              onClick={async () => {
-                const c = centAus(betrag) ?? 0;
-                const f = await onZiel({ ziel_cent: Math.max(0, c), ziel_titel: titel.trim() || "Abiball" });
-                if (f) alert("Hat nicht geklappt: " + f);
-                else setBearbeiten(false);
-              }}
-              className="btn-primary !w-auto shrink-0 px-4"
+              disabled={busy}
+              onClick={() => void entscheiden(false)}
+              className="rounded-xl border border-red-300 py-3 text-[14px] font-bold text-red-600 disabled:opacity-50 dark:border-red-500/40 dark:text-red-400"
             >
-              Speichern
+              Ablehnen
+            </button>
+            <button
+              disabled={busy}
+              onClick={() => void entscheiden(true)}
+              className="rounded-xl bg-emerald-600 py-3 text-[14px] font-bold text-white disabled:opacity-50"
+            >
+              Genehmigen
             </button>
           </div>
         </div>
       )}
 
-      <div className="mt-4 flex flex-col items-center gap-5 sm:flex-row sm:items-center">
-        <Kreis teile={teile} ganz={ganz} prozent={prozent} summe={summe} dunkel={dunkel} />
+      {a.status === "offen" && eigene && !darfEntscheiden && (
+        <button
+          disabled={busy}
+          onClick={async () => {
+            if (!confirm("Anfrage zurückziehen?")) return;
+            setBusy(true);
+            const f = await kosten.zurueckziehen(a.id);
+            setBusy(false);
+            if (f) alert("Hat nicht geklappt: " + f);
+            else onClose();
+          }}
+          className="mt-4 w-full rounded-xl border border-papier-linie py-2.5 text-[13px] font-bold text-tinte-matt dark:border-slate-700"
+        >
+          Anfrage zurückziehen
+        </button>
+      )}
+    </Sheet>
+  );
+}
 
-        {/* Legende: Name, Betrag, Anteil – immer lesbar, nie nur Farbe */}
-        <ul className="grid w-full min-w-0 grid-cols-[minmax(0,1fr)] gap-1.5 sm:w-auto sm:flex-1">
-          {teile.map((t) => (
-            <li key={t.key} className="flex items-center gap-2.5 text-[13px]">
-              <span className="h-3 w-3 shrink-0 rounded-[3px]" style={{ background: t.farbe }} />
-              <span className="min-w-0 flex-1 truncate font-semibold">{t.label}</span>
-              <span className="zahl shrink-0 font-bold">{euroKurz(t.cent)}</span>
-              <span className="zahl w-10 shrink-0 text-right text-[12px] text-tinte-leise">
-                {summe ? Math.round((t.cent / summe) * 100) : 0} %
-              </span>
-            </li>
+// ==================================================================== Verlauf
+
+type Filter = "alle" | "ein" | "aus";
+
+function VerlaufKarte({
+  buchungen, darf, onLoeschen, aktionName,
+}: {
+  buchungen: Buchung[];
+  darf: boolean;
+  onLoeschen: (id: string) => Promise<string | null>;
+  aktionName: (id: string) => string;
+}) {
+  const [filter, setFilter] = useState<Filter>("alle");
+  const [q, setQ] = useState("");
+
+  const liste = useMemo(() => {
+    const n = q.trim().toLowerCase();
+    return buchungen.filter((b) => {
+      if (filter === "ein" && (b.cent < 0 || b.quelle === "abgleich")) return false;
+      if (filter === "aus" && (b.cent > 0 || b.quelle === "abgleich")) return false;
+      if (n && !`${b.titel} ${zuweisungText(b, aktionName)}`.toLowerCase().includes(n)) return false;
+      return true;
+    });
+  }, [buchungen, filter, q, aktionName]);
+
+  const { sichtbar, marke } = useNachschub(liste.length, [filter, q]);
+
+  const gruppen = useMemo(() => {
+    const m = new Map<string, Buchung[]>();
+    for (const b of liste.slice(0, sichtbar)) {
+      const k = b.datum.slice(0, 7);
+      (m.get(k) || m.set(k, []).get(k)!).push(b);
+    }
+    return [...m.entries()];
+  }, [liste, sichtbar]);
+
+  const FILTER: [Filter, string][] = [
+    ["alle", "Alle"],
+    ["ein", "Rein"],
+    ["aus", "Raus"],
+  ];
+
+  return (
+    <section className="card min-w-0 p-5 lg:col-span-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <h2 className="mr-auto text-lg font-bold">Verlauf</h2>
+        <div className="flex gap-1 rounded-xl bg-papier-matt p-1 dark:bg-slate-800">
+          {FILTER.map(([k, label]) => (
+            <button
+              key={k}
+              onClick={() => setFilter(k)}
+              className={`rounded-lg px-3 py-1 text-[12px] font-bold transition ${
+                filter === k ? "bg-white text-tinte shadow-sm dark:bg-slate-700 dark:text-white" : "text-tinte-matt dark:text-slate-400"
+              }`}
+            >
+              {label}
+            </button>
           ))}
-          {ziel.ziel_cent > summe && (
-            <li className="flex items-center gap-2.5 text-[13px] text-tinte-leise">
-              <span className="h-3 w-3 shrink-0 rounded-[3px] bg-papier-linie dark:bg-slate-700" />
-              <span className="min-w-0 flex-1 truncate">Fehlt noch</span>
-              <span className="zahl shrink-0 font-bold">{euroKurz(ziel.ziel_cent - summe)}</span>
-              <span className="w-10 shrink-0" />
-            </li>
-          )}
-        </ul>
+        </div>
       </div>
+      <input className="field mt-2" placeholder="Suchen, z. B. Waffel oder Abiball …" value={q} onChange={(e) => setQ(e.target.value)} />
 
-      {aktionListe.length > 0 && (
-        <div className="mt-4 border-t border-papier-linie pt-3 dark:border-slate-800">
-          <div className="mb-1.5 text-[12px] font-semibold text-tinte-leise">Aktionen im Einzelnen</div>
-          <ul className="grid gap-1">
-            {aktionListe.map(([id, cent]) => (
-              <li key={id} className="flex items-center gap-2 text-[13px]">
-                <span className="shrink-0">{id ? aktionIcon(id) : "📌"}</span>
-                <span className="min-w-0 flex-1 truncate">{id ? aktionName(id) : "Ohne Zuordnung"}</span>
-                <span className="zahl shrink-0 font-semibold">{euroKurz(cent)}</span>
-              </li>
-            ))}
-          </ul>
+      {liste.length === 0 ? (
+        <p className="py-8 text-center text-[13px] text-tinte-leise">Keine Buchungen.</p>
+      ) : (
+        <div className="mt-3 grid grid-cols-[minmax(0,1fr)] gap-4">
+          {gruppen.map(([monat, zeilen]) => {
+            const summe = zeilen.reduce((n, b) => n + b.cent, 0);
+            return (
+              <div key={monat}>
+                <div className="mb-1 flex items-baseline justify-between px-1">
+                  <span className="text-[12px] font-bold uppercase tracking-wide text-tinte-leise">
+                    {new Date(monat + "-01T12:00:00").toLocaleDateString("de-DE", { month: "long", year: "numeric" })}
+                  </span>
+                  <span className="zahl text-[12px] font-semibold text-tinte-leise">
+                    {summe >= 0 ? "+" : "−"} {euro(Math.abs(summe))}
+                  </span>
+                </div>
+                <ul className="divide-y divide-papier-linie overflow-hidden rounded-xl border border-papier-linie dark:divide-slate-800 dark:border-slate-800">
+                  {zeilen.map((b) => (
+                    <Zeile key={b.id} b={b} darf={darf} onLoeschen={onLoeschen} aktionName={aktionName} />
+                  ))}
+                </ul>
+              </div>
+            );
+          })}
+          {sichtbar < liste.length && <div ref={marke} className="h-6" />}
         </div>
       )}
     </section>
+  );
+}
+
+function Zeile({
+  b, darf, onLoeschen, aktionName,
+}: {
+  b: Buchung;
+  darf: boolean;
+  onLoeschen: (id: string) => Promise<string | null>;
+  aktionName: (id: string) => string;
+}) {
+  const plus = b.cent > 0;
+  const zu = zuweisungText(b, aktionName);
+  const icon = b.komitee
+    ? committeeIcon(b.komitee)
+    : b.quelle === "beitrag"
+      ? "🎓"
+      : b.quelle === "aktion"
+        ? "🧇"
+        : b.quelle === "spende"
+          ? "🤝"
+          : b.quelle === "abgleich"
+            ? "🏦"
+            : plus
+              ? "📥"
+              : "📤";
+  return (
+    <li className="flex items-center gap-2.5 bg-white px-3 py-2.5 dark:bg-slate-900">
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-papier-matt text-[15px] dark:bg-slate-800">
+        {icon}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-[14px] font-semibold">{b.titel || zu}</span>
+        <span className="block truncate text-[11px] text-tinte-leise">
+          {new Date(b.datum + "T12:00:00").toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" })}
+          {zu !== b.titel ? ` · ${zu}` : ""}
+          {b.anfrage_id ? " · Kostenanfrage" : ""}
+          {b.automatisch ? " · automatisch" : ""}
+        </span>
+      </span>
+      <span className={`zahl shrink-0 text-[14px] font-bold ${plus ? "text-bezahlt dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
+        {plus ? "+" : "−"} {euro(Math.abs(b.cent))}
+      </span>
+      {darf && !b.automatisch && (
+        <button
+          onClick={async () => {
+            if (!confirm(`Buchung „${b.titel}" über ${euro(Math.abs(b.cent))} löschen?`)) return;
+            const f = await onLoeschen(b.id);
+            if (f) alert("Löschen hat nicht geklappt: " + f);
+          }}
+          className="shrink-0 rounded-md px-1.5 text-[15px] text-tinte-leise hover:text-red-500"
+          aria-label="Buchung löschen"
+          title="Buchung löschen"
+        >
+          ✕
+        </button>
+      )}
+    </li>
   );
 }
 
@@ -371,331 +1067,3 @@ function Kreis({
   );
 }
 
-// ==================================================================== Buchen
-
-function BuchenKarte({
-  onBuchen, aktionen,
-}: {
-  onBuchen: ReturnType<typeof useFinanzen>["buchen"];
-  aktionen: { id: string; titel: string; icon: string }[];
-}) {
-  const [art, setArt] = useState<"ein" | "aus">("ein");
-  const [quelle, setQuelle] = useState<Quelle>("aktion");
-  const [aktionId, setAktionId] = useState("");
-  const [betrag, setBetrag] = useState("");
-  const [titel, setTitel] = useState("");
-  const [datum, setDatum] = useState(heute());
-  const [fehler, setFehler] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [ok, setOk] = useState("");
-
-  async function speichern() {
-    setFehler("");
-    const c = centAus(betrag);
-    if (!c || c <= 0) return setFehler("Bitte einen Betrag über 0 eingeben.");
-    const q: Quelle = art === "aus" ? "ausgabe" : quelle;
-    const aktion = aktionen.find((a) => a.id === aktionId);
-    const t = titel.trim() || (q === "aktion" && aktion ? aktion.titel : "");
-    if (!t) return setFehler("Wofür war das? Kurze Beschreibung reicht.");
-    setBusy(true);
-    const f = await onBuchen({
-      datum,
-      cent: art === "aus" ? -c : c,
-      quelle: q,
-      titel: t,
-      aktion_id: q === "aktion" ? aktionId || null : null,
-    });
-    setBusy(false);
-    if (f) return setFehler("Hat nicht geklappt: " + f);
-    setOk(`${art === "aus" ? "Ausgabe" : "Einnahme"} über ${euro(c)} gebucht.`);
-    setTimeout(() => setOk(""), 2500);
-    setBetrag("");
-    setTitel("");
-  }
-
-  const seg = "flex-1 rounded-lg py-2 text-[13px] font-bold transition";
-  return (
-    <section className="card p-5">
-      <h2 className="text-lg font-bold">Buchung eintragen</h2>
-      <p className="text-[12px] text-tinte-leise">
-        Stufenbeiträge buchen sich von selbst, sobald sie auf „bezahlt“ stehen.
-      </p>
-
-      <div className="mt-3 flex gap-1.5 rounded-xl bg-papier-matt p-1 dark:bg-slate-800">
-        <button onClick={() => setArt("ein")} className={`${seg} ${art === "ein" ? "bg-emerald-600 text-white" : "text-tinte-matt"}`}>
-          + Einnahme
-        </button>
-        <button onClick={() => setArt("aus")} className={`${seg} ${art === "aus" ? "bg-red-600 text-white" : "text-tinte-matt"}`}>
-          − Ausgabe
-        </button>
-      </div>
-
-      {art === "ein" && (
-        <div className="mt-2 flex flex-wrap gap-1.5">
-          {EINNAHME_QUELLEN.filter((q) => q.key !== "beitrag").map((q) => (
-            <button
-              key={q.key}
-              onClick={() => setQuelle(q.key)}
-              className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[12px] font-bold ${
-                quelle === q.key ? "border-brand bg-brand/10 text-brand" : "border-papier-linie text-tinte-matt dark:border-slate-700"
-              }`}
-            >
-              <span className="h-2.5 w-2.5 rounded-[2px]" style={{ background: q.hell }} />
-              {q.label}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {art === "ein" && quelle === "aktion" && (
-        <select
-          className="field mt-2"
-          value={aktionId}
-          onChange={(e) => setAktionId(e.target.value)}
-        >
-          <option value="">Welche Aktion?</option>
-          {aktionen.map((a) => (
-            <option key={a.id} value={a.id}>
-              {a.icon} {a.titel}
-            </option>
-          ))}
-        </select>
-      )}
-
-      <div className="mt-2 grid grid-cols-[minmax(0,1fr)_auto] gap-2">
-        <input
-          className="field"
-          placeholder={art === "aus" ? "Wofür? z. B. Waffeleisen" : "Beschreibung (optional bei Aktionen)"}
-          value={titel}
-          onChange={(e) => setTitel(e.target.value)}
-        />
-        <div className="flex items-center gap-1 rounded-xl bg-papier-matt px-3 dark:bg-slate-800">
-          <input
-            className="w-20 bg-transparent py-2.5 text-right text-[15px] font-bold outline-none"
-            inputMode="decimal"
-            placeholder="0,00"
-            value={betrag}
-            onChange={(e) => setBetrag(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && void speichern()}
-          />
-          <span className="font-bold text-tinte-matt">€</span>
-        </div>
-      </div>
-
-      <div className="mt-2 flex items-center gap-2">
-        <label className="flex min-w-0 flex-1 items-center gap-2 text-[12px] font-semibold text-tinte-leise">
-          Datum
-          <input
-            type="date"
-            className="min-w-0 flex-1 rounded-lg border border-papier-linie bg-white px-2.5 py-2 text-[14px] text-tinte dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-            value={datum}
-            onChange={(e) => setDatum(e.target.value)}
-          />
-        </label>
-        <button disabled={busy} onClick={speichern} className="btn-primary !w-auto shrink-0 px-5 disabled:opacity-50">
-          {busy ? "…" : "Buchen"}
-        </button>
-      </div>
-      {fehler && <p className="mt-2 text-[13px] font-semibold text-amber-600">{fehler}</p>}
-      {ok && <p className="mt-2 text-[13px] font-semibold text-bezahlt dark:text-emerald-400">✓ {ok}</p>}
-    </section>
-  );
-}
-
-/**
- * Abgleich: den echten Kontostand aus dem Online-Banking eintragen. Die App
- * bucht die Differenz als "Abgleich mit der Bank" – danach stimmt der Stand,
- * und im Verlauf steht nachvollziehbar, wann und um wie viel korrigiert wurde.
- */
-function AbgleichKarte({ stand, onBuchen }: { stand: number; onBuchen: ReturnType<typeof useFinanzen>["buchen"] }) {
-  const [bank, setBank] = useState("");
-  const [busy, setBusy] = useState(false);
-  const c = centAus(bank);
-  const diff = c === null ? null : c - stand;
-
-  return (
-    <section className="card p-5">
-      <h2 className="text-lg font-bold">Mit der Bank abgleichen</h2>
-      <p className="text-[12px] leading-relaxed text-tinte-leise">
-        Kontostand aus dem Online-Banking eintragen. Die Differenz wird als Abgleich gebucht.
-      </p>
-      <div className="mt-3 flex items-center gap-2">
-        <div className="flex min-w-0 flex-1 items-center gap-1 rounded-xl bg-papier-matt px-3 dark:bg-slate-800">
-          <input
-            className="min-w-0 flex-1 bg-transparent py-2.5 text-[15px] font-bold outline-none"
-            inputMode="decimal"
-            placeholder="Stand laut Bank"
-            value={bank}
-            onChange={(e) => setBank(e.target.value)}
-          />
-          <span className="font-bold text-tinte-matt">€</span>
-        </div>
-        <button
-          disabled={busy || diff === null || diff === 0}
-          onClick={async () => {
-            if (diff === null || diff === 0) return;
-            if (!confirm(`Kontostand auf ${euro(c!)} setzen? Gebucht wird ${diff > 0 ? "+" : "−"} ${euro(Math.abs(diff))}.`)) return;
-            setBusy(true);
-            const f = await onBuchen({ datum: heute(), cent: diff, quelle: "abgleich", titel: "Abgleich mit der Bank" });
-            setBusy(false);
-            if (f) alert("Hat nicht geklappt: " + f);
-            else setBank("");
-          }}
-          className="btn-primary !w-auto shrink-0 px-4 disabled:opacity-40"
-        >
-          Abgleichen
-        </button>
-      </div>
-      {diff !== null && (
-        <p className="mt-2 text-[12px] text-tinte-matt dark:text-slate-400">
-          {diff === 0
-            ? "Stimmt genau mit dem Kassenbuch überein."
-            : `Unterschied zum Kassenbuch: ${diff > 0 ? "+" : "−"} ${euro(Math.abs(diff))}`}
-        </p>
-      )}
-    </section>
-  );
-}
-
-// ==================================================================== Verlauf
-
-type Filter = "alle" | "ein" | "aus" | Quelle;
-
-function VerlaufKarte({
-  buchungen, darf, onLoeschen, aktionName,
-}: {
-  buchungen: Buchung[];
-  darf: boolean;
-  onLoeschen: (id: string) => Promise<string | null>;
-  aktionName: (id: string) => string;
-}) {
-  const [filter, setFilter] = useState<Filter>("alle");
-  const [q, setQ] = useState("");
-
-  const liste = useMemo(() => {
-    const n = q.trim().toLowerCase();
-    return buchungen.filter((b) => {
-      if (filter === "ein" && (b.cent < 0 || b.quelle === "abgleich")) return false;
-      if (filter === "aus" && b.quelle !== "ausgabe") return false;
-      if (!["alle", "ein", "aus"].includes(filter) && b.quelle !== filter) return false;
-      if (n && !b.titel.toLowerCase().includes(n)) return false;
-      return true;
-    });
-  }, [buchungen, filter, q]);
-
-  const { sichtbar, marke } = useNachschub(liste.length, [filter, q]);
-
-  // Nach Monat gruppieren, mit Monatssumme
-  const gruppen = useMemo(() => {
-    const m = new Map<string, Buchung[]>();
-    for (const b of liste.slice(0, sichtbar)) {
-      const k = b.datum.slice(0, 7);
-      (m.get(k) || m.set(k, []).get(k)!).push(b);
-    }
-    return [...m.entries()];
-  }, [liste, sichtbar]);
-
-  const FILTER: [Filter, string][] = [
-    ["alle", "Alle"],
-    ["ein", "Einnahmen"],
-    ["aus", "Ausgaben"],
-    ["beitrag", "Beiträge"],
-    ["aktion", "Aktionen"],
-    ["spende", "Spenden"],
-  ];
-
-  return (
-    <section className="card p-5 lg:col-span-2">
-      <h2 className="text-lg font-bold">Verlauf</h2>
-      <div className="mt-2 flex flex-wrap gap-1.5">
-        {FILTER.map(([k, label]) => (
-          <button
-            key={k}
-            onClick={() => setFilter(k)}
-            className={`rounded-lg px-2.5 py-1.5 text-[12px] font-bold transition ${
-              filter === k ? "bg-brand text-white" : "bg-papier-matt text-tinte-matt dark:bg-slate-800 dark:text-slate-300"
-            }`}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-      <input className="field mt-2" placeholder="Suchen, z. B. Name oder Waffel …" value={q} onChange={(e) => setQ(e.target.value)} />
-
-      {liste.length === 0 ? (
-        <p className="py-8 text-center text-[13px] text-tinte-leise">Keine Buchungen.</p>
-      ) : (
-        <div className="mt-3 grid grid-cols-[minmax(0,1fr)] gap-4">
-          {gruppen.map(([monat, zeilen]) => {
-            const summe = zeilen.reduce((n, b) => n + b.cent, 0);
-            return (
-              <div key={monat}>
-                <div className="mb-1 flex items-baseline justify-between px-1">
-                  <span className="text-[12px] font-bold uppercase tracking-wide text-tinte-leise">
-                    {new Date(monat + "-01T12:00:00").toLocaleDateString("de-DE", { month: "long", year: "numeric" })}
-                  </span>
-                  <span className="zahl text-[12px] font-semibold text-tinte-leise">
-                    {summe >= 0 ? "+" : "−"} {euro(Math.abs(summe))}
-                  </span>
-                </div>
-                <ul className="divide-y divide-papier-linie overflow-hidden rounded-xl border border-papier-linie dark:divide-slate-800 dark:border-slate-800">
-                  {zeilen.map((b) => (
-                    <Zeile key={b.id} b={b} darf={darf} onLoeschen={onLoeschen} aktionName={aktionName} />
-                  ))}
-                </ul>
-              </div>
-            );
-          })}
-          {sichtbar < liste.length && <div ref={marke} className="h-6" />}
-        </div>
-      )}
-    </section>
-  );
-}
-
-function Zeile({
-  b, darf, onLoeschen, aktionName,
-}: {
-  b: Buchung;
-  darf: boolean;
-  onLoeschen: (id: string) => Promise<string | null>;
-  aktionName: (id: string) => string;
-}) {
-  const q = EINNAHME_QUELLEN.find((x) => x.key === b.quelle);
-  const plus = b.cent > 0;
-  return (
-    <li className="flex items-center gap-2.5 bg-white px-3 py-2.5 dark:bg-slate-900">
-      <span
-        className="h-2.5 w-2.5 shrink-0 rounded-full"
-        style={{ background: q ? q.hell : b.quelle === "ausgabe" ? "#dc2626" : "#94a3b8" }}
-      />
-      <span className="min-w-0 flex-1">
-        <span className="block truncate text-[14px] font-semibold">{b.titel || QUELLE_NAME[b.quelle]}</span>
-        <span className="block truncate text-[11px] text-tinte-leise">
-          {new Date(b.datum + "T12:00:00").toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" })}
-          {" · "}
-          {QUELLE_NAME[b.quelle]}
-          {b.aktion_id && aktionName(b.aktion_id) ? ` · ${aktionName(b.aktion_id)}` : ""}
-          {b.automatisch ? " · automatisch" : ""}
-        </span>
-      </span>
-      <span className={`zahl shrink-0 text-[14px] font-bold ${plus ? "text-bezahlt dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
-        {plus ? "+" : "−"} {euro(Math.abs(b.cent))}
-      </span>
-      {darf && !b.automatisch && (
-        <button
-          onClick={async () => {
-            if (!confirm(`Buchung „${b.titel}" über ${euro(Math.abs(b.cent))} löschen?`)) return;
-            const f = await onLoeschen(b.id);
-            if (f) alert("Löschen hat nicht geklappt: " + f);
-          }}
-          className="shrink-0 rounded-md px-1.5 text-[15px] text-tinte-leise hover:text-red-500"
-          aria-label="Buchung löschen"
-          title="Buchung löschen"
-        >
-          ✕
-        </button>
-      )}
-    </li>
-  );
-}

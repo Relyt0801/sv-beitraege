@@ -23,6 +23,8 @@ export interface Buchung {
   aktion_id: string | null;
   student_id: string | null;
   halbjahr: string | null;
+  komitee: string | null;
+  anfrage_id: string | null;
   automatisch: boolean;
   created_by: string | null;
   created_at: string;
@@ -82,9 +84,18 @@ export interface FinanzenValue {
   ziel: KassenZiel;
   bereit: boolean;
   fehler: string;
-  buchen: (b: { datum: string; cent: number; quelle: Quelle; titel: string; aktion_id?: string | null }) => Promise<string | null>;
+  buchen: (b: {
+    datum: string;
+    cent: number;
+    quelle: Quelle;
+    titel: string;
+    aktion_id?: string | null;
+    komitee?: string | null;
+  }) => Promise<string | null>;
   loeschen: (id: string) => Promise<string | null>;
   zielSetzen: (z: KassenZiel) => Promise<string | null>;
+  /** Sofort neu laden – z. B. nach einer genehmigten Kostenanfrage. */
+  neuLaden: () => Promise<void>;
 }
 
 /**
@@ -141,6 +152,7 @@ export function useFinanzen(aktiv: boolean): FinanzenValue {
         quelle: b.quelle,
         titel: b.titel.trim(),
         aktion_id: b.aktion_id ?? null,
+        komitee: b.komitee ?? null,
         created_by: s.session?.user.id ?? null,
       });
       if (error) return error.message;
@@ -175,7 +187,7 @@ export function useFinanzen(aktiv: boolean): FinanzenValue {
   );
 
   return useMemo(
-    () => ({ buchungen, ziel, bereit, fehler, buchen, loeschen, zielSetzen }),
-    [buchungen, ziel, bereit, fehler, buchen, loeschen, zielSetzen],
+    () => ({ buchungen, ziel, bereit, fehler, buchen, loeschen, zielSetzen, neuLaden: laden }),
+    [buchungen, ziel, bereit, fehler, buchen, loeschen, zielSetzen, laden],
   );
 }

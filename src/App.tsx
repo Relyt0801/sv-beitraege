@@ -30,6 +30,7 @@ import { PermissionsTab } from "./components/PermissionsTab";
 import { EventsTab } from "./components/EventsTab";
 import { BeitraegeTab } from "./components/BeitraegeTab";
 import { FinanzenTab } from "./components/FinanzenTab";
+import { useKostenAnfragen } from "./lib/kosten";
 import { KassenKopf } from "./components/KassenKopf";
 import { EventComposer } from "./components/EventComposer";
 import { AktionSheet } from "./components/AktionSheet";
@@ -94,7 +95,7 @@ type Tab = "kasse" | "events" | "themen" | "beitraege" | "finanzen" | "rollen" |
  *  damit ein Neuladen nicht wieder dorthin springt. */
 function tabAusAdresse(): Tab | null {
   const h = window.location.hash.replace("#", "");
-  const t: Tab | null = h === "events" ? "events" : h === "chats" ? "themen" : h === "kasse" ? "kasse" : null;
+  const t: Tab | null = h === "events" ? "events" : h === "chats" ? "themen" : h === "kasse" ? "kasse" : h === "finanzen" ? "finanzen" : null;
   if (t) history.replaceState(null, "", window.location.pathname + window.location.search);
   return t;
 }
@@ -149,12 +150,18 @@ function Main() {
   }, [roleReady, ready, isStaff, tourResetAt]);
 
   // Rote Zahlen auf den Reitern: alles, was dort auf einen wartet.
-  const { neueTermine, anfragen } = useTermine();
+  const { neueTermine, anfragen, meineVorsitze } = useTermine();
   const { ungelesen: elternUngelesen } = useEltern();
   const offeneAnfragen = isStaff || can("termine.manage") ? anfragen.filter((a) => a.status === "offen").length : 0;
   const unread = allEvents.filter((e) => !reads.has(e.id)).length + neueTermine.size + offeneAnfragen;
   // Beim Team zählen offene Elterngespräche mit zu den Chats.
   const topicsUnread = topicsUnreadChats + (isStaff ? elternUngelesen : 0);
+  // Finanzen: Kassenwart/Admin, freigeschaltete Leser, Aufsichtsrat – und
+  // Komitee-Vorsitzende für ihre Kostenanfragen.
+  const kosten = useKostenAnfragen(roleReady);
+  const showFinanzen =
+    can("finanzen.view") || can("finanzen.manage") || kosten.aufsichtsrat || meineVorsitze.length > 0;
+  const offeneKosten = can("finanzen.manage") ? kosten.anfragen.filter((a) => a.status === "offen").length : 0;
   // Roter Zähler am App-Symbol: ungelesene Chats und Events zusammen.
   useEffect(() => appZaehler(topicsUnread + unread), [topicsUnread, unread]);
   // Ein Tippen auf eine Benachrichtigung öffnet die App mit #events oder
@@ -295,7 +302,7 @@ function Main() {
     { key: "events", icon: "events", label: "Events", badge: unread, show: true },
     { key: "themen", icon: "chats", label: "Chats", badge: topicsUnread, show: showTopicsTab },
     { key: "beitraege", icon: "beitraege", label: "Beiträge", show: can("beitraege.manage") },
-    { key: "finanzen", icon: "finanzen", label: "Finanzen", show: can("finanzen.view") || can("finanzen.manage") },
+    { key: "finanzen", icon: "finanzen", label: "Finanzen", badge: offeneKosten, show: showFinanzen },
     { key: "rollen", icon: "rollen", label: "Rollen", show: canManageRoles },
     { key: "rechte", icon: "rechte", label: "Rechte", show: can("perms.manage") },
   ];
@@ -509,7 +516,7 @@ function Main() {
         </main>
       ) : tab === "finanzen" ? (
         <main className="mt-3 pb-4">
-          <FinanzenTab />
+          <FinanzenTab kosten={kosten} />
         </main>
       ) : tab === "beitraege" ? (
         <main className="mt-3 pb-4">

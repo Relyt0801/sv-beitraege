@@ -8,6 +8,7 @@ import { useTopics } from "../topics-store";
 import { COMMITTEES } from "../lib/committees";
 import { rolleName } from "../lib/permissions";
 import { KontoZeile, Suchfeld } from "./KontoZeile";
+import { PersonAnlegenSheet } from "./PersonAnlegenSheet";
 
 /** Reihenfolge im Auswahlfeld. Die Namen kommen zentral aus permissions.ts. */
 const ROLLEN_AUSWAHL: Role[] = ["schueler", "sprecher", "stv_sprecher", "stufenteam", "kassenwart", "admin", "eltern"];
@@ -28,7 +29,8 @@ const DAUERN: { label: string; ms: number | null }[] = [
 ];
 
 export function RolesTab() {
-  const { profiles, setRole, setBan, can, isAdmin, opUserId } = useRole();
+  const { profiles, setRole, setBan, can, isAdmin, isOp, opUserId, refreshProfiles } = useRole();
+  const [anlegen, setAnlegen] = useState(false);
   const canAssignKom = can("komitees.assign");
   const canTimeout = can("mod.timeout");
   const { students } = useStore();
@@ -63,6 +65,15 @@ export function RolesTab() {
 
   return (
     <div>
+      {(isAdmin || isOp) && (
+        <button
+          onClick={() => setAnlegen(true)}
+          className="mb-3 flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-brand/50 py-3 text-[14px] font-bold text-brand"
+        >
+          + Person hinzufügen
+        </button>
+      )}
+      <PersonAnlegenSheet open={anlegen} onClose={() => setAnlegen(false)} onFertig={refreshProfiles} />
       <Suchfeld wert={q} onChange={setQ} />
 
       <div className="grid gap-2.5 [&>*]:min-w-0">
