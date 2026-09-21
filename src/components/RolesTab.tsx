@@ -23,8 +23,16 @@ const ROLLEN_AUSWAHL: Role[] = ["schueler", "sprecher", "stv_sprecher", "stufent
  */
 const VERSTECKT: Role[] = ["eltern"];
 
-/** Diese beiden Rollen darf nur der Admin vergeben – und je nur einmal. */
-const NUR_ADMIN: Role[] = ["sprecher", "stv_sprecher"];
+/**
+ * Diese Rollen darf nur der Admin vergeben – und nur der Admin wieder
+ * entziehen. Sonst koennte man einen Admin erst herunterstufen und dann
+ * ersetzen. Dieselbe Liste steht in supabase/rollen-nur-admin.sql; dort
+ * haelt sie der Trigger durch, hier graut sie das Auswahlfeld aus.
+ */
+const NUR_ADMIN: Role[] = ["sprecher", "stv_sprecher", "admin", "kassenwart", "eltern"];
+
+/** Und diese beiden gibt es in der Stufe genau einmal. */
+const NUR_EINMAL: Role[] = ["sprecher", "stv_sprecher"];
 
 export function RolesTab() {
   const { profiles, setRole, setBan, can, isAdmin, isOp, opUserId, refreshProfiles } = useRole();
@@ -109,6 +117,9 @@ export function RolesTab() {
           const koms = committeesOf(p.user_id);
           const banned = isBanned(p);
           const geschuetzt = p.is_op || p.user_id === opUserId;
+          // Ohne Admin-Rolle auch nicht weg von einer Admin-Rolle – genau so
+          // haelt es der Trigger in der Datenbank.
+          const rolleGesperrt = geschuetzt || (!isAdmin && NUR_ADMIN.includes(p.role));
           return (
             <div key={p.user_id} className="card min-w-0 p-4">
               {/* Zeile 1: Person */}
@@ -122,8 +133,14 @@ export function RolesTab() {
               {/* Zeile 2: Rolle + Komitees + Chat-Sperre nebeneinander */}
               <div className="mt-2.5 flex min-w-0 flex-wrap items-stretch gap-2">
                 <select
-                  disabled={geschuetzt}
-                  title={geschuetzt ? "Diese Rolle kann nicht geändert werden" : undefined}
+                  disabled={rolleGesperrt}
+                  title={
+                    geschuetzt
+                      ? "Diese Rolle kann nicht geändert werden"
+                      : rolleGesperrt
+                        ? "Diese Rolle darf nur der Admin ändern"
+                        : undefined
+                  }
                   className="h-[42px] w-0 min-w-[8.5rem] flex-1 rounded-xl border border-papier-linie bg-papier-matt px-2.5 font-semibold disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800"
                   value={p.role}
                   onChange={(e) => setRole(p.user_id, e.target.value as Role)}
@@ -131,7 +148,7 @@ export function RolesTab() {
                   {ROLLEN_AUSWAHL
                     .filter((r) => isAdmin || !NUR_ADMIN.includes(r) || p.role === r)
                     .map((r) => {
-                      const vergeben = NUR_ADMIN.includes(r) && profiles.some((x) => x.role === r && x.user_id !== p.user_id);
+                      const vergeben = NUR_EINMAL.includes(r) && profiles.some((x) => x.role === r && x.user_id !== p.user_id);
                       return (
                         <option key={r} value={r} disabled={vergeben}>
                           {rolleName(r)}
