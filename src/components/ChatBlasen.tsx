@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import type { TopicItem } from "../topics-store";
 import { Avatar, PersonName } from "./Avatar";
+import { MuteKnopf } from "./MuteKnopf";
 
 /**
  * Nachrichtenliste im WhatsApp-Stil: fremde Nachrichten links mit Kreis und
@@ -56,6 +57,7 @@ export function ChatBlasen({
                     löschen
                   </button>
                 )}
+                {!meins && <MuteKnopf userId={m.created_by} name={m.author} />}
               </div>
             </div>
           </div>

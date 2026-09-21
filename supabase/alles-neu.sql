@@ -17,7 +17,7 @@
 
 
 -- ==========================================================================
--- SCHRITT 01 von 23: Grundgerüst: Personen und Einstellungen
+-- SCHRITT 01 von 24: Grundgerüst: Personen und Einstellungen
 -- Quelle: supabase/schema.sql
 -- ==========================================================================
 
@@ -74,7 +74,7 @@ create policy "auth write settings"  on public.app_settings for all    to authen
 
 
 -- ==========================================================================
--- SCHRITT 02 von 23: Rollen und Konten
+-- SCHRITT 02 von 24: Rollen und Konten
 -- Quelle: supabase/roles.sql
 -- ==========================================================================
 
@@ -201,7 +201,7 @@ where user_id in (select id from auth.users where email = 'adams.tyler@sv-beitra
 
 
 -- ==========================================================================
--- SCHRITT 03 von 23: Events: Infos, Abstimmungen, Nachrichten
+-- SCHRITT 03 von 24: Events: Infos, Abstimmungen, Nachrichten
 -- Quelle: supabase/events.sql
 -- ==========================================================================
 
@@ -345,7 +345,7 @@ create policy "reads own" on public.event_reads for all to authenticated
 
 
 -- ==========================================================================
--- SCHRITT 04 von 23: Ordner und Chats
+-- SCHRITT 04 von 24: Ordner und Chats
 -- Quelle: supabase/topics.sql
 -- ==========================================================================
 
@@ -454,7 +454,7 @@ create policy "treads own" on public.topic_reads for all to authenticated
 
 
 -- ==========================================================================
--- SCHRITT 05 von 23: Benachrichtigungen
+-- SCHRITT 05 von 24: Benachrichtigungen
 -- Quelle: supabase/push.sql
 -- ==========================================================================
 
@@ -480,7 +480,7 @@ create policy "push own" on public.push_subscriptions for all to authenticated
 
 
 -- ==========================================================================
--- SCHRITT 06 von 23: Konten mit Personen verknüpfen
+-- SCHRITT 06 von 24: Konten mit Personen verknüpfen
 -- Quelle: supabase/link-accounts.sql
 -- ==========================================================================
 
@@ -563,7 +563,7 @@ from public.profiles;
 
 
 -- ==========================================================================
--- SCHRITT 07 von 23: Nutzungsbedingungen erzwingen
+-- SCHRITT 07 von 24: Nutzungsbedingungen erzwingen
 -- Quelle: supabase/consent.sql
 -- ==========================================================================
 
@@ -628,7 +628,7 @@ create policy "profiles read" on public.profiles for select to authenticated
 
 
 -- ==========================================================================
--- SCHRITT 08 von 23: Komitees und Unterordner
+-- SCHRITT 08 von 24: Komitees und Unterordner
 -- Quelle: supabase/komitees.sql
 -- ==========================================================================
 
@@ -676,7 +676,7 @@ $$;
 
 
 -- ==========================================================================
--- SCHRITT 09 von 23: Nur-Admin-Ordner
+-- SCHRITT 09 von 24: Nur-Admin-Ordner
 -- Quelle: supabase/admin-only.sql
 -- ==========================================================================
 
@@ -730,7 +730,7 @@ create policy "titems delete" on public.topic_items for delete to authenticated
 
 
 -- ==========================================================================
--- SCHRITT 10 von 23: Sichtbarkeit von Ordnern
+-- SCHRITT 10 von 24: Sichtbarkeit von Ordnern
 -- Quelle: supabase/visibility.sql
 -- ==========================================================================
 
@@ -788,7 +788,7 @@ create policy "topics delete" on public.topics for delete to authenticated
 
 
 -- ==========================================================================
--- SCHRITT 11 von 23: Team sieht alles, Admin kann sperren
+-- SCHRITT 11 von 24: Team sieht alles, Admin kann sperren
 -- Quelle: supabase/governance.sql
 -- ==========================================================================
 
@@ -854,7 +854,7 @@ end $$;
 
 
 -- ==========================================================================
--- SCHRITT 12 von 23: Mehrere Sichtbarkeits-Ziele je Ordner
+-- SCHRITT 12 von 24: Mehrere Sichtbarkeits-Ziele je Ordner
 -- Quelle: supabase/multi-visibility.sql
 -- ==========================================================================
 
@@ -907,7 +907,7 @@ $$;
 
 
 -- ==========================================================================
--- SCHRITT 13 von 23: Autoren-Markierung an Nachrichten
+-- SCHRITT 13 von 24: Autoren-Markierung an Nachrichten
 -- Quelle: supabase/author-badges.sql
 -- ==========================================================================
 
@@ -923,7 +923,7 @@ alter table public.topic_items add column if not exists author_koms text[];
 
 
 -- ==========================================================================
--- SCHRITT 14 von 23: Konfigurierbare Berechtigungen
+-- SCHRITT 14 von 24: Konfigurierbare Berechtigungen
 -- Quelle: supabase/permissions.sql
 -- ==========================================================================
 
@@ -984,12 +984,14 @@ insert into public.role_permissions (role, perm, allowed) values
   ('stufenteam','chats.manage',true),
   ('stufenteam','komitees.assign',true),
   ('stufenteam','data.edit',true),
+  ('stufenteam','mod.timeout',true),
   ('kassenwart','chats.view_all',true),
   ('kassenwart','chats.delete_messages',true),
   ('kassenwart','chats.manage',true),
   ('kassenwart','komitees.assign',true),
   ('kassenwart','data.edit',true),
   ('kassenwart','kasse.edit',true),
+  ('kassenwart','mod.timeout',true),
   ('admin','chats.view_all',true),
   ('admin','chats.delete_messages',true),
   ('admin','chats.manage',true),
@@ -1073,7 +1075,7 @@ create policy "profiles moderate" on public.profiles for update to authenticated
 
 
 -- ==========================================================================
--- SCHRITT 15 von 23: Beiträge und Tickets
+-- SCHRITT 15 von 24: Beiträge und Tickets
 -- Quelle: supabase/punkte-und-chats.sql
 -- ==========================================================================
 
@@ -1156,7 +1158,7 @@ exception when duplicate_object then null; end $$;
 
 
 -- ==========================================================================
--- SCHRITT 16 von 23: OP-Schutz, Sperren, Vorlagen, Fremdzugriff
+-- SCHRITT 16 von 24: OP-Schutz, Sperren, Vorlagen, Fremdzugriff
 -- Quelle: supabase/erweiterungen.sql
 -- ==========================================================================
 
@@ -1459,7 +1461,7 @@ exception when duplicate_object then null; end $$;
 
 
 -- ==========================================================================
--- SCHRITT 17 von 23: Anzeigename, Initialen, Namensfarbe
+-- SCHRITT 17 von 24: Anzeigename, Initialen, Namensfarbe
 -- Quelle: supabase/profile.sql
 -- ==========================================================================
 
@@ -1535,7 +1537,7 @@ exception when duplicate_object then null; end $$;
 
 
 -- ==========================================================================
--- SCHRITT 18 von 23: Rollen Stufensprecher*in und Stv.
+-- SCHRITT 18 von 24: Rollen Stufensprecher*in und Stv.
 -- Quelle: supabase/sprecher.sql
 -- ==========================================================================
 
@@ -1663,7 +1665,7 @@ create trigger guard_role before update on public.profiles
 
 
 -- ==========================================================================
--- SCHRITT 19 von 23: Sprecher-Rechte zusammenlegen
+-- SCHRITT 19 von 24: Sprecher-Rechte zusammenlegen
 -- Quelle: supabase/sprecher-rechte.sql
 -- ==========================================================================
 
@@ -1701,7 +1703,7 @@ create trigger trg_sync_sprecher_rechte
 
 
 -- ==========================================================================
--- SCHRITT 20 von 23: Anonyme Abstimmungen im Events-Reiter
+-- SCHRITT 20 von 24: Anonyme Abstimmungen im Events-Reiter
 -- Quelle: supabase/events-anonym.sql
 -- ==========================================================================
 
@@ -1725,7 +1727,7 @@ create policy "votes select" on public.poll_votes for select to authenticated
 
 
 -- ==========================================================================
--- SCHRITT 21 von 23: Prozent-Konzept und Abiball-Staffel
+-- SCHRITT 21 von 24: Prozent-Konzept und Abiball-Staffel
 -- Quelle: supabase/prozent-staffel.sql
 -- ==========================================================================
 
@@ -1775,7 +1777,7 @@ insert into public.contribution_templates (titel, punkte, sort) values
 
 
 -- ==========================================================================
--- SCHRITT 22 von 23: Reiter Beiträge und Ticket-Grundpreis
+-- SCHRITT 22 von 24: Reiter Beiträge und Ticket-Grundpreis
 -- Quelle: supabase/beitraege-reiter.sql
 -- ==========================================================================
 
@@ -1809,7 +1811,7 @@ on conflict (role, perm) do nothing;
 
 
 -- ==========================================================================
--- SCHRITT 23 von 23: Einführung erneut zeigen können
+-- SCHRITT 23 von 24: Einführung erneut zeigen können
 -- Quelle: supabase/erklaerungen-reset.sql
 -- ==========================================================================
 
@@ -1822,6 +1824,80 @@ on conflict (role, perm) do nothing;
 -- Das Skript scripts/reset-erklaerungen.mjs setzt ihn auf jetzt.
 alter table public.profiles
   add column if not exists tour_reset_at timestamptz;
+
+
+
+-- ==========================================================================
+-- SCHRITT 24 von 24: Diese Rollen vergibt nur der Admin
+-- Quelle: supabase/rollen-nur-admin.sql
+-- ==========================================================================
+
+-- ============================================================
+-- Stufenkasse – Diese Rollen vergibt nur der Admin
+-- Ausführen im Supabase SQL-Editor, NACH permissions.sql. Mehrfach ausführbar.
+--
+-- Bisher galt die Sperre nur für die beiden Sprecher-Rollen. Jetzt gilt sie
+-- auch für admin, kassenwart und eltern: wer roles.manage hat, aber nicht
+-- Admin ist, kann diese Rollen weder vergeben noch entziehen.
+--
+-- Warum am Trigger und nicht nur in der Oberfläche: roles.manage erlaubt ein
+-- update auf public.profiles. Ohne diese Prüfung könnte sich jeder, der das
+-- Recht bekommt, mit einem einzigen API-Aufruf selbst zum Admin machen – der
+-- ausgegraute Eintrag im Auswahlfeld hält davon niemanden ab.
+--
+-- Heute hat roles.manage ausschliesslich die Rolle admin, und niemand hat es
+-- persönlich zugeteilt bekommen. Die Regel ist also ein Sicherheitsnetz für
+-- den Tag, an dem jemand das Recht im Rechte-Reiter weitergibt.
+--
+-- Der Rest der Funktion ist unverändert (OP-Schutz, mod.timeout, student_id).
+-- ============================================================
+
+create or replace function public.guard_role_change() returns trigger
+  language plpgsql security definer set search_path = public as $$
+begin
+  if auth.uid() is not null then
+    -- Niemand außer dem OP selbst darf am OP-Konto etwas ändern
+    if old.is_op and auth.uid() <> old.user_id then
+      raise exception 'Dieses Konto ist geschützt';
+    end if;
+    -- OP-Status kann nicht vergeben oder entzogen werden
+    if new.is_op is distinct from old.is_op then
+      raise exception 'Der OP-Status kann nicht geändert werden';
+    end if;
+    if new.role is distinct from old.role then
+      if not public.has_perm('roles.manage') then
+        raise exception 'Keine Berechtigung, Rollen zu ändern';
+      end if;
+      -- Hin zu einer dieser Rollen und weg davon: beides nur als Admin.
+      -- Sonst könnte man einen Admin erst herunterstufen und dann ersetzen.
+      if (new.role in ('sprecher','stv_sprecher','admin','kassenwart','eltern')
+          or old.role in ('sprecher','stv_sprecher','admin','kassenwart','eltern'))
+         and public.my_role() <> 'admin' then
+        raise exception 'Diese Rolle darf nur der Admin vergeben oder entziehen';
+      end if;
+    end if;
+    if (new.chat_banned_until is distinct from old.chat_banned_until
+        or new.chat_ban_permanent is distinct from old.chat_ban_permanent)
+       and not public.has_perm('mod.timeout') then
+      raise exception 'Keine Berechtigung zum Sperren/Entsperren';
+    end if;
+    if new.student_id is distinct from old.student_id and not public.has_perm('roles.manage') then
+      raise exception 'Keine Berechtigung, die Zuordnung zu ändern';
+    end if;
+  end if;
+  return new;
+end $$;
+
+drop trigger if exists guard_role on public.profiles;
+create trigger guard_role before update on public.profiles
+  for each row execute function public.guard_role_change();
+
+-- Kontrolle: der Trigger haengt und die Funktion kennt die neue Liste.
+select tgname,
+       (pg_get_functiondef(p.oid) like '%''kassenwart''%') as kennt_kassenwart
+from pg_trigger t
+join pg_proc p on p.oid = t.tgfoid
+where t.tgrelid = 'public.profiles'::regclass and t.tgname = 'guard_role';
 
 
 -- ==========================================================================

@@ -16,6 +16,7 @@ export function KontoZeile({
   student,
   punkt,
   rechts,
+  hinweis,
 }: {
   profil: Profile;
   /** Die zugeordnete Person, falls es eine gibt. */
@@ -24,6 +25,12 @@ export function KontoZeile({
   punkt?: boolean;
   /** Was rechts steht, zum Beispiel eine Anzahl oder ein Pfeil. */
   rechts?: React.ReactNode;
+  /**
+   * Ersetzt das "keiner Person zugeordnet" in der zweiten Zeile. Fuer
+   * Elternzugaenge, die ueber parent_children an ihrem Kind haengen und
+   * nicht ueber student_id.
+   */
+  hinweis?: string;
 }) {
   const name = student ? `${student.nachname}, ${student.vorname}` : null;
 
@@ -43,7 +50,9 @@ export function KontoZeile({
           {name ?? profil.username ?? "Unbekannt"}
         </div>
         <div className="truncate text-[12px] leading-tight text-tinte-leise">
-          {name ? `${profil.username} · ${rolleName(profil.role)}` : `${rolleName(profil.role)} · keiner Person zugeordnet`}
+          {name
+            ? `${profil.username} · ${rolleName(profil.role)}`
+            : `${rolleName(profil.role)} · ${hinweis ?? "keiner Person zugeordnet"}`}
         </div>
       </div>
       {rechts}
