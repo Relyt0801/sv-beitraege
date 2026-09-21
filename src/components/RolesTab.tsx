@@ -9,6 +9,8 @@ import { COMMITTEES } from "../lib/committees";
 import { rolleName } from "../lib/permissions";
 import { KontoZeile, Suchfeld } from "./KontoZeile";
 import { PersonAnlegenSheet } from "./PersonAnlegenSheet";
+// Sperrdauern und die Ist-gesperrt-Frage stehen beim Chat-Knopf – eine Quelle fuer beide.
+import { DAUERN, isBanned } from "./MuteKnopf";
 
 /** Reihenfolge im Auswahlfeld. Die Namen kommen zentral aus permissions.ts. */
 const ROLLEN_AUSWAHL: Role[] = ["schueler", "sprecher", "stv_sprecher", "stufenteam", "kassenwart", "admin", "eltern"];
@@ -18,15 +20,6 @@ const VERSTECKT: Role[] = ["eltern"];
 
 /** Diese beiden Rollen darf nur der Admin vergeben – und je nur einmal. */
 const NUR_ADMIN: Role[] = ["sprecher", "stv_sprecher"];
-
-const isBanned = (p: { chat_banned_until: string | null; chat_ban_permanent?: boolean }) =>
-  Boolean(p.chat_ban_permanent) || (!!p.chat_banned_until && new Date(p.chat_banned_until) > new Date());
-
-const DAUERN: { label: string; ms: number | null }[] = [
-  { label: "1 Stunde", ms: 60 * 60 * 1000 },
-  { label: "1 Tag", ms: 24 * 60 * 60 * 1000 },
-  { label: "Dauerhaft", ms: null },
-];
 
 export function RolesTab() {
   const { profiles, setRole, setBan, can, isAdmin, isOp, opUserId, refreshProfiles } = useRole();

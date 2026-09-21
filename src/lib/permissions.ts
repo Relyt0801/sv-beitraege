@@ -127,7 +127,7 @@ export function rollenDerZeile(key: string): string[] {
 }
 
 // Standard-Rechte je Rolle (Fallback im Client, Seeds in permissions.sql identisch)
-const TEAM_STANDARD: PermKey[] = ["chats.view_all", "chats.delete_messages", "chats.manage", "komitees.assign", "data.edit", "hilfen.edit", "termine.manage"];
+const TEAM_STANDARD: PermKey[] = ["chats.view_all", "chats.delete_messages", "chats.manage", "komitees.assign", "data.edit", "hilfen.edit", "termine.manage", "mod.timeout"];
 
 export const ROLE_DEFAULTS: Record<string, PermKey[]> = {
   schueler: [],

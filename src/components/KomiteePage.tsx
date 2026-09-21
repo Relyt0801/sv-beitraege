@@ -5,6 +5,7 @@ import { useStore } from "../store";
 import { committeeIcon, committeeLabel } from "../lib/committees";
 import { WerHatGestimmt } from "./WerHatGestimmt";
 import { Avatar, PersonName } from "./Avatar";
+import { MuteKnopf } from "./MuteKnopf";
 import { BannHinweis } from "./BannHinweis";
 import { Sheet } from "./Sheet";
 import { VorsitzZeile } from "./VorsitzSheet";
@@ -353,6 +354,7 @@ function ChatBereich({
                       löschen
                     </button>
                   )}
+                  {!meins && <MuteKnopf userId={m.created_by} name={m.author} />}
                 </div>
               </div>
             </div>

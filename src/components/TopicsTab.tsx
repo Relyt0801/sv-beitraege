@@ -4,6 +4,7 @@ import { useRole } from "../auth/RoleProvider";
 import { Sheet } from "./Sheet";
 import { normalize } from "../lib/logic";
 import { COMMITTEES, committeeLabel } from "../lib/committees";
+import { MuteKnopf } from "./MuteKnopf";
 
 const PERMANENT_UNTIL = "2099-12-31T00:00:00.000Z";
 
@@ -497,6 +498,7 @@ function ItemRow({
         <span className="ml-auto flex gap-1">
           {canEditData && <button title={i.pinned ? "Lösen" : "Als Key-Info anheften"} onClick={() => onUpdate(i.id, { pinned: !i.pinned })}>{i.pinned ? "📌" : "📍"}</button>}
           {mayDelete && <button title="Löschen" onClick={() => onDelete(i.id)}>🗑</button>}
+          {i.created_by !== uid && <MuteKnopf userId={i.created_by} name={i.author} icon />}
         </span>
       </div>
       {i.title && <div className="mb-0.5 text-[15px] font-bold">{i.title}</div>}
