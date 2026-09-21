@@ -3,8 +3,9 @@ import { useNachschub } from "../lib/liste";
 import { useVerzoegert } from "../lib/entwurf";
 import { normalize } from "../lib/logic";
 import { useStore } from "../store";
-import { useRole, type Role } from "../auth/RoleProvider";
+import { useRole, type Profile, type Role } from "../auth/RoleProvider";
 import { useTopics } from "../topics-store";
+import { useEltern } from "../eltern-store";
 import { COMMITTEES } from "../lib/committees";
 import { rolleName } from "../lib/permissions";
 import { KontoZeile, Suchfeld } from "./KontoZeile";
@@ -15,7 +16,11 @@ import { DAUERN, isBanned } from "./MuteKnopf";
 /** Reihenfolge im Auswahlfeld. Die Namen kommen zentral aus permissions.ts. */
 const ROLLEN_AUSWAHL: Role[] = ["schueler", "sprecher", "stv_sprecher", "stufenteam", "kassenwart", "admin", "eltern"];
 
-/** Elternzugaenge stehen nicht in der Rollenliste – sie gehoeren nicht zur Stufe. */
+/**
+ * Elternzugaenge stehen normalerweise nicht in der Rollenliste – sie gehoeren
+ * nicht zur Stufe. Ueber die Checkbox ueber der Liste lassen sie sich
+ * dazuholen, zum Nachsehen, wer einen Zugang hat und zu wem er gehoert.
+ */
 const VERSTECKT: Role[] = ["eltern"];
 
 /** Diese beiden Rollen darf nur der Admin vergeben – und je nur einmal. */
@@ -23,7 +28,9 @@ const NUR_ADMIN: Role[] = ["sprecher", "stv_sprecher"];
 
 export function RolesTab() {
   const { profiles, setRole, setBan, can, isAdmin, isOp, opUserId, refreshProfiles } = useRole();
+  const { zuordnung } = useEltern();
   const [anlegen, setAnlegen] = useState(false);
+  const [zeigeEltern, setZeigeEltern] = useState(false);
   const canAssignKom = can("komitees.assign");
   const canTimeout = can("mod.timeout");
   const { students } = useStore();
@@ -42,19 +49,37 @@ export function RolesTab() {
 
   const suche = useVerzoegert(q, 120);
 
+  // Zu welchen Kindern ein Elternzugang gehoert. Ohne das stuende bei jedem
+  // Elternkonto "keiner Person zugeordnet" – richtig ist die Zuordnung nur
+  // nicht ueber student_id, sondern ueber parent_children.
+  const kinderVon = (p: Profile) =>
+    (zuordnung[p.user_id] ?? []).flatMap((id) => {
+      const k = nachId.get(id);
+      return k ? [`${k.nachname}, ${k.vorname}`] : [];
+    });
+
+  const elternAnzahl = useMemo(() => profiles.filter((p) => p.role === "eltern").length, [profiles]);
+
   const rows = useMemo(() => {
     const norm = normalize(suche);
     return [...profiles]
-      .filter((p) => !VERSTECKT.includes(p.role))
-      .map((p) => ({ p, name: p.student_id ? nachId.get(p.student_id) ?? null : null }))
-      .map(({ p, name }) => ({ p, name: name ? `${name.nachname}, ${name.vorname}` : null }))
-      .filter(({ p, name }) => !norm || normalize(`${p.username} ${name ?? ""}`).includes(norm))
-      .sort((a, b) =>
-        (a.name ?? a.p.username ?? "").localeCompare(b.name ?? b.p.username ?? "", "de"),
-      );
-  }, [profiles, suche, nachId]);
+      .filter((p) => zeigeEltern || !VERSTECKT.includes(p.role))
+      .map((p) => {
+        const s = p.student_id ? nachId.get(p.student_id) ?? null : null;
+        const name = s ? `${s.nachname}, ${s.vorname}` : null;
+        const kinder = p.role === "eltern" ? kinderVon(p) : [];
+        // Elternkonten laufen unter dem Namen ihres Kindes mit, sonst stuenden
+        // sie nach Vornamen sortiert irgendwo zwischen der Stufe.
+        return { p, name, kinder, sortier: name ?? kinder[0] ?? p.username ?? "" };
+      })
+      .filter(({ p, name, kinder }) =>
+        !norm || normalize(`${p.username} ${name ?? ""} ${kinder.join(" ")}`).includes(norm))
+      .sort((a, b) => a.sortier.localeCompare(b.sortier, "de"));
+    // kinderVon haengt an zuordnung und nachId, beide stehen in der Liste.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profiles, suche, nachId, zeigeEltern, zuordnung]);
 
-  const { sichtbar, marke, rest } = useNachschub(rows.length, [suche]);
+  const { sichtbar, marke, rest } = useNachschub(rows.length, [suche, zeigeEltern]);
 
   return (
     <div>
@@ -69,8 +94,18 @@ export function RolesTab() {
       <PersonAnlegenSheet open={anlegen} onClose={() => setAnlegen(false)} onFertig={refreshProfiles} />
       <Suchfeld wert={q} onChange={setQ} />
 
+      <label className="mb-3 flex cursor-pointer select-none items-center gap-2.5 px-1 text-[13px] font-semibold text-tinte-matt dark:text-slate-300">
+        <input
+          type="checkbox"
+          className="h-5 w-5 accent-brand"
+          checked={zeigeEltern}
+          onChange={(e) => setZeigeEltern(e.target.checked)}
+        />
+        Elternzugänge anzeigen ({elternAnzahl})
+      </label>
+
       <div className="grid gap-2.5 [&>*]:min-w-0">
-        {rows.slice(0, sichtbar).map(({ p }) => {
+        {rows.slice(0, sichtbar).map(({ p, kinder }) => {
           const koms = committeesOf(p.user_id);
           const banned = isBanned(p);
           const geschuetzt = p.is_op || p.user_id === opUserId;
@@ -81,6 +116,7 @@ export function RolesTab() {
                 profil={p}
                 student={p.student_id ? nachId.get(p.student_id) ?? null : null}
                 punkt={p.must_change_password === false}
+                hinweis={kinder.length ? `Eltern von ${kinder.join(" und ")}` : undefined}
               />
 
               {/* Zeile 2: Rolle + Komitees + Chat-Sperre nebeneinander */}
