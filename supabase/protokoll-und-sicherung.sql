@@ -936,3 +936,115 @@ begin
     perform public.snapshot_erstellen('automatisch', (now() at time zone 'Europe/Berlin')::date - 1);
   end if;
 end $$;
+
+
+-- ============================================================
+-- TEIL 3 – Prüfung zum Schluss
+--
+-- Damit ein einziges Einfügen reicht: Diese Datei prüft sich am Ende selbst
+-- und gibt eine Tabelle aus, in der steht, ob alles sitzt. Kein Suchen in den
+-- Meldungen, kein Nachtippen von Abfragen.
+--
+-- Steht überall ✅, ist nichts mehr zu tun.
+-- ============================================================
+
+create or replace function public.sicherung_pruefen()
+returns table (nr int, pruefung text, ergebnis text)
+  language plpgsql security definer set search_path = public as $pruef$
+declare
+  v text;
+  n int;
+begin
+  nr := 1;
+  pruefung := 'Protokoll (Tabelle audit_log)';
+  if to_regclass('public.audit_log') is null then
+    ergebnis := '❌ fehlt – die Datei ist nicht komplett durchgelaufen';
+  else
+    select count(*) into n from public.audit_log;
+    ergebnis := '✅ da, ' || n || ' Einträge';
+  end if;
+  return next;
+
+  nr := 2;
+  pruefung := 'Protokoll ist unveränderbar';
+  select count(*) into n from pg_policies
+   where schemaname = 'public' and tablename = 'audit_log' and cmd <> 'SELECT';
+  ergebnis := case when n = 0
+    then '✅ ja – niemand darf schreiben oder löschen, auch der Admin nicht'
+    else '❌ es gibt ' || n || ' Schreibregel(n) zu viel' end;
+  return next;
+
+  nr := 3;
+  pruefung := 'Protokoll-Trigger an den Tabellen';
+  select count(*) into n from pg_trigger
+   where not tgisinternal and tgname like 'audit\_%';
+  ergebnis := case when n >= 15 then '✅ ' || n || ' Stück'
+                   when n > 0   then '⚠️ nur ' || n || ' Stück – die Datei noch einmal laufen lassen'
+                   else '❌ keine' end;
+  return next;
+
+  nr := 4;
+  pruefung := 'Passwortwechsel werden protokolliert';
+  ergebnis := case
+    when exists (select 1 from pg_trigger where tgname = 'audit_passwort' and not tgisinternal)
+      then '✅ ja'
+    else '⚠️ nein – der Trigger auf auth.users ging nicht. Alles andere läuft; '
+      || 'nur eigene Passwortwechsel stehen dann nicht im Protokoll.' end;
+  return next;
+
+  nr := 5;
+  pruefung := 'Speicherstände (Tabelle daten_snapshots)';
+  if to_regclass('public.daten_snapshots') is null then
+    ergebnis := '❌ fehlt – die Datei ist nicht komplett durchgelaufen';
+  else
+    select 'vom ' || to_char(tag, 'DD.MM.YYYY') || ' (' || art || ', ' || zeilen || ' Zeilen)'
+      into v from public.daten_snapshots order by erstellt_at desc limit 1;
+    ergebnis := coalesce('✅ neuester Stand ' || v, '⚠️ noch keiner vorhanden');
+  end if;
+  return next;
+
+  nr := 6;
+  pruefung := 'pg_cron eingeschaltet';
+  ergebnis := case when exists (select 1 from pg_extension where extname = 'pg_cron')
+    then '✅ ja'
+    else '❌ NEIN – im Dashboard: Database → Extensions → pg_cron einschalten, '
+      || 'danach diese Datei noch einmal komplett ausführen.' end;
+  return next;
+
+  nr := 7;
+  pruefung := 'Nächtlicher Speicherstand geplant';
+  declare
+    plan   text;
+    laeuft boolean;
+  begin
+    -- Dynamisch, weil cron.job gar nicht existiert, solange pg_cron aus ist –
+    -- ein direkter Zugriff würde schon beim Einlesen der Funktion scheitern.
+    execute $q$select schedule, active from cron.job
+               where jobname = 'stufenkasse-speicherstand'$q$ into plan, laeuft;
+    if plan is null then
+      ergebnis := '❌ nicht geplant – Datei noch einmal ausführen';
+    elsif laeuft then
+      ergebnis := '✅ ja – läuft ' || plan || ', sichert um 0:00 deutscher Zeit';
+    else
+      -- Kein Haken: der Zeitplan steht da, tut aber nichts.
+      ergebnis := '⚠️ eingetragen (' || plan || '), aber ABGESCHALTET. '
+               || 'Wieder anschalten: select cron.alter_job((select jobid from cron.job '
+               || 'where jobname = ''stufenkasse-speicherstand''), active := true);';
+    end if;
+  exception when others then
+    ergebnis := '❌ nein – erst pg_cron einschalten (Zeile 6), dann diese Datei noch einmal ausführen';
+  end;
+  return next;
+
+  nr := 8;
+  pruefung := 'Wer kommt an das Protokoll';
+  ergebnis := '✅ nur die Rolle admin. Kassenwart sieht die Speicherstände, '
+           || 'aber kein Protokoll und kann nichts zurücksetzen.';
+  return next;
+end $pruef$;
+
+-- Die Prüfung ist nichts für die App – nur für den, der die Datei einspielt.
+revoke all on function public.sicherung_pruefen() from public, anon, authenticated;
+
+-- Das Ergebnis. Es erscheint als Tabelle unter dem SQL-Editor.
+select * from public.sicherung_pruefen() order by nr;
