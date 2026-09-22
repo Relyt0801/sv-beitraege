@@ -41,6 +41,24 @@
         };
       }, 8000);
     </script>
+    <!--
+      Chrome, Edge und Samsung Internet melden sehr früh, dass die Seite
+      installierbar ist – oft bevor React überhaupt läuft. Deshalb wird das
+      Ereignis schon hier abgefangen und aufgehoben; ohne das wäre der Knopf
+      "App installieren" beim ersten Öffnen tot.
+      Safari auf iPhone/iPad kennt dieses Ereignis nicht, dort führt die App
+      stattdessen durch "Teilen -> Zum Home-Bildschirm".
+    -->
+    <script>
+      window.addEventListener("beforeinstallprompt", function (e) {
+        e.preventDefault();
+        window.__svInstall = e;
+        window.dispatchEvent(new Event("sv:installierbar"));
+      });
+      window.addEventListener("appinstalled", function () {
+        window.__svInstall = null;
+      });
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

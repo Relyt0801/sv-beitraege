@@ -14,6 +14,7 @@ import { KontoTab } from "./KontoTab";
 import { ProfilSheet } from "./ProfilSheet";
 import { useTheme } from "../lib/theme";
 import { PushHinweis, usePushAuffrischen } from "./PushHinweis";
+import { InstallKarte } from "./InstallHinweis";
 import { appZaehler } from "../lib/push";
 
 type Reiter = "uebersicht" | "infos" | "konto";
@@ -115,6 +116,7 @@ export function ElternApp() {
 
       <main className="mx-auto max-w-3xl px-4 py-4 lg:max-w-5xl lg:pb-8">
         <PushHinweis fuerEltern />
+        {reiter === "uebersicht" && <InstallKarte />}
         {reiter === "uebersicht" && (
           <>
             {!ready || !bereit ? (

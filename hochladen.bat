@@ -5,7 +5,7 @@ cd /d "%~dp0"
 
 echo.
 echo ============================================================
-echo  Stufenkasse hochladen  -  Termine, Vorlagen, Vorsitz
+echo  Stufenkasse hochladen  -  Protokoll, Sicherung, Installation
 echo ============================================================
 echo.
 
@@ -25,21 +25,14 @@ if not exist ".git" (
 rem ---------- 2. Ist alles angekommen? ----------
 set FEHLT=
 for %%F in (
-  "src\lib\termine.ts"
-  "src\termine-store.tsx"
-  "src\components\TerminSheet.tsx"
-  "src\components\Kalender.tsx"
-  "src\components\Wochenstreifen.tsx"
-  "src\components\AktionSheet.tsx"
-  "src\components\AktionenListe.tsx"
-  "src\components\VorsitzSheet.tsx"
-  "src\components\AnfrageSheet.tsx"
-  "src\components\TerminAnfragen.tsx"
-  "src\components\EventsTab.tsx"
-  "src\components\KomiteePage.tsx"
-  "supabase\termine.sql"
-  "supabase\aktionen.sql"
-  "supabase\vorsitz-und-anfragen.sql"
+  "src\lib\protokoll.ts"
+  "src\lib\install.ts"
+  "src\components\ProtokollSheet.tsx"
+  "src\components\InstallHinweis.tsx"
+  "src\components\Rechtliches.tsx"
+  "supabase\protokoll-und-sicherung.sql"
+  "docs\DATENSCHUTZ.md"
+  "docs\DOMAIN-IONOS.md"
 ) do (
   if not exist "%%~F" ( echo FEHLT: %%~F & set FEHLT=1 )
 )
@@ -65,7 +58,7 @@ echo Build in Ordnung.
 rem ---------- 4. Hochladen ----------
 echo.
 git add -A
-git commit -m "Termine: Vorlagen, Kalender, Komiteevorsitz und Terminanfragen" -m "Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
+git commit -m "Protokoll fuer den Admin, taegliche Sicherung, App-Installation, Impressum" -m "Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 if errorlevel 1 echo (Nichts zu committen - dann war schon alles gespeichert.)
 git push
 if errorlevel 1 (
@@ -78,5 +71,9 @@ if errorlevel 1 (
 echo.
 echo ============================================================
 echo  Fertig. Vercel baut jetzt von selbst.
+echo.
+echo  NICHT VERGESSEN: supabase\protokoll-und-sicherung.sql einmal im
+echo  Supabase SQL-Editor ausfuehren - sonst gibt es kein Protokoll und
+echo  keinen naechtlichen Speicherstand. Details in EINSPIELEN.md.
 echo ============================================================
 pause
