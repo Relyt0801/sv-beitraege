@@ -61,6 +61,11 @@ ist mehrfach ausführbar; ein zweiter Lauf schadet nicht.
 > so etwas wie `relation "public.daten_snapshots" does not exist` – und das
 > klingt nach einem Fehler im Code, ist aber keiner.
 >
+> **Am sichersten kopierst du so:** auf GitHub die Datei
+> `supabase/protokoll-und-sicherung.sql` öffnen und oben rechts auf
+> **„Copy raw file"** klicken. Das nimmt garantiert die ganze Datei – anders
+> als Markieren mit der Maus in einer Vorschau.
+>
 > **Vor dem Run einmal nach unten scrollen.** Die letzte Zeile muss lauten:
 >
 > ```sql

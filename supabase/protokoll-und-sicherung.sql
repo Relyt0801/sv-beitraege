@@ -580,14 +580,10 @@ end $$;
 do $$
 begin
   if to_regclass('public.audit_log') is null then
-    raise exception E'Es wurde nur ein TEIL dieser Datei eingefuegt - der Anfang (Teil 1) fehlt.\n\n'
-      'So geht es richtig:\n'
-      '  1. Die Datei protokoll-und-sicherung.sql oeffnen und ALLES markieren (Cmd+A), kopieren (Cmd+C).\n'
-      '  2. Hier in den Editor klicken, Cmd+A druecken (markiert den alten Inhalt), dann Cmd+V.\n'
-      '  3. VOR dem Run nachsehen: ganz unten muss die letzte Zeile lauten\n'
-      '     select * from public.sicherung_pruefen() order by nr;\n'
-      '     und die Zeilennummer davor muss vierstellig sein (ueber 1000).\n\n'
-      'Es wurde nichts geaendert - einfach die ganze Datei einfuegen und noch einmal Run.';
+    -- EINE Zeichenkette, und ohne Semikolon darin. Der SQL-Editor von
+    -- Supabase zerlegt das Skript vor dem Ausfuehren in einzelne Befehle und
+    -- zerschneidet dabei eine Meldung, die ein Semikolon enthaelt.
+    raise exception E'Es wurde nur ein TEIL dieser Datei eingefuegt - der Anfang (Teil 1) fehlt.\n\nSo kommt die ganze Datei an:\n  1. Auf GitHub supabase/protokoll-und-sicherung.sql oeffnen und oben rechts auf "Copy raw file" klicken - das kopiert alles.\n  2. Hier in den Editor klicken, Cmd+A druecken, dann Cmd+V.\n  3. VOR dem Run nach unten scrollen: die letzte Zeilennummer muss vierstellig sein (ueber 1000).\n\nEs wurde nichts geaendert - ganze Datei einfuegen und noch einmal Run.';
   end if;
 end $$;
 
@@ -945,14 +941,10 @@ end $$;
 do $$
 begin
   if to_regclass('public.daten_snapshots') is null then
-    raise exception E'Es wurde nur ein TEIL dieser Datei eingefuegt - Teil 2 fehlt.\n\n'
-      'So geht es richtig:\n'
-      '  1. Die Datei protokoll-und-sicherung.sql oeffnen und ALLES markieren (Cmd+A), kopieren (Cmd+C).\n'
-      '  2. Hier in den Editor klicken, Cmd+A druecken (markiert den alten Inhalt), dann Cmd+V.\n'
-      '  3. VOR dem Run nachsehen: ganz unten muss die letzte Zeile lauten\n'
-      '     select * from public.sicherung_pruefen() order by nr;\n'
-      '     und die Zeilennummer davor muss vierstellig sein (ueber 1000).\n\n'
-      'Es wurde nichts geaendert - einfach die ganze Datei einfuegen und noch einmal Run.';
+    -- EINE Zeichenkette, und ohne Semikolon darin. Der SQL-Editor von
+    -- Supabase zerlegt das Skript vor dem Ausfuehren in einzelne Befehle und
+    -- zerschneidet dabei eine Meldung, die ein Semikolon enthaelt.
+    raise exception E'Es wurde nur ein TEIL dieser Datei eingefuegt - Teil 2 fehlt.\n\nSo kommt die ganze Datei an:\n  1. Auf GitHub supabase/protokoll-und-sicherung.sql oeffnen und oben rechts auf "Copy raw file" klicken - das kopiert alles.\n  2. Hier in den Editor klicken, Cmd+A druecken, dann Cmd+V.\n  3. VOR dem Run nach unten scrollen: die letzte Zeilennummer muss vierstellig sein (ueber 1000).\n\nEs wurde nichts geaendert - ganze Datei einfuegen und noch einmal Run.';
   end if;
 end $$;
 
@@ -982,14 +974,10 @@ end $$;
 do $$
 begin
   if to_regclass('public.audit_log') is null or to_regclass('public.daten_snapshots') is null then
-    raise exception E'Es wurde nur ein TEIL dieser Datei eingefuegt - Teil 1 oder Teil 2 fehlt.\n\n'
-      'So geht es richtig:\n'
-      '  1. Die Datei protokoll-und-sicherung.sql oeffnen und ALLES markieren (Cmd+A), kopieren (Cmd+C).\n'
-      '  2. Hier in den Editor klicken, Cmd+A druecken (markiert den alten Inhalt), dann Cmd+V.\n'
-      '  3. VOR dem Run nachsehen: ganz unten muss die letzte Zeile lauten\n'
-      '     select * from public.sicherung_pruefen() order by nr;\n'
-      '     und die Zeilennummer davor muss vierstellig sein (ueber 1000).\n\n'
-      'Es wurde nichts geaendert - einfach die ganze Datei einfuegen und noch einmal Run.';
+    -- EINE Zeichenkette, und ohne Semikolon darin. Der SQL-Editor von
+    -- Supabase zerlegt das Skript vor dem Ausfuehren in einzelne Befehle und
+    -- zerschneidet dabei eine Meldung, die ein Semikolon enthaelt.
+    raise exception E'Es wurde nur ein TEIL dieser Datei eingefuegt - Teil 1 oder Teil 2 fehlt.\n\nSo kommt die ganze Datei an:\n  1. Auf GitHub supabase/protokoll-und-sicherung.sql oeffnen und oben rechts auf "Copy raw file" klicken - das kopiert alles.\n  2. Hier in den Editor klicken, Cmd+A druecken, dann Cmd+V.\n  3. VOR dem Run nach unten scrollen: die letzte Zeilennummer muss vierstellig sein (ueber 1000).\n\nEs wurde nichts geaendert - ganze Datei einfuegen und noch einmal Run.';
   end if;
 end $$;
 
@@ -1033,7 +1021,7 @@ begin
   ergebnis := case
     when exists (select 1 from pg_trigger where tgname = 'audit_passwort' and not tgisinternal)
       then '✅ ja'
-    else '⚠️ nein – der Trigger auf auth.users ging nicht. Alles andere läuft; '
+    else '⚠️ nein – der Trigger auf auth.users ging nicht. Alles andere läuft, '
       || 'nur eigene Passwortwechsel stehen dann nicht im Protokoll.' end;
   return next;
 
@@ -1072,9 +1060,11 @@ begin
       ergebnis := '✅ ja – läuft ' || plan || ', sichert um 0:00 deutscher Zeit';
     else
       -- Kein Haken: der Zeitplan steht da, tut aber nichts.
+      -- Kein Semikolon im Text: der SQL-Editor wuerde die Meldung sonst
+      -- mitten im Satz zerschneiden.
       ergebnis := '⚠️ eingetragen (' || plan || '), aber ABGESCHALTET. '
-               || 'Wieder anschalten: select cron.alter_job((select jobid from cron.job '
-               || 'where jobname = ''stufenkasse-speicherstand''), active := true);';
+               || 'Wieder anschalten mit cron.alter_job(jobid, active := true) '
+               || 'fuer den Job stufenkasse-speicherstand';
     end if;
   exception when others then
     ergebnis := '❌ nein – erst pg_cron einschalten (Zeile 6), dann diese Datei noch einmal ausführen';
