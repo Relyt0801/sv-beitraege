@@ -55,6 +55,26 @@ So geht's: Supabase-Dashboard → **SQL Editor** → **New query** → den ganze
 Inhalt der Datei hineinkopieren → **Run**. Dauert ein paar Sekunden. Die Datei
 ist mehrfach ausführbar; ein zweiter Lauf schadet nicht.
 
+> ### Die eine Sache, die wirklich schiefgehen kann
+>
+> Dass beim Kopieren nur ein **Teil** der Datei ankommt. Dann meldet Postgres
+> so etwas wie `relation "public.daten_snapshots" does not exist` – und das
+> klingt nach einem Fehler im Code, ist aber keiner.
+>
+> **Vor dem Run einmal nach unten scrollen.** Die letzte Zeile muss lauten:
+>
+> ```sql
+> select * from public.sicherung_pruefen() order by nr;
+> ```
+>
+> und die Zeilennummer davor muss **vierstellig** sein (über 1000). Steht dort
+> eine dreistellige Zahl, ist nur ein Stück angekommen: Datei noch einmal
+> öffnen, **Cmd+A**, **Cmd+C**, im Editor **Cmd+A**, **Cmd+V**.
+>
+> Die Datei fängt die häufigsten dieser Fälle selbst ab und sagt dann im
+> Klartext, was zu tun ist – aber nicht jeden möglichen Schnitt. Die
+> Zeilennummer ist der sichere Test.
+
 **Nichts nachzutippen.** Die Datei prüft sich am Ende selbst und gibt eine
 Tabelle aus:
 

@@ -574,6 +574,23 @@ end $$;
 -- TEIL 2 – Speicherstände (tägliche Sicherung)
 -- ============================================================
 
+-- Wache gegen halb eingefügte Dateien. Wird nur ein Stück dieser Datei in den
+-- SQL-Editor eingefügt, scheitert es sonst weiter unten mit einer Meldung wie
+-- "relation ... does not exist", die niemandem sagt, was wirklich los ist.
+do $$
+begin
+  if to_regclass('public.audit_log') is null then
+    raise exception E'Es wurde nur ein TEIL dieser Datei eingefuegt - der Anfang (Teil 1) fehlt.\n\n'
+      'So geht es richtig:\n'
+      '  1. Die Datei protokoll-und-sicherung.sql oeffnen und ALLES markieren (Cmd+A), kopieren (Cmd+C).\n'
+      '  2. Hier in den Editor klicken, Cmd+A druecken (markiert den alten Inhalt), dann Cmd+V.\n'
+      '  3. VOR dem Run nachsehen: ganz unten muss die letzte Zeile lauten\n'
+      '     select * from public.sicherung_pruefen() order by nr;\n'
+      '     und die Zeilennummer davor muss vierstellig sein (ueber 1000).\n\n'
+      'Es wurde nichts geaendert - einfach die ganze Datei einfuegen und noch einmal Run.';
+  end if;
+end $$;
+
 create table if not exists public.daten_snapshots (
   id          uuid primary key default gen_random_uuid(),
   -- Der TAG, den dieser Stand abbildet. Der Lauf um 0:00 am 21.09. sichert den
@@ -925,6 +942,20 @@ exception when others then
 end $$;
 
 
+do $$
+begin
+  if to_regclass('public.daten_snapshots') is null then
+    raise exception E'Es wurde nur ein TEIL dieser Datei eingefuegt - Teil 2 fehlt.\n\n'
+      'So geht es richtig:\n'
+      '  1. Die Datei protokoll-und-sicherung.sql oeffnen und ALLES markieren (Cmd+A), kopieren (Cmd+C).\n'
+      '  2. Hier in den Editor klicken, Cmd+A druecken (markiert den alten Inhalt), dann Cmd+V.\n'
+      '  3. VOR dem Run nachsehen: ganz unten muss die letzte Zeile lauten\n'
+      '     select * from public.sicherung_pruefen() order by nr;\n'
+      '     und die Zeilennummer davor muss vierstellig sein (ueber 1000).\n\n'
+      'Es wurde nichts geaendert - einfach die ganze Datei einfuegen und noch einmal Run.';
+  end if;
+end $$;
+
 -- ------------------------------------------------------------
 -- Startbestand
 -- ------------------------------------------------------------
@@ -947,6 +978,20 @@ end $$;
 --
 -- Steht überall ✅, ist nichts mehr zu tun.
 -- ============================================================
+
+do $$
+begin
+  if to_regclass('public.audit_log') is null or to_regclass('public.daten_snapshots') is null then
+    raise exception E'Es wurde nur ein TEIL dieser Datei eingefuegt - Teil 1 oder Teil 2 fehlt.\n\n'
+      'So geht es richtig:\n'
+      '  1. Die Datei protokoll-und-sicherung.sql oeffnen und ALLES markieren (Cmd+A), kopieren (Cmd+C).\n'
+      '  2. Hier in den Editor klicken, Cmd+A druecken (markiert den alten Inhalt), dann Cmd+V.\n'
+      '  3. VOR dem Run nachsehen: ganz unten muss die letzte Zeile lauten\n'
+      '     select * from public.sicherung_pruefen() order by nr;\n'
+      '     und die Zeilennummer davor muss vierstellig sein (ueber 1000).\n\n'
+      'Es wurde nichts geaendert - einfach die ganze Datei einfuegen und noch einmal Run.';
+  end if;
+end $$;
 
 create or replace function public.sicherung_pruefen()
 returns table (nr int, pruefung text, ergebnis text)
