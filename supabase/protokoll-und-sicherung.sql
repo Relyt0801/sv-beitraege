@@ -574,6 +574,19 @@ end $$;
 -- TEIL 2 – Speicherstände (tägliche Sicherung)
 -- ============================================================
 
+-- Wache gegen halb eingefügte Dateien. Wird nur ein Stück dieser Datei in den
+-- SQL-Editor eingefügt, scheitert es sonst weiter unten mit einer Meldung wie
+-- "relation ... does not exist", die niemandem sagt, was wirklich los ist.
+do $$
+begin
+  if to_regclass('public.audit_log') is null then
+    -- EINE Zeichenkette, und ohne Semikolon darin. Der SQL-Editor von
+    -- Supabase zerlegt das Skript vor dem Ausfuehren in einzelne Befehle und
+    -- zerschneidet dabei eine Meldung, die ein Semikolon enthaelt.
+    raise exception E'Es wurde nur ein TEIL dieser Datei eingefuegt - der Anfang (Teil 1) fehlt.\n\nSo kommt die ganze Datei an:\n  1. Auf GitHub supabase/protokoll-und-sicherung.sql oeffnen und oben rechts auf "Copy raw file" klicken - das kopiert alles.\n  2. Hier in den Editor klicken, Cmd+A druecken, dann Cmd+V.\n  3. VOR dem Run nach unten scrollen: die letzte Zeilennummer muss vierstellig sein (ueber 1000).\n\nEs wurde nichts geaendert - ganze Datei einfuegen und noch einmal Run.';
+  end if;
+end $$;
+
 create table if not exists public.daten_snapshots (
   id          uuid primary key default gen_random_uuid(),
   -- Der TAG, den dieser Stand abbildet. Der Lauf um 0:00 am 21.09. sichert den
@@ -925,6 +938,16 @@ exception when others then
 end $$;
 
 
+do $$
+begin
+  if to_regclass('public.daten_snapshots') is null then
+    -- EINE Zeichenkette, und ohne Semikolon darin. Der SQL-Editor von
+    -- Supabase zerlegt das Skript vor dem Ausfuehren in einzelne Befehle und
+    -- zerschneidet dabei eine Meldung, die ein Semikolon enthaelt.
+    raise exception E'Es wurde nur ein TEIL dieser Datei eingefuegt - Teil 2 fehlt.\n\nSo kommt die ganze Datei an:\n  1. Auf GitHub supabase/protokoll-und-sicherung.sql oeffnen und oben rechts auf "Copy raw file" klicken - das kopiert alles.\n  2. Hier in den Editor klicken, Cmd+A druecken, dann Cmd+V.\n  3. VOR dem Run nach unten scrollen: die letzte Zeilennummer muss vierstellig sein (ueber 1000).\n\nEs wurde nichts geaendert - ganze Datei einfuegen und noch einmal Run.';
+  end if;
+end $$;
+
 -- ------------------------------------------------------------
 -- Startbestand
 -- ------------------------------------------------------------
@@ -947,6 +970,16 @@ end $$;
 --
 -- Steht überall ✅, ist nichts mehr zu tun.
 -- ============================================================
+
+do $$
+begin
+  if to_regclass('public.audit_log') is null or to_regclass('public.daten_snapshots') is null then
+    -- EINE Zeichenkette, und ohne Semikolon darin. Der SQL-Editor von
+    -- Supabase zerlegt das Skript vor dem Ausfuehren in einzelne Befehle und
+    -- zerschneidet dabei eine Meldung, die ein Semikolon enthaelt.
+    raise exception E'Es wurde nur ein TEIL dieser Datei eingefuegt - Teil 1 oder Teil 2 fehlt.\n\nSo kommt die ganze Datei an:\n  1. Auf GitHub supabase/protokoll-und-sicherung.sql oeffnen und oben rechts auf "Copy raw file" klicken - das kopiert alles.\n  2. Hier in den Editor klicken, Cmd+A druecken, dann Cmd+V.\n  3. VOR dem Run nach unten scrollen: die letzte Zeilennummer muss vierstellig sein (ueber 1000).\n\nEs wurde nichts geaendert - ganze Datei einfuegen und noch einmal Run.';
+  end if;
+end $$;
 
 create or replace function public.sicherung_pruefen()
 returns table (nr int, pruefung text, ergebnis text)
@@ -988,7 +1021,7 @@ begin
   ergebnis := case
     when exists (select 1 from pg_trigger where tgname = 'audit_passwort' and not tgisinternal)
       then '✅ ja'
-    else '⚠️ nein – der Trigger auf auth.users ging nicht. Alles andere läuft; '
+    else '⚠️ nein – der Trigger auf auth.users ging nicht. Alles andere läuft, '
       || 'nur eigene Passwortwechsel stehen dann nicht im Protokoll.' end;
   return next;
 
@@ -1027,9 +1060,11 @@ begin
       ergebnis := '✅ ja – läuft ' || plan || ', sichert um 0:00 deutscher Zeit';
     else
       -- Kein Haken: der Zeitplan steht da, tut aber nichts.
+      -- Kein Semikolon im Text: der SQL-Editor wuerde die Meldung sonst
+      -- mitten im Satz zerschneiden.
       ergebnis := '⚠️ eingetragen (' || plan || '), aber ABGESCHALTET. '
-               || 'Wieder anschalten: select cron.alter_job((select jobid from cron.job '
-               || 'where jobname = ''stufenkasse-speicherstand''), active := true);';
+               || 'Wieder anschalten mit cron.alter_job(jobid, active := true) '
+               || 'fuer den Job stufenkasse-speicherstand';
     end if;
   exception when others then
     ergebnis := '❌ nein – erst pg_cron einschalten (Zeile 6), dann diese Datei noch einmal ausführen';
