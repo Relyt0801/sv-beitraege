@@ -55,21 +55,30 @@ So geht's: Supabase-Dashboard → **SQL Editor** → **New query** → den ganze
 Inhalt der Datei hineinkopieren → **Run**. Dauert ein paar Sekunden. Die Datei
 ist mehrfach ausführbar; ein zweiter Lauf schadet nicht.
 
-**Danach einmal nachsehen:** Steht nach dem Lauf unten eine Meldung mit
-`pg_cron`, dann ist die Erweiterung noch aus. In dem Fall:
-**Database → Extensions → `pg_cron` einschalten**, danach die Datei noch einmal
-laufen lassen. Ohne `pg_cron` funktioniert alles – nur der nächtliche
-Speicherstand entsteht nicht von allein.
+**Nichts nachzutippen.** Die Datei prüft sich am Ende selbst und gibt eine
+Tabelle aus:
 
-Prüfen, ob der Zeitplan steht:
-
-```sql
-select jobname, schedule, active from cron.job;
+```
+ nr | pruefung                                 | ergebnis
+----+------------------------------------------+--------------------------------
+  1 | Protokoll (Tabelle audit_log)            | ✅ da, 0 Einträge
+  2 | Protokoll ist unveränderbar              | ✅ ja – niemand darf schreiben …
+  3 | Protokoll-Trigger an den Tabellen        | ✅ 20 Stück
+  4 | Passwortwechsel werden protokolliert     | ✅ ja
+  5 | Speicherstände (Tabelle daten_snapshots) | ✅ neuester Stand vom …
+  6 | pg_cron eingeschaltet                    | ✅ ja
+  7 | Nächtlicher Speicherstand geplant        | ✅ ja – läuft 7 * * * * …
+  8 | Wer kommt an das Protokoll               | ✅ nur die Rolle admin …
 ```
 
-Da muss `stufenkasse-speicherstand` mit `7 * * * *` stehen. Der Job läuft
-stündlich und tut nur in der Stunde nach Mitternacht etwas – so stimmt die
-Uhrzeit auch nach der Zeitumstellung, denn `pg_cron` rechnet in UTC.
+**Steht überall ✅, ist Schluss.** Steht bei 6 oder 7 ein ❌, dann ist nur
+`pg_cron` noch aus: **Database → Extensions → `pg_cron` einschalten**, danach
+dieselbe Datei noch einmal komplett ausführen. Ohne `pg_cron` funktioniert
+alles andere – nur der nächtliche Speicherstand entsteht nicht von allein.
+
+Der Job läuft stündlich (`7 * * * *`) und tut nur in der Stunde nach
+Mitternacht etwas. So stimmt die Uhrzeit auch nach der Zeitumstellung, denn
+`pg_cron` rechnet in UTC.
 
 ---
 
