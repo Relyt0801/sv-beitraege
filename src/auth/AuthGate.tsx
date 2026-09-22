@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { hasSupabase, supabase, usernameToEmail } from "../lib/supabase";
 import { pushConfigured, pushSupported } from "../lib/push";
+import { RechtLinks } from "../components/Rechtliches";
 import type { Session } from "@supabase/supabase-js";
 
 export function AuthGate({ children }: { children: ReactNode }) {
@@ -143,6 +144,12 @@ function LoginForm() {
           <br />
           Passwort vergessen? Meld dich dort, sie setzen es zurück.
         </p>
+
+        {/* Pflichtangaben müssen auch ohne Anmeldung erreichbar sein – deshalb
+            stehen sie hier und nicht nur im Profil. */}
+        <div className="mt-4 border-t border-papier-linie pt-3 dark:border-slate-700">
+          <RechtLinks klein />
+        </div>
       </form>
     </div>
   );

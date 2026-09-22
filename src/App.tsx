@@ -37,6 +37,7 @@ import { AktionSheet } from "./components/AktionSheet";
 import { ElternProvider, useEltern } from "./eltern-store";
 import { ElternApp } from "./components/ElternApp";
 import { Icon, type IconName } from "./components/Icon";
+import { InstallKarte, InstallOverlay } from "./components/InstallHinweis";
 
 export default function App() {
   return (
@@ -70,6 +71,7 @@ function NachRolle() {
       <ProfilesProvider>
         <ElternProvider>
           <ElternApp />
+          <InstallOverlay />
         </ElternProvider>
       </ProfilesProvider>
     );
@@ -408,6 +410,15 @@ function Main() {
           </div>
         )}
 
+        {/* Zum Home-Bildschirm hinzufügen. Verschwindet von selbst, sobald die
+            App installiert ist – und auf iPhone/iPad, sobald jemand bestätigt,
+            dass er es gemacht hat (mehr dazu in src/lib/install.ts). */}
+        {tab === "kasse" && (
+          <div className="mx-auto max-w-5xl">
+            <InstallKarte />
+          </div>
+        )}
+
         {/* Erst die Lage der Kasse, dann die Liste – nicht umgekehrt. */}
         {tab === "kasse" && teamView && <KassenKopf students={students} settings={settings} punkte={punkte} />}
 
@@ -720,6 +731,9 @@ function Main() {
           setShowTour(true);
         }}
       />
+      {/* Nicht zwei Begrüßungen übereinander: erst die Einführung, danach der
+          Hinweis zum Home-Bildschirm. */}
+      {!showTour && <InstallOverlay />}
       <Tour
         open={showTour}
         steps={tourSteps({ staff: isStaff, staffel: staffelVon(settings) })}

@@ -12,6 +12,8 @@ import { SELECTABLE_COMMITTEES, committeeIcon, committeeLabel, rolleUndKomitees 
 import { ladeKomiteeAntraege, stelleKomiteeAntrag } from "../lib/komitee-antrag";
 import { useTheme } from "../lib/theme";
 import { abmelden, enablePush, pushConfigured, pushPermission } from "../lib/push";
+import { ProtokollSheet } from "./ProtokollSheet";
+import { RechtLinks } from "./Rechtliches";
 
 /** Das eigene Profil: Bild, Namensfarbe, Passwort, Komitee-Wechsel, Hilfe. */
 export function ProfilSheet({
@@ -44,8 +46,13 @@ export function ProfilSheet({
   const [pwBusy, setPwBusy] = useState(false);
   const [perm, setPerm] = useState(pushPermission());
   const [pushBusy, setPushBusy] = useState(false);
+  // Protokoll und Sicherung. Den ganzen Bereich gibt es NUR hier im eigenen
+  // Profil – und nur beim Admin (Kassenwart: nur die Sicherheitskopie).
+  const [protokollOffen, setProtokollOffen] = useState(false);
 
   const meine = committeesOf(uid);
+  const istAdmin = role === "admin";
+  const istKassenwart = role === "kassenwart";
 
   useEffect(() => {
     if (open) void ladeKomiteeAntraege().then((r) => setHatAntrag(r.some((x) => x.user_id === uid)));
@@ -340,6 +347,19 @@ export function ProfilSheet({
             <span>🔑</span> Passwort ändern
           </button>
         )}
+        {/* Nur der Admin. Steht bewusst hier und in keinem Reiter: so taucht der
+            Bereich bei niemandem sonst auch nur als leere Kachel auf. */}
+        {hasSupabase && istAdmin && (
+          <button className={row} onClick={() => setProtokollOffen(true)}>
+            <span>🗂️</span> Protokoll &amp; Sicherung
+          </button>
+        )}
+        {/* Der Kassenwart darf sich die Sicherheitskopie holen – aber kein Protokoll. */}
+        {hasSupabase && istKassenwart && (
+          <button className={row} onClick={() => setProtokollOffen(true)}>
+            <span>🗄️</span> Sicherheitskopie der Daten
+          </button>
+        )}
         {onTutorial && (
           <button className={row} onClick={onTutorial}>
             <span>🧭</span> Einführung noch mal ansehen
@@ -355,9 +375,21 @@ export function ProfilSheet({
         )}
       </div>
 
-      <button className="btn-primary mt-5" onClick={onClose}>
+      <div className="mt-5">
+        <RechtLinks />
+      </div>
+
+      <button className="btn-primary mt-4" onClick={onClose}>
         Fertig
       </button>
+
+      {(istAdmin || istKassenwart) && (
+        <ProtokollSheet
+          open={protokollOffen}
+          onClose={() => setProtokollOffen(false)}
+          nurSicherung={!istAdmin}
+        />
+      )}
     </Sheet>
   );
 }

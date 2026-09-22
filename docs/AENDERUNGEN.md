@@ -1,4 +1,4 @@
-# Änderungen – Stand 19.09.2026
+# Änderungen – Stand 22.09.2026
 
 Diese Datei erklärt, was sich in den letzten Runden geändert hat, **wo** es im
 Code steht und **warum** es so gebaut ist. Die Kommentare im Code selbst sind
@@ -18,7 +18,8 @@ ausführlich (auf Deutsch); hier steht der Überblick dazu.
 | `6971ceb` | Termine Schritt 1: Wochenstreifen, Kalender (Monat/Woche/Tag), Sichtbarkeit je Termin |
 | `cbe7b7d` | Aktionsvorlagen und Schichten, Komiteevorsitz, Terminanfragen, wiederholbare Termine |
 | `8759219` | Benachrichtigungen repariert, Elternansicht überarbeitet |
-| *(dieser)* | Benachrichtigungen für Termine/Schichten/Anfragen, rote Zähler, Löschen fürs Team, Verwendungszweck, Push-Diagnose |
+| `aa647ef` | Benachrichtigungen für Termine/Schichten/Anfragen, rote Zähler, Löschen fürs Team, Verwendungszweck, Push-Diagnose |
+| *(dieser)* | Protokoll für den Admin, tägliche Sicherung, Knopf zum Installieren, Impressum und Datenschutz |
 
 ---
 
@@ -329,3 +330,133 @@ im Repo, damit ein Neuaufbau funktioniert:
   noch einmal für die Schichten“ ist weg.
 - Migration: `supabase/aktion-vorlagen.sql` (eingespielt).
 - **Meine Kasse**: linke und rechte Spalte enden am Rechner auf einer Höhe.
+
+
+---
+
+## Protokoll und tägliche Sicherung
+
+**Dateien:** `supabase/protokoll-und-sicherung.sql`, `src/lib/protokoll.ts`,
+`src/components/ProtokollSheet.tsx`, `src/components/ProfilSheet.tsx`
+
+### Warum das Protokoll in der Datenbank steht und nicht in der App
+
+Ein Protokoll, das die App schreibt, protokolliert nur, was durch die App
+läuft. Wer den anon-Key nimmt und direkt gegen die API geht, taucht dort nie
+auf – und genau davor soll ein Protokoll schützen. Deshalb hängen die Trigger
+an den Tabellen: `profiles`, `students`, `tag_members`, `komitee_vorsitz`,
+`role_permissions`, `user_permissions`, `parent_children`, `kasse_buchungen`,
+`kasse_einstellungen`, `bank_konto`, `app_settings` – und für Passwortwechsel
+an `auth.users`.
+
+* **Lesen darf nur der Admin** (RLS-Policy `audit lesen`).
+* **Schreiben darf niemand.** Es gibt keine INSERT-, UPDATE- oder
+  DELETE-Policy. Geschrieben wird ausschließlich über
+  `public.audit_schreiben()`, und die ist für `anon` und `authenticated`
+  gesperrt – die Trigger rufen sie als `security definer` auf.
+* Jede Zeile trägt einen fertigen deutschen Satz (`klartext`). Absicht: das
+  Protokoll soll in drei Jahren noch lesbar sein, auch wenn die App die
+  Schlüssel bis dahin anders benennt.
+* **Die IBAN steht bewusst nicht im Protokoll.** Dass die Bankverbindung
+  geändert wurde, ja – womit, nein. Ein Protokoll soll keine zweite Kopie der
+  Kontodaten werden.
+
+### Speicherstände
+
+`daten_snapshots` hält den Stand der **Kerndaten** als JSON: Personen,
+Beteiligungen, Vorlagen, Einstellungen, Kassenbuch, Sparziel, Bankverbindung,
+Komitees, Rollen-/Personenrechte, Elternzuordnungen, Profile.
+
+Nicht dabei – und deshalb beim Zurücksetzen auch nicht angefasst: Chats,
+Events, Termine, Aktionen, Abstimmungen, Elterngespräche, Push-Abos.
+
+**Und die Konten selbst schon gar nicht.** Anmeldedaten liegen in
+`auth.users`; ein gelöschtes Konto holt kein Speicherstand zurück. Dafür gibt
+es nur das Backup der ganzen Datenbank im Supabase-Dashboard. Das steht so
+auch in der Oberfläche, damit sich niemand in falscher Sicherheit wiegt.
+
+### Warum der Zeitplan stündlich läuft und nicht um Mitternacht
+
+`pg_cron` rechnet in UTC. `0 0 * * *` wäre im Sommer 2:00 Uhr deutscher Zeit
+und im Winter 1:00 Uhr. Deshalb läuft der Job **stündlich** und
+`snapshot_taeglich()` prüft selbst, ob es in `Europe/Berlin` gerade die Stunde
+nach Mitternacht ist. Das überlebt die Zeitumstellung, ohne dass jemand etwas
+umstellen muss.
+
+### Was beim Zurücksetzen passiert
+
+1. Der **jetzige** Zustand wird als `vor_ruecksetzung` weggeschrieben. Ein
+   Fehlgriff ist damit rückgängig zu machen.
+2. Die Protokoll-Trigger schweigen (`sv.wiederherstellung`), sonst stünden dort
+   tausend Zeilen, die niemand ausgelöst hat.
+3. Die Automatik „Beitrag bezahlt → Buchung" wird kurz abgeschaltet; das
+   Kassenbuch wird gleich selbst zurückgesetzt und würde sonst doppelt buchen.
+4. `students` wird **abgeglichen, nicht gelöscht und neu angelegt**. Ein DELETE
+   auf `students` reißt per `ON DELETE CASCADE` Elternzuordnungen und
+   Event-Einladungen mit, die mit dem Zurücksetzen nichts zu tun haben.
+5. `profiles` bekommt **nur** Rolle, Sperre und Verknüpfung zurück. Zeilen
+   werden dort nie angelegt oder gelöscht – ein heute existierendes Konto
+   verschwindet nicht, weil es im Speicherstand fehlt.
+6. Danach genau **ein** Protokolleintrag.
+
+Alles in einer Transaktion: geht etwas schief, ist nichts passiert.
+
+### Wer sieht was
+
+| | Protokoll | Kopie herunterladen | Zurücksetzen |
+|---|---|---|---|
+| Admin | ja | ja | ja |
+| Kassenwart | nein | ja | nein |
+| alle anderen | nein | nein | nein |
+
+Das steht nicht nur in der Oberfläche, sondern in den Policies und in den
+Funktionen selbst.
+
+---
+
+## „Zur Startseite hinzufügen"
+
+**Dateien:** `src/lib/install.ts`, `src/components/InstallHinweis.tsx`,
+`index.html`
+
+Chrome, Edge und Samsung Internet melden `beforeinstallprompt`. Das Ereignis
+kommt oft, **bevor React läuft** – deshalb fängt es ein kurzes Skript in
+`index.html` ab und legt es unter `window.__svInstall` ab. Ohne das wäre der
+Knopf beim ersten Öffnen tot.
+
+**Safari auf iPhone und iPad kennt dieses Ereignis nicht.** Apple hat es nie
+eingebaut, und Chrome und Firefox dürfen auf iOS ohnehin nicht installieren.
+Dort ist eine Anleitung („Teilen → Zum Home-Bildschirm") das Einzige, was
+möglich ist – das ist keine Bequemlichkeit, sondern die Grenze des Browsers.
+
+Daraus folgt eine zweite Grenze, ehrlich gesagt: Ob die App auf einem iPad
+schon auf dem Home-Bildschirm liegt, **kann die Seite im Safari-Tab nicht
+erkennen**. Sie weiß nur, ob sie gerade als installierte App läuft. Deshalb
+gibt es dort „Hab ich gemacht" – danach ist auf dem Gerät Ruhe.
+
+Der Zustand liegt **im Modul**, nicht in jedem Baustein einzeln. Vorher blieb
+die Karte auf der Startseite stehen, nachdem jemand über den
+Begrüßungs-Bildschirm installiert hatte.
+
+Gar nichts angeboten wird auf Desktop-Browsern ohne Installationsweg (z. B.
+Firefox am Rechner) – eine Anleitung, die zu nichts führt, ist schlimmer als
+kein Knopf.
+
+---
+
+## Impressum und Datenschutz
+
+**Dateien:** `src/components/Rechtliches.tsx`, `src/auth/AuthGate.tsx`,
+`docs/DATENSCHUTZ.md`
+
+Beide Seiten hängen **unter dem Anmeldeformular** – Pflichtangaben müssen ohne
+Anmeldung erreichbar sein – und zusätzlich im Profil. Sie liegen im Code und
+nicht in der Datenbank: Sie müssen auch dann da sein, wenn gerade nichts lädt.
+
+Die Stellen, für die es echte Angaben braucht (Name, ladungsfähige Anschrift,
+Aufsichtsbehörde, Supabase-Region), stehen als **gelb hinterlegte Platzhalter**
+drin. Erfundene Adressen wären schlimmer als keine.
+
+`docs/DATENSCHUTZ.md` führt die Liste weiter: Auftragsverarbeitungsverträge,
+Einwilligung der Eltern nach Art. 8 DSGVO, Verarbeitungsverzeichnis,
+Löschkonzept – und warum der App Store für eine PWA nicht der richtige Weg ist.
