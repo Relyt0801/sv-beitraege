@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { hasSupabase, supabase, usernameToEmail } from "../lib/supabase";
 import { pushConfigured, pushSupported } from "../lib/push";
 import { RechtLinks } from "../components/Rechtliches";
+import { InstallKarte, InstallOverlay } from "../components/InstallHinweis";
 import type { Session } from "@supabase/supabase-js";
 
 export function AuthGate({ children }: { children: ReactNode }) {
@@ -79,7 +80,17 @@ function LoginForm() {
   }
 
   return (
-    <div className="flex min-h-full items-center justify-center p-6">
+    <div className="flex min-h-full flex-col items-center justify-center p-6">
+      {/* Der Hinweis zum Home-Bildschirm gehoert VOR die Anmeldung, nicht
+          dahinter. Zwei Gruende: Es ist das Erste, was jemand ueberhaupt zu
+          sehen bekommt – und auf iPhone/iPad hat die installierte App einen
+          eigenen Speicher. Wer sich erst anmeldet und dann installiert, steht
+          in der App wieder vor dem Anmeldeformular. */}
+      <div className="w-full max-w-sm">
+        <InstallKarte />
+      </div>
+      <InstallOverlay />
+
       {/* Ein echtes <form> mit Submit. Browser erkennen ein Anmeldeformular
           daran – ohne das fragt der Passwortmanager an unpassenden Stellen
           nach und zeigt Hinweise, die nichts mit dieser App zu tun haben. */}
