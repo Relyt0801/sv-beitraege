@@ -2,8 +2,9 @@
 //
 // Nur der Admin darf das. Der service_role-Key steckt automatisch in der
 // Function (SUPABASE_SERVICE_ROLE_KEY) und verlässt den Server nie.
-// Das Startpasswort wird genau einmal an den Admin zurückgegeben und nirgends
-// gespeichert – beim ersten Login muss es geändert werden.
+// Das Startpasswort tippt der Admin selbst ein (oder es wird erzeugt). Es wird
+// genau einmal zurückgegeben und nirgends gespeichert – beim ersten Login muss
+// es geändert werden.
 //
 // Deploy: supabase functions deploy person-anlegen
 
@@ -41,6 +42,15 @@ function startpasswort(): string {
   return `${a}-${b}-${100 + zufall(900)}`;
 }
 
+/** Vom Admin eingetipptes Passwort: leer = automatisch, sonst 8–72 Zeichen. */
+function pruefePw(p: unknown): { pw: string; fehler?: string } {
+  const pw = typeof p === "string" ? p.trim() : "";
+  if (!pw) return { pw: "" };
+  if (pw.length < 8) return { pw, fehler: "Das Passwort braucht mindestens 8 Zeichen." };
+  if (pw.length > 72) return { pw, fehler: "Das Passwort ist zu lang." };
+  return { pw };
+}
+
 const sauber = (s: unknown) => String(s ?? "").replace(/\s+/g, " ").trim();
 
 /** Wie scripts/eltern-anlegen.mjs: "Liv Icking" -> "liv.icking" (Kind andersherum). */
@@ -55,7 +65,7 @@ function schlicht(s: string): string {
 type Db = ReturnType<typeof createClient>;
 
 /** Elternzugang für ein Kind: sieht nur dieses Kind (parent_children + RLS). */
-async function elternAnlegen(admin: Db, kind: { id: string; vorname: string; nachname: string }) {
+async function elternAnlegen(admin: Db, kind: { id: string; vorname: string; nachname: string }, wunschPw = "") {
   let username = `${schlicht(kind.vorname)}.${schlicht(kind.nachname)}`;
   const basis = username;
   for (let i = 2; i < 50; i++) {
@@ -63,7 +73,7 @@ async function elternAnlegen(admin: Db, kind: { id: string; vorname: string; nac
     if (!da) break;
     username = `${basis}${i}`;
   }
-  const passwort = startpasswort();
+  const passwort = wunschPw || startpasswort();
   const { data: neu, error } = await admin.auth.admin.createUser({
     email: `${username}@sv-beitraege.local`,
     password: passwort,
@@ -117,7 +127,9 @@ Deno.serve(async (req) => {
     if (!kind) return json({ error: "Person nicht gefunden." }, 404);
     const { data: schon } = await admin.from("parent_children").select("user_id").eq("student_id", kind.id);
     if (schon && schon.length && !k.trotzdem) return json({ error: "Für diese Person gibt es schon einen Elternzugang.", doppelt: true }, 409);
-    const e = await elternAnlegen(admin, kind);
+    const ep = pruefePw(k.eltern_passwort);
+    if (ep.fehler) return json({ error: ep.fehler }, 400);
+    const e = await elternAnlegen(admin, kind, ep.pw);
     if ("error" in e) return json({ error: e.error }, 500);
     console.log("Elternzugang angelegt:", e.username, "von", wer.user.id);
     return json({ ok: true, eltern: e });
@@ -128,6 +140,10 @@ Deno.serve(async (req) => {
   const rolle = ROLLEN.includes(String(k.rolle)) ? String(k.rolle) : "schueler";
   if (!vorname || !nachname) return json({ error: "Vor- und Nachname fehlen." }, 400);
   if (vorname.length > 60 || nachname.length > 60) return json({ error: "Name ist zu lang." }, 400);
+  const sp = pruefePw(k.passwort);
+  if (sp.fehler) return json({ error: "Schüler: " + sp.fehler }, 400);
+  const ep = pruefePw(k.eltern_passwort);
+  if (ep.fehler) return json({ error: "Eltern: " + ep.fehler }, 400);
 
   // Gibt es die Person schon?
   const { data: gleich } = await admin
@@ -151,7 +167,7 @@ Deno.serve(async (req) => {
     .from("students").insert({ vorname, nachname, beigetreten_ab: ab }).select("id").single();
   if (sErr || !st) return json({ error: "Schüler-Datensatz: " + (sErr?.message || "unbekannt") }, 500);
 
-  const passwort = startpasswort();
+  const passwort = sp.pw || startpasswort();
   const { data: neu, error: aErr } = await admin.auth.admin.createUser({
     email: `${username}@sv-beitraege.local`,
     password: passwort,
@@ -175,7 +191,7 @@ Deno.serve(async (req) => {
   let eltern: { username: string; passwort: string } | null = null;
   let elternFehler = "";
   if (k.mit_eltern) {
-    const e = await elternAnlegen(admin, { id: st.id, vorname, nachname });
+    const e = await elternAnlegen(admin, { id: st.id, vorname, nachname }, ep.pw);
     if ("error" in e) elternFehler = e.error || "";
     else eltern = e;
   }

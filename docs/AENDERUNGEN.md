@@ -460,3 +460,11 @@ drin. Erfundene Adressen wären schlimmer als keine.
 `docs/DATENSCHUTZ.md` führt die Liste weiter: Auftragsverarbeitungsverträge,
 Einwilligung der Eltern nach Art. 8 DSGVO, Verarbeitungsverzeichnis,
 Löschkonzept – und warum der App Store für eine PWA nicht der richtige Weg ist.
+
+## Startpasswort beim Anlegen selbst festlegen
+
+- „+ Person hinzufügen“: Startpasswort für Schüler- und Elternzugang wird von
+  Hand eingetippt (mind. 8 Zeichen), mit Knopf „🎲 Vorschlag“ für ein
+  zufälliges 8-stelliges Passwort ohne Verwechsler (0/O, 1/l/I).
+- Schreibweise korrigiert: Liebehenz (Personenliste, beide Zugänge, Nutzernamen
+  `liebehenz.tobias` / `tobias.liebehenz`).

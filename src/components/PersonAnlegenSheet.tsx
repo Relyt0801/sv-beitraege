@@ -17,6 +17,8 @@ export function PersonAnlegenSheet({ open, onClose, onFertig }: { open: boolean;
   const [ab, setAb] = useState<string>("Q1.1");
   const [rolle, setRolle] = useState("schueler");
   const [mitEltern, setMitEltern] = useState(true);
+  const [pw, setPw] = useState("");
+  const [elternPw, setElternPw] = useState("");
   const [busy, setBusy] = useState(false);
   const [fehler, setFehler] = useState("");
   const [doppelt, setDoppelt] = useState(false);
@@ -33,6 +35,8 @@ export function PersonAnlegenSheet({ open, onClose, onFertig }: { open: boolean;
     if (!open) return;
     setVorname("");
     setNachname("");
+    setPw("");
+    setElternPw("");
     setFehler("");
     setDoppelt(false);
     setErgebnis(null);
@@ -42,10 +46,12 @@ export function PersonAnlegenSheet({ open, onClose, onFertig }: { open: boolean;
   async function anlegen(trotzdem = false) {
     setFehler("");
     if (!vorname.trim() || !nachname.trim()) return setFehler("Bitte Vor- und Nachnamen eingeben.");
+    if (pw.trim().length < 8) return setFehler("Passwort für den Schülerzugang: mindestens 8 Zeichen.");
+    if (mitEltern && elternPw.trim().length < 8) return setFehler("Passwort für den Elternzugang: mindestens 8 Zeichen.");
     if (!hasSupabase) return setFehler("Ohne Datenbank geht das nicht.");
     setBusy(true);
     const { data, error } = await supabase!.functions.invoke("person-anlegen", {
-      body: { vorname: vorname.trim(), nachname: nachname.trim(), beigetreten_ab: ab, rolle, trotzdem, mit_eltern: mitEltern },
+      body: { vorname: vorname.trim(), nachname: nachname.trim(), beigetreten_ab: ab, rolle, trotzdem, mit_eltern: mitEltern, passwort: pw.trim(), eltern_passwort: mitEltern ? elternPw.trim() : "" },
     });
     setBusy(false);
     if (error) {
@@ -85,7 +91,7 @@ export function PersonAnlegenSheet({ open, onClose, onFertig }: { open: boolean;
         <>
           <h2 className="text-xl font-extrabold">Person hinzufügen</h2>
           <p className="text-[12px] text-tinte-leise">
-            Legt den Eintrag in der Liste und den Login an. Das Startpasswort siehst du einmal.
+            Legt den Eintrag in der Liste und den Login an. Das Startpasswort legst du selbst fest.
           </p>
           <div className="mt-3 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-2">
             <div className="min-w-0">
@@ -126,6 +132,8 @@ export function PersonAnlegenSheet({ open, onClose, onFertig }: { open: boolean;
             />
             Elternzugang gleich mit anlegen
           </label>
+          <PwFeld label="Startpasswort Schülerzugang" wert={pw} setzen={setPw} />
+          {mitEltern && <PwFeld label="Startpasswort Elternzugang" wert={elternPw} setzen={setElternPw} />}
           {fehler && <p className="mt-2 text-[13px] font-semibold text-amber-600">{fehler}</p>}
           {doppelt ? (
             <button disabled={busy} onClick={() => void anlegen(true)} className="btn-primary mt-4 disabled:opacity-50">
@@ -193,5 +201,39 @@ export function PersonAnlegenSheet({ open, onClose, onFertig }: { open: boolean;
         </>
       )}
     </Sheet>
+  );
+}
+
+/** 8 Zeichen ohne Verwechsler (0/O, 1/l/I) – nur ein Vorschlag zum Übernehmen. */
+function vorschlag(): string {
+  const z = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
+  const a = new Uint32Array(8);
+  crypto.getRandomValues(a);
+  return Array.from(a, (x) => z[x % z.length]).join("");
+}
+
+function PwFeld({ label, wert, setzen }: { label: string; wert: string; setzen: (v: string) => void }) {
+  return (
+    <div className="mt-3">
+      <label className="block text-[12px] font-semibold text-tinte-leise">{label}</label>
+      <div className="mt-1 flex gap-2">
+        <input
+          className="field min-w-0 flex-1 font-mono"
+          placeholder="mindestens 8 Zeichen"
+          value={wert}
+          autoComplete="off"
+          spellCheck={false}
+          onChange={(e) => setzen(e.target.value)}
+        />
+        <button
+          type="button"
+          onClick={() => setzen(vorschlag())}
+          className="shrink-0 rounded-xl border border-papier-linie px-3 text-[13px] font-bold text-tinte-matt dark:border-slate-700 dark:text-slate-300"
+          title="Zufälliges Passwort vorschlagen"
+        >
+          🎲 Vorschlag
+        </button>
+      </div>
+    </div>
   );
 }
