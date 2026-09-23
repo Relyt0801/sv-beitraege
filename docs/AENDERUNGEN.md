@@ -468,3 +468,17 @@ Löschkonzept – und warum der App Store für eine PWA nicht der richtige Weg i
   zufälliges 8-stelliges Passwort ohne Verwechsler (0/O, 1/l/I).
 - Schreibweise korrigiert: Liebehenz (Personenliste, beide Zugänge, Nutzernamen
   `liebehenz.tobias` / `tobias.liebehenz`).
+
+## Impressum ausgefüllt, Schriften ohne Google
+
+- Impressum und Datenschutz: Jahrgang/Schule, Nutzung ab 16, Supabase-Region
+  eu-west-3 (Paris) und die LDI NRW als Aufsichtsbehörde stehen jetzt fest drin.
+- **Name, Anschrift und E-Mail des Betreibers stehen nicht im Code**, sondern
+  kommen aus den Vercel-Umgebungsvariablen `VITE_BETREIBER_NAME`, `_STRASSE`,
+  `_ORT`, `_MAIL` (Anleitung: `docs/DATENSCHUTZ.md`, Abschnitt 2). Fehlt eine,
+  zeigt die App einen gelben Platzhalter.
+- Schriften (Public Sans, Bricolage Grotesque) kommen aus dem eigenen Build
+  statt von Google Fonts – keine IP-Adressen mehr an Google. Die lateinischen
+  Schnitte sind im Offline-Speicher der App.
+- GitHub Pages baut nicht mehr bei jedem Push mit (nur noch von Hand), die App
+  läuft auf Vercel.

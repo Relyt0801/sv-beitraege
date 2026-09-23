@@ -4,11 +4,11 @@ import { Sheet } from "./Sheet";
 /**
  * Impressum und Datenschutzerklärung.
  *
- * WICHTIG – hier steht noch Arbeit an:
- * Die eckigen Klammern sind Platzhalter. Eine ladungsfähige Anschrift darf
- * sich niemand ausdenken, deshalb stehen hier keine erfundenen Daten. Vor dem
- * Livegang unter der eigenen Domain müssen sie ausgefüllt werden – was genau
- * und warum, steht in docs/DATENSCHUTZ.md.
+ * Name, Anschrift und E-Mail des Betreibers stehen NICHT im Code (und damit
+ * nicht im Git), sondern kommen beim Bauen aus den Umgebungsvariablen
+ * VITE_BETREIBER_NAME / _STRASSE / _ORT / _MAIL (Vercel → Settings →
+ * Environment Variables, lokal in .env). Fehlt eine, steht an der Stelle ein
+ * gelber Platzhalter. Was sonst noch offen ist: docs/DATENSCHUTZ.md.
  *
  * Die Texte liegen bewusst in der App und nicht in einer Datenbank: Impressum
  * und Datenschutzerklärung müssen auch dann erreichbar sein, wenn gerade nichts
@@ -28,6 +28,36 @@ const Lueck = ({ children }: { children: ReactNode }) => (
   <span className="rounded bg-amber-400/25 px-1 font-semibold text-amber-800 dark:text-amber-300">[{children}]</span>
 );
 
+/** Betreiberangaben – kommen aus den Umgebungsvariablen, nie aus dem Git. */
+const BETREIBER = {
+  name: (import.meta.env.VITE_BETREIBER_NAME || "").trim(),
+  strasse: (import.meta.env.VITE_BETREIBER_STRASSE || "").trim(),
+  ort: (import.meta.env.VITE_BETREIBER_ORT || "").trim(),
+  mail: (import.meta.env.VITE_BETREIBER_MAIL || "").trim(),
+};
+const Wert = ({ v, fehlt }: { v: string; fehlt: string }) => (v ? <>{v}</> : <Lueck>{fehlt}</Lueck>);
+const Mail = () =>
+  BETREIBER.mail ? (
+    <a className="font-semibold underline underline-offset-2" href={`mailto:${BETREIBER.mail}`}>
+      {BETREIBER.mail}
+    </a>
+  ) : (
+    <Lueck>E-Mail-Adresse</Lueck>
+  );
+
+/** Anschrift-Block, gleich für Impressum und Datenschutz. */
+const Anschrift = () => (
+  <>
+    <Wert v={BETREIBER.name} fehlt="Vor- und Nachname" />
+    <br />
+    <Wert v={BETREIBER.strasse} fehlt="Straße und Hausnummer" />
+    <br />
+    <Wert v={BETREIBER.ort} fehlt="PLZ und Ort" />
+    <br />
+    Deutschland
+  </>
+);
+
 function Impressum() {
   return (
     <>
@@ -35,31 +65,23 @@ function Impressum() {
 
       <H>Diensteanbieter</H>
       <P>
-        <Lueck>Vor- und Nachname der verantwortlichen Person</Lueck>
-        <br />
-        <Lueck>Straße und Hausnummer</Lueck>
-        <br />
-        <Lueck>PLZ und Ort</Lueck>
-        <br />
-        Deutschland
+        <Anschrift />
       </P>
 
       <H>Kontakt</H>
       <P>
-        E-Mail: <Lueck>E-Mail-Adresse</Lueck>
-        <br />
-        Telefon: <Lueck>Telefonnummer – nur nötig, wenn keine E-Mail-Antwort binnen 60 Minuten möglich ist</Lueck>
+        E-Mail: <Mail />
       </P>
 
       <H>Verantwortlich für den Inhalt</H>
       <P>
-        <Lueck>Name</Lueck>, Anschrift wie oben.
+        <Wert v={BETREIBER.name} fehlt="Name" />, Anschrift wie oben.
       </P>
 
       <H>Was diese Seite ist</H>
       <P>
-        Die Stufenkasse ist ein internes Werkzeug der Abiturstufe{" "}
-        <Lueck>Jahrgang / Schule</Lueck>. Sie verwaltet Beiträge, Beteiligungen, Termine und die Absprachen der
+        Die Stufenkasse ist ein internes Werkzeug des Abiturjahrgangs 2028 am Gymnasium Remigianum in
+        Borken. Sie verwaltet Beiträge, Beteiligungen, Termine und die Absprachen der
         Komitees. Es wird nichts verkauft und nichts beworben. Alle Inhalte liegen hinter einer Anmeldung;
         Zugänge vergibt ausschließlich das Stufenteam.
       </P>
@@ -80,7 +102,9 @@ function Datenschutz() {
 
       <H>1. Wer ist verantwortlich?</H>
       <P>
-        <Lueck>Name, Anschrift und E-Mail der verantwortlichen Person – dieselben Angaben wie im Impressum</Lueck>
+        <Anschrift />
+        <br />
+        E-Mail: <Mail />
       </P>
 
       <H>2. Welche Daten werden gespeichert?</H>
@@ -121,8 +145,9 @@ function Datenschutz() {
         Stufe) und, soweit die Nutzung freiwillig ist, Art. 6 Abs. 1 lit. a DSGVO (Einwilligung).
       </P>
       <P>
-        <b>Minderjährige:</b> Wer unter 16 Jahre alt ist, braucht für eine Einwilligung die Zustimmung der
-        Eltern (Art. 8 DSGVO). <Lueck>Wie diese Zustimmung eingeholt wurde, hier eintragen</Lueck>
+        <b>Alter:</b> Die Stufenkasse ist für die Oberstufe gedacht und darf ab 16 Jahren genutzt werden. Wer
+        jünger ist, braucht für eine Einwilligung die Zustimmung der Eltern (Art. 8 DSGVO) und meldet sich
+        dafür beim Stufenteam.
       </P>
 
       <H>4. Wer bekommt die Daten zu sehen?</H>
@@ -136,9 +161,12 @@ function Datenschutz() {
         (Auftragsverarbeitung nach Art. 28 DSGVO):
       </P>
       <P>
-        • <b>Supabase</b> – Datenbank und Anmeldung. Region: <Lueck>Region des Projekts, z. B. eu-central-1</Lueck>
+        • <b>Supabase</b> – Datenbank und Anmeldung. Region: eu-west-3 (Paris, Frankreich) – die Daten
+        liegen in der EU.
         <br />• <b>Vercel</b> – Auslieferung der Seite
         <br />• <b>IONOS</b> – Domain und DNS
+        <br />
+        Schriften werden von dieser Seite selbst geladen, nicht von Google oder anderen Schrift-Diensten.
         <br />• <b>Apple, Google und Mozilla</b> – nur wenn Benachrichtigungen an sind: der Push-Dienst des
         jeweiligen Browserherstellers stellt die Nachricht zu. Der Inhalt ist dabei verschlüsselt.
       </P>
@@ -173,7 +201,8 @@ function Datenschutz() {
       </P>
       <P>
         Außerdem kannst du dich bei einer Datenschutz-Aufsichtsbehörde beschweren, zum Beispiel bei der
-        zuständigen Behörde deines Bundeslandes: <Lueck>zuständige Aufsichtsbehörde eintragen</Lueck>
+        für uns zuständigen: Landesbeauftragte für Datenschutz und Informationsfreiheit Nordrhein-Westfalen
+        (LDI NRW), Postfach 20 04 44, 40102 Düsseldorf, poststelle@ldi.nrw.de, www.ldi.nrw.de.
       </P>
 
       <H>8. Sicherheit</H>

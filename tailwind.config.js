@@ -32,7 +32,7 @@ export default {
         sans: ["Public Sans", "-apple-system", "BlinkMacSystemFont", "Segoe UI", "Helvetica", "sans-serif"],
         // Fuer Betraege, Prozente und Ueberschriften: eigener Charakter,
         // gleiche Ziffernbreite, damit Zahlen untereinander stehen.
-        zahl: ["Bricolage Grotesque", "Georgia", "serif"],
+        zahl: ["Bricolage Grotesque Variable", "Bricolage Grotesque", "Georgia", "serif"],
       },
       boxShadow: {
         card: "0 4px 20px rgba(20,24,45,.06)",

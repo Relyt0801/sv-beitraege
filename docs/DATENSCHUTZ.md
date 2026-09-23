@@ -1,6 +1,6 @@
 # Datenschutz, Impressum – was fertig ist und was du noch tun musst
 
-Stand: 22.09.2026. Diese Datei ist eine Arbeitsliste, keine Rechtsberatung.
+Stand: 23.09.2026. Diese Datei ist eine Arbeitsliste, keine Rechtsberatung.
 Bei einer App, in der **Daten von Minderjährigen** stehen, lohnt sich ein Blick
 der Schule oder des Datenschutzbeauftragten, bevor sie unter einer eigenen
 Domain öffentlich erreichbar ist.
@@ -18,22 +18,37 @@ Domain öffentlich erreichbar ist.
   löschen, nach zwei Jahren löscht es sich selbst.
 * **Speicherstände** mit begrenzter Aufbewahrung (30 bzw. 90 Tage).
 
-## 2. Was du noch ausfüllen musst – ohne das nicht live gehen
+## 2. Betreiberangaben – kommen aus Vercel, nicht aus dem Git
 
-In `src/components/Rechtliches.tsx` stehen die offenen Stellen in
-`[eckigen Klammern]` und sind in der App **gelb hinterlegt**. Such dort nach
-`Lueck`:
+Name, Anschrift und E-Mail stehen **nicht** im Code. Die App liest sie beim
+Bauen aus vier Umgebungsvariablen. So landet die Privatanschrift nie in der
+Git-Historie – auch dann nicht, wenn das Repo öffentlich ist.
 
-| Stelle | Was hin muss |
+**Einmalig in Vercel eintragen** (Browser → vercel.com → Projekt
+`sv-beitraege` → Settings → Environment Variables → für *Production* und
+*Preview*), danach einmal neu deployen (Deployments → ⋯ → Redeploy):
+
+| Variable | Inhalt |
 |---|---|
-| Impressum → Diensteanbieter | Vor- und Nachname, **ladungsfähige Anschrift** (kein Postfach), Ort |
-| Impressum → Kontakt | E-Mail-Adresse; Telefonnummer nur nötig, wenn keine schnelle E-Mail-Antwort möglich ist |
-| Impressum → Was diese Seite ist | Jahrgang und Schule |
-| Datenschutz → 1. Verantwortlicher | dieselben Angaben |
-| Datenschutz → 3. Minderjährige | wie die Zustimmung der Eltern eingeholt wurde |
-| Datenschutz → 4. Supabase-Region | z. B. `eu-central-1` (steht im Supabase-Dashboard unter Settings → General) |
-| Datenschutz → 4. Auftragsverarbeitung | bestätigen, dass die Verträge abgeschlossen sind |
-| Datenschutz → 7. Aufsichtsbehörde | die des eigenen Bundeslandes, für NRW die LDI NRW |
+| `VITE_BETREIBER_NAME` | Vor- und Nachname |
+| `VITE_BETREIBER_STRASSE` | Straße und Hausnummer |
+| `VITE_BETREIBER_ORT` | PLZ und Ort |
+| `VITE_BETREIBER_MAIL` | E-Mail-Adresse |
+
+Fehlt eine Variable, steht an der Stelle in der App ein **gelber Platzhalter**.
+
+Schon fest im Text (keine persönlichen Daten):
+
+* Jahrgang und Schule: Abiturjahrgang 2028, Gymnasium Remigianum Borken
+* Nutzung ab 16 Jahren (Oberstufe), jüngere nur mit Zustimmung der Eltern
+* Supabase-Region: **eu-west-3 (Paris)** – laut Supabase-Projekt, also EU
+* Aufsichtsbehörde: **LDI NRW**, Postfach 20 04 44, 40102 Düsseldorf
+* Schriften kommen aus dem eigenen Build (`@fontsource`), **nicht mehr von
+  Google Fonts** – vorher ging bei jedem Aufruf die IP-Adresse an Google,
+  ohne dass das in der Datenschutzerklärung stand.
+
+Noch gelb in der App: nur die Bestätigung der **Auftragsverarbeitungsverträge**
+(siehe Abschnitt 4) – die Zeile löschen, sobald alle drei abgeschlossen sind.
 
 **Wer ist verantwortlich?** Das ist keine Formsache. Entweder eine
 volljährige Privatperson mit echter Anschrift – dann steht diese Adresse
@@ -58,14 +73,11 @@ Stufenkasse ohne Werbung und ohne Verkauf fällt da eher nicht drunter. Aber:
       **Vercel** und **IONOS** abschließen. Alle drei bieten einen DPA an;
       bei Supabase und Vercel im Dashboard unter Legal/Privacy, bei IONOS im
       Vertragsbereich.
-- [ ] **Supabase-Region prüfen.** Liegt das Projekt in den USA, ist das kein
-      Beinbruch (Supabase bietet Standardvertragsklauseln), aber es gehört in
-      die Datenschutzerklärung. Eine EU-Region ist die einfachere Antwort.
-      Nachträglich umziehen geht nur über ein neues Projekt – lieber jetzt
-      nachsehen.
-- [ ] **Einwilligung der Eltern** für alle unter 16 einholen und aufbewahren
-      (Art. 8 DSGVO). Ein unterschriebener Zettel reicht; er muss vorzeigbar
-      sein.
+- [x] **Supabase-Region geprüft:** eu-west-3 (Paris). Steht so in der
+      Datenschutzerklärung.
+- [ ] **Unter 16?** Die App ist ab 16 freigegeben. Falls doch jemand jünger
+      ist: Zustimmung der Eltern schriftlich einholen und aufbewahren
+      (Art. 8 DSGVO).
 - [ ] **Verzeichnis von Verarbeitungstätigkeiten** (Art. 30 DSGVO) anlegen.
       Für diese Größe reicht eine Seite: welche Daten, wozu, wie lange, wer
       bekommt sie.

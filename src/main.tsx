@@ -3,6 +3,12 @@ import ReactDOM from "react-dom/client";
 import App from "./App";
 import { StoreProvider } from "./store";
 import { Fehlerfang } from "./components/Fehlerfang";
+// Schriften selbst ausliefern statt von Google laden (DSGVO: keine IP an Dritte)
+import "@fontsource/public-sans/400.css";
+import "@fontsource/public-sans/500.css";
+import "@fontsource/public-sans/600.css";
+import "@fontsource/public-sans/700.css";
+import "@fontsource-variable/bricolage-grotesque/opsz.css";
 import "./index.css";
 
 /**

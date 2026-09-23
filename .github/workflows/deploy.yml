@@ -1,8 +1,9 @@
 name: Deploy to GitHub Pages
 
+# Die App läuft auf Vercel. GitHub Pages baut deshalb nicht mehr bei jedem
+# Push mit (sonst gäbe es eine zweite, veraltete Kopie der App im Netz).
+# Bei Bedarf von Hand starten: GitHub → Actions → "Deploy to GitHub Pages".
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 permissions:

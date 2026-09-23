@@ -20,7 +20,7 @@ export default defineConfig({
       registerType: "autoUpdate",
       includeAssets: ["favicon.svg"],
       injectManifest: {
-        globPatterns: ["**/*.{js,css,html,svg,png,ico,webmanifest}"],
+        globPatterns: ["**/*.{js,css,html,svg,png,ico,webmanifest}", "**/*-latin-*.woff2"],
       },
       manifest: {
         name: "Stufenkasse",
