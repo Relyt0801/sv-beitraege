@@ -164,7 +164,12 @@ function seed(): Student[] {
     ["Bauer", "Lena"], ["Çelik", "Deniz"], ["Müller", "Jonas"], ["Schäfer", "Mia"],
     ["Weiß", "Tom"], ["Ackermann", "Nour"], ["Özdemir", "Elif"], ["Brandt", "Finn"],
   ];
-  return names.map(([n, v]) => newStudent(n, v));
+  // Wie im Demo-Kassenbuch (src/lib/demo.ts): drei haben EF.1 schon bezahlt
+  return names.map(([n, v], i) => {
+    const s = newStudent(n, v);
+    if (i === 0 || i === 1 || i === 3) s.terms["EF.1"] = { status: "bezahlt" };
+    return s;
+  });
 }
 
 function toRow(st: Student) {

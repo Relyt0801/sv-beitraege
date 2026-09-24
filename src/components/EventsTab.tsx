@@ -130,7 +130,7 @@ export function EventsTab() {
   if (events.length === 0)
     return rahmen(
       <>
-        <div className="py-12 text-center text-sm text-tinte-leise">Noch keine Beiträge.</div>
+        <div className="py-12 text-center text-sm text-tinte-leise">Noch keine Events.</div>
       </>,
     );
 

@@ -5,7 +5,7 @@ import { MyKasse } from "./components/MyKasse";
 import { PunkteSheet } from "./components/PunkteSheet";
 import { ProfilSheet } from "./components/ProfilSheet";
 import { Avatar } from "./components/Avatar";
-import { Tour, tourSteps } from "./components/Tour";
+import { Tour, schuelerSchritte, teamSchritte } from "./components/Tour";
 import { useTheme } from "./lib/theme";
 import { useVerzoegert } from "./lib/entwurf";
 import { hasSupabase, supabase } from "./lib/supabase";
@@ -38,6 +38,8 @@ import { ElternProvider, useEltern } from "./eltern-store";
 import { ElternApp } from "./components/ElternApp";
 import { Icon, type IconName } from "./components/Icon";
 import { InstallKarte, InstallOverlay } from "./components/InstallHinweis";
+import { useGescrollt } from "./lib/gescrollt";
+import { Schalter } from "./components/Schalter";
 
 export default function App() {
   return (
@@ -62,7 +64,7 @@ function NachRolle() {
   if (!ready)
     return (
       <div className="flex min-h-dvh items-center justify-center">
-        <div className="h-9 w-9 animate-spin rounded-full border-[3px] border-papier-linie border-t-brand dark:border-slate-700 dark:border-t-brand" />
+        <div className="h-8 w-8 animate-spin rounded-full border-[3px] border-slate-200 border-t-slate-500 dark:border-slate-700 dark:border-t-slate-300" />
       </div>
     );
 
@@ -95,10 +97,10 @@ type Tab = "kasse" | "events" | "themen" | "beitraege" | "finanzen" | "rollen" |
 
 /** "#events" -> Events, "#chats" -> Chats. Danach wird die Marke entfernt,
  *  damit ein Neuladen nicht wieder dorthin springt. */
-function tabAusAdresse(): Tab | null {
+function tabAusAdresse(entfernen = true): Tab | null {
   const h = window.location.hash.replace("#", "");
   const t: Tab | null = h === "events" ? "events" : h === "chats" ? "themen" : h === "kasse" ? "kasse" : h === "finanzen" ? "finanzen" : null;
-  if (t) history.replaceState(null, "", window.location.pathname + window.location.search);
+  if (t && entfernen) history.replaceState(null, "", window.location.pathname + window.location.search);
   return t;
 }
 
@@ -112,8 +114,8 @@ const REITER_TITEL: Record<Tab, string> = {
   themen: "Chats",
   beitraege: "Beiträge & Abiball",
   finanzen: "Finanzen",
-  rollen: "Rollen & Rechte",
-  rechte: "Berechtigungen",
+  rollen: "Rollen",
+  rechte: "Rechte",
 };
 
 function Main() {
@@ -143,7 +145,8 @@ function Main() {
   // Einführung zurück, wird sie beim nächsten Öffnen wieder gezeigt.
   useEffect(() => {
     if (!roleReady || !ready) return;
-    const key = `sv:tour:v2:${isStaff ? "team" : "schueler"}`;
+    // v3: neue Einführung mit Reiterwechsel – alle sehen sie einmal neu.
+    const key = `sv:tour:v3:${isStaff ? "team" : "schueler"}`;
     const gesehen = localStorage.getItem(key);
     const wiederZeigen = tourResetAt && (!gesehen || gesehen === "1" || gesehen < tourResetAt);
     if (gesehen && !wiederZeigen) return;
@@ -168,7 +171,11 @@ function Main() {
   useEffect(() => appZaehler(topicsUnread + unread), [topicsUnread, unread]);
   // Ein Tippen auf eine Benachrichtigung öffnet die App mit #events oder
   // #chats – dann direkt dort landen statt auf der Kasse.
-  const [tab, setTab] = useState<Tab>(() => tabAusAdresse() || "kasse");
+  // Nur lesen – React ruft den Startwert im Entwicklungsmodus zweimal auf.
+  const [tab, setTab] = useState<Tab>(() => tabAusAdresse(false) || "kasse");
+  useEffect(() => {
+    tabAusAdresse(true);
+  }, []);
   useEffect(() => {
     const neu = () => {
       const t = tabAusAdresse();
@@ -177,6 +184,10 @@ function Main() {
     window.addEventListener("hashchange", neu);
     return () => window.removeEventListener("hashchange", neu);
   }, []);
+  // Jeder Reiter beginnt oben – sonst landet man mitten in einer fremden Liste.
+  useEffect(() => {
+    window.scrollTo({ top: 0 });
+  }, [tab]);
   const [showComposer, setShowComposer] = useState(false);
   const [showAktion, setShowAktion] = useState(false);
   const [query, setQuery] = useState("");
@@ -191,6 +202,8 @@ function Main() {
   const [showAdd, setShowAdd] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showTour, setShowTour] = useState(false);
+  const gescrollt = useGescrollt(4);
+  const titelWeg = useGescrollt(44);
   // Listen-, Such- und Filterwerkzeug nur für Leute, die wirklich alle Personen verwalten.
   const teamView = isStaff;
 
@@ -297,7 +310,10 @@ function Main() {
   }
 
   const numField =
-    "w-16 rounded-lg border border-papier-linie bg-white px-2.5 py-2 text-center dark:border-slate-700 dark:bg-slate-800";
+    "w-16 rounded-lg bg-[rgb(118_118_128/0.12)] px-2.5 py-2 text-center outline-none focus:ring-2 focus:ring-brand/30 dark:bg-[rgb(118_118_128/0.24)]";
+  // Kleine graue Kapselknoepfe in der Filterkarte
+  const klein =
+    "rounded-full bg-[rgb(118_118_128/0.12)] px-3.5 py-1.5 text-[14px] font-semibold text-brand-dark transition active:scale-95 dark:bg-[rgb(118_118_128/0.24)] dark:text-brand";
 
   const navItems: { key: Tab; icon: IconName; label: string; badge?: number; show: boolean }[] = [
     { key: "kasse", icon: "kasse", label: "Kasse", show: true },
@@ -317,15 +333,23 @@ function Main() {
   }, [roleReady, reiterErlaubt]);
 
   return (
-    <div className="mx-auto max-w-5xl px-3 pb-36 sm:px-5 lg:pb-12">
-      <header className="sticky top-0 z-20 -mx-3 border-b border-papier-linie bg-papier/90 px-3 pb-3 pt-[calc(env(safe-area-inset-top)+0.7rem)] backdrop-blur dark:border-slate-800 dark:bg-slate-950/90 sm:-mx-5 sm:px-5">
+    <div className="mx-auto max-w-5xl px-3 pb-36 sm:px-5 lg:pb-16">
+      {/* Kopf wie eine iOS-Navigationsleiste: oben die Knöpfe, darunter der
+          große Titel. Scrollt der Titel weg, erscheint er klein in der nun
+          milchigen Leiste (Glas). */}
+      <header
+        className={`sticky top-0 z-20 -mx-3 px-3 pb-2 pt-[calc(env(safe-area-inset-top)+0.5rem)] transition-[background-color,box-shadow] duration-300 sm:-mx-5 sm:px-5 ${
+          gescrollt ? "glas shadow-[0_0.5px_0_rgba(0,0,0,.18)] dark:shadow-[0_0.5px_0_rgba(255,255,255,.15)]" : "bg-papier dark:bg-slate-950"
+        }`}
+      >
         <div className="mx-auto flex max-w-5xl items-center gap-2.5">
-          {/* Ein Titel, der zum Reiter passt – genau wie in der Elternansicht. */}
-          <div className="min-w-0 flex-1 leading-tight">
-            <div className="truncate font-zahl text-[1.25rem] font-extrabold tracking-[-0.02em]">{REITER_TITEL[tab]}</div>
-            <div className="truncate text-[11px] text-tinte-leise">
-              {isStaff ? "Stufenteam" : "Mein Zugang"} · Abi 28
-            </div>
+          <div
+            aria-hidden={!titelWeg}
+            className={`min-w-0 flex-1 truncate text-[17px] font-semibold tracking-[-0.01em] transition duration-300 ease-ios ${
+              titelWeg ? "translate-y-0 opacity-100" : "translate-y-1 opacity-0"
+            }`}
+          >
+            {REITER_TITEL[tab]}
           </div>
 
           <div className="ml-auto flex shrink-0 items-center gap-2">
@@ -337,8 +361,9 @@ function Main() {
                     className={`iconbtn ${showFilter ? "iconbtn-active" : ""}`}
                     onClick={() => setShowFilter((v) => !v)}
                     aria-label="Filter & Einstellungen"
+                    title="Filter & Einstellungen"
                   >
-                    ⚙︎
+                    <Icon name="regler" size={19} />
                   </button>
                 )}
                 {teamView && (canEditData || canEditHilfen) && (
@@ -350,19 +375,20 @@ function Main() {
                       setSelected(new Set());
                     }}
                     aria-label="Mehrere auswählen"
+                    title="Mehrere auswählen"
                   >
-                    ☑
+                    <Icon name="auswahl" size={20} />
                   </button>
                 )}
               </>
             )}
-            <button className="iconbtn" onClick={toggle} aria-label="Hell/Dunkel">
-              {theme === "dark" ? "☀" : "☾"}
+            <button className="iconbtn" onClick={toggle} aria-label={theme === "dark" ? "Helles Design" : "Dunkles Design"} title="Hell/Dunkel">
+              <Icon name={theme === "dark" ? "sonne" : "mond"} size={19} />
             </button>
             <button
               data-tour="profil"
               onClick={() => setShowSettings(true)}
-              className="rounded-full transition active:scale-95"
+              className="rounded-full ring-2 ring-white transition active:scale-90 dark:ring-slate-900"
               aria-label="Mein Profil"
             >
               <Avatar userId={uid} size={40} />
@@ -370,43 +396,58 @@ function Main() {
           </div>
         </div>
 
-        {/* Am Rechner steht die Navigation oben – eine Leiste unten am Bildschirmrand
-            gibt es so auf keinem Dashboard. Auf dem Handy bleibt sie unten. */}
-        <div className="mx-auto mt-2.5 hidden max-w-5xl items-center gap-1 lg:flex">
+        {/* Am Rechner und iPad quer: schwebende Reiterleiste oben in der Mitte
+            (wie iPadOS). Auf dem Handy steht sie unten. */}
+        <nav className="mx-auto mt-3 hidden w-fit max-w-full items-center gap-0.5 overflow-x-auto rounded-full border border-black/[0.06] p-1 shadow-glas glas no-scrollbar dark:border-white/10 lg:flex">
           {navItems.filter((n) => n.show).map((n) => (
             <button
               key={n.key}
+              data-tour={`tab-${n.key}`}
               onClick={() => setTab(n.key)}
-              className={`relative flex items-center gap-2 rounded-lg px-3 py-2 text-[13px] font-semibold transition ${
+              aria-current={tab === n.key ? "page" : undefined}
+              className={`relative flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[14px] font-semibold transition duration-300 ease-ios active:scale-95 ${
                 tab === n.key
-                  ? "bg-brand/10 text-brand-dark dark:bg-brand/20 dark:text-brand-soft"
-                  : "text-tinte-matt hover:bg-papier-matt dark:text-slate-300 dark:hover:bg-slate-800"
+                  ? "bg-white text-brand-dark shadow-[0_2px_8px_rgba(0,0,0,.1)] dark:bg-slate-700 dark:text-white"
+                  : "text-tinte-matt hover:text-tinte dark:text-slate-300 dark:hover:text-white"
               }`}
             >
-              <Icon name={n.icon} size={17} />
+              <Icon name={n.icon} size={16} />
               {n.label}
               {(n.badge ?? 0) > 0 && (
-                <span className="flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+                <span className="flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#FF3B30] px-1 text-[11px] font-semibold text-white">
                   {n.badge! > 9 ? "9+" : n.badge}
                 </span>
               )}
             </button>
           ))}
-        </div>
+        </nav>
       </header>
+
+      {/* Großer Titel – läuft beim Scrollen einfach mit weg */}
+      <div className="mx-auto max-w-5xl px-1 pb-1 pt-1">
+        <h1 className="font-zahl text-[2.125rem] font-bold leading-tight tracking-[-0.025em]">{REITER_TITEL[tab]}</h1>
+        <p className="text-[13px] text-tinte-leise">{isStaff ? "Stufenteam" : "Mein Zugang"} · Abi 28</p>
+      </div>
 
       {/* Suche, Kennzahlen und Halbjahr laufen mit – nur die Titelzeile bleibt
           oben kleben. Sonst verdeckt der Kopf auf dem Handy die halbe Liste. */}
       <div>
         {tab === "kasse" && teamView && (
-          <div className="mx-auto mt-2.5 flex max-w-5xl items-center gap-2 rounded-xl border border-papier-linie bg-white px-3.5 py-2.5 shadow-card dark:border-slate-800 dark:bg-slate-900 dark:shadow-cardDark">
-            <span className="text-tinte-leise">🔍</span>
+          <div className="mx-auto mt-1 flex h-11 max-w-5xl items-center gap-2 rounded-xl bg-[rgb(118_118_128/0.12)] px-3 dark:bg-[rgb(118_118_128/0.24)]">
+            <span className="text-tinte-leise">
+              <Icon name="lupe" size={17} />
+            </span>
             <input
-              className="w-full bg-transparent text-base outline-none placeholder:text-tinte-leise"
-              placeholder="Name suchen…"
+              className="w-full min-w-0 bg-transparent text-base outline-none placeholder:text-tinte-leise"
+              placeholder="Name suchen"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
+            {query && (
+              <button onClick={() => setQuery("")} aria-label="Suche leeren" className="px-1 text-tinte-leise">
+                ✕
+              </button>
+            )}
           </div>
         )}
 
@@ -423,21 +464,20 @@ function Main() {
         {tab === "kasse" && teamView && <KassenKopf students={students} settings={settings} punkte={punkte} />}
 
         {tab === "kasse" && teamView && canEditData && (
-          <div className="mx-auto mt-2.5 max-w-5xl">
-            <div className="flex items-center gap-2">
-              <span className="shrink-0 text-[11px] font-semibold uppercase tracking-wide text-tinte-leise">
-                Laufendes Halbjahr
-              </span>
-              <div className="flex min-w-0 flex-1 gap-1">
+          <div className="mx-auto mt-3 max-w-5xl">
+            <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-3">
+              <span className="shrink-0 px-1 text-[13px] text-tinte-leise">Laufendes Halbjahr</span>
+              <div className="seg min-w-0 flex-1" role="radiogroup" aria-label="Laufendes Halbjahr">
                 {HY.map((h) => (
                   <button
                     key={h}
-                    onClick={() => setSettings({ aktuelles_halbjahr: h })}
-                    className={`min-w-0 flex-1 rounded-lg border px-1 py-1.5 text-[11px] font-bold transition ${
-                      h === settings.aktuelles_halbjahr
-                        ? "border-brand bg-brand text-white"
-                        : "border-papier-linie bg-white text-tinte-matt dark:border-slate-700 dark:bg-slate-900"
-                    }`}
+                    role="radio"
+                    aria-checked={h === settings.aktuelles_halbjahr}
+                    onClick={() => {
+                      if (h === settings.aktuelles_halbjahr) return;
+                      if (confirm(`Laufendes Halbjahr für die ganze Stufe auf ${h} umstellen?`)) setSettings({ aktuelles_halbjahr: h });
+                    }}
+                    className={`seg-item !px-1 !text-[12px] ${h === settings.aktuelles_halbjahr ? "seg-aktiv" : ""}`}
                   >
                     {h}
                   </button>
@@ -448,9 +488,9 @@ function Main() {
         )}
 
         {tab === "kasse" && teamView && showFilter && (
-          <div className="mx-auto mt-3 max-w-5xl">
+          <div className="mx-auto mt-3 max-w-5xl animate-aufsteigen">
             <div className="card grid grid-cols-2 gap-x-5 gap-y-4 p-4 sm:grid-cols-4">
-              <label className="flex flex-col gap-1.5 text-xs font-semibold uppercase tracking-wide text-tinte-matt">
+              <label className="flex flex-col gap-1.5 text-xs font-semibold uppercase tracking-wide text-tinte-leise">
                 Prozent
                 <div className="flex items-center gap-1.5 text-tinte dark:text-slate-200">
                   <input type="number" className={numField} placeholder="min" value={min} onChange={(e) => setMin(e.target.value)} />
@@ -459,49 +499,45 @@ function Main() {
                 </div>
               </label>
 
-              <div className="flex flex-col gap-1.5 text-xs font-semibold uppercase tracking-wide text-tinte-matt">
+              <div className="flex flex-col gap-1.5 text-xs font-semibold uppercase tracking-wide text-tinte-leise">
                 Anzeige
-                <button
-                  onClick={() => setOnlyOpen((v) => !v)}
-                  className={`rounded-lg border px-3 py-2 text-[13px] font-bold normal-case transition ${
-                    onlyOpen ? "border-brand bg-brand text-white" : "border-papier-linie bg-white dark:border-slate-700 dark:bg-slate-800"
-                  }`}
-                >
-                  {onlyOpen ? "✓ nur offene" : "nur offene"}
-                </button>
+                <label className="flex h-10 items-center justify-between gap-2 normal-case">
+                  <span className="text-[14px] font-medium text-tinte dark:text-slate-100">nur offene</span>
+                  <Schalter an={onlyOpen} onChange={setOnlyOpen} />
+                </label>
               </div>
 
               {can("beitraege.manage") && (
                 <div className="col-span-2 flex items-center gap-2 text-[12px] text-tinte-leise sm:col-span-4">
-                  🎟️ Abiball-Staffel und Prozent-Möglichkeiten stehen jetzt im Reiter{" "}
-                  <button onClick={() => setTab("beitraege")} className="font-bold text-brand underline">
+                  Abiball-Staffel und Prozent-Möglichkeiten stehen im Reiter{" "}
+                  <button onClick={() => setTab("beitraege")} className="font-semibold text-brand">
                     Beiträge
                   </button>
                 </div>
               )}
 
-              <div className="col-span-2 flex flex-wrap items-center gap-2 border-t border-papier-linie pt-3 dark:border-slate-700 sm:col-span-4">
-                <span className="mr-1 text-xs font-semibold uppercase tracking-wide text-tinte-matt">Daten</span>
+              <div className="col-span-2 flex flex-wrap items-center gap-2 border-t border-papier-linie pt-3 dark:border-slate-800 sm:col-span-4">
+                <span className="mr-1 text-xs font-semibold uppercase tracking-wide text-tinte-leise">Daten</span>
                 {canEditData && (
                   <>
-                    <button onClick={exportData} className="rounded-lg border border-papier-linie px-3 py-1.5 text-sm font-semibold dark:border-slate-700">
+                    <button onClick={exportData} className={klein}>
                       Export
                     </button>
-                    <button onClick={onImport} className="rounded-lg bg-brand px-3 py-1.5 text-sm font-semibold text-white">
+                    <button onClick={onImport} className={klein}>
                       Import
                     </button>
                   </>
                 )}
-                <button onClick={() => setShowTour(true)} className="rounded-lg border border-papier-linie px-3 py-1.5 text-sm font-semibold text-tinte-matt dark:border-slate-700">
+                <button onClick={() => setShowTour(true)} className={klein}>
                   Einführung
                 </button>
                 {hasSupabase && (
                   <>
-                    <button onClick={changePassword} className="ml-auto rounded-lg border border-papier-linie px-3 py-1.5 text-sm font-semibold dark:border-slate-700">
+                    <button onClick={changePassword} className={`${klein} ml-auto`}>
                       Passwort ändern
                     </button>
-                    <button onClick={() => void abmelden()} className="rounded-lg border border-papier-linie px-3 py-1.5 text-sm font-semibold text-tinte-matt dark:border-slate-700">
-                      Logout
+                    <button onClick={() => void abmelden()} className={`${klein} !text-red-600 dark:!text-red-400`}>
+                      Abmelden
                     </button>
                   </>
                 )}
@@ -517,27 +553,27 @@ function Main() {
       </div>
 
       {tab === "rollen" ? (
-        <main className="mt-3">
+        <main key={tab} className="animate-fadeIn mt-3">
           <RolesTab />
         </main>
       ) : tab === "rechte" ? (
-        <main className="mt-3 pb-4">
+        <main key={tab} className="animate-fadeIn mt-3 pb-4">
           <PermissionsTab />
         </main>
       ) : tab === "events" ? (
-        <main className="mt-3">
+        <main key={tab} className="animate-fadeIn mt-3">
           <EventsTab />
         </main>
       ) : tab === "themen" ? (
-        <main className="mt-3 pb-4">
+        <main key={tab} className="animate-fadeIn mt-3 pb-4">
           <ChatsTab />
         </main>
       ) : tab === "finanzen" ? (
-        <main className="mt-3 pb-4">
+        <main key={tab} className="animate-fadeIn mt-3 pb-4">
           <FinanzenTab kosten={kosten} />
         </main>
       ) : tab === "beitraege" ? (
-        <main className="mt-3 pb-4">
+        <main key={tab} className="animate-fadeIn mt-3 pb-4">
           <BeitraegeTab />
         </main>
       ) : !teamView ? (
@@ -556,7 +592,7 @@ function Main() {
         <main className="card mt-3 divide-y divide-papier-linie overflow-hidden dark:divide-slate-800" data-tour="liste">
           {!ready && (
             <div className="flex flex-col items-center justify-center gap-4 py-24 text-tinte-leise">
-              <div className="h-9 w-9 animate-spin rounded-full border-[3px] border-papier-linie border-t-brand dark:border-slate-700 dark:border-t-brand" />
+              <div className="h-8 w-8 animate-spin rounded-full border-[3px] border-slate-200 border-t-slate-500 dark:border-slate-700 dark:border-t-slate-300" />
               <div className="text-sm font-medium">Beitragsliste wird geladen …</div>
             </div>
           )}
@@ -577,28 +613,16 @@ function Main() {
             </div>
           )}
           {ready && (
-            <div className="flex flex-wrap items-center gap-2 border-b border-papier-linie px-3.5 py-2.5 dark:border-slate-800 sm:px-4">
-              <button
-                onClick={() => setOnlyOpen(false)}
-                className={`rounded-lg border px-3 py-1.5 text-[12px] font-semibold transition ${
-                  !onlyOpen
-                    ? "border-brand bg-brand/10 text-brand-dark dark:bg-brand/20 dark:text-brand-soft"
-                    : "border-papier-linie text-tinte-matt dark:border-slate-700 dark:text-slate-300"
-                }`}
-              >
-                Alle
-              </button>
-              <button
-                onClick={() => setOnlyOpen(true)}
-                className={`rounded-lg border px-3 py-1.5 text-[12px] font-semibold transition ${
-                  onlyOpen
-                    ? "border-brand bg-brand/10 text-brand-dark dark:bg-brand/20 dark:text-brand-soft"
-                    : "border-papier-linie text-tinte-matt dark:border-slate-700 dark:text-slate-300"
-                }`}
-              >
-                Nur offene
-              </button>
-              <span className="zahl ml-auto text-[12px] text-tinte-leise">
+            <div className="flex flex-wrap items-center gap-3 border-b border-papier-linie px-3.5 py-2.5 dark:border-slate-800 sm:px-4">
+              <div className="seg w-52" role="radiogroup" aria-label="Anzeige">
+                <button role="radio" aria-checked={!onlyOpen} onClick={() => setOnlyOpen(false)} className={`seg-item ${!onlyOpen ? "seg-aktiv" : ""}`}>
+                  Alle
+                </button>
+                <button role="radio" aria-checked={onlyOpen} onClick={() => setOnlyOpen(true)} className={`seg-item ${onlyOpen ? "seg-aktiv" : ""}`}>
+                  Nur offene
+                </button>
+              </div>
+              <span className="zahl ml-auto text-[13px] text-tinte-leise">
                 {filtered.length} von {students.length}
               </span>
             </div>
@@ -656,20 +680,20 @@ function Main() {
       {tab === "kasse" && teamView && canEditData && !massMode && (
         <button
           onClick={() => setShowAdd(true)}
-          className="fixed bottom-[calc(env(safe-area-inset-bottom)+5rem)] right-4 z-30 flex h-14 w-14 items-center justify-center rounded-2xl bg-brand text-3xl text-white shadow-lg shadow-brand/40 transition active:scale-95 sm:right-6"
+          className="fixed bottom-[calc(env(safe-area-inset-bottom)+5.5rem)] right-4 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-brand text-white shadow-[0_8px_24px_-6px_rgb(var(--brand)/.6)] transition duration-200 ease-ios active:scale-90 sm:right-6 lg:bottom-8"
           aria-label="Person hinzufügen"
         >
-          ＋
+          <Icon name="plus" size={26} strich={2.4} />
         </button>
       )}
 
       {tab === "events" && canEditData && (
         <button
           onClick={() => setShowComposer(true)}
-          className="fixed bottom-[calc(env(safe-area-inset-bottom)+5rem)] right-4 z-30 flex h-14 w-14 items-center justify-center rounded-2xl bg-brand text-3xl text-white shadow-lg shadow-brand/40 transition active:scale-95 sm:right-6"
+          className="fixed bottom-[calc(env(safe-area-inset-bottom)+5.5rem)] right-4 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-brand text-white shadow-[0_8px_24px_-6px_rgb(var(--brand)/.6)] transition duration-200 ease-ios active:scale-90 sm:right-6 lg:bottom-8"
           aria-label="Event erstellen"
         >
-          ＋
+          <Icon name="plus" size={26} strich={2.4} />
         </button>
       )}
 
@@ -683,29 +707,30 @@ function Main() {
         />
       )}
 
-      {/* Feste Tab-Bar unten */}
+      {/* Schwebende Tab-Leiste aus Glas – wie in iOS 26 */}
       {!massMode && (
-        <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-papier-linie bg-white/95 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95 lg:hidden">
-          <div className="mx-auto flex max-w-5xl items-stretch justify-around pb-[env(safe-area-inset-bottom)]">
+        <nav className="pointer-events-none fixed inset-x-0 bottom-0 z-40 px-3 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] lg:hidden">
+          <div className="glas pointer-events-auto mx-auto flex max-w-xl items-stretch rounded-[1.9rem] border border-black/[0.06] p-1 shadow-glas dark:border-white/10">
             {navItems.filter((n) => n.show).map((n) => (
               <button
                 key={n.key}
                 data-tour={`tab-${n.key}`}
                 onClick={() => setTab(n.key)}
-                className={`relative flex flex-1 flex-col items-center gap-0.5 py-2 text-[11px] font-semibold transition ${
-                  tab === n.key ? "text-brand" : "text-tinte-leise"
+                aria-current={tab === n.key ? "page" : undefined}
+                className={`relative flex min-w-0 flex-1 flex-col items-center gap-0.5 rounded-[1.5rem] px-0.5 pb-1.5 pt-2 text-[10px] font-semibold tracking-[-0.01em] transition duration-300 ease-ios active:scale-90 ${
+                  tab === n.key ? "bg-black/[0.06] text-brand dark:bg-white/[0.12]" : "text-tinte dark:text-slate-100"
                 }`}
                 aria-label={n.label}
               >
                 <span className="relative flex h-[22px] items-center leading-none">
-                  <Icon name={n.icon} size={21} />
+                  <Icon name={n.icon} size={22} strich={tab === n.key ? 2.2 : 1.8} />
                   {(n.badge ?? 0) > 0 && (
-                    <span className="absolute -right-3 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+                    <span className="absolute -right-3 -top-1.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#FF3B30] px-1 text-[11px] font-semibold text-white ring-2 ring-white dark:ring-slate-900">
                       {n.badge! > 9 ? "9+" : n.badge}
                     </span>
                   )}
                 </span>
-                {n.label}
+                <span className="w-full truncate text-center">{n.label}</span>
               </button>
             ))}
           </div>
@@ -736,11 +761,28 @@ function Main() {
       {!showTour && <InstallOverlay />}
       <Tour
         open={showTour}
-        steps={tourSteps({ staff: isStaff, staffel: staffelVon(settings) })}
+        steps={
+          isStaff
+            ? teamSchritte({
+                kasseBearbeiten: canEditBeitrag,
+                mehrere: canEditData || canEditHilfen,
+                beitraege: can("beitraege.manage"),
+                finanzen: showFinanzen,
+                rollen: canManageRoles,
+                rechte: can("perms.manage"),
+              })
+            : schuelerSchritte(staffelVon(settings))
+        }
+        onTab={(t) => {
+          setShowFilter(false);
+          setMassMode(false);
+          setTab(t as Tab);
+        }}
         onClose={() => {
           setShowTour(false);
+          setTab("kasse");
           // Zeitpunkt merken, damit ein späteres Zurücksetzen erkannt wird
-          localStorage.setItem(`sv:tour:v2:${isStaff ? "team" : "schueler"}`, new Date().toISOString());
+          localStorage.setItem(`sv:tour:v3:${isStaff ? "team" : "schueler"}`, new Date().toISOString());
         }}
       />
     </div>

@@ -1,4 +1,4 @@
-# Änderungen – Stand 22.09.2026
+# Änderungen – Stand 24.09.2026
 
 Diese Datei erklärt, was sich in den letzten Runden geändert hat, **wo** es im
 Code steht und **warum** es so gebaut ist. Die Kommentare im Code selbst sind
@@ -8,6 +8,84 @@ ausführlich (auf Deutsch); hier steht der Überblick dazu.
 > Bankdaten, der `service_role`-Schlüssel und der VAPID Private Key liegen nur
 > in der Datenbank bzw. als Supabase-Secret. `privat/` ist per `.gitignore`
 > ausgeschlossen. Bitte so beibehalten.
+
+---
+
+## Neu am 24.09.2026: Kinder für Elternzugänge, Apple-Design, neue Einführung
+
+**Rollen-Reiter – Kinder statt Komitees bei Eltern**
+(`src/components/RolesTab.tsx`, `KinderSheet.tsx`, `src/eltern-store.tsx` → `kindZuordnen`)
+- Bei Elternzugängen steht statt „Komitees“ ein Knopf **„1 Kind / 2 Kinder“**
+  (orange **„Kind wählen“**, wenn noch keins zugeordnet ist). Er öffnet das
+  Blatt **„Kinder zuordnen“**: oben die zugeordneten Kinder (Entfernen), darunter
+  Suche und alle Personen – ein Tipp ordnet zu oder nimmt weg, sofort gespeichert
+  in `parent_children`. Zuordnen darf nur der Admin (wie Elternzugänge vergeben);
+  alle anderen sehen die Zuordnung nur.
+- Eltern haben keinen Chat – der Sperr-Knopf fällt bei ihnen weg.
+
+**Elternzugang ohne Kind sieht nichts** (`src/components/ElternApp.tsx`)
+- Kein Kind zugeordnet → nur ein Hinweis, keine Infos, keine Kontodaten, keine
+  Reiter. Die App filtert zusätzlich selbst nach der Zuordnung.
+- Ordnet der Admin ein Kind zu, erscheint es beim Elternteil **live** (Realtime
+  auf `parent_children`, danach lädt die App die Personen neu).
+- Datenbank-Seite: **`supabase/eltern-kinder.sql` muss einmal eingespielt
+  werden** (siehe unten).
+
+**Design im Apple-Stil** (`tailwind.config.js`, `src/index.css`)
+- Systemschrift (San Francisco auf iPhone/iPad/Mac), Systemfarben mit geprüftem
+  Kontrast (≥ 4,5:1), gruppierter grauer Hintergrund, echte iOS-Dunkeltöne.
+  Grau/Grün/Orange/Rot sind zentral umgestellt – alle Bausteine ziehen mit.
+- Großer Titel, der beim Scrollen klein in eine Glas-Leiste wandert
+  (`src/lib/gescrollt.ts`); schwebende Tab-Leiste aus Glas (Handy unten, ab
+  1024 px oben mittig wie auf dem iPad); Segment-Schalter, iOS-Kippschalter
+  (`Schalter.tsx`), Blätter mit Griff zum Runterwischen (`Sheet.tsx`, per Portal
+  immer ganz oben).
+- Eigene Webschriften entfallen – nichts wird mehr nachgeladen.
+
+**Transaktionsinfos** (`src/components/FinanzenTab.tsx`)
+- Buchungen wie in der Wallet-App: farbige Kachel je Art, Titel, Kategorie ·
+  Datum, Betrag. Monatsweise gruppiert mit Monatssumme.
+- Antippen öffnet das **Detailblatt**: Betrag groß, Titel, Datum, darunter
+  Status, Art, Kategorie, Aktion/Komitee, Person und Halbjahr (bei Beiträgen),
+  Grundlage (Kostenanfrage), erfasst von/am, Buchungs-Nr. Löschen nur dort
+  (nicht mehr als ✕ in jeder Zeile) und nie bei automatischen Buchungen.
+
+**Einführung (Tour)** (`src/components/Tour.tsx`)
+- Eigene Rundgänge für **Schüler**, **Stufenteam** (je nach Rechten mit
+  Beiträge/Finanzen/Rollen/Rechte) und – neu – **Eltern** (Sie-Form).
+- Die Tour **wechselt selbst die Reiter** und zeigt, was dort steht.
+- Geräte: Sie nimmt immer das sichtbare Element (Tab-Leiste unten am Handy,
+  oben am Rechner). Handy: Karte am freien Rand; Rechner/iPad: Karte direkt am
+  Element. Pfeiltasten/Enter/Escape funktionieren.
+- Merker jetzt `sv:tour:v3:*` – alle sehen die neue Einführung einmal.
+
+**Demo-Modus zum gefahrlosen Testen** (`src/lib/demo.ts`)
+- `npm run demo` startet ohne Datenbank (auch wenn `.env` da ist), Rolle über
+  die Adresse: `?rolle=schueler | stufenteam | kassenwart | admin | eltern |
+  eltern-leer`. Erfundene Personen, Buchungen und Elternzuordnungen. Im echten
+  Build wirkungslos.
+
+**Nach dem Test mit drei Test-Nutzern (Eltern, Schüler, Team) behoben**
+- Betragseingabe: „1.500“ ist jetzt 1.500 € (vorher 1,50 €) – auch beim Bankabgleich.
+- Buchung: Wechsel von „Spende“ auf „Ausgabe“ leert die Zuordnung (vorher als Spende gebucht).
+- Direktlinks `#finanzen`, `#events`, `#chats`, `#infos` landen wieder im richtigen Reiter.
+- Chat-Eingabe und Kalender sitzen fest am Bildschirm, über der schwebenden Leiste.
+- Spätere Halbjahre sind grau („noch nicht fällig“) statt orange wie eine Schuld.
+- Einheitliche Begriffe: „Aufschlag“ und „Abiball-Ticket“; Eltern-Hinweis „bitte jetzt nicht überweisen“.
+- Laufendes Halbjahr umstellen und heikle Rollenwechsel (Eltern ↔ Team, Admin) fragen nach.
+- Tour: Karte verdeckt das Element nicht mehr (auch iPhone SE), Tab bleibt in der Karte, Enter nur auf dem Knopf.
+
+### Datenbank – einmal einspielen
+
+`supabase/eltern-kinder.sql` im SQL Editor ausführen (mehrfach ausführbar,
+prüft sich am Ende selbst). Sie
+1. übernimmt die alte Verknüpfung `profiles.student_id` bei Elternkonten nach
+   `parent_children` (niemand verliert Zugriff) und leert sie danach,
+2. sperrt Kontodaten, Infos und neue Anfragen für Elternzugänge ohne Kind,
+3. lässt Eltern Personen und Mithilfe nur noch über die Zuordnung sehen.
+4. erlaubt das Zuordnen von Kindern in der Datenbank nur noch dem Admin
+   (vorher reichte „Daten bearbeiten“ – Stufenteam hätte per API zuordnen können),
+5. schützt automatische Beitragsbuchungen vor Löschen/Ändern von Hand.
 
 ---
 

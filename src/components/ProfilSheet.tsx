@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Sheet } from "./Sheet";
+import { Sheet, SheetKopf } from "./Sheet";
 import { Avatar } from "./Avatar";
 import { personIcon } from "../lib/committees";
 import { useProfiles } from "../profiles-store";
@@ -89,15 +89,13 @@ export function ProfilSheet({
     setPwInfo("Passwort geändert.");
   }
 
+  // Zeilen wie in den iOS-Einstellungen: eine gruppierte Liste mit Trennlinien
   const row =
-    "flex w-full items-center gap-3 rounded-xl border border-papier-linie px-4 py-3 text-left text-[15px] font-semibold transition active:scale-[.99] dark:border-slate-700";
+    "flex min-h-[2.75rem] w-full items-center gap-3 px-4 py-2.5 text-left text-[16px] transition active:bg-black/[0.05] dark:active:bg-white/[0.07] [&>span:first-child]:w-6 [&>span:first-child]:text-center";
 
   return (
     <Sheet open={open} onClose={onClose}>
-      <div className="mb-4 flex items-center gap-3">
-        <span className="flex-1 text-xl font-bold">Mein Profil</span>
-        <button className="iconbtn" onClick={onClose} aria-label="Schließen">✕</button>
-      </div>
+      <SheetKopf titel="Mein Profil" onClose={onClose} />
 
       {/* Kopf: Namenskreis + Name. Elternzugaenge tragen kein Bild. */}
       <div className="mb-5 flex items-center gap-4">
@@ -183,9 +181,9 @@ export function ProfilSheet({
             />
           </span>
           <span className="min-w-0 flex-1">
-            <span className="block text-[15px] font-semibold">Pop-ups für Chats</span>
+            <span className="block text-[15px] font-semibold">Mitteilungen für Chats</span>
             <span className="block text-[12px] text-tinte-matt">
-              Nur normale Chat-Nachrichten. Angepinntes, Nachrichten vom Stufenteam und Events kommen immer.
+              Wichtiges – Angepinntes, Stufenteam und Events – bekommst du immer.
             </span>
           </span>
         </button>
@@ -201,7 +199,7 @@ export function ProfilSheet({
       {/* Komitee-Wechsel – Eltern gehoeren in kein Komitee */}
       {!isStaff && !istEltern && (
         <div className="mb-5 rounded-2xl bg-papier-matt p-3 dark:bg-slate-800/70">
-          <div className="mb-1 text-sm font-bold">Komitee wechseln</div>
+          <div className="mb-1 text-sm font-bold">{meine.length ? "Komitee wechseln" : "Komitee wählen"}</div>
           {hatAntrag ? (
             <p className="text-[13px] text-tinte-matt">Dein Wunsch liegt beim Stufenteam. Sie melden sich.</p>
           ) : antragOffen ? (
@@ -341,7 +339,7 @@ export function ProfilSheet({
         </div>
       )}
 
-      <div className="grid gap-2">
+      <div className="liste bg-papier dark:bg-slate-800/60">
         {hasSupabase && !pwOffen && (
           <button className={row} onClick={() => { setPwOffen(true); setPwInfo(""); }}>
             <span>🔑</span> Passwort ändern
@@ -367,7 +365,7 @@ export function ProfilSheet({
         )}
         {hasSupabase && (
           <button
-            className={`${row} text-red-500`}
+            className={`${row} text-red-600 dark:text-red-400`}
             onClick={() => confirm("Wirklich abmelden?") && void abmelden()}
           >
             <span>↩</span> Abmelden

@@ -30,7 +30,7 @@ export function MyKasse({
   if (!ready)
     return (
       <div className="flex flex-col items-center justify-center gap-4 py-24 text-tinte-leise">
-        <div className="h-9 w-9 animate-spin rounded-full border-[3px] border-papier-linie border-t-brand dark:border-slate-700 dark:border-t-brand" />
+        <div className="h-8 w-8 animate-spin rounded-full border-[3px] border-slate-200 border-t-slate-500 dark:border-slate-700 dark:border-t-slate-300" />
         <div className="text-sm font-medium">Deine Beiträge werden geladen …</div>
       </div>
     );
@@ -55,17 +55,16 @@ export function MyKasse({
   return (
     <div
       className="mx-auto grid max-w-3xl items-start gap-3 lg:max-w-5xl lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-stretch"
-      data-tour="meine-karte"
     >
       {/* ------------------------------------------ die eine Zahl */}
-      <section className="leitkarte lg:col-span-2">
-        <div className="kennlabel text-white/60">
+      <section className="leitkarte lg:col-span-2" data-tour="meine-karte">
+        <div className="text-[13px] font-medium text-white/60">
           {offen > 0 ? "Du musst noch zahlen" : "Deine Stufenkasse"}
         </div>
         <div className="mt-1.5 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-          <span className={`leitwert ${offen > 0 ? "text-white" : "text-emerald-400"}`}>{offen} €</span>
+          <span className={`leitwert ${offen > 0 ? "text-white" : "text-[#30D158]"}`}>{offen} €</span>
           <span className="text-[13px] text-white/60">
-            {offen > 0 ? `für ${settings.aktuelles_halbjahr} und was davor offen ist` : "Alles bezahlt. Danke!"}
+            {offen > 0 ? `fällig bis ${settings.aktuelles_halbjahr}` : "Alles bezahlt. Danke!"}
           </span>
         </div>
         <div className="mt-2 text-[12px] text-white/50">
@@ -76,8 +75,10 @@ export function MyKasse({
       {/* ------------------------------------------ Halbjahre mit Preis */}
       <section className="card p-4 sm:p-5 lg:col-span-2">
         <div className="flex items-baseline justify-between">
-          <h2 className="text-[13px] font-semibold text-tinte-matt">Deine Halbjahre</h2>
-          <span className="text-[12px] text-tinte-leise">EF je 25 €, ab Q1 je 50 €</span>
+          <h2 className="text-[15px] font-semibold">Deine Halbjahre</h2>
+          <span className="text-[12px] text-tinte-leise">
+            EF je {beitragFuer("EF.1", settings)} €, Q1/Q2 je {beitragFuer("Q1.1", settings)} €
+          </span>
         </div>
 
         <div className="mt-3 flex gap-1.5" data-tour="meine-halbjahre">
@@ -93,30 +94,30 @@ export function MyKasse({
           ))}
         </div>
 
-        <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-tinte-leise">
+        <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[12px] text-tinte-leise">
           <Legende farbe="bg-bezahlt" text="bezahlt" />
-          <Legende farbe="bg-amber-400" text="noch offen" />
+          <Legende farbe="bg-offen" text="noch offen" />
           <Legende farbe="bg-erlassen" text="erlassen" />
-          <Legende farbe="bg-papier-linie dark:bg-slate-600" text="noch nicht dabei" />
+          <Legende farbe="bg-slate-300 dark:bg-slate-600" text="später fällig / nicht dabei" />
         </div>
       </section>
 
       {/* ------------------------------------------ Prozentstand */}
       <section className="card p-4 sm:p-5" data-tour="meine-punkte">
-        <h2 className="text-[13px] font-semibold text-tinte-matt">Mithelfen beim Abiball</h2>
+        <h2 className="text-[15px] font-semibold">Mithilfe bei Aktionen</h2>
 
         <div className="mt-3 flex items-center gap-4">
           <Ring pct={pct} />
           <div className="min-w-0 flex-1">
-            <div className="text-[13px] font-semibold leading-snug">
+            <div className="text-[14px] font-semibold leading-snug">
               {pct >= 100
-                ? "Geschafft. Auf dein erstes Abiballticket kommt nichts mehr drauf."
-                : "Mehr Prozent = günstigeres erstes Abiballticket."}
+                ? "Geschafft. Auf dein erstes Abiball-Ticket kommt kein Aufschlag mehr."
+                : "Mehr Prozent = weniger Aufschlag auf dein Abiball-Ticket."}
             </div>
             {next && (
-              <div className="mt-1.5 text-[12px] leading-relaxed text-tinte-matt">
-                Noch <b className="text-brand">{next.fehlt} %</b> bis zur nächsten Stufe, das spart dir{" "}
-                <b className="text-brand">{next.spart} €</b>.
+              <div className="mt-1.5 text-[13px] leading-relaxed text-tinte-matt">
+                Noch <b className="text-brand-dark dark:text-brand">{next.fehlt} %</b> bis zur nächsten Stufe, das spart dir{" "}
+                <b className="text-brand-dark dark:text-brand">{next.spart} €</b>.
               </div>
             )}
           </div>
@@ -129,16 +130,16 @@ export function MyKasse({
             return (
               <div
                 key={stufe.ab}
-                className={`rounded-lg px-1 py-1.5 text-center ${
+                className={`rounded-xl px-1 py-2 text-center transition ${
                   aktuell
                     ? "bg-brand text-white"
                     : erreicht
-                      ? "bg-brand/10 text-brand"
-                      : "bg-papier-matt text-tinte-leise dark:bg-slate-800"
+                      ? "bg-brand/[0.12] text-brand-dark dark:text-brand"
+                      : "bg-[rgb(118_118_128/0.1)] text-tinte-leise"
                 }`}
               >
-                <div className="zahl text-[12px] font-extrabold leading-none">{stufe.ab}%</div>
-                <div className="zahl mt-0.5 text-[10px] font-semibold leading-none opacity-90">+{stufe.betrag} €</div>
+                <div className="zahl text-[13px] font-bold leading-none">{stufe.ab} %</div>
+                <div className="zahl mt-1 text-[11px] font-medium leading-none opacity-90">+{stufe.betrag} €</div>
               </div>
             );
           })}
@@ -156,7 +157,7 @@ export function MyKasse({
 
       {/* ------------------------------------------ meine Beiträge */}
       <section className="card p-4 sm:p-5">
-        <h2 className="text-[13px] font-semibold text-tinte-matt">Wobei du geholfen hast</h2>
+        <h2 className="text-[15px] font-semibold">Wobei du geholfen hast</h2>
         <BeitragsListe
           eintraege={meine}
           leerText="Noch nichts eingetragen. Wenn du mithilfst, trägt das Stufenteam es hier ein."

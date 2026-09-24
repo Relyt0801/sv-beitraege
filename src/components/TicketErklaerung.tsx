@@ -25,21 +25,21 @@ export function TicketErklaerung({
 
   return (
     <section className={`card flex flex-col p-4 sm:p-5 ${className}`}>
-      <div className="text-sm text-tinte-matt">Abiballticket</div>
+      <div className="text-[15px] font-semibold">Abiball-Ticket</div>
 
       <div className="mt-3 grid gap-2">
-        <div className="rounded-2xl border-2 border-brand/40 bg-brand/5 p-3">
-          <div className="text-[12px] font-bold uppercase tracking-wide text-brand">
+        <div className="rounded-2xl bg-brand/[0.07] p-3.5 ring-1 ring-brand/25">
+          <div className="text-[12px] font-semibold uppercase tracking-wide text-brand-dark dark:text-brand">
             {fuerEltern ? "Das 1. Ticket Ihres Kindes" : "Dein eigenes Ticket"}
           </div>
           <div className="mt-0.5 text-3xl font-extrabold leading-none text-tinte dark:text-slate-100">
-            {preisSteht ? `${erstes} €` : `${zusatz} € extra`}
+            {preisSteht ? `${erstes} €` : `${zusatz} € Aufschlag`}
           </div>
           <div className="mt-1 text-[12px] leading-relaxed text-tinte-matt dark:text-slate-400">
             {preisSteht ? (
               zusatz > 0 ? (
                 <>
-                  {grund} € Grundpreis und {zusatz} € Zusatzbeitrag, weil{" "}
+                  {grund} € Grundpreis und {zusatz} € Aufschlag, weil{" "}
                   {fuerEltern ? "Ihr Kind" : "du"} bei {prozent} % {fuerEltern ? "steht" : "stehst"}.
                 </>
               ) : (
@@ -51,14 +51,14 @@ export function TicketErklaerung({
               <>Aufschlag bei {prozent} %. Der Ticketpreis selbst steht noch nicht fest.</>
             )}
           </div>
-          <div className="mt-2 rounded-lg bg-white/70 px-2.5 py-1.5 text-[12px] font-semibold text-brand-dark dark:bg-slate-900/60 dark:text-brand-soft">
+          <div className="mt-2 rounded-xl bg-white/80 px-2.5 py-1.5 text-[12px] font-medium text-brand-dark dark:bg-slate-900/60 dark:text-brand">
             {fuerEltern
-              ? "Nur dieses Ticket – nicht Ihre Karten."
+              ? "Gilt nur für das Ticket Ihres Kindes. Ihre eigenen Karten kosten den normalen Preis."
               : "Nur dein eigenes Ticket – nicht Karten für Eltern oder Gäste."}
           </div>
         </div>
 
-        <div className="rounded-2xl border border-papier-linie p-3 dark:border-slate-700">
+        <div className="rounded-2xl bg-papier p-3.5 dark:bg-slate-800/60">
           <div className="text-[12px] font-bold uppercase tracking-wide text-tinte-leise">
             Jedes weitere Ticket
           </div>
@@ -68,8 +68,8 @@ export function TicketErklaerung({
           <div className="mt-1 text-[12px] leading-relaxed text-tinte-matt dark:text-slate-400">
             {fuerEltern
               ? preisSteht
-                ? "Normaler Preis, ohne Zusatzbeitrag."
-                : "Noch nicht festgelegt. Normaler Preis, ohne Zusatzbeitrag."
+                ? "Normaler Preis, ohne Aufschlag."
+                : "Noch nicht festgelegt. Normaler Preis, ohne Aufschlag."
               : preisSteht
                 ? "Karten für Eltern, Geschwister oder Gäste: normaler Preis, ohne Aufschlag."
                 : "Noch nicht festgelegt. Karten für Eltern und Gäste: normaler Preis, ohne Aufschlag."}
@@ -77,11 +77,11 @@ export function TicketErklaerung({
         </div>
       </div>
 
-      {!fuerEltern && (
-        <div className="mt-auto pt-3 text-[12px] text-tinte-leise">
-          Hat nichts mit dem offenen Stufenbeitrag zu tun.
-        </div>
-      )}
+      <div className="mt-auto pt-3 text-[12px] text-tinte-leise">
+        {fuerEltern
+          ? "Wird erst mit dem Abiball-Ticket bezahlt – bitte jetzt nicht überweisen."
+          : "Hat nichts mit dem offenen Stufenbeitrag zu tun."}
+      </div>
     </section>
   );
 }

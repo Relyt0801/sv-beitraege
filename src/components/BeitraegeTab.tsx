@@ -144,9 +144,9 @@ export function BeitraegeTab() {
       {/* ---------------- Abiballticket ---------------- */}
       {bereich === "ticket" && (
       <section className="card h-fit p-4 sm:p-5">
-        <h2 className="text-lg font-bold">Abiballticket</h2>
+        <h2 className="text-lg font-bold">Abiball-Ticket</h2>
         <p className="mt-0.5 text-[13px] leading-relaxed text-tinte-matt dark:text-slate-400">
-          Der Zusatzbeitrag gilt <b>nur fürs erste Ticket</b>. Jedes weitere kostet den
+          Der Aufschlag gilt <b>nur fürs erste Ticket</b>. Jedes weitere kostet den
           Grundpreis. Es zählt immer die höchste erreichte Stufe, 60 % zählen also als 50 %.
         </p>
 
@@ -165,12 +165,12 @@ export function BeitraegeTab() {
         </label>
         {grund === 0 && (
           <p className="mt-1.5 text-[12px] text-tinte-leise">
-            Steht 0 drin, ist der Preis noch offen. Dann sehen alle nur den Zusatzbeitrag.
+            Steht 0 drin, ist der Preis noch offen. Dann sehen alle nur den Aufschlag.
           </p>
         )}
 
         <div className="mt-4 text-xs font-semibold uppercase tracking-wide text-tinte-matt">
-          Zusatzbeitrag je Prozentstufe
+          Aufschlag je Prozentstufe
         </div>
         <ul className="mt-2 grid gap-2">
           {staffel.map((stufe, i) => (

@@ -37,6 +37,8 @@ export function ProfilesProvider({ children }: { children: ReactNode }) {
       const p: PublicProfile = roh
         ? JSON.parse(roh)
         : { user_id: "local-user", anzeigename: "Test Nutzer", initialen: "TN", farbe: zufallsFarbe() };
+      // Farbe merken, sonst wechselt sie bei jedem Start
+      if (!roh) localStorage.setItem("sv-beitraege:mein-profil", JSON.stringify(p));
       setProfile({ "local-user": p });
     } catch { /* ignore */ }
   }, []);

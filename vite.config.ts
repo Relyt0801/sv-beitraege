@@ -20,14 +20,14 @@ export default defineConfig({
       registerType: "autoUpdate",
       includeAssets: ["favicon.svg"],
       injectManifest: {
-        globPatterns: ["**/*.{js,css,html,svg,png,ico,webmanifest}", "**/*-latin-*.woff2"],
+        globPatterns: ["**/*.{js,css,html,svg,png,ico,webmanifest}"],
       },
       manifest: {
         name: "Stufenkasse",
         short_name: "Stufenkasse",
         description: "Beiträge & Beteiligungen der Stufe verwalten",
-        theme_color: "#4f46e5",
-        background_color: "#0e1017",
+        theme_color: "#f2f2f7",
+        background_color: "#f2f2f7",
         display: "standalone",
         orientation: "portrait",
         icons: [

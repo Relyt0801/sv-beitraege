@@ -72,7 +72,7 @@ export function PunkteSheet({
           <StaffelTabelle settings={settings} pct={pct} />
         </div>
         <p className="mt-2.5 text-[13px] leading-relaxed text-tinte-matt dark:text-slate-300">
-          Das <b>erste</b> Abiballticket kostet bei diesem Stand{" "}
+          Das <b>erste</b> Abiball-Ticket kostet bei diesem Stand{" "}
           <b>{(settings.ticket_preis || 0) + ticketBetrag(pct, settings)} €</b>
           {settings.ticket_preis ? ` (${settings.ticket_preis} € Grundpreis + ${ticketBetrag(pct, settings)} €)` : ""}.
           Weitere Tickets sind davon nicht betroffen.

@@ -11,8 +11,9 @@ import {
   type Buchung, type FinanzenValue, type Quelle,
 } from "../lib/finanzen";
 import type { KostenAnfrage, KostenValue } from "../lib/kosten";
-import { Sheet } from "./Sheet";
+import { Sheet, SheetKopf } from "./Sheet";
 import { Avatar } from "./Avatar";
+import { Icon, type IconName } from "./Icon";
 
 /** Folgt dem Hell/Dunkel-Schalter der App (Klasse "dark" am <html>). */
 function useDunkel(): boolean {
@@ -64,9 +65,11 @@ export function FinanzenTab({ kosten }: { kosten: KostenValue }) {
     let aus = 0;
     const jeQuelle: Record<string, number> = { beitrag: 0, aktion: 0, spende: 0, sonstiges: 0 };
     let letzterAbgleich: string | null = null;
+    let abgleich = 0;
     for (const b of fin.buchungen) {
       stand += b.cent;
       if (b.quelle === "abgleich") {
+        abgleich += b.cent;
         if (!letzterAbgleich || b.datum > letzterAbgleich) letzterAbgleich = b.datum;
         continue;
       }
@@ -77,7 +80,7 @@ export function FinanzenTab({ kosten }: { kosten: KostenValue }) {
       ein += b.cent;
       jeQuelle[b.quelle] = (jeQuelle[b.quelle] || 0) + b.cent;
     }
-    return { stand, ein, aus, jeQuelle, letzterAbgleich };
+    return { stand, ein, aus, jeQuelle, letzterAbgleich, abgleich };
   }, [fin.buchungen]);
 
   const offen = useMemo(() => {
@@ -122,8 +125,9 @@ export function FinanzenTab({ kosten }: { kosten: KostenValue }) {
   return (
     <div className="grid grid-cols-[minmax(0,1fr)] gap-3 pb-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-start">
       {nurLesen && (
-        <div className="rounded-xl bg-papier-matt px-4 py-2.5 text-[13px] text-tinte-matt dark:bg-slate-800 dark:text-slate-300 lg:col-span-2">
-          👁 Nur lesen{kosten.aufsichtsrat ? " – du siehst die Finanzen als Aufsichtsrat" : ""}. Buchen kann nur der Kassenwart.
+        <div className="flex items-center gap-2 rounded-2xl bg-[rgb(118_118_128/0.1)] px-4 py-2.5 text-[14px] text-tinte-matt dark:text-slate-300 lg:col-span-2">
+          <Icon name="info" size={17} />
+          Nur lesen{kosten.aufsichtsrat ? " – du siehst die Finanzen als Aufsichtsrat" : ""}. Buchen kann nur der Kassenwart.
         </div>
       )}
 
@@ -141,15 +145,17 @@ export function FinanzenTab({ kosten }: { kosten: KostenValue }) {
           <div className="grid grid-cols-2 gap-2">
             <button
               onClick={() => setBuchen("ein")}
-              className="rounded-2xl bg-emerald-600 py-3.5 text-[15px] font-extrabold text-white shadow-sm active:scale-[0.98]"
+              className="flex min-h-[3.125rem] items-center justify-center gap-1.5 rounded-full bg-bezahlt/[0.12] text-[16px] font-semibold text-bezahlt transition duration-200 ease-ios active:scale-[.97]"
             >
-              + Einnahme
+              <Icon name="pfeil-rein" size={18} strich={2.2} />
+              Einnahme
             </button>
             <button
               onClick={() => setBuchen("aus")}
-              className="rounded-2xl bg-red-600 py-3.5 text-[15px] font-extrabold text-white shadow-sm active:scale-[0.98]"
+              className="flex min-h-[3.125rem] items-center justify-center gap-1.5 rounded-full bg-red-500/[0.12] text-[16px] font-semibold text-red-600 transition duration-200 ease-ios active:scale-[.97] dark:text-red-400"
             >
-              − Ausgabe
+              <Icon name="pfeil-raus" size={18} strich={2.2} />
+              Ausgabe
             </button>
           </div>
         )}
@@ -188,7 +194,7 @@ export function FinanzenTab({ kosten }: { kosten: KostenValue }) {
 function UebersichtKarte({
   zahlen, offen, halbjahr, ziel, darf, onEinstellungen,
 }: {
-  zahlen: { stand: number; ein: number; aus: number; jeQuelle: Record<string, number>; letzterAbgleich: string | null };
+  zahlen: { stand: number; ein: number; aus: number; jeQuelle: Record<string, number>; letzterAbgleich: string | null; abgleich: number };
   /** null: wer nicht alle Personen sieht, bekäme hier eine falsche Summe */
   offen: { cent: number; personen: number } | null;
   halbjahr: string;
@@ -210,23 +216,23 @@ function UebersichtKarte({
     <section className="card p-5">
       <div className="flex items-start gap-3">
         <div className="min-w-0 flex-1">
-          <div className="text-[12px] font-semibold uppercase tracking-wide text-tinte-leise">Kontostand</div>
+          <div className="text-[14px] font-medium text-tinte-leise">Kontostand</div>
           <div
-            className={`zahl mt-0.5 font-zahl text-[2.3rem] font-extrabold leading-none tracking-[-0.02em] ${
+            className={`zahl mt-1 font-zahl text-[2.5rem] font-bold leading-none tracking-[-0.03em] ${
               zahlen.stand < 0 ? "text-red-600 dark:text-red-400" : ""
             }`}
           >
             {euro(zahlen.stand)}
           </div>
-          <div className="mt-1 text-[11px] text-tinte-leise">
+          <div className="mt-1.5 text-[12px] text-tinte-leise">
             {zahlen.letzterAbgleich
-              ? `mit der Bank abgeglichen am ${new Date(zahlen.letzterAbgleich).toLocaleDateString("de-DE")}`
+              ? `Rein − Raus ${zahlen.abgleich >= 0 ? "+" : "−"} ${euro(Math.abs(zahlen.abgleich))} Bankabgleich · zuletzt ${new Date(zahlen.letzterAbgleich).toLocaleDateString("de-DE")}`
               : "noch nicht mit der Bank abgeglichen"}
           </div>
         </div>
         {darf && (
           <button onClick={onEinstellungen} className="iconbtn shrink-0" aria-label="Ziel und Bankabgleich" title="Ziel und Bankabgleich">
-            ⚙︎
+            <Icon name="regler" size={19} />
           </button>
         )}
       </div>
@@ -269,16 +275,16 @@ function UebersichtKarte({
 
 function Zahl({ titel, wert, unter, ton }: { titel: string; wert: string; unter?: string; ton?: "plus" | "minus" }) {
   return (
-    <div className="min-w-0 rounded-xl bg-papier-matt px-1.5 py-2 dark:bg-slate-800">
-      <dt className="text-[10.5px] font-semibold uppercase tracking-wide text-tinte-leise">{titel}</dt>
+    <div className="min-w-0 rounded-2xl bg-papier px-2 py-2.5 dark:bg-slate-800/70">
+      <dt className="text-[12px] font-medium text-tinte-leise">{titel}</dt>
       <dd
-        className={`zahl truncate text-[15px] font-extrabold leading-tight ${
+        className={`zahl mt-0.5 truncate text-[16px] font-bold leading-tight ${
           ton === "plus" ? "text-bezahlt dark:text-emerald-400" : ton === "minus" ? "text-red-600 dark:text-red-400" : ""
         }`}
       >
         {wert}
       </dd>
-      {unter && <dd className="truncate text-[10.5px] text-tinte-leise">{unter}</dd>}
+      {unter && <dd className="mt-0.5 truncate text-[11px] text-tinte-leise">{unter}</dd>}
     </div>
   );
 }
@@ -325,7 +331,7 @@ function BuchungSheet({
     }
     if (k === "komitee")
       return { quelle: typ === "aus" ? "ausgabe" : "sonstiges", aktion_id: null, komitee: v, name: committeeLabel(v) };
-    if (k === "spende") return { quelle: "spende", aktion_id: null, komitee: null, name: "Spende" };
+    if (k === "spende" && typ !== "aus") return { quelle: "spende", aktion_id: null, komitee: null, name: "Spende" };
     return { quelle: typ === "aus" ? "ausgabe" : "sonstiges", aktion_id: null, komitee: null, name: typ === "aus" ? "Ausgabe" : "Sonstiges" };
   }
 
@@ -349,32 +355,26 @@ function BuchungSheet({
     onClose();
   }
 
-  const seg = "rounded-xl border py-2.5 text-[14px] font-bold transition";
+  const seg = "seg-item !py-2 !text-[14px]";
   const aus = typ === "aus";
   return (
     <Sheet open={art !== null} onClose={onClose}>
-      <h2 className="mb-3 text-xl font-extrabold">Buchung</h2>
+      <SheetKopf titel="Neue Buchung" onClose={onClose} />
 
-      {/* Gleiches Raster wie Datum | Wofür darunter – die Kanten fluchten */}
-      <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-2">
-        <button
-          onClick={() => setTyp("ein")}
-          className={`${seg} ${!aus ? "border-emerald-600 bg-emerald-600 text-white" : "border-papier-linie text-tinte-matt dark:border-slate-700"}`}
-        >
-          + Einnahme
+      <div className="seg" role="radiogroup" aria-label="Art der Buchung">
+        <button role="radio" aria-checked={!aus} onClick={() => setTyp("ein")} className={`${seg} ${!aus ? "seg-aktiv !text-bezahlt" : ""}`}>
+          Einnahme
         </button>
-        <button
-          onClick={() => setTyp("aus")}
-          className={`${seg} ${aus ? "border-red-600 bg-red-600 text-white" : "border-papier-linie text-tinte-matt dark:border-slate-700"}`}
-        >
-          − Ausgabe
+        <button role="radio" aria-checked={aus} onClick={() => { setTyp("aus"); if (zu === "spende") setZu(""); }} className={`${seg} ${aus ? "seg-aktiv !text-red-600 dark:!text-red-400" : ""}`}>
+          Ausgabe
         </button>
       </div>
 
-      <label className="mt-4 block text-[12px] font-semibold text-tinte-leise">Betrag</label>
-      <div className="mt-1 flex items-center gap-1 rounded-xl bg-papier-matt px-4 dark:bg-slate-800">
+      <label className="mt-4 block text-[13px] font-medium text-tinte-leise">Betrag</label>
+      <div className="mt-1 flex items-center gap-1 rounded-2xl bg-[rgb(118_118_128/0.12)] px-4 dark:bg-[rgb(118_118_128/0.24)]">
+        <span className={`zahl text-[1.6rem] font-bold ${aus ? "text-red-600 dark:text-red-400" : "text-bezahlt"}`}>{aus ? "−" : "+"}</span>
         <input
-          className="zahl min-w-0 flex-1 bg-transparent py-3 text-[1.6rem] font-extrabold outline-none"
+          className="zahl min-w-0 flex-1 bg-transparent py-3 text-[1.75rem] font-bold outline-none"
           inputMode="decimal"
           placeholder="0,00"
           value={betrag}
@@ -386,11 +386,11 @@ function BuchungSheet({
 
       <div className="mt-3 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-2">
         <div className="min-w-0">
-          <label className="block text-[12px] font-semibold text-tinte-leise">Datum</label>
+          <label className="block text-[13px] font-medium text-tinte-leise">Datum</label>
           <input type="date" className="field mt-1 h-12" value={datum} onChange={(e) => setDatum(e.target.value)} />
         </div>
         <div className="min-w-0">
-          <label className="block text-[12px] font-semibold text-tinte-leise">Wofür</label>
+          <label className="block text-[13px] font-medium text-tinte-leise">Wofür</label>
           <select className="field mt-1 h-12" value={zu} onChange={(e) => setZu(e.target.value)}>
             <option value="">Bitte wählen …</option>
             {aktionen.length > 0 && (
@@ -417,7 +417,7 @@ function BuchungSheet({
         </div>
       </div>
 
-      <label className="mt-3 block text-[12px] font-semibold text-tinte-leise">Notiz (freiwillig)</label>
+      <label className="mt-3 block text-[13px] font-medium text-tinte-leise">Bezeichnung (freiwillig)</label>
       <input
         className="field mt-1"
         placeholder={aus ? "z. B. Waffelteig, Deko" : "z. B. Kuchenverkauf 2. Pause"}
@@ -427,13 +427,7 @@ function BuchungSheet({
       />
 
       {fehler && <p className="mt-2 text-[13px] font-semibold text-amber-600">{fehler}</p>}
-      <button
-        disabled={busy}
-        onClick={speichern}
-        className={`mt-4 w-full rounded-2xl py-3.5 text-[15px] font-extrabold text-white disabled:opacity-50 ${
-          aus ? "bg-red-600" : "bg-emerald-600"
-        }`}
-      >
+      <button disabled={busy} onClick={speichern} className="btn-primary mt-5">
         {busy ? "…" : aus ? "Ausgabe buchen" : "Einnahme buchen"}
       </button>
       <p className="mt-2 text-center text-[11px] text-tinte-leise">
@@ -471,9 +465,9 @@ function EinstellungenSheet({
 
   return (
     <Sheet open={open} onClose={onClose}>
-      <h2 className="text-xl font-extrabold">Ziel & Bank</h2>
+      <SheetKopf titel="Ziel & Bank" onClose={onClose} />
 
-      <h3 className="mt-4 text-[13px] font-bold">Sparziel</h3>
+      <h3 className="text-[15px] font-semibold">Sparziel</h3>
       <div className="mt-1.5 grid grid-cols-[minmax(0,1fr)_8rem] gap-2">
         <input className="field" placeholder="Wofür? z. B. Abiball" value={titel} onChange={(e) => setTitel(e.target.value)} />
         <input className="field text-right" inputMode="decimal" placeholder="Betrag €" value={betrag} onChange={(e) => setBetrag(e.target.value)} />
@@ -492,7 +486,7 @@ function EinstellungenSheet({
         Ziel speichern
       </button>
 
-      <h3 className="mt-6 text-[13px] font-bold">Mit der Bank abgleichen</h3>
+      <h3 className="mt-6 text-[15px] font-semibold">Mit der Bank abgleichen</h3>
       <p className="text-[12px] text-tinte-leise">
         Stand aus dem Online-Banking eintragen. Die Differenz wird als Abgleich gebucht.
       </p>
@@ -532,9 +526,9 @@ function EinstellungenSheet({
 // ==================================================================== Kostenanfragen
 
 const STATUS: Record<KostenAnfrage["status"], { text: string; klasse: string }> = {
-  offen: { text: "wartet", klasse: "bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300" },
-  genehmigt: { text: "genehmigt", klasse: "bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300" },
-  abgelehnt: { text: "abgelehnt", klasse: "bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300" },
+  offen: { text: "wartet", klasse: "bg-offen-grund text-offen" },
+  genehmigt: { text: "genehmigt", klasse: "bg-bezahlt-grund text-bezahlt" },
+  abgelehnt: { text: "abgelehnt", klasse: "bg-red-500/10 text-red-600 dark:text-red-400" },
 };
 
 function KostenKarte({
@@ -558,7 +552,7 @@ function KostenKarte({
     <section className="card min-w-0 p-5">
       <div className="flex items-start gap-3">
         <div className="min-w-0 flex-1">
-          <h2 className="text-lg font-bold">Kostenanfragen</h2>
+          <h2 className="text-[1.125rem] font-semibold tracking-[-0.01em]">Kostenanfragen</h2>
           <p className="text-[12px] text-tinte-leise">
             {vorsitze.length > 0
               ? "Du brauchst Geld fürs Komitee? Hier anfragen – der Kassenwart entscheidet."
@@ -584,10 +578,10 @@ function KostenKarte({
             <li key={a.id}>
               <button
                 onClick={() => setAuswahl(a)}
-                className={`flex w-full items-center gap-2.5 rounded-xl border px-3 py-2.5 text-left ${
+                className={`flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left transition active:scale-[.99] ${
                   a.status === "offen" && darfEntscheiden
-                    ? "border-amber-300 bg-amber-50/60 dark:border-amber-500/40 dark:bg-amber-500/5"
-                    : "border-papier-linie dark:border-slate-800"
+                    ? "bg-offen-grund/70 ring-1 ring-offen-rand"
+                    : "bg-papier dark:bg-slate-800/60"
                 }`}
               >
                 <span className="shrink-0 text-lg">{committeeIcon(a.tag)}</span>
@@ -600,7 +594,7 @@ function KostenKarte({
                 </span>
                 <span className="flex shrink-0 flex-col items-end gap-0.5">
                   <span className="zahl text-[14px] font-bold">{euro(a.cent)}</span>
-                  <span className={`rounded-full px-1.5 py-px text-[10.5px] font-bold ${STATUS[a.status].klasse}`}>
+                  <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${STATUS[a.status].klasse}`}>
                     {STATUS[a.status].text}
                   </span>
                 </span>
@@ -692,12 +686,12 @@ function KostenAnfrageSheet({
         </div>
       )}
 
-      <label className="mt-3 block text-[12px] font-semibold text-tinte-leise">Wofür</label>
+      <label className="mt-3 block text-[13px] font-medium text-tinte-leise">Wofür</label>
       <input className="field mt-1" placeholder="z. B. Deko für den Abiball" value={titel} maxLength={120} onChange={(e) => setTitel(e.target.value)} />
 
       <div className="mt-3 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-2">
         <div className="min-w-0">
-          <label className="block text-[12px] font-semibold text-tinte-leise">Betrag</label>
+          <label className="block text-[13px] font-medium text-tinte-leise">Betrag</label>
           <div className="mt-1 flex items-center gap-1 rounded-xl bg-papier-matt px-3 dark:bg-slate-800">
             <input
               className="zahl min-w-0 flex-1 bg-transparent py-2.5 text-[15px] font-bold outline-none"
@@ -710,12 +704,12 @@ function KostenAnfrageSheet({
           </div>
         </div>
         <div className="min-w-0">
-          <label className="block text-[12px] font-semibold text-tinte-leise">Gebraucht bis (freiwillig)</label>
+          <label className="block text-[13px] font-medium text-tinte-leise">Gebraucht bis (freiwillig)</label>
           <input type="date" className="field mt-1" value={bis} onChange={(e) => setBis(e.target.value)} />
         </div>
       </div>
 
-      <label className="mt-3 block text-[12px] font-semibold text-tinte-leise">Begründung (freiwillig)</label>
+      <label className="mt-3 block text-[13px] font-medium text-tinte-leise">Begründung (freiwillig)</label>
       <textarea
         className="field mt-1 min-h-[4rem]"
         placeholder="z. B. Angebot vom Baumarkt, 3 Rollen Lichterkette"
@@ -799,7 +793,7 @@ function AnfrageDetailSheet({
 
       {a.status === "offen" && darfEntscheiden && (
         <div className="mt-4 border-t border-papier-linie pt-4 dark:border-slate-800">
-          <label className="block text-[12px] font-semibold text-tinte-leise">Antwort (freiwillig)</label>
+          <label className="block text-[13px] font-medium text-tinte-leise">Antwort (freiwillig)</label>
           <input
             className="field mt-1"
             placeholder="z. B. Bitte Kassenbon abgeben"
@@ -851,6 +845,18 @@ function AnfrageDetailSheet({
 
 type Filter = "alle" | "ein" | "aus";
 
+/** Wie eine Buchungsart aussieht: Farbe der Kachel und Zeichen darin. */
+function art(b: Buchung): { farbe: string; icon: IconName; name: string } {
+  if (b.quelle === "abgleich") return { farbe: "#8E8E93", icon: "bank", name: "Abgleich mit der Bank" };
+  if (b.cent < 0) return { farbe: "#E5484D", icon: "pfeil-raus", name: b.quelle === "beitrag" ? "Beitrag zurückgenommen" : "Ausgabe" };
+  const q = EINNAHME_QUELLEN.find((x) => x.key === b.quelle);
+  const icon: IconName = b.quelle === "beitrag" ? "kasse" : b.quelle === "aktion" ? "events" : b.quelle === "spende" ? "herz" : "pfeil-rein";
+  return { farbe: q?.hell ?? "#8E8E93", icon, name: QUELLE_NAME[b.quelle] };
+}
+
+const monatName = (m: string) =>
+  new Date(m + "-01T12:00:00").toLocaleDateString("de-DE", { month: "long", year: "numeric" });
+
 function VerlaufKarte({
   buchungen, darf, onLoeschen, aktionName,
 }: {
@@ -861,13 +867,14 @@ function VerlaufKarte({
 }) {
   const [filter, setFilter] = useState<Filter>("alle");
   const [q, setQ] = useState("");
+  const [auswahl, setAuswahl] = useState<Buchung | null>(null);
 
   const liste = useMemo(() => {
     const n = q.trim().toLowerCase();
     return buchungen.filter((b) => {
       if (filter === "ein" && (b.cent < 0 || b.quelle === "abgleich")) return false;
       if (filter === "aus" && (b.cent > 0 || b.quelle === "abgleich")) return false;
-      if (n && !`${b.titel} ${zuweisungText(b, aktionName)}`.toLowerCase().includes(n)) return false;
+      if (n && !`${b.titel} ${zuweisungText(b, aktionName)} ${euro(Math.abs(b.cent))}`.toLowerCase().includes(n)) return false;
       return true;
     });
   }, [buchungen, filter, q, aktionName]);
@@ -885,49 +892,56 @@ function VerlaufKarte({
 
   const FILTER: [Filter, string][] = [
     ["alle", "Alle"],
-    ["ein", "Rein"],
-    ["aus", "Raus"],
+    ["ein", "Einnahmen"],
+    ["aus", "Ausgaben"],
   ];
 
   return (
-    <section className="card min-w-0 p-5 lg:col-span-2">
-      <div className="flex flex-wrap items-center gap-2">
-        <h2 className="mr-auto text-lg font-bold">Verlauf</h2>
-        <div className="flex gap-1 rounded-xl bg-papier-matt p-1 dark:bg-slate-800">
+    <section className="min-w-0 lg:col-span-2">
+      <div className="mb-2 flex flex-wrap items-center gap-3 px-1 pt-2">
+        <h2 className="mr-auto text-[1.375rem] font-bold tracking-[-0.02em]">Buchungen</h2>
+        <div className="seg w-full sm:w-80" role="radiogroup" aria-label="Buchungen filtern">
           {FILTER.map(([k, label]) => (
-            <button
-              key={k}
-              onClick={() => setFilter(k)}
-              className={`rounded-lg px-3 py-1 text-[12px] font-bold transition ${
-                filter === k ? "bg-white text-tinte shadow-sm dark:bg-slate-700 dark:text-white" : "text-tinte-matt dark:text-slate-400"
-              }`}
-            >
+            <button key={k} role="radio" aria-checked={filter === k} onClick={() => setFilter(k)} className={`seg-item ${filter === k ? "seg-aktiv" : ""}`}>
               {label}
             </button>
           ))}
         </div>
       </div>
-      <input className="field mt-2" placeholder="Suchen, z. B. Waffel oder Abiball …" value={q} onChange={(e) => setQ(e.target.value)} />
+      <div className="mb-4 flex h-11 items-center gap-2 rounded-xl bg-[rgb(118_118_128/0.12)] px-3 dark:bg-[rgb(118_118_128/0.24)]">
+        <span className="text-tinte-leise">
+          <Icon name="lupe" size={17} />
+        </span>
+        <input
+          className="min-w-0 flex-1 bg-transparent text-base outline-none placeholder:text-tinte-leise"
+          placeholder="Suchen, z. B. Waffel oder Abiball"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+        />
+        {q && (
+          <button onClick={() => setQ("")} aria-label="Suche leeren" className="px-1 text-tinte-leise">
+            ✕
+          </button>
+        )}
+      </div>
 
       {liste.length === 0 ? (
-        <p className="py-8 text-center text-[13px] text-tinte-leise">Keine Buchungen.</p>
+        <div className="card py-10 text-center text-[14px] text-tinte-leise">Keine Buchungen.</div>
       ) : (
-        <div className="mt-3 grid grid-cols-[minmax(0,1fr)] gap-4">
+        <div className="grid grid-cols-[minmax(0,1fr)] gap-5">
           {gruppen.map(([monat, zeilen]) => {
-            const summe = zeilen.reduce((n, b) => n + b.cent, 0);
+            const summe = zeilen.reduce((n, b) => n + (b.quelle === "abgleich" ? 0 : b.cent), 0);
             return (
               <div key={monat}>
-                <div className="mb-1 flex items-baseline justify-between px-1">
-                  <span className="text-[12px] font-bold uppercase tracking-wide text-tinte-leise">
-                    {new Date(monat + "-01T12:00:00").toLocaleDateString("de-DE", { month: "long", year: "numeric" })}
-                  </span>
-                  <span className="zahl text-[12px] font-semibold text-tinte-leise">
+                <div className="abschnitt flex items-baseline justify-between">
+                  <span>{monatName(monat)}</span>
+                  <span className="zahl normal-case tracking-normal">
                     {summe >= 0 ? "+" : "−"} {euro(Math.abs(summe))}
                   </span>
                 </div>
-                <ul className="divide-y divide-papier-linie overflow-hidden rounded-xl border border-papier-linie dark:divide-slate-800 dark:border-slate-800">
+                <ul className="liste border border-black/[0.04] dark:border-white/[0.06]">
                   {zeilen.map((b) => (
-                    <Zeile key={b.id} b={b} darf={darf} onLoeschen={onLoeschen} aktionName={aktionName} />
+                    <Zeile key={b.id} b={b} aktionName={aktionName} onOeffnen={() => setAuswahl(b)} />
                   ))}
                 </ul>
               </div>
@@ -936,65 +950,176 @@ function VerlaufKarte({
           {sichtbar < liste.length && <div ref={marke} className="h-6" />}
         </div>
       )}
+
+      <BuchungDetail
+        buchung={auswahl}
+        onClose={() => setAuswahl(null)}
+        darf={darf}
+        onLoeschen={onLoeschen}
+        aktionName={aktionName}
+      />
     </section>
   );
 }
 
+/** Farbige Kachel mit Zeichen – wie in der Wallet-App. */
+function Kachel({ b, gross }: { b: Buchung; gross?: boolean }) {
+  const a = art(b);
+  return (
+    <span
+      className={`flex shrink-0 items-center justify-center text-white ${gross ? "h-14 w-14 rounded-[1rem]" : "h-9 w-9 rounded-[0.65rem]"}`}
+      style={{ background: a.farbe }}
+      aria-hidden="true"
+    >
+      <Icon name={a.icon} size={gross ? 26 : 18} strich={2.1} />
+    </span>
+  );
+}
+
+function Betrag({ b, gross }: { b: Buchung; gross?: boolean }) {
+  const plus = b.cent > 0;
+  const farbe = b.quelle === "abgleich" ? "text-tinte-leise" : plus ? "text-bezahlt" : "";
+  return (
+    <span className={`zahl shrink-0 whitespace-nowrap font-semibold ${gross ? "text-[2.5rem] font-bold tracking-[-0.03em]" : "text-[15px]"} ${farbe}`}>
+      {plus ? "+" : "−"}
+      {gross ? " " : "\u2009"}
+      {euro(Math.abs(b.cent))}
+    </span>
+  );
+}
+
 function Zeile({
-  b, darf, onLoeschen, aktionName,
+  b, aktionName, onOeffnen,
 }: {
   b: Buchung;
+  aktionName: (id: string) => string;
+  onOeffnen: () => void;
+}) {
+  const zu = zuweisungText(b, aktionName);
+  return (
+    <li>
+      <button
+        onClick={onOeffnen}
+        className="flex w-full items-center gap-3 px-4 py-2.5 text-left transition hover:bg-black/[0.02] active:bg-black/[0.05] dark:hover:bg-white/[0.03] dark:active:bg-white/[0.07]"
+      >
+        <Kachel b={b} />
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-[15px] font-medium">{b.titel || zu}</span>
+          <span className="block truncate text-[13px] text-tinte-leise">
+            {zu !== b.titel ? `${zu} · ` : ""}
+            {new Date(b.datum + "T12:00:00").toLocaleDateString("de-DE", { day: "numeric", month: "short" })}
+          </span>
+        </span>
+        <Betrag b={b} />
+      </button>
+    </li>
+  );
+}
+
+/**
+ * Alle Angaben zu einer Buchung – ruhig und geordnet: oben Betrag und
+ * Titel, darunter eine Liste mit je einer Angabe pro Zeile.
+ */
+function BuchungDetail({
+  buchung, onClose, darf, onLoeschen, aktionName,
+}: {
+  buchung: Buchung | null;
+  onClose: () => void;
   darf: boolean;
   onLoeschen: (id: string) => Promise<string | null>;
   aktionName: (id: string) => string;
 }) {
-  const plus = b.cent > 0;
-  const zu = zuweisungText(b, aktionName);
-  const icon = b.komitee
-    ? committeeIcon(b.komitee)
-    : b.quelle === "beitrag"
-      ? "🎓"
-      : b.quelle === "aktion"
-        ? "🧇"
-        : b.quelle === "spende"
-          ? "🤝"
-          : b.quelle === "abgleich"
-            ? "🏦"
-            : plus
-              ? "📥"
-              : "📤";
+  const { profile } = useProfiles();
+  const { students } = useStore();
+  const [busy, setBusy] = useState(false);
+  if (!buchung) return null;
+  const b = buchung;
+  const a = art(b);
+  const person = b.student_id ? students.find((x) => x.id === b.student_id) : null;
+  const wer = b.created_by ? profile[b.created_by]?.anzeigename : null;
+  const erfasst = new Date(b.created_at);
+
+  const artName = b.quelle === "abgleich" ? "Abgleich mit der Bank" : b.cent > 0 ? "Einnahme" : "Ausgabe";
+  // Eine Einnahme fuers Komitee heisst so – nicht "Sonstiges"
+  const kategorie = b.cent > 0 && b.komitee && b.quelle === "sonstiges" ? "Komitee-Einnahme" : a.name;
+  const zeilen: [string, React.ReactNode][] = [
+    ["Status", b.automatisch ? "Automatisch gebucht" : "Gebucht"],
+    ["Art", artName],
+  ];
+  if (kategorie !== artName) zeilen.push(["Kategorie", kategorie]);
+  if (b.aktion_id && aktionName(b.aktion_id)) zeilen.push(["Aktion", aktionName(b.aktion_id)]);
+  if (b.komitee) zeilen.push(["Komitee", committeeLabel(b.komitee)]);
+  if (person) zeilen.push(["Person", `${person.vorname} ${person.nachname}`]);
+  if (b.halbjahr) zeilen.push(["Halbjahr", b.halbjahr]);
+  if (b.anfrage_id) zeilen.push(["Grundlage", "Genehmigte Kostenanfrage"]);
+  zeilen.push(["Erfasst von", wer || (b.automatisch ? "App (Beitrag auf bezahlt)" : "–")]);
+  zeilen.push([
+    "Erfasst am",
+    `${erfasst.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" })}, ${erfasst.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })} Uhr`,
+  ]);
+  zeilen.push(["Buchungs-Nr.", <span key="nr" className="font-mono text-[13px] tracking-wide">{b.id.slice(0, 8).toUpperCase()}</span>]);
+
   return (
-    <li className="flex items-center gap-2.5 bg-white px-3 py-2.5 dark:bg-slate-900">
-      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-papier-matt text-[15px] dark:bg-slate-800">
-        {icon}
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="block truncate text-[14px] font-semibold">{b.titel || zu}</span>
-        <span className="block truncate text-[11px] text-tinte-leise">
-          {new Date(b.datum + "T12:00:00").toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" })}
-          {zu !== b.titel ? ` · ${zu}` : ""}
-          {b.anfrage_id ? " · Kostenanfrage" : ""}
-          {b.automatisch ? " · automatisch" : ""}
-        </span>
-      </span>
-      <span className={`zahl shrink-0 text-[14px] font-bold ${plus ? "text-bezahlt dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
-        {plus ? "+" : "−"} {euro(Math.abs(b.cent))}
-      </span>
+    <Sheet open onClose={onClose}>
+      <div className="flex justify-end">
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Schließen"
+          className="-m-1.5 flex h-11 w-11 items-center justify-center rounded-full transition active:scale-90"
+        >
+          <span className="flex h-[30px] w-[30px] items-center justify-center rounded-full bg-[rgb(118_118_128/0.12)] text-[13px] font-bold text-tinte-leise dark:bg-[rgb(118_118_128/0.24)]">
+            ✕
+          </span>
+        </button>
+      </div>
+
+      {/* Kopf: Kachel, Betrag, Titel, Datum */}
+      <div className="flex flex-col items-center px-2 pb-5 pt-1 text-center">
+        <Kachel b={b} gross />
+        <div className="mt-4">
+          <Betrag b={b} gross />
+        </div>
+        <div className="mt-2 text-[17px] font-semibold leading-snug">{b.titel || zuweisungText(b, aktionName)}</div>
+        <div className="mt-0.5 text-[14px] text-tinte-leise">
+          {new Date(b.datum + "T12:00:00").toLocaleDateString("de-DE", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
+        </div>
+      </div>
+
+      <dl className="liste bg-papier dark:bg-slate-800/60">
+        {zeilen.map(([k, v]) => (
+          <div key={k} className="zeile justify-between !py-3">
+            <dt className="shrink-0 text-tinte-leise">{k}</dt>
+            <dd className="min-w-0 truncate text-right font-medium">{v}</dd>
+          </div>
+        ))}
+      </dl>
+
+      {b.automatisch && (
+        <p className="mt-3 px-4 text-[13px] leading-relaxed text-tinte-leise">
+          Entsteht von selbst, wenn ein Beitrag auf „bezahlt“ gesetzt wird – und verschwindet wieder, wenn er zurück
+          auf „offen“ geht.
+        </p>
+      )}
+
       {darf && !b.automatisch && (
         <button
+          disabled={busy}
           onClick={async () => {
-            if (!confirm(`Buchung „${b.titel}" über ${euro(Math.abs(b.cent))} löschen?`)) return;
+            if (!confirm(`Buchung „${b.titel}“ über ${euro(Math.abs(b.cent))} löschen?`)) return;
+            setBusy(true);
             const f = await onLoeschen(b.id);
+            setBusy(false);
             if (f) alert("Löschen hat nicht geklappt: " + f);
+            else onClose();
           }}
-          className="shrink-0 rounded-md px-1.5 text-[15px] text-tinte-leise hover:text-red-500"
-          aria-label="Buchung löschen"
-          title="Buchung löschen"
+          className="mt-4 flex min-h-[2.75rem] w-full items-center justify-center gap-2 rounded-[1.25rem] bg-papier text-[16px] font-medium text-red-600 transition active:scale-[.99] disabled:opacity-50 dark:bg-slate-800/60 dark:text-red-400"
         >
-          ✕
+          <Icon name="muell" size={18} />
+          Buchung löschen
         </button>
       )}
-    </li>
+    </Sheet>
   );
 }
 
@@ -1031,7 +1156,7 @@ function Kreis({
   return (
     <div className="relative shrink-0" style={{ width: G, height: G }}>
       <svg width={G} height={G} viewBox={`0 0 ${G} ${G}`} className="-rotate-90" role="img" aria-label="Einnahmen nach Quelle">
-        <circle cx={G / 2} cy={G / 2} r={r} fill="none" strokeWidth={dicke} stroke={dunkel ? "#334155" : "#e7e5df"} />
+        <circle cx={G / 2} cy={G / 2} r={r} fill="none" strokeWidth={dicke} stroke={dunkel ? "#3A3A3C" : "#E5E5EA"} />
         {boegen.map((b) => (
           <circle
             key={b.key}

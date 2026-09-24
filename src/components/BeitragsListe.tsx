@@ -27,32 +27,27 @@ export function BeitragsListe({
 
   if (!eintraege.length)
     return (
-      <div className="mt-3 rounded-2xl border border-dashed border-papier-linie p-5 text-center text-[13px] text-tinte-leise dark:border-slate-700">
+      <div className="mt-3 rounded-2xl bg-papier p-5 text-center text-[14px] text-tinte-leise dark:bg-slate-800/60">
         {leerText}
       </div>
     );
 
   return (
     <>
-      <ul className="mt-3 grid gap-1.5">
+      <ul className="liste mt-3 bg-papier dark:bg-slate-800/60">
         {eintraege.map((c) => (
-          <li
-            key={c.id}
-            className="flex items-center gap-3 rounded-xl bg-papier px-3 py-2.5 dark:bg-slate-800/60"
-          >
+          <li key={c.id} className="flex items-center gap-3 px-4 py-2.5">
             <div className="min-w-0 flex-1">
-              <div className="truncate text-[14px] font-semibold text-tinte dark:text-slate-200">{c.titel}</div>
-              <div className="text-[12px] text-tinte-leise">{datumLang(c.datum)}</div>
+              <div className="truncate text-[15px] font-medium text-tinte dark:text-slate-100">{c.titel}</div>
+              <div className="text-[13px] text-tinte-leise">{datumLang(c.datum)}</div>
             </div>
-            <div className="zahl shrink-0 rounded-lg bg-brand/10 px-2.5 py-1 text-[14px] font-extrabold text-brand">
-              +{c.punkte} %
-            </div>
+            <div className="zahl shrink-0 text-[15px] font-semibold text-brand-dark dark:text-brand">+{c.punkte} %</div>
           </li>
         ))}
       </ul>
-      <div className="mt-2 flex items-center justify-between rounded-xl bg-brand/10 px-3 py-2">
-        <span className="text-[13px] font-semibold text-brand">Zusammen</span>
-        <span className="zahl text-[15px] font-extrabold text-brand">{summe} %</span>
+      <div className="mt-2 flex items-center justify-between px-4">
+        <span className="text-[14px] text-tinte-leise">Zusammen</span>
+        <span className="zahl text-[16px] font-bold text-brand-dark dark:text-brand">{summe} %</span>
       </div>
     </>
   );

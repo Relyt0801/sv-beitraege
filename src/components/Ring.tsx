@@ -9,7 +9,7 @@ export function Ring({ pct, klein }: { pct: number; klein?: boolean }) {
   return (
     <div className="relative shrink-0" style={{ width: groesse, height: groesse }}>
       <svg width={groesse} height={groesse} viewBox={`0 0 ${groesse} ${groesse}`} className="-rotate-90">
-        <circle cx={mitte} cy={mitte} r={r} fill="none" strokeWidth={dicke} className="stroke-papier-linie dark:stroke-slate-700" />
+        <circle cx={mitte} cy={mitte} r={r} fill="none" strokeWidth={dicke} className="stroke-[rgb(118_118_128/0.16)]" />
         <circle
           cx={mitte}
           cy={mitte}
@@ -17,10 +17,10 @@ export function Ring({ pct, klein }: { pct: number; klein?: boolean }) {
           fill="none"
           strokeWidth={dicke}
           strokeLinecap="round"
-          className={voll ? "stroke-emerald-500" : "stroke-brand"}
+          className={voll ? "stroke-bezahlt" : "stroke-brand"}
           strokeDasharray={umfang}
           strokeDashoffset={umfang * (1 - Math.min(pct, 100) / 100)}
-          style={{ transition: "stroke-dashoffset .5s" }}
+          style={{ transition: "stroke-dashoffset .8s cubic-bezier(.32,.72,0,1)" }}
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center leading-none">
