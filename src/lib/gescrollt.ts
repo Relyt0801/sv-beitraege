@@ -47,3 +47,60 @@ export function useReiter<T>(start: T | (() => T)): [T, (neu: T) => void] {
   }, []);
   return [reiter, setReiter];
 }
+
+/**
+ * Höhe eines festen Bereichs (Kopf, Tab-Leiste) als CSS-Variable ablegen.
+ *
+ * Vorher standen an jeder Stelle geratene Zahlen (3.6rem, 4.9rem, 52px), die
+ * nach dem neuen Design nicht mehr stimmten: Die Leiste mit „Anpinnen /
+ * Abstimmung / To-do“ lag halb unter der Tab-Leiste. Jetzt wird gemessen –
+ * auch wenn sich die Leiste ändert (Schriftgröße, Drehen, iPad).
+ * Ist das Element ausgeblendet (z. B. Tab-Leiste am Rechner), gilt 0.
+ */
+export function useHoeheAlsVariable(name: string) {
+  const [el, setEl] = useState<HTMLElement | null>(null);
+  useEffect(() => {
+    if (!el) return;
+    const root = document.documentElement;
+    const setzen = () => {
+      const sichtbar = getComputedStyle(el).display !== "none";
+      root.style.setProperty(name, `${sichtbar ? el.offsetHeight : 0}px`);
+    };
+    setzen();
+    const ro = new ResizeObserver(setzen);
+    ro.observe(el);
+    window.addEventListener("resize", setzen);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", setzen);
+      root.style.removeProperty(name);
+    };
+  }, [el, name]);
+  return setEl;
+}
+
+/**
+ * Chat: ans Ende scrollen – beim Öffnen immer, bei neuen Nachrichten nur, wenn
+ * man ohnehin unten war oder selbst geschrieben hat. Vorher riss jede neue
+ * Nachricht die Ansicht nach unten, auch wenn man gerade ältere las.
+ */
+export function useChatEnde(anzahl: number, letzteIstMeine: boolean) {
+  const ende = useRef<HTMLDivElement | null>(null);
+  const erstes = useRef(true);
+  const warUnten = useRef(true);
+  useEffect(() => {
+    const pruefen = () => {
+      const rest = document.documentElement.scrollHeight - window.scrollY - window.innerHeight;
+      warUnten.current = rest < 160;
+    };
+    pruefen();
+    window.addEventListener("scroll", pruefen, { passive: true });
+    return () => window.removeEventListener("scroll", pruefen);
+  }, []);
+  useEffect(() => {
+    if (!ende.current) return;
+    if (erstes.current || warUnten.current || letzteIstMeine) ende.current.scrollIntoView({ block: "end" });
+    if (anzahl > 0) erstes.current = false;
+  }, [anzahl, letzteIstMeine]);
+  return ende;
+}

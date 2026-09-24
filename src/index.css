@@ -57,6 +57,28 @@ html, body, #root {
   height: 100%;
 }
 
+/* Höhe von Kopf und Tab-Leiste. App.tsx misst sie und überschreibt diese
+   Startwerte (useHoeheAlsVariable); sie gelten nur bis zur ersten Messung. */
+:root {
+  --kopf: calc(env(safe-area-inset-top) + 3.5rem);
+  --leiste: calc(env(safe-area-inset-bottom) + 4.45rem);
+}
+@media (min-width: 1024px) {
+  :root { --leiste: 0px; }
+}
+
+/* iPhone, App vom Home-Bildschirm (Statusleiste "black-translucent"):
+   Safari rechnet die Seitenhöhe dort ohne die Statusleiste oben. Ist eine
+   Seite kürzer als der Bildschirm (Events ohne Einträge, Chats), sass die
+   feste Tab-Leiste deshalb um genau diese Höhe zu weit oben – bei langen
+   Seiten (Kasse) dagegen richtig. Mit dieser Mindesthöhe ist jede Seite
+   mindestens bildschirmhoch, und die Leiste steht überall gleich. */
+@media (display-mode: standalone) {
+  html {
+    min-height: calc(100% + env(safe-area-inset-top));
+  }
+}
+
 /* Kein Nachfedern der ganzen Seite. Muss an <html> stehen: Safari nimmt den
    Wert für das Fenster nur von dort, nicht von <body>. Sonst federt auf iOS
    bei kurzen Seiten (z. B. Events ohne Einträge) die feste Tab-Leiste mit. */

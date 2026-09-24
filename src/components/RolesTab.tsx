@@ -44,7 +44,7 @@ export function RolesTab() {
   const [zeigeEltern, setZeigeEltern] = useState(false);
   const canAssignKom = can("komitees.assign");
   const canTimeout = can("mod.timeout");
-  const { students } = useStore();
+  const { students, reload } = useStore();
   const { committeesOf, setUserCommittee } = useTopics();
   const [q, setQ] = useState("");
   const [openKom, setOpenKom] = useState<string | null>(null);
@@ -110,7 +110,16 @@ export function RolesTab() {
           Person hinzufügen
         </button>
       )}
-      <PersonAnlegenSheet open={anlegen} onClose={() => setAnlegen(false)} onFertig={refreshProfiles} />
+      <PersonAnlegenSheet
+        open={anlegen}
+        onClose={() => setAnlegen(false)}
+        onFertig={() => {
+          // Konten UND Personen neu holen – sonst fehlt der neuen Person bis zum
+          // nächsten Neuladen der Name, und sie steht nur als Nutzername da.
+          refreshProfiles();
+          reload();
+        }}
+      />
       <Suchfeld wert={q} onChange={setQ} />
 
       {/* Umschalter wie in den iOS-Einstellungen */}

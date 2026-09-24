@@ -11,6 +11,31 @@ ausführlich (auf Deutsch); hier steht der Überblick dazu.
 
 ---
 
+## Nachtrag 2 (24.09.2026): Tab-Leiste in der Home-Bildschirm-App, Komitee-Leiste, Rollen-Hinweis
+
+**Tab-Leiste stand bei kurzen Seiten zu hoch** (`src/index.css`)
+- Nur in der App vom Home-Bildschirm (iPhone, Statusleiste „black-translucent“):
+  Safari rechnet die Seitenhöhe dort ohne die Statusleiste oben. Bei kurzen
+  Seiten (Events ohne Einträge, Chats) stand die feste Tab-Leiste deshalb um
+  genau diese Höhe (~47 pt) zu weit oben, bei langen Seiten (Kasse) richtig –
+  beim Wechsel sprang sie hoch. Jetzt ist jede Seite dort mindestens
+  bildschirmhoch (`@media (display-mode: standalone)`), die Leiste steht überall
+  gleich. Im normalen Browser ändert sich nichts.
+
+**Komitee-Leiste und Chat-Eingabe unter der Tab-Leiste** (`App.tsx`,
+`KomiteePage.tsx`, `ChatBlasen.tsx`, `ChatsTab.tsx`, `lib/gescrollt.ts`)
+- „Anpinnen / Abstimmung / To-do“ und die Eingabe im Komitee-Chat hingen noch an
+  der Höhe der alten Tab-Leiste (3,6 rem) und lagen halb darunter. Kopf und
+  Tab-Leiste werden jetzt gemessen (`--kopf`, `--leiste`), alles Feste richtet
+  sich danach. Auch der Plus-Knopf und die Zwischenüberschriften in den Chats.
+- Die letzte Nachricht landet über der Eingabe statt dahinter, und beim Lesen
+  älterer Nachrichten reißt eine neue Nachricht die Ansicht nicht mehr nach unten.
+
+**Rollen-Reiter: „keiner Person zugeordnet“ nur noch bei Eltern** (`KontoZeile.tsx`, `RolesTab.tsx`)
+- Konten ohne eigene Person (Admin, Test) zeigen nur ihre Rolle. Nach „Person
+  hinzufügen“ werden auch die Personen neu geladen, damit die neue Person gleich
+  mit Namen dasteht statt als Nutzername.
+
 ## Nachtrag 24.09.2026: Tab-Leiste auf dem iPhone, schmale Handys
 
 **Tab-Leiste federt nicht mehr hoch** (`src/lib/gescrollt.ts` → `useReiter`,

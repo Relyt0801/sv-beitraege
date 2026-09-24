@@ -38,7 +38,7 @@ import { ElternProvider, useEltern } from "./eltern-store";
 import { ElternApp } from "./components/ElternApp";
 import { Icon, type IconName } from "./components/Icon";
 import { InstallKarte, InstallOverlay } from "./components/InstallHinweis";
-import { useGescrollt, useReiter } from "./lib/gescrollt";
+import { useGescrollt, useHoeheAlsVariable, useReiter } from "./lib/gescrollt";
 import { Schalter } from "./components/Schalter";
 
 export default function App() {
@@ -201,6 +201,10 @@ function Main() {
   const [showSettings, setShowSettings] = useState(false);
   const [showTour, setShowTour] = useState(false);
   const gescrollt = useGescrollt(4);
+  // Kopf und Tab-Leiste messen: danach richten sich Chat-Eingabe,
+  // Komitee-Leiste und die Zwischenüberschriften (siehe index.css).
+  const kopfRef = useHoeheAlsVariable("--kopf");
+  const leisteRef = useHoeheAlsVariable("--leiste");
   const titelWeg = useGescrollt(44);
   // Listen-, Such- und Filterwerkzeug nur für Leute, die wirklich alle Personen verwalten.
   const teamView = isStaff;
@@ -336,6 +340,7 @@ function Main() {
           große Titel. Scrollt der Titel weg, erscheint er klein in der nun
           milchigen Leiste (Glas). */}
       <header
+        ref={kopfRef}
         className={`sticky top-0 z-20 -mx-3 px-3 pb-2 pt-[calc(env(safe-area-inset-top)+0.5rem)] transition-[background-color,box-shadow] duration-300 sm:-mx-5 sm:px-5 ${
           gescrollt ? "glas shadow-[0_0.5px_0_rgba(0,0,0,.18)] dark:shadow-[0_0.5px_0_rgba(255,255,255,.15)]" : "bg-papier dark:bg-slate-950"
         }`}
@@ -678,7 +683,7 @@ function Main() {
       {tab === "kasse" && teamView && canEditData && !massMode && (
         <button
           onClick={() => setShowAdd(true)}
-          className="fixed bottom-[calc(env(safe-area-inset-bottom)+5.5rem)] right-4 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-brand text-white shadow-[0_8px_24px_-6px_rgb(var(--brand)/.6)] transition duration-200 ease-ios active:scale-90 sm:right-6 lg:bottom-8"
+          className="fixed bottom-[calc(var(--leiste)+1rem)] right-4 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-brand text-white shadow-[0_8px_24px_-6px_rgb(var(--brand)/.6)] transition duration-200 ease-ios active:scale-90 sm:right-6 lg:bottom-8"
           aria-label="Person hinzufügen"
         >
           <Icon name="plus" size={26} strich={2.4} />
@@ -688,7 +693,7 @@ function Main() {
       {tab === "events" && canEditData && (
         <button
           onClick={() => setShowComposer(true)}
-          className="fixed bottom-[calc(env(safe-area-inset-bottom)+5.5rem)] right-4 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-brand text-white shadow-[0_8px_24px_-6px_rgb(var(--brand)/.6)] transition duration-200 ease-ios active:scale-90 sm:right-6 lg:bottom-8"
+          className="fixed bottom-[calc(var(--leiste)+1rem)] right-4 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-brand text-white shadow-[0_8px_24px_-6px_rgb(var(--brand)/.6)] transition duration-200 ease-ios active:scale-90 sm:right-6 lg:bottom-8"
           aria-label="Event erstellen"
         >
           <Icon name="plus" size={26} strich={2.4} />
@@ -707,7 +712,7 @@ function Main() {
 
       {/* Schwebende Tab-Leiste aus Glas – wie in iOS 26 */}
       {!massMode && (
-        <nav className="pointer-events-none fixed inset-x-0 bottom-0 z-40 px-3 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] lg:hidden">
+        <nav ref={leisteRef} className="pointer-events-none fixed inset-x-0 bottom-0 z-40 px-3 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] lg:hidden">
           <div className="glas pointer-events-auto mx-auto flex max-w-xl items-stretch rounded-[1.9rem] border border-black/[0.06] p-1 shadow-glas dark:border-white/10">
             {navItems.filter((n) => n.show).map((n) => (
               <button
