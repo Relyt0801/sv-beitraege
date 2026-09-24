@@ -14,7 +14,7 @@ import { KontoTab } from "./KontoTab";
 import { ProfilSheet } from "./ProfilSheet";
 import { Tour, elternSchritte } from "./Tour";
 import { useTheme } from "../lib/theme";
-import { useGescrollt } from "../lib/gescrollt";
+import { useGescrollt, useReiter } from "../lib/gescrollt";
 import { hasSupabase } from "../lib/supabase";
 import { PushHinweis, usePushAuffrischen } from "./PushHinweis";
 import { InstallKarte } from "./InstallHinweis";
@@ -37,15 +37,11 @@ const TOUR_MERKER = "sv:tour:v3:eltern";
 export function ElternApp() {
   // Benachrichtigung angetippt? Dann gleich in die Infos.
   // Nur lesen – React ruft den Startwert im Entwicklungsmodus zweimal auf.
-  const [reiter, setReiter] = useState<Reiter>(() => (window.location.hash === "#infos" ? "infos" : "uebersicht"));
+  const [reiter, setReiter] = useReiter<Reiter>(() => (window.location.hash === "#infos" ? "infos" : "uebersicht"));
   useEffect(() => {
     if (window.location.hash === "#infos") history.replaceState(null, "", window.location.pathname + window.location.search);
   }, []);
   const [profilOffen, setProfilOffen] = useState(false);
-  // Jeder Reiter beginnt oben.
-  useEffect(() => {
-    window.scrollTo({ top: 0 });
-  }, [reiter]);
   const [tour, setTour] = useState(false);
   const { theme, toggle } = useTheme();
   const gescrollt = useGescrollt(4);

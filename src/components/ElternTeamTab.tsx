@@ -49,7 +49,7 @@ export function ElternTeamTab() {
     userId === uid ? "Du" : profile[userId]?.anzeigename || "Eltern";
 
   return (
-    <div className="grid gap-3">
+    <div className="grid grid-cols-1 gap-3">
       {/* -------------------------------------------- Infos anheften */}
       <section className="card p-4 sm:p-5">
         <div className="flex items-center gap-2">
@@ -66,7 +66,7 @@ export function ElternTeamTab() {
         </p>
 
         {neuOffen && (
-          <div className="mt-3 grid gap-2 rounded-2xl border border-dashed border-brand/50 p-3">
+          <div className="mt-3 grid grid-cols-1 gap-2 rounded-2xl border border-dashed border-brand/50 p-3">
             <input
               className="field"
               placeholder="Überschrift, zum Beispiel Termin Abiball"
@@ -107,7 +107,7 @@ export function ElternTeamTab() {
         {infos.length === 0 ? (
           <p className="mt-3 text-[13px] text-tinte-leise">Noch nichts veröffentlicht.</p>
         ) : (
-          <ul className="mt-3 grid gap-2">
+          <ul className="mt-3 grid grid-cols-1 gap-2">
             {infos.map((i) => (
               <li
                 key={i.id}
@@ -158,7 +158,7 @@ export function ElternTeamTab() {
         {tickets.length === 0 ? (
           <p className="mt-2 text-[13px] text-tinte-leise">Bisher hat niemand etwas gefragt.</p>
         ) : (
-          <ul className="mt-3 grid gap-2">
+          <ul className="mt-3 grid grid-cols-1 gap-2">
             {[...offeneTickets, ...erledigte].map((t) => {
               const verlauf = nachrichten.filter((n) => n.ticket_id === t.id);
               const auf = offen === t.id;
@@ -208,7 +208,7 @@ export function ElternTeamTab() {
 
                   {auf && (
                     <div className="border-t border-papier-linie p-3.5 dark:border-slate-700">
-                      <ul className="grid gap-2">
+                      <ul className="grid grid-cols-1 gap-2">
                         {verlauf.map((n) => (
                           <li
                             key={n.id}
@@ -319,7 +319,7 @@ function AnEltern({
   const ziel = konten.find((k) => k.user_id === gewaehlt);
 
   return (
-    <div className="mt-3 grid gap-2 rounded-2xl border border-dashed border-brand/50 p-3">
+    <div className="mt-3 grid grid-cols-1 gap-2 rounded-2xl border border-dashed border-brand/50 p-3">
       {!ziel ? (
         <>
           <input
@@ -332,7 +332,7 @@ function AnEltern({
           {konten.length === 0 ? (
             <p className="text-[13px] text-tinte-leise">Es gibt noch keine Elternzugänge.</p>
           ) : (
-            <ul className="grid gap-1">
+            <ul className="grid grid-cols-1 gap-1">
               {treffer.map((k) => (
                 <li key={k.user_id}>
                   <button

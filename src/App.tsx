@@ -38,7 +38,7 @@ import { ElternProvider, useEltern } from "./eltern-store";
 import { ElternApp } from "./components/ElternApp";
 import { Icon, type IconName } from "./components/Icon";
 import { InstallKarte, InstallOverlay } from "./components/InstallHinweis";
-import { useGescrollt } from "./lib/gescrollt";
+import { useGescrollt, useReiter } from "./lib/gescrollt";
 import { Schalter } from "./components/Schalter";
 
 export default function App() {
@@ -172,7 +172,9 @@ function Main() {
   // Ein Tippen auf eine Benachrichtigung öffnet die App mit #events oder
   // #chats – dann direkt dort landen statt auf der Kasse.
   // Nur lesen – React ruft den Startwert im Entwicklungsmodus zweimal auf.
-  const [tab, setTab] = useState<Tab>(() => tabAusAdresse(false) || "kasse");
+  // useReiter springt vor dem Wechsel nach oben – sonst federt auf iOS die
+  // Tab-Leiste, wenn der neue Reiter kürzer ist als die alte Scrollposition.
+  const [tab, setTab] = useReiter<Tab>(() => tabAusAdresse(false) || "kasse");
   useEffect(() => {
     tabAusAdresse(true);
   }, []);
@@ -183,11 +185,7 @@ function Main() {
     };
     window.addEventListener("hashchange", neu);
     return () => window.removeEventListener("hashchange", neu);
-  }, []);
-  // Jeder Reiter beginnt oben – sonst landet man mitten in einer fremden Liste.
-  useEffect(() => {
-    window.scrollTo({ top: 0 });
-  }, [tab]);
+  }, [setTab]);
   const [showComposer, setShowComposer] = useState(false);
   const [showAktion, setShowAktion] = useState(false);
   const [query, setQuery] = useState("");
@@ -330,7 +328,7 @@ function Main() {
   const reiterErlaubt = navItems.find((n) => n.key === tab)?.show ?? true;
   useEffect(() => {
     if (roleReady && !reiterErlaubt) setTab("kasse");
-  }, [roleReady, reiterErlaubt]);
+  }, [roleReady, reiterErlaubt, setTab]);
 
   return (
     <div className="mx-auto max-w-5xl px-3 pb-36 sm:px-5 lg:pb-16">

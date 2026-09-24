@@ -57,6 +57,13 @@ html, body, #root {
   height: 100%;
 }
 
+/* Kein Nachfedern der ganzen Seite. Muss an <html> stehen: Safari nimmt den
+   Wert für das Fenster nur von dort, nicht von <body>. Sonst federt auf iOS
+   bei kurzen Seiten (z. B. Events ohne Einträge) die feste Tab-Leiste mit. */
+html {
+  overscroll-behavior-y: none;
+}
+
 body {
   @apply bg-papier text-tinte antialiased;
   margin: 0;
