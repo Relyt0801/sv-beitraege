@@ -9,8 +9,8 @@ import type { Student } from "../lib/types";
  * wie im Rechte-Reiter.
  *
  * Immer dieselben drei Dinge: Namenskreis, "Nachname, Vorname" und darunter
- * der Nutzername mit der Rolle. Wer noch keiner Person zugeordnet ist, steht
- * mit dem Nutzernamen oben und einem Hinweis darunter.
+ * der Nutzername mit der Rolle. Konten ohne eigene Person (Elternzugänge,
+ * Admin- oder Testkonten) stehen mit dem Nutzernamen oben.
  */
 export function KontoZeile({
   profil,
@@ -28,9 +28,10 @@ export function KontoZeile({
   /** Was rechts steht, zum Beispiel eine Anzahl oder ein Pfeil. */
   rechts?: React.ReactNode;
   /**
-   * Ersetzt das "keiner Person zugeordnet" in der zweiten Zeile. Fuer
-   * Elternzugaenge, die ueber parent_children an ihrem Kind haengen und
-   * nicht ueber student_id.
+   * Zusatz in der zweiten Zeile – für Elternzugänge (ihre Kinder oder
+   * "kein Kind zugeordnet"). Bei allen anderen Konten steht dort nur die
+   * Rolle: "keiner Person zugeordnet" erschien früher auch bei frisch
+   * angelegten Personen und nach einem Rollenwechsel und verwirrte nur.
    */
   hinweis?: string;
   /** Hinweis in Orange – etwa bei einem Elternzugang ohne Kind. */
@@ -58,8 +59,13 @@ export function KontoZeile({
             `${profil.username} · ${rolleName(profil.role)}`
           ) : (
             <>
-              {rolleName(profil.role)} ·{" "}
-              <span className={hinweisWarnt ? "font-medium text-offen" : ""}>{hinweis ?? "keiner Person zugeordnet"}</span>
+              {rolleName(profil.role)}
+              {hinweis && (
+                <>
+                  {" · "}
+                  <span className={hinweisWarnt ? "font-medium text-offen" : ""}>{hinweis}</span>
+                </>
+              )}
             </>
           )}
         </div>

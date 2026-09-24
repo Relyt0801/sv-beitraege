@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useChatEnde } from "../lib/gescrollt";
 import type { TopicItem } from "../topics-store";
 import { Avatar, PersonName } from "./Avatar";
 import { MuteKnopf } from "./MuteKnopf";
@@ -20,13 +20,10 @@ export function ChatBlasen({
   onDelete: (id: string) => void;
   leerText?: string;
 }) {
-  const ende = useRef<HTMLDivElement | null>(null);
-  useEffect(() => {
-    ende.current?.scrollIntoView({ block: "end" });
-  }, [liste.length]);
+  const ende = useChatEnde(liste.length, liste[liste.length - 1]?.created_by === uid);
 
   return (
-    <div className="space-y-2 py-3 pb-28">
+    <div className="space-y-2 py-3">
       {liste.length === 0 && <p className="py-12 text-center text-sm text-tinte-leise">{leerText}</p>}
       {liste.map((m) => {
         const meins = m.created_by === uid;
@@ -63,6 +60,10 @@ export function ChatBlasen({
           </div>
         );
       })}
+      {/* Platz für Eingabezeile und Tab-Leiste. Die Marke fürs Scrollen steht
+          dahinter – so landet die letzte Nachricht über der Eingabe statt
+          dahinter (vorher lag der Freiraum als padding hinter der Marke). */}
+      <div aria-hidden className="h-[calc(var(--leiste)+5rem)] lg:h-24" />
       <div ref={ende} />
     </div>
   );
@@ -81,7 +82,7 @@ export function ChatEingabe({
   platzhalter?: string;
 }) {
   return (
-    <div className="glas fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+4.9rem)] z-30 flex items-end gap-2 border-t border-black/[0.06] px-3 py-2 dark:border-white/10 sm:px-5 lg:bottom-0 lg:pb-[calc(env(safe-area-inset-bottom)+0.75rem)]">
+    <div className="glas fixed inset-x-0 bottom-[var(--leiste)] z-30 flex items-end gap-2 border-t border-black/[0.06] px-3 py-2 dark:border-white/10 sm:px-5 lg:bottom-0 lg:pb-[calc(env(safe-area-inset-bottom)+0.75rem)]">
       <textarea
         rows={1}
         className="field max-h-28 flex-1 resize-none py-2.5"

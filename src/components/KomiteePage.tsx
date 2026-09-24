@@ -8,6 +8,7 @@ import { Avatar, PersonName } from "./Avatar";
 import { MuteKnopf } from "./MuteKnopf";
 import { BannHinweis } from "./BannHinweis";
 import { Sheet } from "./Sheet";
+import { useChatEnde } from "../lib/gescrollt";
 import { VorsitzZeile } from "./VorsitzSheet";
 
 type Neu = "pin" | "umfrage" | "todo" | null;
@@ -53,7 +54,7 @@ export function KomiteePage({ topic, onBack }: { topic: Topic; onBack: () => voi
 
   return (
     <div>
-      <div className="sticky top-[52px] z-10 -mx-3 flex items-center gap-2 border-b border-papier-linie bg-papier-matt/95 px-3 py-2 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95 sm:-mx-5 sm:px-5">
+      <div className="sticky top-[var(--kopf)] z-10 -mx-3 flex items-center gap-2 border-b border-papier-linie bg-papier-matt/95 px-3 py-2 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95 sm:-mx-5 sm:px-5">
         <button className="iconbtn" onClick={onBack} aria-label="Zurück">‹</button>
         <span className="text-xl">{icon}</span>
         <div className="min-w-0 flex-1 truncate text-[17px] font-bold">{titel}</div>
@@ -88,7 +89,7 @@ export function KomiteePage({ topic, onBack }: { topic: Topic; onBack: () => voi
       )}
 
       {tab === "uebersicht" ? (
-        <div className="mt-3 space-y-5 pb-28">
+        <div className="mt-3 space-y-5 pb-[calc(var(--leiste)+5rem)] lg:pb-24">
           {/* Wer hier den Vorsitz hat, darf Termine anfragen. */}
           {topic.tag && <VorsitzZeile tag={topic.tag} />}
 
@@ -143,7 +144,7 @@ export function KomiteePage({ topic, onBack }: { topic: Topic; onBack: () => voi
       )}
 
       {tab === "uebersicht" && !banned && (
-        <div className="fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+3.6rem)] lg:bottom-0 lg:pb-[calc(env(safe-area-inset-bottom)+0.75rem)] z-30 border-t border-papier-linie bg-papier-matt/95 px-3 py-2 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95 sm:px-5">
+        <div className="fixed inset-x-0 bottom-[var(--leiste)] lg:bottom-0 lg:pb-[calc(env(safe-area-inset-bottom)+0.75rem)] z-30 border-t border-papier-linie bg-papier-matt/95 px-3 py-2 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95 sm:px-5">
           <div className="mx-auto grid max-w-5xl grid-cols-3 gap-2">
             <NeuKnopf icon="📌" label="Anpinnen" onClick={() => setNeu("pin")} />
             <NeuKnopf icon="🗳️" label="Abstimmung" onClick={() => setNeu("umfrage")} />
@@ -315,11 +316,7 @@ function ChatBereich({
   const { postItem, deleteItem, committeesOf } = useTopics();
   const { role } = useRole();
   const [text, setText] = useState("");
-  const ende = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    ende.current?.scrollIntoView({ block: "end" });
-  }, [liste.length]);
+  const ende = useChatEnde(liste.length, liste[liste.length - 1]?.created_by === uid);
 
   async function senden() {
     if (!text.trim()) return;
@@ -330,7 +327,7 @@ function ChatBereich({
 
   return (
     <div className="flex flex-col">
-      <div className="space-y-2.5 py-3 pb-28">
+      <div className="space-y-2.5 py-3">
         {liste.length === 0 && <p className="py-12 text-center text-sm text-tinte-leise">Noch keine Nachricht.</p>}
         {liste.map((m) => {
           const meins = m.created_by === uid;
@@ -360,11 +357,13 @@ function ChatBereich({
             </div>
           );
         })}
+        {/* Platz für Eingabezeile und Tab-Leiste, Scroll-Marke dahinter */}
+        <div aria-hidden className="h-[calc(var(--leiste)+5rem)] lg:h-24" />
         <div ref={ende} />
       </div>
 
       {!banned && (
-        <div className="fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+3.6rem)] lg:bottom-0 lg:pb-[calc(env(safe-area-inset-bottom)+0.75rem)] z-30 flex items-end gap-2 border-t border-papier-linie bg-papier-matt/95 px-3 py-2 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95 sm:px-5">
+        <div className="fixed inset-x-0 bottom-[var(--leiste)] lg:bottom-0 lg:pb-[calc(env(safe-area-inset-bottom)+0.75rem)] z-30 flex items-end gap-2 border-t border-papier-linie bg-papier-matt/95 px-3 py-2 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95 sm:px-5">
           <textarea
             rows={1}
             className="field max-h-28 flex-1 resize-none py-2.5"
