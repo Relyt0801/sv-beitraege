@@ -20,6 +20,7 @@ import { PushHinweis, usePushAuffrischen } from "./PushHinweis";
 import { InstallKarte } from "./InstallHinweis";
 import { abmelden, appZaehler } from "../lib/push";
 
+import { frage } from "../lib/melder";
 type Reiter = "uebersicht" | "infos" | "konto";
 
 const TITEL: Record<Reiter, string> = { uebersicht: "Stufenkasse", infos: "Infos", konto: "Kontodaten" };
@@ -145,7 +146,7 @@ export function ElternApp() {
           <button className="btn-grau" onClick={() => setProfilOffen(true)}>
             Passwort & Einstellungen
           </button>
-          <button className="btn-grau !text-red-600 dark:!text-red-400" onClick={() => confirm("Wirklich abmelden?") && void abmelden()}>
+          <button className="btn-grau !text-red-600 dark:!text-red-400" onClick={() => void frage("Wirklich abmelden?", "Abmelden", true).then((ok) => { if (ok) void abmelden(); })}>
             Abmelden
           </button>
         </div>

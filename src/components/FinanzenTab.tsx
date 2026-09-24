@@ -15,6 +15,7 @@ import { Sheet, SheetKopf } from "./Sheet";
 import { Avatar } from "./Avatar";
 import { Icon, type IconName } from "./Icon";
 
+import { frage, meldeFehler } from "../lib/melder";
 /** Folgt dem Hell/Dunkel-Schalter der App (Klasse "dark" am <html>). */
 function useDunkel(): boolean {
   const [dunkel, setDunkel] = useState(() => document.documentElement.classList.contains("dark"));
@@ -478,7 +479,7 @@ function EinstellungenSheet({
           setBusy(true);
           const f = await fin.zielSetzen({ ziel_cent: Math.max(0, centAus(betrag) ?? 0), ziel_titel: titel.trim() || "Abiball" });
           setBusy(false);
-          if (f) alert("Hat nicht geklappt: " + f);
+          if (f) meldeFehler("Hat nicht geklappt: " + f);
           else onClose();
         }}
         className="btn-primary mt-2"
@@ -502,11 +503,11 @@ function EinstellungenSheet({
           disabled={busy || diff === null || diff === 0}
           onClick={async () => {
             if (diff === null || diff === 0) return;
-            if (!confirm(`Kontostand auf ${euro(c!)} setzen? Gebucht wird ${diff > 0 ? "+" : "−"} ${euro(Math.abs(diff))}.`)) return;
+            if (!(await frage(`Kontostand auf ${euro(c!)} setzen? Gebucht wird ${diff > 0 ? "+" : "−"} ${euro(Math.abs(diff))}.`, "Buchen"))) return;
             setBusy(true);
             const f = await fin.buchen({ datum: heute(), cent: diff, quelle: "abgleich", titel: "Abgleich mit der Bank" });
             setBusy(false);
-            if (f) alert("Hat nicht geklappt: " + f);
+            if (f) meldeFehler("Hat nicht geklappt: " + f);
             else onClose();
           }}
           className="btn-primary !w-auto shrink-0 px-4 disabled:opacity-40"
@@ -754,7 +755,7 @@ function AnfrageDetailSheet({
     setBusy(true);
     const f = await kosten.entscheiden(a, ja, antwort, datum);
     setBusy(false);
-    if (f) return alert("Hat nicht geklappt: " + f);
+    if (f) return meldeFehler("Hat nicht geklappt: " + f);
     onEntschieden?.();
     onClose();
   }
@@ -825,11 +826,11 @@ function AnfrageDetailSheet({
         <button
           disabled={busy}
           onClick={async () => {
-            if (!confirm("Anfrage zurückziehen?")) return;
+            if (!(await frage("Anfrage zurückziehen?", "Zurückziehen", true))) return;
             setBusy(true);
             const f = await kosten.zurueckziehen(a.id);
             setBusy(false);
-            if (f) alert("Hat nicht geklappt: " + f);
+            if (f) meldeFehler("Hat nicht geklappt: " + f);
             else onClose();
           }}
           className="mt-4 w-full rounded-xl border border-papier-linie py-2.5 text-[13px] font-bold text-tinte-matt dark:border-slate-700"
@@ -1106,11 +1107,11 @@ function BuchungDetail({
         <button
           disabled={busy}
           onClick={async () => {
-            if (!confirm(`Buchung „${b.titel}“ über ${euro(Math.abs(b.cent))} löschen?`)) return;
+            if (!(await frage(`Buchung „${b.titel}“ über ${euro(Math.abs(b.cent))} löschen?`, "Löschen", true))) return;
             setBusy(true);
             const f = await onLoeschen(b.id);
             setBusy(false);
-            if (f) alert("Löschen hat nicht geklappt: " + f);
+            if (f) meldeFehler("Löschen hat nicht geklappt: " + f);
             else onClose();
           }}
           className="mt-4 flex min-h-[2.75rem] w-full items-center justify-center gap-2 rounded-[1.25rem] bg-papier text-[16px] font-medium text-red-600 transition active:scale-[.99] disabled:opacity-50 dark:bg-slate-800/60 dark:text-red-400"

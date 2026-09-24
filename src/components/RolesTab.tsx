@@ -16,6 +16,7 @@ import { Schalter } from "./Schalter";
 // Sperrdauern und die Ist-gesperrt-Frage stehen beim Chat-Knopf – eine Quelle fuer beide.
 import { DAUERN, isBanned } from "./MuteKnopf";
 
+import { frage } from "../lib/melder";
 /** Reihenfolge im Auswahlfeld. Die Namen kommen zentral aus permissions.ts. */
 const ROLLEN_AUSWAHL: Role[] = ["schueler", "sprecher", "stv_sprecher", "stufenteam", "kassenwart", "admin", "eltern"];
 
@@ -173,11 +174,11 @@ export function RolesTab() {
                   }
                   className={`${feld} w-0 min-w-[8.5rem] flex-1 px-3 disabled:opacity-50`}
                   value={p.role}
-                  onChange={(e) => {
+                  onChange={async (e) => {
                     const neu = e.target.value as Role;
                     // Eltern zu Stufenteam oder umgekehrt ist fast immer ein Versehen
                     const heikel = p.role === "eltern" || neu === "eltern" || neu === "admin";
-                    if (heikel && !confirm(`${p.username ?? "Dieses Konto"} wirklich zu „${rolleName(neu)}“ machen?`)) return;
+                    if (heikel && !(await frage(`${p.username ?? "Dieses Konto"} wirklich zu „${rolleName(neu)}“ machen?`, "Ändern"))) return;
                     void setRole(p.user_id, neu);
                   }}
                 >

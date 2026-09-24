@@ -1,7 +1,10 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { hasSupabase, supabase } from "./lib/supabase";
+import { abonniere } from "./lib/realtime";
+import { sendePush } from "./lib/push";
 import type { EventItem, NewEvent } from "./lib/events";
 
+import { meldeFehler } from "./lib/melder";
 const LS = "sv-beitraege:events";
 const LOCAL_UID = "local-user";
 
@@ -133,7 +136,7 @@ export function EventsProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!hasSupabase) return;
     let alive = true;
-    let channel: ReturnType<NonNullable<typeof supabase>["channel"]> | null = null;
+    let abmelden: (() => void) | null = null;
     const start = async () => {
       const { data } = await supabase!.auth.getSession();
       uidRef.current = data.session?.user.id || LOCAL_UID;
@@ -142,12 +145,16 @@ export function EventsProvider({ children }: { children: ReactNode }) {
         return;
       }
       await loadAll();
-      if (channel) return;
-      channel = supabase!
-        .channel("sv-events")
-        .on("postgres_changes", { event: "*", schema: "public", table: "events" }, planeNachladen)
-        .on("postgres_changes", { event: "*", schema: "public", table: "poll_votes" }, planeNachladen)
-        .subscribe();
+      // Siehe topics-store: der Kanal entsteht erst nach einem await.
+      if (!alive || abmelden) return;
+      abmelden = abonniere({
+        name: "sv-events",
+        nachholen: planeNachladen,
+        aufbauen: (kanal) =>
+          kanal
+            .on("postgres_changes", { event: "*", schema: "public", table: "events" }, planeNachladen)
+            .on("postgres_changes", { event: "*", schema: "public", table: "poll_votes" }, planeNachladen),
+      });
     };
     void start();
     const { data: sub } = supabase!.auth.onAuthStateChange((event) => {
@@ -155,10 +162,8 @@ export function EventsProvider({ children }: { children: ReactNode }) {
         setEvents([]);
         setMyVotes({});
         setVoteCounts({});
-        if (channel) {
-          supabase!.removeChannel(channel);
-          channel = null;
-        }
+        abmelden?.();
+        abmelden = null;
         void start();
       }
     });
@@ -166,7 +171,7 @@ export function EventsProvider({ children }: { children: ReactNode }) {
       alive = false;
       sub.subscription.unsubscribe();
       if (nachladeTimer.current) clearTimeout(nachladeTimer.current);
-      if (channel) supabase!.removeChannel(channel);
+      abmelden?.();
     };
   }, [loadAll, planeNachladen]);
 
@@ -215,7 +220,7 @@ export function EventsProvider({ children }: { children: ReactNode }) {
         .select()
         .single();
       if (error || !ev) {
-        alert("Event anlegen fehlgeschlagen: " + (error?.message || ""));
+        meldeFehler("Event anlegen fehlgeschlagen: " + (error?.message || ""));
         return;
       }
       if (e.options.filter(Boolean).length)
@@ -226,12 +231,9 @@ export function EventsProvider({ children }: { children: ReactNode }) {
         await supabase!.from("event_targets").insert(e.target_ids.map((student_id) => ({ event_id: ev.id, student_id })));
       if (e.audience === "komitee" && e.tags.length)
         await supabase!.from("event_committees").insert(e.tags.map((tag) => ({ event_id: ev.id, tag })));
-      // Push-Benachrichtigung auslösen (Function optional – Fehler ignorieren, falls noch nicht deployt)
-      try {
-        await supabase!.functions.invoke("send-push", { body: { event_id: ev.id } });
-      } catch {
-        /* Function evtl. noch nicht deployt */
-      }
+      // Push-Benachrichtigung auslösen. Scheitert sie, bleibt das Event trotzdem
+      // stehen – der Fehler erscheint in der Prüfung im Profil.
+      await sendePush({ event_id: ev.id });
       await loadAll();
     },
     [loadAll, myVotes, reads, saveLocal],
@@ -248,7 +250,7 @@ export function EventsProvider({ children }: { children: ReactNode }) {
         return;
       }
       const { error } = await supabase!.from("events").delete().eq("id", id);
-      if (error) alert("Löschen fehlgeschlagen: " + error.message);
+      if (error) meldeFehler("Löschen fehlgeschlagen: " + error.message);
       await loadAll();
     },
     [loadAll, myVotes, reads, saveLocal],

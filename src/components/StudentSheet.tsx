@@ -6,6 +6,7 @@ import { useRole } from "../auth/RoleProvider";
 import { Sheet } from "./Sheet";
 import { PunkteSheet } from "./PunkteSheet";
 
+import { frage } from "../lib/melder";
 /**
  * Wie ein Halbjahr aussieht, je nach Stand. Die Farben kommen aus der Palette
  * (bezahlt / offen / erlassen), damit ueberall dasselbe Gruen, Braun und Blau
@@ -188,8 +189,8 @@ export function StudentSheet({
             ))}
           </select>
           <button
-            onClick={() => {
-              if (confirm("Diese Person wirklich löschen?")) {
+            onClick={async () => {
+              if (await frage("Diese Person wirklich löschen?", "Löschen", true)) {
                 removeStudent(student.id);
                 onClose();
               }

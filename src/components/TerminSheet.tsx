@@ -12,6 +12,7 @@ import {
 import { committeeLabel } from "../lib/committees";
 import { umfangText } from "../lib/termine";
 
+import { frage } from "../lib/melder";
 const seg = "flex-1 rounded-lg py-2 text-[13px] font-bold transition";
 
 /**
@@ -469,8 +470,8 @@ export function TerminSheet({
         </button>
         {termin && (
           <button
-            onClick={() => {
-              if (confirm(`Den Termin „${termin.titel}" wirklich löschen?`)) {
+            onClick={async () => {
+              if (await frage(`Den Termin „${termin.titel}" wirklich löschen?`, "Löschen", true)) {
                 void loeschen(termin.id);
                 onSchliessen();
               }
@@ -566,8 +567,8 @@ export function TerminAnsehen({
                 <span className="min-w-0 flex-1 truncate font-semibold">{namen.get(sid) || "Unbekannt"}</span>
                 {darf && termin_.aktion_id && (
                   <button
-                    onClick={() => {
-                      if (confirm(`${namen.get(sid) || "Diese Person"} aus der Schicht nehmen? Sie bekommt Bescheid.`))
+                    onClick={async () => {
+                      if (await frage(`${namen.get(sid) || "Diese Person"} aus der Schicht nehmen? Sie bekommt Bescheid.`, "Austragen", true))
                         void zuteilen(termin_.id, sid, false);
                     }}
                     className="shrink-0 rounded-md px-2 py-0.5 text-[12px] font-bold text-red-500"
@@ -585,8 +586,8 @@ export function TerminAnsehen({
       {darf && (
         <div className="mt-4 grid gap-1.5 rounded-xl border border-red-200 p-2.5 dark:border-red-500/30">
           <button
-            onClick={() => {
-              if (confirm(`„${termin_.titel}" am ${tagLang(termin_.datum)} löschen?`)) {
+            onClick={async () => {
+              if (await frage(`„${termin_.titel}" am ${tagLang(termin_.datum)} löschen?`, "Löschen", true)) {
                 void loeschen(termin_.id);
                 onSchliessen();
               }
@@ -597,8 +598,8 @@ export function TerminAnsehen({
           </button>
           {reihe.length > 1 && (
             <button
-              onClick={() => {
-                if (confirm(`Alle ${reihe.length} kommenden Termine „${termin_.titel}" löschen?`)) {
+              onClick={async () => {
+                if (await frage(`Alle ${reihe.length} kommenden Termine „${termin_.titel}" löschen?`, "Alle löschen", true)) {
                   void loeschenViele(reihe.map((x) => x.id));
                   onSchliessen();
                 }

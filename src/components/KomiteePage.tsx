@@ -11,6 +11,7 @@ import { Sheet } from "./Sheet";
 import { useChatEnde } from "../lib/gescrollt";
 import { VorsitzZeile } from "./VorsitzSheet";
 
+import { frage } from "../lib/melder";
 type Neu = "pin" | "umfrage" | "todo" | null;
 
 /**
@@ -101,7 +102,7 @@ export function KomiteePage({ topic, onBack }: { topic: Topic; onBack: () => voi
                   <PersonName userId={p.created_by} name={p.author} role={p.author_role} koms={p.author_koms} className="text-[11px] font-semibold" />
                 </div>
                 {(p.created_by === uid || darfLoeschen) && (
-                  <button onClick={() => confirm("Loslösen?") && updateItem(p.id, { pinned: false })} className="text-tinte-leise">
+                  <button onClick={() => void frage("Nicht mehr anpinnen?", "Loslösen").then((ok) => { if (ok) void updateItem(p.id, { pinned: false }); })} className="text-tinte-leise">
                     ✕
                   </button>
                 )}
@@ -235,7 +236,7 @@ function UmfrageKarte({
           <PersonName userId={item.created_by} name={item.author} role={item.author_role} koms={item.author_koms} className="font-semibold" />
         </span>
         {kannLoeschen && (
-          <button onClick={() => confirm("Abstimmung löschen?") && onDelete()} className="shrink-0 text-tinte-leise">
+          <button onClick={() => void frage("Abstimmung löschen?", "Löschen", true).then((ok) => { if (ok) void onDelete(); })} className="shrink-0 text-tinte-leise">
             🗑
           </button>
         )}
@@ -344,10 +345,20 @@ function ChatBereich({
                   aufFarbig={meins}
                 />
                 <div className="whitespace-pre-wrap break-words text-[15px] leading-snug">{m.body}</div>
+                {m.nicht_gesendet && (
+                  <div
+                    className={`mt-1 rounded-lg px-2 py-1 text-[11px] font-semibold ${
+                      meins ? "bg-white/20 text-white" : "bg-red-50 text-red-600 dark:bg-red-500/15 dark:text-red-400"
+                    }`}
+                    title={m.nicht_gesendet}
+                  >
+                    ⚠ Nicht gesendet – bitte noch einmal schreiben
+                  </div>
+                )}
                 <div className={`mt-1 text-right text-[10px] ${meins ? "text-white/70" : "text-tinte-leise"}`}>
                   {new Date(m.created_at).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })}
                   {(meins || darfLoeschen) && (
-                    <button onClick={() => confirm("Nachricht löschen?") && deleteItem(m.id)} className="ml-2 underline">
+                    <button onClick={() => void frage("Nachricht löschen?", "Löschen", true).then((ok) => { if (ok) void deleteItem(m.id); })} className="ml-2 underline">
                       löschen
                     </button>
                   )}

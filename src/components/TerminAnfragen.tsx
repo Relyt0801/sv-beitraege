@@ -7,6 +7,7 @@ import { Avatar } from "./Avatar";
 import { AnfrageSheet } from "./AnfrageSheet";
 import { tagLang, uhr, type TerminAnfrage } from "../lib/termine";
 
+import { frage, meldeFehler } from "../lib/melder";
 function wann(a: TerminAnfrage): string {
   const zeit = a.von ? `${uhr(a.von)}${a.bis ? ` – ${uhr(a.bis)}` : ""}` : "ganztägig";
   return `${tagLang(a.datum)} · ${zeit}`;
@@ -83,7 +84,7 @@ export function AnfragenFuerTeam({ onUebernehmen }: { onUebernehmen: (a: TerminA
                     setBusy(null);
                     setAblehnen(null);
                     setGrund("");
-                    if (f) alert("Fehler: " + f);
+                    if (f) meldeFehler("Fehler: " + f);
                   }}
                   className="flex-1 rounded-xl border border-red-300 py-2 text-sm font-bold text-red-500 dark:border-red-500/40"
                 >
@@ -175,8 +176,8 @@ export function MeineAnfragen() {
                 </span>
                 {a.status === "offen" && (
                   <button
-                    onClick={() => {
-                      if (confirm(`Die Anfrage „${a.titel}" zurücknehmen?`)) void anfrageLoeschen(a.id);
+                    onClick={async () => {
+                      if (await frage(`Die Anfrage „${a.titel}" zurücknehmen?`, "Zurücknehmen", true)) void anfrageLoeschen(a.id);
                     }}
                     className="shrink-0 text-tinte-leise hover:text-red-500"
                     aria-label="Zurücknehmen"

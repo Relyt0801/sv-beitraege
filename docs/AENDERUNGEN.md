@@ -11,6 +11,59 @@ ausführlich (auf Deutsch); hier steht der Überblick dazu.
 
 ---
 
+## Nachtrag 3 (24.09.2026): Übernommen aus dem alten Entwurf PR #1
+
+PR #1 (18.09.) lag noch auf einem viel älteren Stand und ließ sich nicht mehr
+mergen. Was davon noch fehlte, steht jetzt angepasst im aktuellen Code:
+
+**Live-Verbindung wird überwacht und neu aufgebaut** (`src/lib/realtime.ts`, alle `*-store.tsx`,
+`RoleProvider.tsx`, `lib/kosten.ts`, `lib/finanzen.ts`, `UnbanRequests.tsx`, `KomiteeRequests.tsx`)
+- Überall stand `.subscribe()` ohne Rückmeldung. Brach die Verbindung ab (Handy
+  gesperrt, WLAN gewechselt, Server voll), zeigte die App still den alten Stand –
+  „bei anderen aktualisiert es sich nicht“. Jetzt: Zustand je Kanal, neu verbinden
+  mit wachsendem Abstand (1 s … 30 s), danach still nachladen; sofort prüfen beim
+  Zurückkehren aus dem Hintergrund und bei „wieder online“.
+- Jeder Versuch bekommt einen eigenen Kanalnamen (sonst gibt `supabase.channel()`
+  den alten, noch schließenden Kanal zurück), und das CLOSED eines abgebauten
+  Kanals löst keinen weiteren Neustart aus.
+- Kanäle werden nicht mehr nach einem `await` angelegt, wenn die Ansicht schon
+  weg ist (lief unter StrictMode doppelt).
+- `Verbindungshinweis.tsx`: Kapsel „Keine Live-Verbindung · Neu verbinden“ oben,
+  erst nach 6 s ohne Verbindung, nie vor dem Login.
+
+**Fremde Änderungen werden nicht mehr verschluckt** (`src/lib/echo.ts`, `store.tsx`)
+- Das Echo der eigenen Änderung wurde 5 s lang pro Zeile weggeworfen – auch
+  fremde Änderungen an derselben Person. Bei den Einstellungen galt ein fester
+  Schlüssel: jede Umstellung machte 5 s lang ALLE Einstellungsänderungen aller
+  unsichtbar. Jetzt wird zusammengeführt: Serverstand gilt, nur die eigenen
+  frisch geschriebenen Felder behalten kurz Vorrang. Beim Abmelden wird geleert.
+- Die vier Startabfragen laufen parallel; Nachladen nach einer Unterbrechung
+  ersetzt die Liste nicht durch den Ladekreis. Profilfarben: nur die geänderte
+  Zeile statt aller Profile neu laden.
+
+**Benachrichtigungen: Fehler sind sichtbar** (`src/lib/push.ts`, `ProfilSheet.tsx`)
+- `functions.invoke()` wirft nicht, sondern liefert `{ error }` – das wurde nie
+  gelesen. Alle Aufrufe laufen jetzt über `sendePush()`, der Fehler landet in
+  „Kommt nichts an? Hier prüfen“ im Profil (Schlüssel, Erlaubnis, Abo, letzter
+  Serverfehler).
+
+**Eigene Meldungen und Rückfragen statt Browser-Fenster** (`src/lib/melder.ts`, `components/Melder.tsx`)
+- alert()/confirm() an über 60 Stellen ersetzt. Browser bieten nach ein paar
+  Fenstern „weitere Dialoge verhindern“ an – danach liefert confirm() stumm
+  „nein“ und Löschen tut nichts. Löschen-Rückfragen haben einen roten Knopf.
+- Eine Chatnachricht, die nicht gespeichert werden konnte, bleibt stehen und ist
+  als „Nicht gesendet“ markiert, statt kommentarlos zu verschwinden.
+
+**Sonstiges**
+- Build-Stempel unten im Profil („Stand … · Version abc1234“), damit man sieht,
+  was live ist (`vite.config.ts`).
+- `schema.sql`, `termine.sql`, `aktionen.sql`: Realtime-Zeilen mehrfach ausführbar.
+- Entfernt: `MyCommittee.tsx`, `SettingsSheet.tsx`, `TopicsTab.tsx` (nirgends eingebunden).
+- Nicht übernommen, weil schon erledigt oder überholt: `nachtrag.sql`/`pruefen.sql`
+  (Spalten der Elterngespräche und die entschärfte Zustimmungsprüfung sind in der
+  Datenbank schon da), die Chat-Scroll-Korrektur (kam mit Nachtrag 2), Push-Abo
+  der Elternansicht (war schon drin).
+
 ## Nachtrag 2 (24.09.2026): Tab-Leiste in der Home-Bildschirm-App, Komitee-Leiste, Rollen-Hinweis
 
 **Tab-Leiste stand bei kurzen Seiten zu hoch** (`src/index.css`)

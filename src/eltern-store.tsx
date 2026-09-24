@@ -1,10 +1,12 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { hasSupabase, supabase } from "./lib/supabase";
+import { abonniere } from "./lib/realtime";
 import type { BankKonto } from "./lib/types";
 import { pushToUsers } from "./lib/push";
 import { DEMO_KONTO, demoRolle, demoUid, demoZuordnung } from "./lib/demo";
 import { useStore } from "./store";
 
+import { meldeFehler } from "./lib/melder";
 export interface ElternInfo {
   id: string;
   titel: string;
@@ -217,27 +219,27 @@ export function ElternProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!hasSupabase) return;
     void laden();
-    let kanal: ReturnType<NonNullable<typeof supabase>["channel"]> | null = supabase!
-      .channel("sv-eltern")
-      .on("postgres_changes", { event: "*", schema: "public", table: "eltern_infos" }, () => void laden())
-      .on("postgres_changes", { event: "*", schema: "public", table: "eltern_tickets" }, () => void laden())
-      // Kind zugeordnet oder weggenommen: Eltern sehen es sofort, ohne Neuladen.
-      .on("postgres_changes", { event: "*", schema: "public", table: "parent_children" }, () => void laden())
-      .on("postgres_changes", { event: "*", schema: "public", table: "eltern_ticket_nachrichten" }, (p) => {
-        const row = p.new as TicketNachricht;
-        if (!row?.id) return;
-        setNachrichten((prev) => (prev.some((x) => x.id === row.id) ? prev : [...prev, row]));
-      })
-      .subscribe();
+    const abmelden = abonniere({
+      name: "sv-eltern",
+      nachholen: () => void laden(),
+      aufbauen: (kanal) =>
+        kanal
+          .on("postgres_changes", { event: "*", schema: "public", table: "eltern_infos" }, () => void laden())
+          .on("postgres_changes", { event: "*", schema: "public", table: "eltern_tickets" }, () => void laden())
+          // Kind zugeordnet oder weggenommen: Eltern sehen es sofort, ohne Neuladen.
+          .on("postgres_changes", { event: "*", schema: "public", table: "parent_children" }, () => void laden())
+          .on("postgres_changes", { event: "*", schema: "public", table: "eltern_ticket_nachrichten" }, (p) => {
+            const row = p.new as TicketNachricht;
+            if (!row?.id) return;
+            setNachrichten((prev) => (prev.some((x) => x.id === row.id) ? prev : [...prev, row]));
+          }),
+    });
     const { data: sub } = supabase!.auth.onAuthStateChange((e) => {
       if (e === "SIGNED_IN" || e === "SIGNED_OUT") void laden();
     });
     return () => {
       sub.subscription.unsubscribe();
-      if (kanal) {
-        supabase!.removeChannel(kanal);
-        kanal = null;
-      }
+      abmelden();
     };
   }, [laden]);
 
@@ -278,7 +280,7 @@ export function ElternProvider({ children }: { children: ReactNode }) {
       .insert({ id: neueId, ticket_id: ticketId, user_id: uid.current, text: text.trim() });
     if (error) {
       setNachrichten((prev) => prev.filter((x) => x.id !== neueId));
-      alert("Die Nachricht ging nicht raus: " + error.message);
+      meldeFehler("Die Nachricht ging nicht raus: " + error.message);
       return;
     }
     supabase!.from("eltern_tickets").update({ updated_at: new Date().toISOString() }).eq("id", ticketId).then(({ error }) => { if (error) console.warn("[speichern]", error.message); }); // then() nötig, sonst wird nie gesendet
@@ -348,7 +350,7 @@ export function ElternProvider({ children }: { children: ReactNode }) {
     if (error) {
       setTickets(vorher);
       void laden();
-      alert("Das Gespräch konnte nicht gelöscht werden: " + error.message);
+      meldeFehler("Das Gespräch konnte nicht gelöscht werden: " + error.message);
     }
   }, [tickets, laden]);
 
@@ -357,7 +359,7 @@ export function ElternProvider({ children }: { children: ReactNode }) {
     const { error } = await supabase!
       .from("eltern_infos")
       .insert({ titel: titel.trim(), text: text.trim(), angeheftet, autor: uid.current });
-    if (error) alert("Die Info konnte nicht gespeichert werden: " + error.message);
+    if (error) meldeFehler("Die Info konnte nicht gespeichert werden: " + error.message);
     else void laden();
   }, [laden]);
 

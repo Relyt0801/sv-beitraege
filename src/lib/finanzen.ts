@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { hasSupabase, supabase } from "./supabase";
+import { abonniere } from "./realtime";
 import { demoBuchungen } from "./demo";
 import { useStore } from "../store";
 
@@ -149,14 +150,17 @@ export function useFinanzen(aktiv: boolean): FinanzenValue {
       if (timer.current) clearTimeout(timer.current);
       timer.current = setTimeout(() => void laden(), 250);
     };
-    const kanal = supabase!
-      .channel("sv-finanzen")
-      .on("postgres_changes", { event: "*", schema: "public", table: "kasse_buchungen" }, nach)
-      .on("postgres_changes", { event: "*", schema: "public", table: "kasse_einstellungen" }, nach)
-      .subscribe();
+    const abmelden = abonniere({
+      name: "sv-finanzen",
+      nachholen: nach,
+      aufbauen: (kanal) =>
+        kanal
+          .on("postgres_changes", { event: "*", schema: "public", table: "kasse_buchungen" }, nach)
+          .on("postgres_changes", { event: "*", schema: "public", table: "kasse_einstellungen" }, nach),
+    });
     return () => {
       if (timer.current) clearTimeout(timer.current);
-      void supabase!.removeChannel(kanal);
+      abmelden();
     };
   }, [aktiv, laden]);
 

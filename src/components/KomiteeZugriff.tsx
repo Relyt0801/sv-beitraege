@@ -4,6 +4,7 @@ import { COMMITTEES, committeeIcon, committeeLabel } from "../lib/committees";
 import { useRole } from "../auth/RoleProvider";
 import { useStore } from "../store";
 
+import { frage, meldeFehler } from "../lib/melder";
 interface Zugriff {
   id: string;
   tag: string;
@@ -52,7 +53,7 @@ export function KomiteeZugriff() {
     const { error } = await supabase!.from("committee_access").insert(eintrag);
     setBusy(false);
     if (error) {
-      alert("Nicht möglich: " + error.message);
+      meldeFehler("Nicht möglich: " + error.message);
       return;
     }
     setWer("");
@@ -133,7 +134,7 @@ export function KomiteeZugriff() {
               </span>
               <button
                 onClick={async () => {
-                  if (!confirm("Zugriff entziehen?")) return;
+                  if (!(await frage("Zugriff entziehen?", "Entziehen", true))) return;
                   await supabase!.from("committee_access").delete().eq("id", z.id);
                   void laden();
                 }}

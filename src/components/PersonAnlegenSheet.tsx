@@ -3,6 +3,7 @@ import { hasSupabase, supabase } from "../lib/supabase";
 import { HY } from "../lib/types";
 import { Sheet } from "./Sheet";
 
+import { hinweis } from "../lib/melder";
 /**
  * Nur für den Admin: eine neue Person anlegen – Eintrag in der Liste und Login
  * in einem Schritt. Das Konto entsteht auf dem Server (Edge Function
@@ -187,7 +188,8 @@ export function PersonAnlegenSheet({ open, onClose, onFertig }: { open: boolean;
                   await navigator.clipboard.writeText(zugang);
                   setKopiert(true);
                 } catch {
-                  alert(zugang);
+                  // Kopieren geht nicht (manche Browser): zum Abschreiben zeigen
+                  void hinweis(zugang);
                 }
               }}
               className="rounded-xl border border-papier-linie py-3 text-[14px] font-bold dark:border-slate-700"
