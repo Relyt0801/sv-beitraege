@@ -2,8 +2,55 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Farben als Variablen (R G B), je einmal fuer hell und dunkel.
+ * Angelehnt an die Systemfarben von iOS; wo das Original zu wenig Kontrast
+ * hat (z. B. #007AFF auf Weiss), steht die barrierearme Variante.
+ */
 :root {
   color-scheme: light dark;
+  --brand: 0 113 227;          /* #0071E3 */
+  --brand-soft: 64 156 255;
+  --brand-dark: 0 102 204;     /* #0066CC – Text auf getoentem Grund */
+  --papier: 242 242 247;       /* systemGroupedBackground */
+  --karte: 255 255 255;
+  --linie: 229 229 234;        /* Trennlinie */
+  --matt: 238 238 240;         /* Fuellung fuer Felder und Chips */
+  --tinte: 28 28 30;
+  --tinte-matt: 84 84 88;      /* #545458 */
+  --tinte-leise: 108 108 112;  /* #6C6C70 – 4,7:1 auch auf #F2F2F7 */
+  --bezahlt: 30 123 52;        /* #1E7B34 */
+  --bezahlt-grund: 232 246 236;
+  --bezahlt-rand: 197 232 207;
+  --offen: 201 52 0;           /* #C93400 */
+  --offen-grund: 255 241 230;
+  --offen-rand: 255 217 191;
+  --erlassen: 88 86 214;       /* systemIndigo */
+  --erlassen-grund: 238 238 252;
+  --erlassen-rand: 214 213 247;
+  --glas: 255 255 255;
+}
+.dark {
+  --brand: 10 132 255;         /* #0A84FF */
+  --brand-soft: 64 156 255;
+  --brand-dark: 100 170 255;
+  --papier: 0 0 0;
+  --karte: 28 28 30;
+  --linie: 56 56 58;
+  --matt: 44 44 46;
+  --tinte: 242 242 247;
+  --tinte-matt: 174 174 178;
+  --tinte-leise: 142 142 147;
+  --bezahlt: 48 209 88;
+  --bezahlt-grund: 20 48 28;
+  --bezahlt-rand: 32 80 44;
+  --offen: 255 159 10;
+  --offen-grund: 56 36 8;
+  --offen-rand: 90 58 12;
+  --erlassen: 125 122 255;
+  --erlassen-grund: 34 33 70;
+  --erlassen-rand: 58 56 110;
+  --glas: 30 30 32;
 }
 
 html, body, #root {
@@ -13,8 +60,12 @@ html, body, #root {
 body {
   @apply bg-papier text-tinte antialiased;
   margin: 0;
+  font-size: 16px;
+  letter-spacing: -0.01em;
   -webkit-tap-highlight-color: transparent;
+  -webkit-font-smoothing: antialiased;
   overscroll-behavior-y: none;
+  font-feature-settings: "kern";
 }
 .dark body {
   @apply bg-slate-950 text-slate-100;
@@ -31,40 +82,101 @@ body {
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
+/* Knoepfe geben beim Druecken leicht nach – wie auf dem iPhone. */
+button:not(:disabled) {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
 @layer components {
+  /* Eine Zelle/Karte: weiss auf grauem Grund, ohne harten Rand. */
   .card {
-    @apply rounded-2xl border border-papier-linie bg-white shadow-card transition
-           dark:border-slate-800 dark:bg-slate-900 dark:shadow-cardDark;
+    @apply rounded-[1.25rem] border border-black/[0.04] bg-white shadow-card transition
+           dark:border-white/[0.06] dark:bg-slate-900 dark:shadow-cardDark;
   }
-  /* Die eine Zahl, auf die es ankommt: dunkles Feld, alles andere tritt zurueck. */
+  /* Die eine Zahl, auf die es ankommt. */
   .leitkarte {
-    @apply rounded-2xl bg-tinte p-5 text-white dark:bg-slate-900 dark:ring-1 dark:ring-slate-800;
+    @apply rounded-[1.25rem] bg-gradient-to-br from-[#1c1c1e] to-[#3a3a3c] p-5 text-white
+           shadow-[0_10px_30px_-12px_rgba(0,0,0,.45)]
+           dark:from-slate-900 dark:to-slate-800 dark:ring-1 dark:ring-white/[0.06];
   }
   .leitwert {
-    @apply zahl text-[2.75rem] font-extrabold leading-none;
+    @apply zahl text-[2.75rem] font-bold leading-none tracking-[-0.03em];
   }
-  /* Beschriftung ueber einer Kennzahl */
+  /* Beschriftung ueber einer Kennzahl / Abschnittskopf wie in iOS-Listen */
   .kennlabel {
-    @apply text-[11px] font-semibold uppercase tracking-[0.06em] text-tinte-matt;
+    @apply text-[12px] font-semibold uppercase tracking-[0.04em] text-tinte-leise;
+  }
+  .abschnitt {
+    @apply mb-1.5 px-4 text-[13px] font-semibold uppercase tracking-[0.02em] text-tinte-leise;
   }
   .pill {
-    @apply inline-flex items-center rounded-full px-2.5 py-1 text-xs font-bold;
+    @apply inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold;
   }
+  /* Runder Glasknopf wie in der Navigationsleiste von iOS 26 */
   .iconbtn {
-    @apply flex h-10 w-10 min-w-10 items-center justify-center rounded-xl border border-papier-linie
-           bg-white text-tinte-matt shadow-card transition active:scale-95
-           dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:shadow-cardDark;
+    @apply flex h-10 w-10 min-w-10 items-center justify-center rounded-full border border-black/[0.06]
+           bg-white/80 text-[17px] text-tinte shadow-card backdrop-blur-xl transition duration-200 ease-ios
+           active:scale-90 dark:border-white/10 dark:bg-slate-800/80 dark:text-slate-100 dark:shadow-none;
   }
   .iconbtn-active {
-    @apply border-brand bg-brand text-white dark:border-brand;
+    @apply border-brand bg-brand text-white dark:border-brand dark:bg-brand;
   }
+  /* Eingabefeld: graue Fuellung statt Rahmen */
   .field {
-    @apply w-full rounded-xl border border-papier-linie bg-papier px-4 py-3 text-base outline-none
-           transition focus:border-brand focus:ring-2 focus:ring-brand/20
-           dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100;
+    @apply w-full rounded-xl border border-transparent bg-[rgb(118_118_128/0.12)] px-4 py-3 text-base
+           outline-none transition placeholder:text-tinte-leise
+           focus:border-brand/40 focus:bg-white focus:ring-4 focus:ring-brand/15
+           dark:bg-[rgb(118_118_128/0.24)] dark:text-slate-100 dark:focus:bg-slate-800;
   }
+  /* Hauptknopf: Kapsel in Systemblau */
   .btn-primary {
-    @apply w-full rounded-xl bg-brand py-3.5 text-center text-base font-semibold text-white
-           transition active:scale-[.98] hover:bg-brand-dark;
+    @apply flex min-h-[3.125rem] w-full items-center justify-center rounded-full bg-brand px-5 text-center
+           text-[17px] font-semibold text-white transition duration-200 ease-ios
+           hover:bg-brand-dark active:scale-[.97] disabled:opacity-40;
+  }
+  .btn-grau {
+    @apply flex min-h-[3.125rem] w-full items-center justify-center rounded-full bg-[rgb(118_118_128/0.12)]
+           px-5 text-[17px] font-semibold text-brand-dark transition duration-200 ease-ios
+           active:scale-[.97] disabled:opacity-40 dark:bg-[rgb(118_118_128/0.24)] dark:text-brand;
+  }
+  /* Segmentierte Auswahl (Alle / Rein / Raus …) */
+  .seg {
+    @apply flex rounded-[0.6rem] bg-[rgb(118_118_128/0.12)] p-[2px] dark:bg-[rgb(118_118_128/0.24)];
+  }
+  .seg-item {
+    @apply min-w-0 flex-1 rounded-[0.5rem] px-3 py-1.5 text-center text-[13px] font-semibold text-tinte
+           transition duration-200 ease-ios dark:text-slate-100;
+  }
+  .seg-aktiv {
+    @apply bg-white shadow-[0_3px_8px_rgba(0,0,0,.12),0_3px_1px_rgba(0,0,0,.04)] dark:bg-slate-600;
+  }
+  /* Gruppierte Liste mit eingerueckten Trennlinien (Einstellungen-Stil) */
+  .liste {
+    @apply overflow-hidden rounded-[1.25rem] bg-white dark:bg-slate-900;
+  }
+  .liste > * + * {
+    @apply relative;
+  }
+  .liste > * + *::before {
+    content: "";
+    @apply pointer-events-none absolute left-4 right-0 top-0 h-px scale-y-50 bg-black/15 dark:bg-white/15;
+  }
+  .zeile {
+    @apply flex min-h-[2.75rem] items-center gap-3 px-4 py-2.5 text-[16px];
+  }
+  /* Glas-Material fuer Kopf- und Tab-Leiste */
+  .glas {
+    @apply bg-[rgb(var(--glas)/0.72)] backdrop-blur-2xl backdrop-saturate-[1.8];
+  }
+}
+
+/* Wer Bewegung abgeschaltet hat, bekommt keine. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+    scroll-behavior: auto !important;
   }
 }

@@ -95,7 +95,7 @@ export function StudentSheet({
         </button>
       </div>
       <div className="mt-2 text-[11px] text-tinte-leise">
-        1. Abiballticket {ticket} € · wird getrennt bezahlt
+        1. Abiball-Ticket {ticket} € · wird getrennt bezahlt
       </div>
 
       {/* ------------------------------------------------- Zahlungen */}

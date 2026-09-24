@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { hasSupabase, supabase } from "./supabase";
+import { demoBuchungen } from "./demo";
+import { useStore } from "../store";
 
 /**
  * Das Kassenbuch der Stufe.
@@ -73,7 +75,13 @@ export function centAus(text: string): number | null {
   const t = text.trim().replace(/\s/g, "").replace(/€/g, "");
   if (!t) return null;
   // Deutsch: Punkt = Tausender, Komma = Dezimal. "1.234,56" und "1234.56" gehen beide.
-  const norm = t.includes(",") ? t.replace(/\./g, "").replace(",", ".") : t;
+  // "1.500" oder "12.000" (Punkt vor genau drei Ziffern) ist ein Tausenderpunkt –
+  // sonst wuerden daraus 1,50 € bzw. 12,00 €.
+  const norm = t.includes(",")
+    ? t.replace(/\./g, "").replace(",", ".")
+    : /^-?\d{1,3}(\.\d{3})+$/.test(t)
+      ? t.replace(/\./g, "")
+      : t;
   const n = Number(norm);
   if (!Number.isFinite(n)) return null;
   return Math.round(n * 100);
@@ -104,11 +112,21 @@ export interface FinanzenValue {
  * ohne Neuladen.
  */
 export function useFinanzen(aktiv: boolean): FinanzenValue {
+  const { students } = useStore();
   const [buchungen, setBuchungen] = useState<Buchung[]>([]);
   const [ziel, setZiel] = useState<KassenZiel>({ ziel_cent: 0, ziel_titel: "Abiball" });
   const [bereit, setBereit] = useState(!hasSupabase);
   const [fehler, setFehler] = useState("");
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Ohne Datenbank (Demo): ein paar erfundene Buchungen zum Ausprobieren.
+  const demo = useRef(false);
+  useEffect(() => {
+    if (hasSupabase || demo.current || !students.length) return;
+    demo.current = true;
+    setBuchungen(demoBuchungen(students));
+    setZiel({ ziel_cent: 800000, ziel_titel: "Abiball" });
+  }, [students]);
 
   const laden = useCallback(async () => {
     if (!hasSupabase) return;
@@ -144,7 +162,25 @@ export function useFinanzen(aktiv: boolean): FinanzenValue {
 
   const buchen = useCallback<FinanzenValue["buchen"]>(
     async (b) => {
-      if (!hasSupabase) return "Ohne Datenbank geht das nicht.";
+      if (!hasSupabase) {
+        const neu: Buchung = {
+          id: crypto.randomUUID(),
+          datum: b.datum,
+          cent: b.cent,
+          quelle: b.quelle,
+          titel: b.titel.trim(),
+          aktion_id: b.aktion_id ?? null,
+          komitee: b.komitee ?? null,
+          student_id: null,
+          halbjahr: null,
+          anfrage_id: null,
+          automatisch: false,
+          created_by: "local-user",
+          created_at: new Date().toISOString(),
+        };
+        setBuchungen((prev) => [neu, ...prev].sort((x, y) => (x.datum < y.datum ? 1 : -1)));
+        return null;
+      }
       const { data: s } = await supabase!.auth.getSession();
       const { error } = await supabase!.from("kasse_buchungen").insert({
         datum: b.datum,
@@ -164,8 +200,8 @@ export function useFinanzen(aktiv: boolean): FinanzenValue {
 
   const loeschen = useCallback<FinanzenValue["loeschen"]>(
     async (id) => {
-      if (!hasSupabase) return null;
       setBuchungen((prev) => prev.filter((x) => x.id !== id));
+      if (!hasSupabase) return null;
       const { error } = await supabase!.from("kasse_buchungen").delete().eq("id", id);
       if (error) {
         void laden();
@@ -178,8 +214,8 @@ export function useFinanzen(aktiv: boolean): FinanzenValue {
 
   const zielSetzen = useCallback<FinanzenValue["zielSetzen"]>(
     async (z) => {
-      if (!hasSupabase) return null;
       setZiel(z);
+      if (!hasSupabase) return null;
       const { error } = await supabase!.from("kasse_einstellungen").update(z).eq("id", 1);
       return error ? error.message : null;
     },

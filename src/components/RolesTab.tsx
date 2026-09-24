@@ -10,6 +10,9 @@ import { COMMITTEES } from "../lib/committees";
 import { rolleName } from "../lib/permissions";
 import { KontoZeile, Suchfeld } from "./KontoZeile";
 import { PersonAnlegenSheet } from "./PersonAnlegenSheet";
+import { KinderSheet } from "./KinderSheet";
+import { Icon } from "./Icon";
+import { Schalter } from "./Schalter";
 // Sperrdauern und die Ist-gesperrt-Frage stehen beim Chat-Knopf – eine Quelle fuer beide.
 import { DAUERN, isBanned } from "./MuteKnopf";
 
@@ -18,8 +21,8 @@ const ROLLEN_AUSWAHL: Role[] = ["schueler", "sprecher", "stv_sprecher", "stufent
 
 /**
  * Elternzugaenge stehen normalerweise nicht in der Rollenliste – sie gehoeren
- * nicht zur Stufe. Ueber die Checkbox ueber der Liste lassen sie sich
- * dazuholen, zum Nachsehen, wer einen Zugang hat und zu wem er gehoert.
+ * nicht zur Stufe. Ueber den Schalter ueber der Liste lassen sie sich
+ * dazuholen – zum Nachsehen und um ihnen ihre Kinder zuzuordnen.
  */
 const VERSTECKT: Role[] = ["eltern"];
 
@@ -46,6 +49,10 @@ export function RolesTab() {
   const [q, setQ] = useState("");
   const [openKom, setOpenKom] = useState<string | null>(null);
   const [openBan, setOpenBan] = useState<string | null>(null);
+  // Elternzugang, dessen Kinder gerade bearbeitet werden
+  const [kinderFuer, setKinderFuer] = useState<Profile | null>(null);
+  // Kinder ordnet nur zu, wer auch Elternzugaenge vergeben darf: der Admin.
+  const darfKinder = isAdmin || isOp;
 
   // Nachschlagen statt durchsuchen. Vorher lief fuer jedes der 300 Konten ein
   // students.find() ueber alle 300 Personen – 90.000 Vergleiche je Zeichnung.
@@ -63,7 +70,7 @@ export function RolesTab() {
   const kinderVon = (p: Profile) =>
     (zuordnung[p.user_id] ?? []).flatMap((id) => {
       const k = nachId.get(id);
-      return k ? [`${k.nachname}, ${k.vorname}`] : [];
+      return k ? [k] : [];
     });
 
   const elternAnzahl = useMemo(() => profiles.filter((p) => p.role === "eltern").length, [profiles]);
@@ -75,10 +82,13 @@ export function RolesTab() {
       .map((p) => {
         const s = p.student_id ? nachId.get(p.student_id) ?? null : null;
         const name = s ? `${s.nachname}, ${s.vorname}` : null;
-        const kinder = p.role === "eltern" ? kinderVon(p) : [];
+        // Anzeige "Lena Bauer", sortiert wird nach "Bauer, Lena"
+        const kinder = p.role === "eltern" ? kinderVon(p).map((k) => `${k.vorname} ${k.nachname}`) : [];
+        const erstesKind = p.role === "eltern" ? kinderVon(p)[0] : undefined;
         // Elternkonten laufen unter dem Namen ihres Kindes mit, sonst stuenden
         // sie nach Vornamen sortiert irgendwo zwischen der Stufe.
-        return { p, name, kinder, sortier: name ?? kinder[0] ?? p.username ?? "" };
+        const sortier = name ?? (erstesKind ? `${erstesKind.nachname}, ${erstesKind.vorname}` : p.username ?? "");
+        return { p, name, kinder, sortier };
       })
       .filter(({ p, name, kinder }) =>
         !norm || normalize(`${p.username} ${name ?? ""} ${kinder.join(" ")}`).includes(norm))
@@ -94,22 +104,22 @@ export function RolesTab() {
       {(isAdmin || isOp) && (
         <button
           onClick={() => setAnlegen(true)}
-          className="mb-3 flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-brand/50 py-3 text-[14px] font-bold text-brand"
+          className="btn-grau mb-3 gap-2 !text-[15px]"
         >
-          + Person hinzufügen
+          <Icon name="plus" size={18} strich={2.4} />
+          Person hinzufügen
         </button>
       )}
       <PersonAnlegenSheet open={anlegen} onClose={() => setAnlegen(false)} onFertig={refreshProfiles} />
       <Suchfeld wert={q} onChange={setQ} />
 
-      <label className="mb-3 flex cursor-pointer select-none items-center gap-2.5 px-1 text-[13px] font-semibold text-tinte-matt dark:text-slate-300">
-        <input
-          type="checkbox"
-          className="h-5 w-5 accent-brand"
-          checked={zeigeEltern}
-          onChange={(e) => setZeigeEltern(e.target.checked)}
-        />
-        Elternzugänge anzeigen ({elternAnzahl})
+      {/* Umschalter wie in den iOS-Einstellungen */}
+      <label className="card mb-3 flex min-h-[2.75rem] cursor-pointer select-none items-center gap-3 px-4 py-2 text-[15px]">
+        <span className="min-w-0 flex-1">
+          Elternzugänge anzeigen
+          <span className="ml-1.5 text-tinte-leise">{elternAnzahl}</span>
+        </span>
+        <Schalter an={zeigeEltern} onChange={setZeigeEltern} />
       </label>
 
       <div className="grid gap-2.5 [&>*]:min-w-0">
@@ -120,6 +130,9 @@ export function RolesTab() {
           // Ohne Admin-Rolle auch nicht weg von einer Admin-Rolle – genau so
           // haelt es der Trigger in der Datenbank.
           const rolleGesperrt = geschuetzt || (!isAdmin && NUR_ADMIN.includes(p.role));
+          const istEltern = p.role === "eltern";
+          const feld =
+            "h-11 rounded-xl border border-transparent bg-[rgb(118_118_128/0.12)] font-semibold transition dark:bg-[rgb(118_118_128/0.24)]";
           return (
             <div key={p.user_id} className="card min-w-0 p-4">
               {/* Zeile 1: Person */}
@@ -127,13 +140,21 @@ export function RolesTab() {
                 profil={p}
                 student={p.student_id ? nachId.get(p.student_id) ?? null : null}
                 punkt={p.must_change_password === false}
-                hinweis={kinder.length ? `Eltern von ${kinder.join(" und ")}` : undefined}
+                hinweis={
+                  istEltern
+                    ? kinder.length
+                      ? kinder.join(" und ")
+                      : "kein Kind zugeordnet – sieht nichts"
+                    : undefined
+                }
+                hinweisWarnt={istEltern && kinder.length === 0}
               />
 
-              {/* Zeile 2: Rolle + Komitees + Chat-Sperre nebeneinander */}
-              <div className="mt-2.5 flex min-w-0 flex-wrap items-stretch gap-2">
+              {/* Zeile 2: Rolle + Komitees (bei Eltern: Kinder) + Chat-Sperre */}
+              <div className="mt-3 flex min-w-0 flex-wrap items-stretch gap-2">
                 <select
                   disabled={rolleGesperrt}
+                  aria-label="Rolle"
                   title={
                     geschuetzt
                       ? "Diese Rolle kann nicht geändert werden"
@@ -141,9 +162,15 @@ export function RolesTab() {
                         ? "Diese Rolle darf nur der Admin ändern"
                         : undefined
                   }
-                  className="h-[42px] w-0 min-w-[8.5rem] flex-1 rounded-xl border border-papier-linie bg-papier-matt px-2.5 font-semibold disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800"
+                  className={`${feld} w-0 min-w-[8.5rem] flex-1 px-3 disabled:opacity-50`}
                   value={p.role}
-                  onChange={(e) => setRole(p.user_id, e.target.value as Role)}
+                  onChange={(e) => {
+                    const neu = e.target.value as Role;
+                    // Eltern zu Stufenteam oder umgekehrt ist fast immer ein Versehen
+                    const heikel = p.role === "eltern" || neu === "eltern" || neu === "admin";
+                    if (heikel && !confirm(`${p.username ?? "Dieses Konto"} wirklich zu „${rolleName(neu)}“ machen?`)) return;
+                    void setRole(p.user_id, neu);
+                  }}
                 >
                   {ROLLEN_AUSWAHL
                     .filter((r) => isAdmin || !NUR_ADMIN.includes(r) || p.role === r)
@@ -158,50 +185,72 @@ export function RolesTab() {
                     })}
                 </select>
 
-                {canAssignKom && (
-                  <div className="relative w-0 min-w-[7rem] flex-1">
-                    <button
-                      onClick={() => setOpenKom(openKom === p.user_id ? null : p.user_id)}
-                      className="flex h-[42px] w-full items-center gap-1.5 rounded-xl border border-papier-linie bg-papier-matt px-3 font-semibold dark:border-slate-700 dark:bg-slate-800"
-                    >
-                      <span className="truncate text-tinte-matt dark:text-slate-300">Komitees</span>
-                      {koms.length > 0 && (
-                        <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-brand px-1 text-xs font-bold text-white">{koms.length}</span>
+                {/* Eltern haben keine Komitees – dort waehlt man stattdessen die Kinder. */}
+                {istEltern ? (
+                  <button
+                    onClick={() => setKinderFuer(p)}
+                    className={`${feld} flex w-0 min-w-[7rem] flex-1 items-center gap-2 px-3 text-left active:scale-[.98] ${
+                      kinder.length === 0 ? "!border-offen/40 !bg-offen-grund text-offen" : ""
+                    }`}
+                  >
+                    <Icon name="kind" size={17} />
+                    <span className="min-w-0 flex-1 truncate">
+                      {kinder.length === 0 ? (darfKinder ? "Kind wählen" : "Kein Kind") : kinder.length === 1 ? "1 Kind" : `${kinder.length} Kinder`}
+                    </span>
+                    <span className="hidden text-tinte-leise min-[400px]:inline">
+                      <Icon name="chevron" size={15} />
+                    </span>
+                  </button>
+                ) : (
+                  canAssignKom && (
+                    <div className="relative w-0 min-w-[7rem] flex-1">
+                      <button
+                        onClick={() => setOpenKom(openKom === p.user_id ? null : p.user_id)}
+                        className={`${feld} flex w-full items-center gap-1.5 px-3`}
+                      >
+                        <span className="truncate text-tinte-matt dark:text-slate-300">Komitees</span>
+                        {koms.length > 0 && (
+                          <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-brand px-1.5 text-xs font-semibold text-white">{koms.length}</span>
+                        )}
+                        <span className="ml-auto text-tinte-leise">▾</span>
+                      </button>
+                      {openKom === p.user_id && (
+                        <>
+                          <button className="fixed inset-0 z-20 cursor-default" onClick={() => setOpenKom(null)} aria-label="Schließen" />
+                          <div className="absolute left-0 right-0 z-30 mt-1.5 max-h-72 animate-popIn overflow-y-auto rounded-2xl border border-black/[0.06] bg-white/95 p-1.5 shadow-glas backdrop-blur-xl dark:border-white/10 dark:bg-slate-800/95">
+                            {COMMITTEES.map((c) => {
+                              const on = koms.includes(c.slug);
+                              return (
+                                <button
+                                  key={c.slug}
+                                  onClick={() => setUserCommittee(p.user_id, c.slug, !on)}
+                                  className="flex w-full items-center gap-2 rounded-xl px-2.5 py-2 text-left text-[15px] hover:bg-black/[0.04] dark:hover:bg-white/[0.06]"
+                                >
+                                  <span className="min-w-0 flex-1 truncate">{c.label}</span>
+                                  <span className={`text-brand transition ${on ? "opacity-100" : "opacity-0"}`}>
+                                    <Icon name="haken" size={18} strich={2.5} />
+                                  </span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </>
                       )}
-                      <span className="ml-auto text-tinte-leise">▾</span>
-                    </button>
-                    {openKom === p.user_id && (
-                      <>
-                        <button className="fixed inset-0 z-20 cursor-default" onClick={() => setOpenKom(null)} aria-label="Schließen" />
-                        <div className="absolute left-0 right-0 z-30 mt-1 max-h-64 overflow-y-auto rounded-xl border border-papier-linie bg-white p-1.5 shadow-lg dark:border-slate-700 dark:bg-slate-900">
-                          {COMMITTEES.map((c) => {
-                            const on = koms.includes(c.slug);
-                            return (
-                              <button
-                                key={c.slug}
-                                onClick={() => setUserCommittee(p.user_id, c.slug, !on)}
-                                className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm hover:bg-papier-matt dark:hover:bg-slate-800"
-                              >
-                                <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border text-xs text-white ${on ? "border-brand bg-brand" : "border-papier-linie dark:border-slate-600"}`}>{on ? "✓" : ""}</span>
-                                {c.label}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </>
-                    )}
-                  </div>
+                    </div>
+                  )
                 )}
 
-                {canTimeout && !geschuetzt && (
+                {/* Eltern schreiben in keinem Chat – da gibt es nichts zu sperren. */}
+                {canTimeout && !geschuetzt && !istEltern && (
                   <div className={`relative shrink-0 ${canAssignKom ? "" : "ml-auto"}`}>
                     <button
                       onClick={() => (banned ? setBan(p.user_id, null, false) : setOpenBan(openBan === p.user_id ? null : p.user_id))}
                       title={banned ? "Sperre aufheben" : "Vom Chat sperren"}
-                      className={`flex h-[42px] w-[42px] items-center justify-center rounded-xl border text-lg transition ${
+                      aria-label={banned ? "Sperre aufheben" : "Vom Chat sperren"}
+                      className={`flex h-11 w-11 items-center justify-center rounded-xl border text-lg transition active:scale-95 ${
                         banned
                           ? "border-red-300 bg-red-500/10 text-red-500"
-                          : "border-papier-linie text-tinte-leise hover:text-tinte-matt dark:border-slate-700 dark:hover:text-slate-200"
+                          : "border-transparent bg-[rgb(118_118_128/0.12)] text-tinte-leise dark:bg-[rgb(118_118_128/0.24)]"
                       }`}
                     >
                       {banned ? "🚫" : "💬"}
@@ -209,8 +258,8 @@ export function RolesTab() {
                     {openBan === p.user_id && !banned && (
                       <>
                         <button className="fixed inset-0 z-20 cursor-default" onClick={() => setOpenBan(null)} aria-label="Schließen" />
-                        <div className="absolute right-0 z-30 mt-1 w-40 rounded-xl border border-papier-linie bg-white p-1.5 shadow-lg dark:border-slate-700 dark:bg-slate-900">
-                          <div className="px-2 py-1 text-[11px] font-bold uppercase tracking-wide text-tinte-leise">Sperren für</div>
+                        <div className="absolute right-0 z-30 mt-1.5 w-44 animate-popIn rounded-2xl border border-black/[0.06] bg-white/95 p-1.5 shadow-glas backdrop-blur-xl dark:border-white/10 dark:bg-slate-800/95">
+                          <div className="px-2.5 py-1 text-[12px] font-semibold text-tinte-leise">Sperren für</div>
                           {DAUERN.map((d) => (
                             <button
                               key={d.label}
@@ -222,7 +271,7 @@ export function RolesTab() {
                                   d.ms === null,
                                 );
                               }}
-                              className="w-full rounded-lg px-2 py-2 text-left text-sm font-semibold hover:bg-papier-matt dark:hover:bg-slate-800"
+                              className="w-full rounded-xl px-2.5 py-2 text-left text-[15px] hover:bg-black/[0.04] dark:hover:bg-white/[0.06]"
                             >
                               {d.label}
                             </button>
@@ -232,10 +281,10 @@ export function RolesTab() {
                     )}
                   </div>
                 )}
-                {canTimeout && geschuetzt && (
+                {canTimeout && geschuetzt && !istEltern && (
                   <span
                     title="Dieses Konto kann nicht gesperrt werden"
-                    className={`flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-xl border border-papier-linie text-lg text-tinte-leise opacity-40 dark:border-slate-700 ${
+                    className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[rgb(118_118_128/0.12)] text-lg opacity-40 ${
                       canAssignKom ? "" : "ml-auto"
                     }`}
                   >
@@ -257,6 +306,10 @@ export function RolesTab() {
           </div>
         )}
       </div>
+
+      {kinderFuer && (
+        <KinderSheet profil={kinderFuer} darf={darfKinder} onClose={() => setKinderFuer(null)} />
+      )}
     </div>
   );
 }

@@ -66,14 +66,14 @@ export function Wochenstreifen({
         </h2>
         <button
           onClick={() => woche(-1)}
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-tinte-leise transition hover:bg-papier-matt active:scale-90 dark:hover:bg-slate-800"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-tinte-leise transition hover:bg-black/[0.04] active:scale-90 dark:hover:bg-white/[0.06]"
           aria-label="Woche zurück"
         >
           ‹
         </button>
         <button
           onClick={() => woche(1)}
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-tinte-leise transition hover:bg-papier-matt active:scale-90 dark:hover:bg-slate-800"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-tinte-leise transition hover:bg-black/[0.04] active:scale-90 dark:hover:bg-white/[0.06]"
           aria-label="Woche vor"
         >
           ›

@@ -67,30 +67,30 @@ function KassenKopfRoh({
   });
 
   return (
-    <div className="mx-auto mt-2.5 max-w-5xl space-y-2.5">
+    <div className="mx-auto mt-3 max-w-5xl space-y-2.5">
       {/* --------------------------------------------- drei Kennzahlen */}
-      <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2 lg:grid-cols-4" data-tour="kassenkopf">
         <div className="card p-3.5 sm:p-4">
           <div className="kennlabel">Eingegangen</div>
           <div className="zahl mt-1.5 text-[1.75rem] font-extrabold leading-none sm:text-[2rem]">{ein} €</div>
           <div className="mt-1.5 text-[12px] text-tinte-matt">
             von <span className="zahl font-semibold">{soll} €</span> bis {settings.aktuelles_halbjahr}
           </div>
-          <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-papier-matt dark:bg-slate-800">
-            <div className="h-full rounded-full bg-bezahlt" style={{ width: `${quote}%` }} />
+          <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-[rgb(118_118_128/0.14)]">
+            <div className="h-full rounded-full transition-[width] duration-700 ease-ios bg-bezahlt" style={{ width: `${quote}%` }} />
           </div>
         </div>
 
         <div className="card p-3.5 sm:p-4">
           <div className="kennlabel">Noch offen</div>
-          <div className="zahl mt-1.5 text-[1.75rem] font-extrabold leading-none text-offen dark:text-amber-300 sm:text-[2rem]">
+          <div className="zahl mt-1.5 text-[1.75rem] font-extrabold leading-none text-offen sm:text-[2rem]">
             {offen} €
           </div>
           <div className="mt-1.5 text-[12px] text-tinte-matt">
             bei <span className="font-semibold">{students.length - fertig} Personen</span>
           </div>
-          <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-papier-matt dark:bg-slate-800">
-            <div className="h-full rounded-full bg-amber-400" style={{ width: `${100 - quote}%` }} />
+          <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-[rgb(118_118_128/0.14)]">
+            <div className="h-full rounded-full transition-[width] duration-700 ease-ios bg-offen" style={{ width: `${100 - quote}%` }} />
           </div>
         </div>
 
@@ -101,8 +101,8 @@ function KassenKopfRoh({
             <span className="text-[15px] font-semibold text-tinte-matt">von {students.length}</span>
           </div>
           <div className="mt-1.5 text-[12px] text-tinte-matt">{anteilFertig} % der Stufe</div>
-          <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-papier-matt dark:bg-slate-800">
-            <div className="h-full rounded-full bg-brand" style={{ width: `${anteilFertig}%` }} />
+          <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-[rgb(118_118_128/0.14)]">
+            <div className="h-full rounded-full transition-[width] duration-700 ease-ios bg-brand" style={{ width: `${anteilFertig}%` }} />
           </div>
         </div>
 
@@ -123,8 +123,8 @@ function KassenKopfRoh({
               </>
             )}
           </div>
-          <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-papier-matt dark:bg-slate-800">
-            <div className="h-full rounded-full bg-brand" style={{ width: `${Math.min(100, schnitt)}%` }} />
+          <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-[rgb(118_118_128/0.14)]">
+            <div className="h-full rounded-full transition-[width] duration-700 ease-ios bg-brand" style={{ width: `${Math.min(100, schnitt)}%` }} />
           </div>
         </div>
       </div>
@@ -135,14 +135,14 @@ function KassenKopfRoh({
           <h2 className="text-[13px] font-semibold text-tinte-matt">Die sechs Halbjahre</h2>
           <span className="text-[11px] text-tinte-leise">Anteil bezahlt</span>
         </div>
-        <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-6">
+        <div className="no-scrollbar -mx-3 flex gap-1.5 overflow-x-auto px-3 sm:mx-0 sm:grid sm:grid-cols-6 sm:overflow-visible sm:px-0">
           {halbjahre.map((h) => (
             <div
               key={h.name}
-              className={`rounded-xl border p-2 ${
+              className={`min-w-[5.6rem] shrink-0 rounded-xl border p-2 sm:min-w-0 ${
                 h.laeuft
-                  ? "border-brand bg-brand/5"
-                  : "border-papier-linie dark:border-slate-700"
+                  ? "border-brand/40 bg-brand/[0.06]"
+                  : "border-transparent bg-papier dark:bg-slate-800/60"
               }`}
             >
               <div className="flex items-baseline justify-between gap-1">

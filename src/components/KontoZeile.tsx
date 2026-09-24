@@ -1,4 +1,5 @@
 import { Avatar } from "./Avatar";
+import { Icon } from "./Icon";
 import { rolleName } from "../lib/permissions";
 import type { Profile } from "../auth/RoleProvider";
 import type { Student } from "../lib/types";
@@ -17,6 +18,7 @@ export function KontoZeile({
   punkt,
   rechts,
   hinweis,
+  hinweisWarnt,
 }: {
   profil: Profile;
   /** Die zugeordnete Person, falls es eine gibt. */
@@ -31,6 +33,8 @@ export function KontoZeile({
    * nicht ueber student_id.
    */
   hinweis?: string;
+  /** Hinweis in Orange – etwa bei einem Elternzugang ohne Kind. */
+  hinweisWarnt?: boolean;
 }) {
   const name = student ? `${student.nachname}, ${student.vorname}` : null;
 
@@ -46,13 +50,18 @@ export function KontoZeile({
       )}
       <Avatar userId={profil.user_id} name={name ?? profil.username ?? ""} size={38} />
       <div className="min-w-0 flex-1">
-        <div className="truncate text-[15px] font-semibold leading-tight">
+        <div className="truncate text-[16px] font-semibold leading-tight tracking-[-0.01em]">
           {name ?? profil.username ?? "Unbekannt"}
         </div>
-        <div className="truncate text-[12px] leading-tight text-tinte-leise">
-          {name
-            ? `${profil.username} · ${rolleName(profil.role)}`
-            : `${rolleName(profil.role)} · ${hinweis ?? "keiner Person zugeordnet"}`}
+        <div className="mt-0.5 truncate text-[13px] leading-tight text-tinte-leise">
+          {name ? (
+            `${profil.username} · ${rolleName(profil.role)}`
+          ) : (
+            <>
+              {rolleName(profil.role)} ·{" "}
+              <span className={hinweisWarnt ? "font-medium text-offen" : ""}>{hinweis ?? "keiner Person zugeordnet"}</span>
+            </>
+          )}
         </div>
       </div>
       {rechts}
@@ -71,14 +80,21 @@ export function Suchfeld({
   platzhalter?: string;
 }) {
   return (
-    <div className="mb-3 flex items-center gap-2 rounded-xl border border-papier-linie bg-white px-3.5 py-2.5 shadow-card dark:border-slate-800 dark:bg-slate-900 dark:shadow-cardDark">
-      <span className="text-tinte-leise">🔍</span>
+    <div className="mb-3 flex h-11 items-center gap-2 rounded-xl bg-[rgb(118_118_128/0.12)] px-3 dark:bg-[rgb(118_118_128/0.24)]">
+      <span className="text-tinte-leise">
+        <Icon name="lupe" size={17} />
+      </span>
       <input
-        className="w-full bg-transparent text-base outline-none placeholder:text-tinte-leise"
+        className="w-full min-w-0 bg-transparent text-base outline-none placeholder:text-tinte-leise"
         placeholder={platzhalter}
         value={wert}
         onChange={(e) => onChange(e.target.value)}
       />
+      {wert && (
+        <button onClick={() => onChange("")} aria-label="Suche leeren" className="px-1 text-tinte-leise">
+          ✕
+        </button>
+      )}
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTermine } from "../termine-store";
 import { useRole } from "../auth/RoleProvider";
 import { committeeIcon, committeeLabel } from "../lib/committees";
@@ -62,6 +62,13 @@ export function Kalender({
       setAnker(plusTage(anker, richtung));
     }
   }
+
+  // Escape schliesst den Kalender – wie jedes andere Fenster
+  useEffect(() => {
+    const taste = (e: KeyboardEvent) => e.key === "Escape" && onSchliessen();
+    window.addEventListener("keydown", taste);
+    return () => window.removeEventListener("keydown", taste);
+  }, [onSchliessen]);
 
   const titel =
     ansicht === "monat"

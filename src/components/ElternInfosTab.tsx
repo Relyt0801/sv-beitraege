@@ -64,7 +64,7 @@ export function ElternInfosTab() {
                 <div className="flex items-baseline gap-2">
                   {i.angeheftet && <span className="text-[12px]">📌</span>}
                   <h3 className="min-w-0 flex-1 text-[15px] font-bold">{i.titel}</h3>
-                  <span className="shrink-0 text-[11px] text-tinte-leise">{datumLang(i.created_at.slice(0, 10))}</span>
+                  <span className="shrink-0 text-[11px] text-tinte-leise">{new Date(i.created_at).toLocaleDateString("de-DE", { day: "numeric", month: "short" })}</span>
                 </div>
                 <p className="mt-1 whitespace-pre-wrap text-[13px] leading-relaxed text-tinte-matt dark:text-slate-300">
                   {i.text}

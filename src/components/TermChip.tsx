@@ -1,10 +1,11 @@
 import { type Halbjahr, type Student } from "../lib/types";
-import { isDead, isPreJoin } from "../lib/logic";
+import { idx, isDead, isPreJoin } from "../lib/logic";
 
+// Die Farben passen sich selbst an hell/dunkel an (Variablen in index.css).
 const STATUS_CLASS: Record<string, string> = {
-  offen: "bg-offen-grund text-offen border-offen-rand dark:bg-amber-500/15 dark:text-amber-300 dark:border-amber-500/25",
-  bezahlt: "bg-bezahlt-grund text-bezahlt border-bezahlt-rand dark:bg-emerald-500/15 dark:text-emerald-300 dark:border-emerald-500/25",
-  erlassen: "bg-erlassen-grund text-erlassen border-erlassen-rand dark:bg-blue-500/15 dark:text-blue-300 dark:border-blue-500/25",
+  offen: "bg-offen-grund text-offen border-offen-rand",
+  bezahlt: "bg-bezahlt-grund text-bezahlt border-bezahlt-rand",
+  erlassen: "bg-erlassen-grund text-erlassen border-erlassen-rand",
 };
 // erlassen = Schrägstrich: "zählt nicht", klar unterscheidbar von € und ✓
 const GLYPH: Record<string, string> = { offen: "€", bezahlt: "✓", erlassen: "/" };
@@ -40,12 +41,16 @@ export function TermChip({
   } else if (dead) {
     cls = "bg-red-100 text-red-500 border-red-200 opacity-70 dark:bg-red-500/15 dark:text-red-300 dark:border-red-500/25";
     glyph = "×";
+  } else if (t.status === "offen" && i > idx(current)) {
+    // Kommt erst noch: nicht wie eine Schuld aussehen lassen
+    cls = "bg-[rgb(118_118_128/0.1)] text-tinte-leise border-transparent";
+    glyph = GLYPH.offen;
   } else {
     cls = STATUS_CLASS[t.status];
     glyph = GLYPH[t.status];
   }
 
-  const size = big ? "h-14 text-sm" : kompakt ? "h-8 text-[11px]" : "h-12 text-[13px] sm:h-[52px]";
+  const size = big ? "h-14 text-sm" : kompakt ? "h-8 text-[11px]" : "h-12 text-[13px] sm:h-[52px] lg:h-16 lg:text-[15px]";
   const ring = isCur
     ? kompakt
       ? "ring-2 ring-brand"
@@ -65,7 +70,7 @@ export function TermChip({
         clickable ? "cursor-pointer active:scale-95" : "cursor-default"
       }`}
     >
-      <span className={`font-semibold opacity-70 ${kompakt ? "text-[8px] leading-none" : "text-[10px]"}`}>{h}</span>
+      <span className={`font-semibold opacity-70 ${kompakt ? "text-[8px] leading-none" : "text-[10px] lg:text-[12px]"}`}>{h}</span>
       <span
         className={`${kompakt ? "text-[12px]" : "text-base"} ${
           t.status === "erlassen" && !inactive ? (kompakt ? "font-black" : "text-lg font-black") : ""

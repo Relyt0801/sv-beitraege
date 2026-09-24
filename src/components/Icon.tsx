@@ -16,7 +16,22 @@ export type IconName =
   | "pin"
   | "bank"
   | "kalender"
-  | "finanzen";
+  | "finanzen"
+  | "sonne"
+  | "mond"
+  | "regler"
+  | "auswahl"
+  | "lupe"
+  | "plus"
+  | "chevron"
+  | "haken"
+  | "kind"
+  | "pfeil-rein"
+  | "pfeil-raus"
+  | "muell"
+  | "info"
+  | "herz"
+  | "pfeile";
 
 const PFADE: Record<IconName, JSX.Element> = {
   kasse: (
@@ -68,6 +83,62 @@ const PFADE: Record<IconName, JSX.Element> = {
       <path d="M15 3.5A9 9 0 0 1 20.5 9H15z" />
     </>
   ),
+  sonne: (
+    <>
+      <circle cx="12" cy="12" r="4" />
+      <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
+    </>
+  ),
+  mond: <path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" />,
+  regler: (
+    <>
+      <path d="M4 7h10M18 7h2M4 17h4M12 17h8" />
+      <circle cx="16" cy="7" r="2" />
+      <circle cx="10" cy="17" r="2" />
+    </>
+  ),
+  auswahl: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="m8.5 12 2.5 2.5 4.5-5" />
+    </>
+  ),
+  lupe: (
+    <>
+      <circle cx="11" cy="11" r="6.5" />
+      <path d="m20 20-4.2-4.2" />
+    </>
+  ),
+  plus: <path d="M12 5v14M5 12h14" />,
+  chevron: <path d="m9 6 6 6-6 6" />,
+  haken: <path d="m5 12.5 4.5 4.5L19 7.5" />,
+  kind: (
+    <>
+      <circle cx="12" cy="7" r="3.5" />
+      <path d="M5.5 21a6.5 6.5 0 0 1 13 0" />
+    </>
+  ),
+  "pfeil-rein": <path d="M12 5v14M6 13l6 6 6-6" />,
+  "pfeil-raus": <path d="M12 19V5M6 11l6-6 6 6" />,
+  muell: (
+    <>
+      <path d="M4 7h16M10 11v6M14 11v6" />
+      <path d="M6 7l1 13h10l1-13M9 7V4h6v3" />
+    </>
+  ),
+  herz: <path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z" />,
+  pfeile: (
+    <>
+      <path d="M7 4v16M3 8l4-4 4 4" />
+      <path d="M17 20V4M13 16l4 4 4-4" />
+    </>
+  ),
+  info: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 11v5M12 8h.01" />
+    </>
+  ),
   bank: (
     <>
       <path d="M3 10h18" />
@@ -78,7 +149,7 @@ const PFADE: Record<IconName, JSX.Element> = {
   ),
 };
 
-export function Icon({ name, size = 20 }: { name: IconName; size?: number }) {
+export function Icon({ name, size = 20, strich = 2 }: { name: IconName; size?: number; strich?: number }) {
   return (
     <svg
       width={size}
@@ -86,7 +157,7 @@ export function Icon({ name, size = 20 }: { name: IconName; size?: number }) {
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
-      strokeWidth={2}
+      strokeWidth={strich}
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden="true"

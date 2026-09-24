@@ -26,6 +26,13 @@ npm run dev
 Ohne Supabase-Konfiguration läuft die App im **lokalen Modus** (nur dieses Gerät, kein Login) –
 gut zum Ausprobieren.
 
+**Demo-Modus** – jede Rolle gefahrlos durchklicken, auch wenn eine `.env` mit echten Daten da ist:
+```bash
+npm run demo
+```
+Dann z. B. `http://localhost:5173/?rolle=eltern` öffnen. Rollen: `schueler`, `stufenteam`,
+`kassenwart`, `admin`, `eltern`, `eltern-leer` (Elternzugang ohne Kind). Alles sind erfundene Daten.
+
 ## Supabase einrichten (für Sync + Login)
 1. Auf https://supabase.com ein kostenloses Projekt anlegen – **Region: Europe (Frankfurt)**.
 2. **SQL Editor** → Inhalt von [`supabase/schema.sql`](supabase/schema.sql) einfügen → **Run**.

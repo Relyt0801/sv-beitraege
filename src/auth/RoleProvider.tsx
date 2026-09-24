@@ -1,6 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { hasSupabase, supabase } from "../lib/supabase";
 import { ALL_PERMS, ROLE_DEFAULTS, rechteRolle, type PermKey } from "../lib/permissions";
+import { demoProfile, demoRolle, demoRolleAlsRolle, demoUid } from "../lib/demo";
+import { useStore } from "../store";
 
 export type Role = "schueler" | "stufenteam" | "kassenwart" | "admin" | "sprecher" | "stv_sprecher" | "eltern";
 
@@ -63,8 +65,11 @@ export const useRole = () => {
 const STAFF: Role[] = ["stufenteam", "kassenwart", "admin", "sprecher", "stv_sprecher"];
 
 export function RoleProvider({ children }: { children: ReactNode }) {
-  // Lokaler Modus (ohne Supabase): voller Zugriff zum Entwickeln/Testen.
-  const [role, setRoleState] = useState<Role>(hasSupabase ? "schueler" : "admin");
+  // Lokaler Modus (ohne Supabase): voller Zugriff zum Entwickeln/Testen –
+  // oder die Rolle aus ?rolle=… (Demo-Modus, siehe src/lib/demo.ts).
+  const [demo] = useState(() => demoRolle());
+  const { students } = useStore();
+  const [role, setRoleState] = useState<Role>(hasSupabase ? "schueler" : demoRolleAlsRolle(demo) ?? "admin");
   const [ready, setReady] = useState(!hasSupabase);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [bannedUntil, setBannedUntil] = useState<string | null>(null);
@@ -105,6 +110,19 @@ export function RoleProvider({ children }: { children: ReactNode }) {
     for (const p of ALL_PERMS) if (over[p] ?? base[p] ?? false) set.add(p);
     setPerms(set);
   }, []);
+
+  // Ohne Datenbank: Rechte aus den Standardwerten der Rolle, erfundene Konten
+  // fuer den Rollen-Reiter und – als Schueler – die erste Person als eigene.
+  useEffect(() => {
+    if (hasSupabase) return;
+    setPerms(new Set(role === "admin" ? ALL_PERMS : ROLE_DEFAULTS[role] || []));
+  }, [role]);
+  useEffect(() => {
+    if (hasSupabase || !students.length) return;
+    setUid(demoUid(demo));
+    setProfiles((vorher) => (vorher.length ? vorher : demoProfile(students)));
+    if (demo && !STAFF.includes(role) && role !== "eltern") setStudentId(students[0].id);
+  }, [students, demo, role]);
 
   useEffect(() => {
     if (!hasSupabase) return;
@@ -200,7 +218,10 @@ export function RoleProvider({ children }: { children: ReactNode }) {
 
   const setRole = useCallback(
     async (userId: string, r: Role) => {
-      if (!hasSupabase) return;
+      if (!hasSupabase) {
+        setProfiles((prev) => prev.map((p) => (p.user_id === userId ? { ...p, role: r } : p)));
+        return;
+      }
       const { error } = await supabase!.from("profiles").update({ role: r }).eq("user_id", userId);
       if (error) {
         const doppelt = /duplicate key|profiles_sprecher_eindeutig|unique/i.test(error.message);
@@ -217,8 +238,11 @@ export function RoleProvider({ children }: { children: ReactNode }) {
   );
 
   const setBan = useCallback(async (userId: string, until: string | null, permanent = false) => {
-    if (!hasSupabase) return;
     const patch = { chat_banned_until: permanent ? null : until, chat_ban_permanent: permanent };
+    if (!hasSupabase) {
+      setProfiles((prev) => prev.map((p) => (p.user_id === userId ? { ...p, ...patch } : p)));
+      return;
+    }
     const { error } = await supabase!.from("profiles").update(patch).eq("user_id", userId);
     if (error) {
       alert("Sperre setzen fehlgeschlagen: " + error.message);

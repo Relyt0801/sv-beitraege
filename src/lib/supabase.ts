@@ -20,7 +20,15 @@ const clean = (v?: string): string | undefined => {
 const url = clean(import.meta.env.VITE_SUPABASE_URL);
 const key = clean(import.meta.env.VITE_SUPABASE_ANON_KEY);
 
-export const hasSupabase = Boolean(url && key);
+/**
+ * `npm run demo` startet die App ohne Datenbank, auch wenn eine .env mit den
+ * echten Zugangsdaten daliegt. So laesst sich jede Rolle gefahrlos
+ * durchklicken (siehe src/lib/demo.ts). Im fertigen Build ist MODE immer
+ * "production" – dort greift das nie.
+ */
+const demoBuild = import.meta.env.MODE === "demo";
+
+export const hasSupabase = !demoBuild && Boolean(url && key);
 /**
  * @deprecated Der Zugangscode war fuer die Selbstregistrierung gedacht. Die
  * gibt es nicht mehr: der Code stand im ausgelieferten JavaScript und war

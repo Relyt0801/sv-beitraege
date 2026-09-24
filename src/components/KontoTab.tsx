@@ -25,10 +25,15 @@ export function jahrgangKurz(halbjahr: string): string {
  * Lesen darf sie jedes angemeldete Konto, ändern nur Admin und Kassenwart.
  */
 export function KontoTab() {
-  const { konto, kontoSpeichern } = useEltern();
+  const { konto, kontoSpeichern, kinder: meineKinder } = useEltern();
   const { role } = useRole();
-  // Eltern sehen hier nur die eigenen Kinder – dafür sorgt die Datenbank.
-  const { students: kinder, settings } = useStore();
+  // Eltern sehen hier nur die eigenen Kinder – dafür sorgt die Datenbank,
+  // und zur Sicherheit filtert die App noch einmal nach der Zuordnung.
+  const { students, settings } = useStore();
+  // Gleiche Reihenfolge wie in der Übersicht: nach Vorname
+  const kinder = (role === "eltern" ? students.filter((s) => meineKinder.includes(s.id)) : students)
+    .slice()
+    .sort((a, b) => a.vorname.localeCompare(b.vorname, "de"));
   const [kopiert, setKopiert] = useState<string | null>(null);
   const darfAendern = role === "admin" || role === "kassenwart";
 
@@ -59,13 +64,13 @@ export function KontoTab() {
   return (
     <div className="grid gap-3">
       <section className="card p-5">
-        <h2 className="text-lg font-bold">So überweisen Sie</h2>
+        <h2 className="text-[1.25rem] font-bold tracking-[-0.01em]">So überweisen Sie</h2>
         <p className="mt-0.5 text-[13px] leading-relaxed text-tinte-matt dark:text-slate-400">
           Bitte immer den Verwendungszweck angeben – sonst können wir das Geld nicht zuordnen. Bei
           mehreren Kindern bitte für jedes Kind einzeln überweisen.
         </p>
 
-        <dl className="mt-4 grid gap-2">
+        <dl className="mt-4 grid gap-2" data-tour="konto-daten">
           <Zeile label="Empfänger" wert={konto.inhaber} onKopieren={() => kopieren(konto.inhaber, "inhaber")} kopiert={kopiert === "inhaber"} />
           <Zeile
             label="IBAN"
@@ -88,7 +93,7 @@ export function KontoTab() {
             return (
               <li key={id}>
                 <Zeile
-                  label={kinder.length > 1 && k ? `Für ${k.vorname}` : "Verwendungszweck"}
+                  label={kinder.length > 1 && k ? `Verwendungszweck für ${k.vorname}` : "Verwendungszweck"}
                   gross
                   wert={zweck}
                   onKopieren={() => kopieren(zweck, id)}
@@ -100,7 +105,7 @@ export function KontoTab() {
         </ul>
 
         {konto.hinweis && (
-          <p className="mt-3 rounded-xl bg-amber-50 p-3 text-[12px] leading-relaxed text-amber-900 dark:bg-amber-500/10 dark:text-amber-200">
+          <p className="mt-3 rounded-2xl bg-[rgb(118_118_128/0.1)] p-3.5 text-[13px] leading-relaxed text-tinte-matt dark:text-slate-300">
             {konto.hinweis}
           </p>
         )}
@@ -130,8 +135,8 @@ function Zeile({
   const knopf = onKopieren && (
     <button
       onClick={onKopieren}
-      className={`shrink-0 rounded-lg px-3 py-2 text-[12px] font-bold transition active:scale-95 ${
-        kopiert ? "bg-emerald-500 text-white" : "bg-white text-brand shadow-sm dark:bg-slate-900 dark:text-brand-soft"
+      className={`shrink-0 rounded-full px-3.5 py-2 text-[13px] font-semibold transition duration-200 active:scale-95 ${
+        kopiert ? "bg-bezahlt text-white" : "bg-white text-brand-dark shadow-[0_1px_3px_rgba(0,0,0,.08)] dark:bg-slate-700 dark:text-brand"
       }`}
     >
       {kopiert ? "✓ kopiert" : "kopieren"}

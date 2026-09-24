@@ -2,6 +2,8 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState, ty
 import { hasSupabase, supabase } from "./lib/supabase";
 import type { BankKonto } from "./lib/types";
 import { pushToUsers } from "./lib/push";
+import { DEMO_KONTO, demoRolle, demoUid, demoZuordnung } from "./lib/demo";
+import { useStore } from "./store";
 
 export interface ElternInfo {
   id: string;
@@ -61,6 +63,12 @@ interface ElternCtx {
    * sind. Eltern sehen hier nur sich selbst.
    */
   zuordnung: Record<string, string[]>;
+  /**
+   * Die Zuordnung liess sich nicht laden (Netz weg o. Ä.). Dann nicht
+   * faelschlich "kein Kind" zeigen, sondern auf das zurueckfallen, was die
+   * Datenbank ohnehin nur an Personen herausgibt.
+   */
+  zuordnungFehlt: boolean;
   neuesTicket: (betreff: string, text: string) => Promise<string | null>;
   /** Das Stufenteam schreibt ein bestimmtes Elternhaus an. */
   anEltern: (userId: string, betreff: string, text: string) => Promise<string | null>;
@@ -72,6 +80,12 @@ interface ElternCtx {
   infoAnlegen: (titel: string, text: string, angeheftet: boolean) => Promise<void>;
   infoLoeschen: (id: string) => Promise<void>;
   kontoSpeichern: (patch: Partial<BankKonto>) => Promise<string | null>;
+  /**
+   * Einem Elternzugang ein Kind zuordnen (an=true) oder wegnehmen. Die
+   * Datenbank laesst das nur mit dem Recht "Daten bearbeiten" zu – im
+   * Rollen-Reiter bietet die App es nur dem Admin an.
+   */
+  kindZuordnen: (userId: string, studentId: string, an: boolean) => Promise<string | null>;
 }
 
 const Ctx = createContext<ElternCtx | null>(null);
@@ -92,7 +106,9 @@ const LEER: BankKonto = { inhaber: "", iban: "", bic: "", bank: "", hinweis: "" 
  * Admin und Kassenwart.
  */
 export function ElternProvider({ children }: { children: ReactNode }) {
-  const [bereit, setBereit] = useState(!hasSupabase);
+  const { students } = useStore();
+  // Ohne Datenbank wird "bereit" erst gesetzt, wenn die Demo-Zuordnung steht.
+  const [bereit, setBereit] = useState(false);
   const [konto, setKonto] = useState<BankKonto | null>(null);
   const [infos, setInfos] = useState<ElternInfo[]>([]);
   const [tickets, setTickets] = useState<ElternTicket[]>([]);
@@ -100,10 +116,35 @@ export function ElternProvider({ children }: { children: ReactNode }) {
   const [kinder, setKinder] = useState<string[]>([]);
   const [zuordnung, setZuordnung] = useState<Record<string, string[]>>({});
   const [konten, setKonten] = useState<Elternkonto[]>([]);
+  const [zuordnungFehlt, setZuordnungFehlt] = useState(false);
   const istTeam = useRef(false);
   /** Kennungen des Stufenteams – damit Antworten der Eltern dort ankommen. */
   const teamIds = useRef<string[]>([]);
   const uid = useRef<string | null>(null);
+
+  // Ohne Datenbank (Demo): erfundene Zuordnung, Kontodaten und eine Info.
+  const demoGeladen = useRef(false);
+  useEffect(() => {
+    if (hasSupabase || demoGeladen.current || !students.length) return;
+    demoGeladen.current = true;
+    const karte = demoZuordnung(students);
+    uid.current = demoUid(demoRolle()) ?? "local-user";
+    setZuordnung(karte);
+    setKinder(karte[uid.current] || []);
+    setKonto(DEMO_KONTO);
+    setInfos([
+      {
+        id: "demo-info",
+        titel: "Kuchenverkauf am Freitag",
+        text: "Wir freuen uns über jede Kuchenspende – bitte bis 7:45 Uhr im Foyer abgeben.",
+        angeheftet: true,
+        autor: null,
+        created_at: new Date().toISOString(),
+      },
+    ]);
+    istTeam.current = uid.current === "local-user";
+    setBereit(true);
+  }, [students]);
 
   const laden = useCallback(async () => {
     if (!hasSupabase) return;
@@ -126,6 +167,8 @@ export function ElternProvider({ children }: { children: ReactNode }) {
     setNachrichten((n.data as TicketNachricht[]) || []);
     // Die Datenbank liefert nur, was man sehen darf: Eltern ihre eigene Zeile,
     // das Stufenteam alle.
+    setZuordnungFehlt(Boolean(kd.error));
+    if (kd.error) console.warn("[eltern] Zuordnung nicht geladen:", kd.error.message);
     const paare = (kd.data as { user_id: string; student_id: string }[]) || [];
     const karte: Record<string, string[]> = {};
     for (const r of paare) (karte[r.user_id] ||= []).push(r.student_id);
@@ -178,6 +221,8 @@ export function ElternProvider({ children }: { children: ReactNode }) {
       .channel("sv-eltern")
       .on("postgres_changes", { event: "*", schema: "public", table: "eltern_infos" }, () => void laden())
       .on("postgres_changes", { event: "*", schema: "public", table: "eltern_tickets" }, () => void laden())
+      // Kind zugeordnet oder weggenommen: Eltern sehen es sofort, ohne Neuladen.
+      .on("postgres_changes", { event: "*", schema: "public", table: "parent_children" }, () => void laden())
       .on("postgres_changes", { event: "*", schema: "public", table: "eltern_ticket_nachrichten" }, (p) => {
         const row = p.new as TicketNachricht;
         if (!row?.id) return;
@@ -197,19 +242,19 @@ export function ElternProvider({ children }: { children: ReactNode }) {
   }, [laden]);
 
   const neuesTicket = useCallback<ElternCtx["neuesTicket"]>(async (betreff, text) => {
-    if (!hasSupabase || !uid.current) return "Du bist nicht angemeldet.";
+    if (!hasSupabase || !uid.current) return "Nicht angemeldet – bitte einmal ab- und wieder anmelden.";
     const { data, error } = await supabase!
       .from("eltern_tickets")
       .insert({ user_id: uid.current, betreff: betreff.trim() })
       .select()
       .single();
-    if (error || !data) return error?.message || "Die Anfrage konnte nicht angelegt werden.";
+    if (error || !data) return "Die Anfrage konnte nicht gesendet werden. Bitte später noch einmal versuchen.";
     const ticket = data as ElternTicket;
     setTickets((prev) => [ticket, ...prev]);
     const { error: e2 } = await supabase!
       .from("eltern_ticket_nachrichten")
       .insert({ ticket_id: ticket.id, user_id: uid.current, text: text.trim() });
-    if (e2) return e2.message;
+    if (e2) return "Die Nachricht konnte nicht gespeichert werden. Bitte später noch einmal versuchen.";
     void laden();
     return null;
   }, [laden]);
@@ -322,6 +367,36 @@ export function ElternProvider({ children }: { children: ReactNode }) {
     await supabase!.from("eltern_infos").delete().eq("id", id);
   }, []);
 
+  const kindZuordnen = useCallback<ElternCtx["kindZuordnen"]>(async (userId, studentId, an) => {
+    // Sofort anzeigen, bei einem Fehler zuruecknehmen.
+    const setzen = (dazu: boolean) => {
+      setZuordnung((prev) => {
+        const alt = prev[userId] || [];
+        const neu = dazu ? (alt.includes(studentId) ? alt : [...alt, studentId]) : alt.filter((x) => x !== studentId);
+        return { ...prev, [userId]: neu };
+      });
+      setKonten((prev) =>
+        prev.map((k) =>
+          k.user_id !== userId
+            ? k
+            : { ...k, kinder: dazu ? [...new Set([...k.kinder, studentId])] : k.kinder.filter((x) => x !== studentId) },
+        ),
+      );
+      if (userId === uid.current)
+        setKinder((prev) => (dazu ? [...new Set([...prev, studentId])] : prev.filter((x) => x !== studentId)));
+    };
+    setzen(an);
+    if (!hasSupabase) return null;
+    const { error } = an
+      ? await supabase!.from("parent_children").upsert({ user_id: userId, student_id: studentId })
+      : await supabase!.from("parent_children").delete().eq("user_id", userId).eq("student_id", studentId);
+    if (!error) return null;
+    setzen(!an);
+    return /row-level security/i.test(error.message)
+      ? "Dafür fehlen dir die Rechte. Kinder zuordnen darf nur der Admin."
+      : error.message;
+  }, []);
+
   const kontoSpeichern = useCallback<ElternCtx["kontoSpeichern"]>(async (patch) => {
     if (!hasSupabase) return "Ohne Datenbank geht das nicht.";
     const next = { ...(konto || LEER), ...patch };
@@ -359,6 +434,7 @@ export function ElternProvider({ children }: { children: ReactNode }) {
         nachrichten,
         kinder,
         zuordnung,
+        zuordnungFehlt,
         konten,
         ungelesen,
         neuesTicket,
@@ -370,6 +446,7 @@ export function ElternProvider({ children }: { children: ReactNode }) {
         infoAnlegen,
         infoLoeschen,
         kontoSpeichern,
+        kindZuordnen,
       }}
     >
       {children}
