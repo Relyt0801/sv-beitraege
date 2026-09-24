@@ -11,6 +11,28 @@ ausführlich (auf Deutsch); hier steht der Überblick dazu.
 
 ---
 
+## Nachtrag 24.09.2026: Tab-Leiste auf dem iPhone, schmale Handys
+
+**Tab-Leiste federt nicht mehr hoch** (`src/lib/gescrollt.ts` → `useReiter`,
+`src/App.tsx`, `src/components/ElternApp.tsx`, `src/index.css`)
+- Auf dem iPhone sprang die Tab-Leiste beim Wechsel zu **Events** nach oben.
+  Grund: Erst kam der neue Reiter, danach ging es nach oben. War man vorher
+  weit unten und ist der neue Reiter kurz (Events ohne Einträge), stand die
+  Seite kurz „hinter dem Ende“ – iOS federt das zurück und nimmt die feste
+  Leiste mit. Jetzt geht es erst nach oben, dann in den neuen Reiter.
+- Ein Tipp auf den Reiter, in dem man schon ist, scrollt sanft nach oben.
+- `overscroll-behavior-y: none` steht jetzt auch an `<html>` – nur dort gilt
+  es in Safari für die ganze Seite (an `<body>` wirkte es nicht).
+
+**Nichts mehr breiter als der Bildschirm auf kleinen iPhones (SE, 320 px)**
+(`KontoTab.tsx`, `ChatsTab.tsx`, `ElternTeamTab.tsx`)
+- Eltern → Konto: Die IBAN schob die ganze Seite breiter; die Tab-Leiste ragte
+  über den Rand. Die Schrift wird auf schmalen Handys etwas kleiner (ab 12 px),
+  notfalls scrollt nur die Zeile.
+- Chats (Team): Lange Titel in „Infos für die Eltern“ drückten die Karten über
+  den Rand. Die Listen sind jetzt `grid-cols-1`, dadurch kürzen die Titel wie
+  gedacht mit „…“.
+
 ## Neu am 24.09.2026: Kinder für Elternzugänge, Apple-Design, neue Einführung
 
 **Rollen-Reiter – Kinder statt Komitees bei Eltern**

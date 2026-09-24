@@ -156,8 +156,10 @@ export function ChatsTab() {
 
         {/* Bitten aus der Stufe: Komitee wechseln, Sperre aufheben.
             Der Abstand gehoert hierher: vorher stiessen die Elternkarten
-            direkt an die Ticketkarte und der Anschreiben-Knopf sass auf ihr. */}
-        <div className="grid gap-2.5">
+            direkt an die Ticketkarte und der Anschreiben-Knopf sass auf ihr.
+            grid-cols-1: sonst drueckt ein langer Titel die Seite auf kleinen
+            Handys breiter als den Bildschirm. */}
+        <div className="grid grid-cols-1 gap-2.5">
         {isStaff ? (
           <>
             <KomiteeRequests />
@@ -512,7 +514,7 @@ function SchuelerAnschreiben({ open, onClose }: { open: boolean; onClose: () => 
       {!wer ? (
         <>
           <input className="field mt-3" placeholder="Name suchen …" value={q} autoFocus onChange={(e) => setQ(e.target.value)} />
-          <ul className="mt-2 grid max-h-[50vh] gap-1 overflow-y-auto">
+          <ul className="mt-2 grid max-h-[50vh] grid-cols-1 gap-1 overflow-y-auto">
             {liste.map((x) => (
               <li key={x.id}>
                 <button
