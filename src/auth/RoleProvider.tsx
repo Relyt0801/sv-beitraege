@@ -1,9 +1,11 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { hasSupabase, supabase } from "../lib/supabase";
+import { abonniere } from "../lib/realtime";
 import { ALL_PERMS, ROLE_DEFAULTS, rechteRolle, type PermKey } from "../lib/permissions";
 import { demoProfile, demoRolle, demoRolleAlsRolle, demoUid } from "../lib/demo";
 import { useStore } from "../store";
 
+import { meldeFehler } from "../lib/melder";
 export type Role = "schueler" | "stufenteam" | "kassenwart" | "admin" | "sprecher" | "stv_sprecher" | "eltern";
 
 export interface Profile {
@@ -127,12 +129,20 @@ export function RoleProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!hasSupabase) return;
     let alive = true;
-    let channel: ReturnType<NonNullable<typeof supabase>["channel"]> | null = null;
+    let abmelden: (() => void) | null = null;
 
     const subscribe = () => {
-      if (channel) return;
-      channel = supabase!
-        .channel("sv-profiles")
+      if (abmelden || !alive) return;
+      abmelden = abonniere({
+        name: "sv-profiles",
+        // Nach einer Unterbrechung: Rechte und Personenliste neu holen – eine
+        // Rollenänderung in der Zwischenzeit käme sonst nie an.
+        nachholen: () => {
+          void loadPerms(roleRef.current, uidRef.current);
+          void loadProfiles(STAFF.includes(roleRef.current));
+        },
+        aufbauen: (kanal) =>
+          kanal
         .on("postgres_changes", { event: "*", schema: "public", table: "profiles" }, (p) => {
           if (p.eventType === "DELETE") {
             const old = p.old as Partial<Profile>;
@@ -158,8 +168,8 @@ export function RoleProvider({ children }: { children: ReactNode }) {
           });
         })
         .on("postgres_changes", { event: "*", schema: "public", table: "role_permissions" }, () => void loadPerms(roleRef.current, uidRef.current))
-        .on("postgres_changes", { event: "*", schema: "public", table: "user_permissions" }, () => void loadPerms(roleRef.current, uidRef.current))
-        .subscribe();
+        .on("postgres_changes", { event: "*", schema: "public", table: "user_permissions" }, () => void loadPerms(roleRef.current, uidRef.current)),
+      });
     };
 
     const load = async () => {
@@ -202,17 +212,15 @@ export function RoleProvider({ children }: { children: ReactNode }) {
         setProfiles([]);
         setPerms(new Set());
         setStudentId(null);
-        if (channel) {
-          supabase!.removeChannel(channel);
-          channel = null;
-        }
+        abmelden?.();
+        abmelden = null;
         void load();
       }
     });
     return () => {
       alive = false;
       sub.subscription.unsubscribe();
-      if (channel) supabase!.removeChannel(channel);
+      abmelden?.();
     };
   }, [loadProfiles, loadPerms]);
 
@@ -225,7 +233,7 @@ export function RoleProvider({ children }: { children: ReactNode }) {
       const { error } = await supabase!.from("profiles").update({ role: r }).eq("user_id", userId);
       if (error) {
         const doppelt = /duplicate key|profiles_sprecher_eindeutig|unique/i.test(error.message);
-        alert(
+        meldeFehler(
           doppelt
             ? "Diese Rolle ist schon vergeben. Nimm sie der anderen Person erst weg."
             : "Rolle ändern fehlgeschlagen: " + error.message,
@@ -245,7 +253,7 @@ export function RoleProvider({ children }: { children: ReactNode }) {
     }
     const { error } = await supabase!.from("profiles").update(patch).eq("user_id", userId);
     if (error) {
-      alert("Sperre setzen fehlgeschlagen: " + error.message);
+      meldeFehler("Sperre setzen fehlgeschlagen: " + error.message);
       return;
     }
     setProfiles((prev) => prev.map((p) => (p.user_id === userId ? { ...p, ...patch } : p)));

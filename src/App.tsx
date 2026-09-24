@@ -41,6 +41,7 @@ import { InstallKarte, InstallOverlay } from "./components/InstallHinweis";
 import { useGescrollt, useHoeheAlsVariable, useReiter } from "./lib/gescrollt";
 import { Schalter } from "./components/Schalter";
 
+import { frage, melde, meldeFehler } from "./lib/melder";
 export default function App() {
   return (
     <AuthGate>
@@ -298,7 +299,7 @@ function Main() {
     inp.accept = "application/json";
     inp.onchange = () => {
       const f = inp.files?.[0];
-      if (f) f.text().then((t) => alert(importData(t) ? "Import erfolgreich." : "Ungültige Datei."));
+      if (f) f.text().then((t) => (importData(t) ? melde("Import erfolgreich.", "erfolg") : meldeFehler("Ungültige Datei.")));
     };
     inp.click();
   }
@@ -476,9 +477,9 @@ function Main() {
                     key={h}
                     role="radio"
                     aria-checked={h === settings.aktuelles_halbjahr}
-                    onClick={() => {
+                    onClick={async () => {
                       if (h === settings.aktuelles_halbjahr) return;
-                      if (confirm(`Laufendes Halbjahr für die ganze Stufe auf ${h} umstellen?`)) setSettings({ aktuelles_halbjahr: h });
+                      if (await frage(`Laufendes Halbjahr für die ganze Stufe auf ${h} umstellen?`, "Umstellen")) setSettings({ aktuelles_halbjahr: h });
                     }}
                     className={`seg-item !px-1 !text-[12px] ${h === settings.aktuelles_halbjahr ? "seg-aktiv" : ""}`}
                   >

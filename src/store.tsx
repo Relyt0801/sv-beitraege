@@ -1,9 +1,11 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { HY, type ContribTemplate, type Contribution, type Halbjahr, type Settings, type Status, type Student, type Beitraege, newStudent, STAFFEL_STANDARD, BEITRAEGE_STANDARD } from "./lib/types";
 import { hasSupabase, supabase } from "./lib/supabase";
-import { istEigenesEcho, merkeEigeneAenderung } from "./lib/echo";
+import { echoLeeren, merkeEigeneAenderung, zusammenfuehren } from "./lib/echo";
+import { abonniere } from "./lib/realtime";
 import { pushAnPersonen } from "./lib/push";
 
+import { hinweis, meldeFehler } from "./lib/melder";
 /** Text zu einem geänderten Halbjahr – nur bezahlt/erlassen wird gemeldet. */
 function zahlText(vorname: string, h: string, status: string): { title: string; body: string } | null {
   if (status === "bezahlt") return { title: `✓ ${h} bezahlt`, body: `Der Stufenbeitrag für ${h} (${vorname}) ist als bezahlt eingetragen. Danke!` };
@@ -117,14 +119,14 @@ function reportErr(msg?: string) {
   // Fehlende Spalte: das passiert, wenn ein SQL-Update noch nicht gelaufen ist.
   const spalte = /Could not find the '([^']+)' column of '([^']+)'/.exec(msg);
   if (spalte) {
-    alert(
+    void hinweis(
       `In der Datenbank fehlt noch die Spalte "${spalte[1]}" in der Tabelle "${spalte[2]}".\n\n` +
         "Das ist kein Fehler in der App. In Supabase muss noch das passende SQL aus dem Ordner " +
         "supabase/ ausgeführt werden, dann läuft alles wieder.",
     );
     return;
   }
-  alert("Das Speichern hat nicht geklappt.\n\n" + msg);
+  meldeFehler("Das Speichern hat nicht geklappt.\n\n" + msg);
 }
 /**
  * Einstellungen speichern. Fehlt in einer alten Datenbank noch eine der neuen
@@ -225,19 +227,29 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }
 
     let alive = true;
-    let channel: ReturnType<NonNullable<typeof supabase>["channel"]> | null = null;
+    let abmelden: (() => void) | null = null;
     let loaded = false;
 
     const subscribeRealtime = () => {
-      if (channel) return;
-      channel = supabase!
-        .channel("sv-realtime")
+      if (abmelden) return;
+      // Über abonniere(): meldet den Verbindungszustand, verbindet nach einem
+      // Abbruch neu und holt danach still nach, was in der Zwischenzeit
+      // passiert ist. Vorher stand hier ein blankes .subscribe() ohne
+      // Rückmeldung – eine abgebrochene Verbindung fiel niemandem auf.
+      abmelden = abonniere({
+        name: "sv-realtime",
+        nachholen: () => void loadAll(true),
+        aufbauen: (kanal) =>
+          kanal
         .on("postgres_changes", { event: "*", schema: "public", table: "students" }, (p) => {
           const wenId = ((p.eventType === "DELETE" ? p.old : p.new) as { id?: string })?.id;
-          if (wenId && istEigenesEcho(`student:${wenId}`)) return;
           setStudents((prev) => {
             if (p.eventType === "DELETE") return prev.filter((x) => x.id !== (p.old as Student).id);
-            const row = migrate(p.new);
+            // Stand vom Server übernehmen, nur die eigenen frisch geschriebenen
+            // Felder behalten kurz Vorrang. Früher wurde das ganze Ereignis
+            // verworfen – damit gingen fremde Änderungen an derselben Person
+            // verloren.
+            const row = migrate(zusammenfuehren(`student:${wenId}`, p.new as Record<string, unknown>));
             const i = prev.findIndex((x) => x.id === row.id);
             if (i === -1) return [...prev, row];
             const next = [...prev];
@@ -247,10 +259,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         })
         .on("postgres_changes", { event: "*", schema: "public", table: "contributions" }, (p) => {
           const wenId = ((p.eventType === "DELETE" ? p.old : p.new) as { id?: string })?.id;
-          if (wenId && istEigenesEcho(`beitrag:${wenId}`)) return;
           setContributions((prev) => {
             if (p.eventType === "DELETE") return prev.filter((c) => c.id !== (p.old as Contribution).id);
-            const row = p.new as Contribution;
+            const row = zusammenfuehren(`beitrag:${wenId}`, p.new as Contribution);
             const i = prev.findIndex((c) => c.id === row.id);
             if (i === -1) return [...prev, row];
             const next = [...prev];
@@ -262,10 +273,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           // Nur die eine geänderte Zeile einpflegen. Früher wurde hier die ganze
           // Liste neu geladen – bei jedem getippten Buchstaben einmal.
           const wenId = ((p.eventType === "DELETE" ? p.old : p.new) as { id?: string })?.id;
-          if (wenId && istEigenesEcho(`vorlage:${wenId}`)) return;
           setTemplates((prev) => {
             if (p.eventType === "DELETE") return prev.filter((t) => t.id !== wenId);
-            const row = p.new as ContribTemplate;
+            const row = zusammenfuehren(`vorlage:${wenId}`, p.new as ContribTemplate);
             const i = prev.findIndex((t) => t.id === row.id);
             if (i === -1) return [...prev, row].sort((a, b) => a.sort - b.sort || a.punkte - b.punkte);
             const next = [...prev];
@@ -274,8 +284,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           });
         })
         .on("postgres_changes", { event: "*", schema: "public", table: "app_settings" }, (p) => {
-          if (istEigenesEcho("einstellungen")) return;
-          const row = p.new as any;
+          // Früher stand hier ein fester Schlüssel für die ganze Tabelle: wer
+          // irgendetwas umstellte, machte für fünf Sekunden ALLE Änderungen
+          // von ALLEN unsichtbar. Jetzt behalten nur die eigenen Felder Vorrang.
+          const row = zusammenfuehren("einstellungen", p.new as Record<string, any>) as any;
           if (row)
             setSettingsState({
               aktuelles_halbjahr: row.aktuelles_halbjahr,
@@ -285,17 +297,28 @@ export function StoreProvider({ children }: { children: ReactNode }) {
               ticket_preis: row.ticket_preis ?? 0,
               beitraege: gueltigeBeitraege(row.beitraege),
             });
-        })
-        .subscribe();
+        }),
+      });
     };
 
     // Daten erst laden, wenn eine Session da ist (sonst blockt RLS und es kommt nichts).
-    const loadAll = async () => {
-      setReady(false);
-      const { data: stu, error: stuErr } = await supabase!.from("students").select("*");
-      const { data: con, error: conErr } = await supabase!.from("contributions").select("*").order("datum", { ascending: false });
-      const { data: tpl } = await supabase!.from("contribution_templates").select("*").order("sort");
-      const { data: cfg, error: cfgErr } = await supabase!.from("app_settings").select("*").eq("id", 1).maybeSingle();
+    // leise: nach einer Unterbrechung nachladen, ohne die Liste durch den
+    // Ladekreis zu ersetzen.
+    const loadAll = async (leise = false) => {
+      if (!leise) setReady(false);
+      // Vier Abfragen parallel statt nacheinander – vorher wartete jede auf die
+      // vorherige, das summierte sich beim Start spürbar.
+      const [
+        { data: stu, error: stuErr },
+        { data: con, error: conErr },
+        { data: tpl },
+        { data: cfg, error: cfgErr },
+      ] = await Promise.all([
+        supabase!.from("students").select("*"),
+        supabase!.from("contributions").select("*").order("datum", { ascending: false }),
+        supabase!.from("contribution_templates").select("*").order("sort"),
+        supabase!.from("app_settings").select("*").eq("id", 1).maybeSingle(),
+      ]);
       if (!alive) return;
       reportErr(stuErr?.message || cfgErr?.message);
       if (conErr && !/does not exist|schema cache/i.test(conErr.message)) reportErr(conErr.message);
@@ -325,13 +348,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         void loadAll();
       } else if (event === "SIGNED_OUT") {
         loaded = false;
+        // Sonst gelten die gemerkten eigenen Änderungen für den nächsten
+        // Nutzer weiter, der sich an diesem Gerät anmeldet.
+        echoLeeren();
         setStudents([]);
         setContributions([]);
         setReady(true);
-        if (channel) {
-          supabase!.removeChannel(channel);
-          channel = null;
-        }
+        abmelden?.();
+        abmelden = null;
       } else if (event === "INITIAL_SESSION" && !session) {
         setReady(true);
       }
@@ -340,7 +364,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return () => {
       alive = false;
       sub.subscription.unsubscribe();
-      if (channel) supabase!.removeChannel(channel);
+      abmelden?.();
     };
   }, [mode]);
 
@@ -386,9 +410,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const cur = studentsRef.current.find((s) => s.id === id);
       if (!cur) return;
       const changed = fn(cur);
+      const spalten = cols(changed);
       setStudents((prev) => prev.map((s) => (s.id === id ? changed : s)));
-      merkeEigeneAenderung(`student:${id}`);
-      patchCols(id, cols(changed));
+      // Nur die Spalten, die wirklich rausgehen, behalten kurz Vorrang.
+      merkeEigeneAenderung(`student:${id}`, spalten);
+      patchCols(id, spalten);
     },
     [patchCols],
   );
@@ -499,7 +525,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     (id, patch) => {
       setTemplates((prev) => prev.map((t) => (t.id === id ? { ...t, ...patch } : t)));
       if (mode === "supabase") {
-        merkeEigeneAenderung(`vorlage:${id}`);
+        merkeEigeneAenderung(`vorlage:${id}`, patch as Record<string, unknown>);
         void run(supabase!.from("contribution_templates").update(patch).eq("id", id));
       }
     },
@@ -523,7 +549,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       if (clean.punkte != null) clean.punkte = Math.max(0, Math.round(clean.punkte) || 0);
       setContributions((prev) => prev.map((c) => (c.id === id ? { ...c, ...clean } : c)));
       if (mode === "supabase") {
-        merkeEigeneAenderung(`beitrag:${id}`);
+        merkeEigeneAenderung(`beitrag:${id}`, clean as Record<string, unknown>);
         void run(supabase!.from("contributions").update(clean).eq("id", id));
       }
     },
@@ -550,7 +576,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       settingsRef.current = next;
       setSettingsState(next);
       if (mode === "supabase") {
-        merkeEigeneAenderung("einstellungen");
+        // In der Datenbank heißt "zusatz" zusatzbetrag – die eigenen Felder
+        // müssen unter dem Spaltennamen gemerkt werden, sonst greifen sie nicht.
+        const { zusatz, ...rest } = patch;
+        merkeEigeneAenderung("einstellungen", { ...rest, ...(zusatz !== undefined ? { zusatzbetrag: zusatz } : {}) });
         void speichereEinstellungen(next);
       }
     },
@@ -570,7 +599,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       }
       const map = new Map(updates);
       setStudents((prev) => prev.map((s) => (map.has(s.id) ? { ...s, ...map.get(s.id) } : s)));
-      updates.forEach(([id, cols]) => patchCols(id, cols));
+      updates.forEach(([id, cols]) => {
+        merkeEigeneAenderung(`student:${id}`, cols);
+        patchCols(id, cols);
+      });
       if (mode === "supabase") {
         const meldungen = studentsRef.current
           .filter((s) => map.has(s.id) && s.terms?.[h]?.status !== action)

@@ -2,10 +2,12 @@ import {
   createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode,
 } from "react";
 import { hasSupabase, supabase } from "./lib/supabase";
+import { abonniere } from "./lib/realtime";
 import { kurzDatum, uhr, type Aktion, type NeueAnfrage, type NeuerTermin, type Termin, type TerminAnfrage } from "./lib/termine";
 import { pushAnTeam, pushToUsers, pushZuTermin } from "./lib/push";
 import { committeeIcon, committeeLabel } from "./lib/committees";
 
+import { meldeFehler } from "./lib/melder";
 const LS = "sv-beitraege:termine";
 const LOCAL_UID = "local-user";
 
@@ -187,7 +189,7 @@ export function TermineProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!hasSupabase) return;
     let alive = true;
-    let channel: ReturnType<NonNullable<typeof supabase>["channel"]> | null = null;
+    let abmelden: (() => void) | null = null;
 
     const start = async () => {
       const { data } = await supabase!.auth.getSession();
@@ -198,17 +200,24 @@ export function TermineProvider({ children }: { children: ReactNode }) {
         return;
       }
       await Promise.all([laden(), michLaden()]);
-      if (channel) return;
-      channel = supabase!
-        .channel("sv-termine")
-        .on("postgres_changes", { event: "*", schema: "public", table: "termine" }, planeNachladen)
-        .on("postgres_changes", { event: "*", schema: "public", table: "termin_komitees" }, planeNachladen)
-        .on("postgres_changes", { event: "*", schema: "public", table: "termin_personen" }, planeNachladen)
-        .on("postgres_changes", { event: "*", schema: "public", table: "aktionen" }, planeNachladen)
-        .on("postgres_changes", { event: "*", schema: "public", table: "aktion_bewerbungen" }, planeNachladen)
-        .on("postgres_changes", { event: "*", schema: "public", table: "komitee_vorsitz" }, planeNachladen)
-        .on("postgres_changes", { event: "*", schema: "public", table: "termin_requests" }, planeNachladen)
-        .subscribe();
+      // Siehe topics-store: der Kanal entsteht erst nach einem await.
+      if (!alive || abmelden) return;
+      abmelden = abonniere({
+        name: "sv-termine",
+        nachholen: () => {
+          planeNachladen();
+          void michLaden();
+        },
+        aufbauen: (kanal) =>
+          kanal
+            .on("postgres_changes", { event: "*", schema: "public", table: "termine" }, planeNachladen)
+            .on("postgres_changes", { event: "*", schema: "public", table: "termin_komitees" }, planeNachladen)
+            .on("postgres_changes", { event: "*", schema: "public", table: "termin_personen" }, planeNachladen)
+            .on("postgres_changes", { event: "*", schema: "public", table: "aktionen" }, planeNachladen)
+            .on("postgres_changes", { event: "*", schema: "public", table: "aktion_bewerbungen" }, planeNachladen)
+            .on("postgres_changes", { event: "*", schema: "public", table: "komitee_vorsitz" }, planeNachladen)
+            .on("postgres_changes", { event: "*", schema: "public", table: "termin_requests" }, planeNachladen),
+      });
     };
     void start();
 
@@ -221,10 +230,8 @@ export function TermineProvider({ children }: { children: ReactNode }) {
         setAnfragen([]);
         setMeineKomitees([]);
         setMeineStudentIds([]);
-        if (channel) {
-          supabase!.removeChannel(channel);
-          channel = null;
-        }
+        abmelden?.();
+        abmelden = null;
         void start();
       }
     });
@@ -233,7 +240,7 @@ export function TermineProvider({ children }: { children: ReactNode }) {
       alive = false;
       sub.subscription.unsubscribe();
       if (timer.current) clearTimeout(timer.current);
-      if (channel) supabase!.removeChannel(channel);
+      abmelden?.();
     };
   }, [laden, michLaden, planeNachladen]);
 
@@ -333,7 +340,7 @@ export function TermineProvider({ children }: { children: ReactNode }) {
       const { error } = await supabase!.from("termine").delete().eq("id", id);
       if (error) {
         setTermine(vorher);
-        alert("Der Termin konnte nicht gelöscht werden: " + error.message);
+        meldeFehler("Der Termin konnte nicht gelöscht werden: " + error.message);
       }
     },
     [termine, lokalSpeichern],
@@ -369,7 +376,7 @@ export function TermineProvider({ children }: { children: ReactNode }) {
       const { error } = await supabase!.from("aktionen").delete().eq("id", id);
       if (error) {
         void laden();
-        alert("Die Aktion konnte nicht gelöscht werden: " + error.message);
+        meldeFehler("Die Aktion konnte nicht gelöscht werden: " + error.message);
       }
     },
     [laden],
@@ -435,7 +442,7 @@ export function TermineProvider({ children }: { children: ReactNode }) {
             .eq("user_id", ich);
       if (error) {
         void laden();
-        alert("Das hat nicht geklappt: " + error.message);
+        meldeFehler("Das hat nicht geklappt: " + error.message);
       }
     },
     [laden],
@@ -465,7 +472,7 @@ export function TermineProvider({ children }: { children: ReactNode }) {
             .eq("student_id", studentId);
       if (error) {
         void laden();
-        alert("Die Zuteilung hat nicht geklappt: " + error.message);
+        meldeFehler("Die Zuteilung hat nicht geklappt: " + error.message);
         return;
       }
       // Die Person bekommt Bescheid – mit dem Termin als Betreff:
@@ -499,7 +506,7 @@ export function TermineProvider({ children }: { children: ReactNode }) {
         .eq("user_id", userId);
       if (error) {
         void laden();
-        alert("Das hat nicht geklappt: " + error.message);
+        meldeFehler("Das hat nicht geklappt: " + error.message);
       }
     },
     [laden],
@@ -513,7 +520,7 @@ export function TermineProvider({ children }: { children: ReactNode }) {
       const { error } = await supabase!.from("termine").delete().in("id", ids);
       if (error) {
         void laden();
-        alert("Löschen hat nicht geklappt: " + error.message);
+        meldeFehler("Löschen hat nicht geklappt: " + error.message);
       }
     },
     [laden],
@@ -616,7 +623,7 @@ export function TermineProvider({ children }: { children: ReactNode }) {
       const { error } = await supabase!.from("termin_requests").delete().eq("id", id);
       if (error) {
         void laden();
-        alert("Die Anfrage konnte nicht zurückgenommen werden: " + error.message);
+        meldeFehler("Die Anfrage konnte nicht zurückgenommen werden: " + error.message);
       }
     },
     [laden],

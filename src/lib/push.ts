@@ -73,14 +73,42 @@ function urlBase64ToUint8Array(base64: string): Uint8Array {
   return arr;
 }
 
-/** Push an das Stufenteam (z. B. neue Terminanfrage). */
-export async function pushAnTeam(title: string, body: string, url = "./#events"): Promise<void> {
+/**
+ * Der letzte Fehler beim Verschicken einer Benachrichtigung.
+ *
+ * functions.invoke() wirft in supabase-js v2 **nicht**, sondern gibt
+ * { data, error } zurück. Der alte Code hat den Aufruf in try/catch gesteckt
+ * und den error nie gelesen: fehlender VAPID-Schlüssel, nicht hochgeladene
+ * Function, abgelehnter Zugriff – alles blieb unsichtbar. Genau deshalb konnte
+ * niemand sagen, warum keine Benachrichtigungen kommen.
+ *
+ * Der Text landet in der Prüfung im Profil ("Kommt nichts an?").
+ */
+let letzterSendefehler: string | null = null;
+
+/**
+ * send-push aufrufen. Eine Benachrichtigung ist nie so wichtig, dass die
+ * eigentliche Aktion daran scheitern darf – aber sichtbar muss der Fehler sein.
+ */
+export async function sendePush(body: Record<string, unknown>): Promise<void> {
   if (!hasSupabase) return;
   try {
-    await supabase!.functions.invoke("send-push", { body: { an_team: true, title, body, url } });
-  } catch {
-    /* Benachrichtigung ist optional */
+    const { error } = await supabase!.functions.invoke("send-push", { body });
+    if (error) {
+      letzterSendefehler = error.message || String(error);
+      console.warn("[push] send-push meldet:", letzterSendefehler);
+      return;
+    }
+    letzterSendefehler = null;
+  } catch (e) {
+    letzterSendefehler = (e as Error).message;
+    console.warn("[push] send-push nicht erreichbar:", letzterSendefehler);
   }
+}
+
+/** Push an das Stufenteam (z. B. neue Terminanfrage). */
+export async function pushAnTeam(title: string, body: string, url = "./#events"): Promise<void> {
+  await sendePush({ an_team: true, title, body, url });
 }
 
 /**
@@ -91,32 +119,51 @@ export async function pushAnPersonen(
   liste: { student_id: string; title: string; body: string }[],
   url = "./#kasse",
 ): Promise<void> {
-  if (!hasSupabase || !liste.length) return;
-  try {
-    await supabase!.functions.invoke("send-push", { body: { an_personen: liste, url } });
-  } catch {
-    /* Benachrichtigung ist optional */
-  }
+  if (!liste.length) return;
+  await sendePush({ an_personen: liste, url });
 }
 
 /** Push zu einem Termin an alle, die ihn sehen dürfen. */
 export async function pushZuTermin(termin_id: string, title?: string, body?: string): Promise<void> {
-  if (!hasSupabase) return;
-  try {
-    await supabase!.functions.invoke("send-push", { body: { termin_id, title, body, url: "./#events" } });
-  } catch {
-    /* Benachrichtigung ist optional */
-  }
+  await sendePush({ termin_id, title, body, url: "./#events" });
 }
 
-/** Push direkt an bestimmte Nutzer senden (via Edge Function, best effort). */
+/** Push direkt an bestimmte Nutzer senden (via Edge Function). */
 export async function pushToUsers(user_ids: string[], title: string, body: string, url = "./"): Promise<void> {
-  if (!hasSupabase || !user_ids.length) return;
-  try {
-    await supabase!.functions.invoke("send-push", { body: { user_ids, title, body, url } });
-  } catch {
-    /* Function evtl. nicht deployt – Benachrichtigung ist optional */
+  if (!user_ids.length) return;
+  await sendePush({ user_ids, title, body, url });
+}
+
+/**
+ * "Warum kommt bei mir nichts an?"
+ *
+ * Fragt der Reihe nach ab, woran es hängen kann, und gibt einen Satz zurück,
+ * den man jemandem vorlesen kann. Steht im Profil unter den Benachrichtigungen.
+ */
+export async function pushDiagnose(): Promise<string> {
+  if (!pushSupported) return "Dieses Gerät kann keine Benachrichtigungen anzeigen. Auf dem iPhone geht es nur, wenn die App zum Home-Bildschirm hinzugefügt ist.";
+  if (!hasSupabase) return "Ohne Server-Verbindung gibt es keine Benachrichtigungen.";
+  const key = await schluessel();
+  if (!key) {
+    return (
+      "Auf dem Server ist kein Schlüssel hinterlegt. In Supabase müssen unter " +
+      "Edge Functions → Secrets VAPID_PUBLIC_KEY und VAPID_PRIVATE_KEY gesetzt " +
+      "und die Functions send-push und vapid-info hochgeladen sein."
+    );
   }
+  const erlaubnis = pushPermission();
+  if (erlaubnis === "denied")
+    return "Benachrichtigungen sind für diese Seite abgelehnt. Das lässt sich nur in den Einstellungen des Geräts bzw. Browsers wieder erlauben.";
+  if (erlaubnis === "default") return "Benachrichtigungen sind noch nicht eingeschaltet.";
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    const abo = await reg.pushManager.getSubscription();
+    if (!abo) return "Erlaubnis liegt vor, aber es ist kein Abo eingetragen. Einmal „Benachrichtigungen anschalten“ antippen oder die App neu öffnen.";
+  } catch {
+    return "Der Hintergrunddienst der App antwortet nicht. Ein Neuladen hilft meistens.";
+  }
+  if (letzterSendefehler) return `Zuletzt meldete der Server beim Versenden: ${letzterSendefehler}`;
+  return "Alles eingerichtet.";
 }
 
 /**

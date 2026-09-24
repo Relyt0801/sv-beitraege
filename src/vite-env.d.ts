@@ -15,3 +15,10 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
+
+/**
+ * Beim Bauen eingesetzt (siehe vite.config.ts). Damit steht im Profil, welcher
+ * Stand gerade läuft.
+ */
+declare const __BAU_COMMIT__: string;
+declare const __BAU_ZEIT__: string;

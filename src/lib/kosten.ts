@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { hasSupabase, supabase } from "./supabase";
+import { abonniere } from "./realtime";
 import { pushToUsers } from "./push";
 import { committeeLabel } from "./committees";
 import { euro } from "./finanzen";
@@ -65,14 +66,14 @@ export function useKostenAnfragen(aktiv: boolean): KostenValue {
   useEffect(() => {
     if (!aktiv || !hasSupabase) return;
     void laden();
-    const kanal = supabase!
-      .channel("sv-kostenanfragen")
-      .on("postgres_changes", { event: "*", schema: "public", table: "kosten_anfragen" }, () => void laden())
-      .on("postgres_changes", { event: "*", schema: "public", table: "tag_members" }, () => void laden())
-      .subscribe();
-    return () => {
-      void supabase!.removeChannel(kanal);
-    };
+    return abonniere({
+      name: "sv-kostenanfragen",
+      nachholen: () => void laden(),
+      aufbauen: (kanal) =>
+        kanal
+          .on("postgres_changes", { event: "*", schema: "public", table: "kosten_anfragen" }, () => void laden())
+          .on("postgres_changes", { event: "*", schema: "public", table: "tag_members" }, () => void laden()),
+    });
   }, [aktiv, laden]);
 
   const stellen = useCallback<KostenValue["stellen"]>(

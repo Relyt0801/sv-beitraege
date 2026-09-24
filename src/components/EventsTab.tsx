@@ -13,6 +13,7 @@ import { AktionenListe } from "./AktionenListe";
 import { AnfragenFuerTeam, MeineAnfragen } from "./TerminAnfragen";
 import { useTermine } from "../termine-store";
 
+import { frage } from "../lib/melder";
 export function EventsTab() {
   const { events, ready, myVotes, voteCounts, voters, reads, vote, deleteEvent, markRead } = useEvents();
   const { canEditData, isStaff, can } = useRole();
@@ -148,8 +149,8 @@ export function EventsTab() {
           zeigeWaehler={!e.poll_anon || isStaff}
           canDelete={canEditData}
           onVote={(optId) => vote(e.id, optId, e.poll_multiple)}
-          onDelete={() => {
-            if (confirm("Dieses Event wirklich löschen?")) void deleteEvent(e.id);
+          onDelete={async () => {
+            if (await frage("Dieses Event wirklich löschen?", "Löschen", true)) void deleteEvent(e.id);
           }}
         />
         ))}

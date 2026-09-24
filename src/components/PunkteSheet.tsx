@@ -5,6 +5,7 @@ import { Sheet } from "./Sheet";
 import { PunkteBar, StaffelTabelle } from "./PunkteBar";
 import { prozentVon, ticketBetrag } from "../lib/logic";
 
+import { frage } from "../lib/melder";
 /**
  * Liste der gesammelten Beiträge einer Person.
  * - Schüler: nur ansehen
@@ -174,8 +175,8 @@ export function PunkteSheet({
               c={c}
               editable={editable}
               onChange={(patch) => updateContribution(c.id, patch)}
-              onDelete={() => {
-                if (confirm(`„${c.titel}" wirklich löschen?`)) removeContribution(c.id);
+              onDelete={async () => {
+                if (await frage(`„${c.titel}" wirklich löschen?`, "Löschen", true)) removeContribution(c.id);
               }}
             />
           ))}

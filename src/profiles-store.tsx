@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { hasSupabase, supabase } from "./lib/supabase";
+import { abonniere } from "./lib/realtime";
 import { elternNachname, familienKuerzel, initialen as initialenVon, lesbarerName, zufallsFarbe, type PublicProfile } from "./lib/profil";
 import { useStore } from "./store";
 
@@ -54,20 +55,42 @@ export function ProfilesProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!hasSupabase) return;
-    let channel: ReturnType<NonNullable<typeof supabase>["channel"]> | null = null;
+    let alive = true;
+    let abmelden: (() => void) | null = null;
     void (async () => {
       const { data: s } = await supabase!.auth.getSession();
       const id = s.session?.user.id;
       if (!id) return;
       setUid(id);
       await laden();
-      channel = supabase!
-        .channel("sv-pprofiles")
-        .on("postgres_changes", { event: "*", schema: "public", table: "public_profiles" }, () => void laden())
-        .subscribe();
+      if (!alive || abmelden) return;
+      abmelden = abonniere({
+        name: "sv-pprofiles",
+        nachholen: () => void laden(),
+        // Ändert eine Person ihre Farbe, kam hier bisher ein komplettes Neuladen
+        // aller Profile – bei 300 Personen auf 300 Geräten gleichzeitig. Jetzt
+        // wird nur die geänderte Zeile eingepflegt.
+        aufbauen: (kanal) =>
+          kanal.on("postgres_changes", { event: "*", schema: "public", table: "public_profiles" }, (p) => {
+            if (p.eventType === "DELETE") {
+              const weg = (p.old as { user_id?: string })?.user_id;
+              if (weg)
+                setProfile((prev) => {
+                  const next = { ...prev };
+                  delete next[weg];
+                  return next;
+                });
+              return;
+            }
+            const row = p.new as PublicProfile;
+            if (!row?.user_id) return;
+            setProfile((prev) => ({ ...prev, [row.user_id]: row }));
+          }),
+      });
     })();
     return () => {
-      if (channel) supabase!.removeChannel(channel);
+      alive = false;
+      abmelden?.();
     };
   }, [laden]);
 

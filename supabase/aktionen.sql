@@ -60,8 +60,8 @@ drop policy if exists "bewerbungen austragen" on aktion_bewerbungen;
 create policy "bewerbungen austragen" on aktion_bewerbungen for delete
   using (user_id = auth.uid() or ist_team() or has_perm('termine.manage'));
 
-alter publication supabase_realtime add table aktionen;
-alter publication supabase_realtime add table aktion_bewerbungen;
+do $$ begin alter publication supabase_realtime add table aktionen;           exception when duplicate_object then null; end $$;
+do $$ begin alter publication supabase_realtime add table aktion_bewerbungen; exception when duplicate_object then null; end $$;
 
 -- Startvorlagen
 insert into aktionen (titel, icon, prozent, beschreibung)

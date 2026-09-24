@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
 import { hasSupabase, supabase } from "../lib/supabase";
+import { abonniere } from "../lib/realtime";
 import { useRole } from "../auth/RoleProvider";
 import { useProfiles } from "../profiles-store";
 import { Avatar } from "./Avatar";
 import { committeeIcon, committeeLabel } from "../lib/committees";
 import { entscheideKomitee, ladeKomiteeAntraege, type KomiteeRequest } from "../lib/komitee-antrag";
 
+import { meldeFehler } from "../lib/melder";
 /** Anträge auf Komitee-Wechsel – wie die Entbannungsanfragen oben in den Events. */
 export function KomiteeRequests() {
   const { can } = useRole();
@@ -17,16 +19,18 @@ export function KomiteeRequests() {
   useEffect(() => {
     laden();
     // Live: entscheidet jemand anderes, verschwindet der Antrag sofort
-    const kanal = hasSupabase
-      ? supabase!
-          .channel("sv-komitee-antraege")
-          .on("postgres_changes", { event: "*", schema: "public", table: "komitee_requests" }, () => laden())
-          .subscribe()
+    const abmelden = hasSupabase
+      ? abonniere({
+          name: "sv-komitee-antraege",
+          nachholen: laden,
+          aufbauen: (kanal) =>
+            kanal.on("postgres_changes", { event: "*", schema: "public", table: "komitee_requests" }, () => laden()),
+        })
       : null;
     const t = setInterval(laden, 60000); // Rückfall, falls die Verbindung hängt
     return () => {
       clearInterval(t);
-      if (kanal) void supabase!.removeChannel(kanal);
+      abmelden?.();
     };
   }, []);
 
@@ -56,7 +60,7 @@ export function KomiteeRequests() {
                 setBusy(r.id);
                 const res = await entscheideKomitee(r, false);
                 setBusy(null);
-                if (!res.ok) alert("Fehler: " + res.error);
+                if (!res.ok) meldeFehler("Fehler: " + res.error);
                 laden();
               }}
               className="flex-1 rounded-xl border border-papier-linie py-2 text-sm font-bold text-tinte-matt dark:border-slate-700"
@@ -69,7 +73,7 @@ export function KomiteeRequests() {
                 setBusy(r.id);
                 const res = await entscheideKomitee(r, true);
                 setBusy(null);
-                if (!res.ok) alert("Fehler: " + res.error);
+                if (!res.ok) meldeFehler("Fehler: " + res.error);
                 laden();
               }}
               className="flex-1 rounded-xl bg-brand py-2 text-sm font-bold text-white"

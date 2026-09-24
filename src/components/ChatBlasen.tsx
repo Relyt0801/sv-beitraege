@@ -3,6 +3,7 @@ import type { TopicItem } from "../topics-store";
 import { Avatar, PersonName } from "./Avatar";
 import { MuteKnopf } from "./MuteKnopf";
 
+import { frage } from "../lib/melder";
 /**
  * Nachrichtenliste im WhatsApp-Stil: fremde Nachrichten links mit Kreis und
  * farbigem Namen in der Blase, eigene rechts ohne Namen.
@@ -44,11 +45,21 @@ export function ChatBlasen({
                 aufFarbig={meins}
               />
               <div className="whitespace-pre-wrap break-words text-[15px] leading-snug">{m.body}</div>
+              {m.nicht_gesendet && (
+                <div
+                  className={`mt-1 rounded-lg px-2 py-1 text-[11px] font-semibold ${
+                    meins ? "bg-white/20 text-white" : "bg-red-50 text-red-600 dark:bg-red-500/15 dark:text-red-400"
+                  }`}
+                  title={m.nicht_gesendet}
+                >
+                  ⚠ Nicht gesendet – bitte noch einmal schreiben
+                </div>
+              )}
               <div className={`mt-0.5 text-right text-[10px] ${meins ? "text-white/70" : "text-tinte-leise"}`}>
                 {new Date(m.created_at).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })}
                 {(meins || darfLoeschen) && (
                   <button
-                    onClick={() => confirm("Nachricht löschen?") && onDelete(m.id)}
+                    onClick={() => void frage("Nachricht löschen?", "Löschen", true).then((ok) => { if (ok) void onDelete(m.id); })}
                     className="ml-2 underline"
                   >
                     löschen

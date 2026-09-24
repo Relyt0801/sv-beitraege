@@ -3,6 +3,8 @@ import ReactDOM from "react-dom/client";
 import App from "./App";
 import { StoreProvider } from "./store";
 import { Fehlerfang } from "./components/Fehlerfang";
+import { Verbindungshinweis } from "./components/Verbindungshinweis";
+import { MelderProvider } from "./components/Melder";
 // Keine eigenen Schriften: Die App nutzt die Systemschrift des Geraets –
 // San Francisco auf iPhone, iPad und Mac. Nichts wird nachgeladen, also
 // auch keine IP-Adresse an Dritte (DSGVO).
@@ -25,9 +27,13 @@ if ("serviceWorker" in navigator) {
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <Fehlerfang>
-      <StoreProvider>
-        <App />
-      </StoreProvider>
+      {/* Ganz außen, damit auch die Datenspeicher Meldungen zeigen können. */}
+      <MelderProvider>
+        <Verbindungshinweis />
+        <StoreProvider>
+          <App />
+        </StoreProvider>
+      </MelderProvider>
     </Fehlerfang>
   </React.StrictMode>,
 );

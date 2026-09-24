@@ -14,6 +14,7 @@ import { useStore } from "../store";
 import { Sheet } from "./Sheet";
 import { normalize } from "../lib/logic";
 
+import { frage } from "../lib/melder";
 const TEAM_CHAT_TITLE = "Stufenteam";
 
 /**
@@ -378,8 +379,8 @@ function TicketChat({ topic, onBack }: { topic: Topic; onBack: () => void }) {
               <button
                 className="iconbtn"
                 title="Ticket löschen"
-                onClick={() => {
-                  if (confirm("Diese Frage samt Verlauf löschen?")) {
+                onClick={async () => {
+                  if (await frage("Diese Frage samt Verlauf löschen?", "Löschen", true)) {
                     void deleteTopic(topic.id);
                     onBack();
                   }
@@ -553,8 +554,8 @@ function TicketListe({
   offene, erledigt, onBack, onOpen,
 }: { offene: Topic[]; erledigt: Topic[]; onBack: () => void; onOpen: (id: string) => void }) {
   const { unreadCount, deleteTopic } = useTopics();
-  const loeschen = (t: Topic) => () => {
-    if (confirm(`Das Ticket „${t.title}" endgültig löschen?\n\nAlle Nachrichten darin verschwinden.`))
+  const loeschen = (t: Topic) => async () => {
+    if (await frage(`Das Ticket „${t.title}" endgültig löschen?\n\nAlle Nachrichten darin verschwinden.`, "Löschen", true))
       void deleteTopic(t.id);
   };
   return (

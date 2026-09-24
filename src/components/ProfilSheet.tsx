@@ -11,10 +11,11 @@ import { passwortProblem } from "../lib/passwort";
 import { SELECTABLE_COMMITTEES, committeeIcon, committeeLabel, rolleUndKomitees } from "../lib/committees";
 import { ladeKomiteeAntraege, stelleKomiteeAntrag } from "../lib/komitee-antrag";
 import { useTheme } from "../lib/theme";
-import { abmelden, enablePush, pushConfigured, pushPermission } from "../lib/push";
+import { abmelden, enablePush, pushConfigured, pushDiagnose, pushPermission } from "../lib/push";
 import { ProtokollSheet } from "./ProtokollSheet";
 import { RechtLinks } from "./Rechtliches";
 
+import { frage, meldeFehler } from "../lib/melder";
 /** Das eigene Profil: Bild, Namensfarbe, Passwort, Komitee-Wechsel, Hilfe. */
 export function ProfilSheet({
   open,
@@ -233,7 +234,7 @@ export function ProfilSheet({
                     if (r.ok) {
                       setHatAntrag(true);
                       setAntragOffen(false);
-                    } else alert(r.error);
+                    } else meldeFehler(r.error || "Das hat nicht geklappt.");
                   }}
                   className="ml-auto rounded-lg bg-brand px-4 py-2 text-sm font-bold text-white disabled:opacity-40"
                 >
@@ -285,7 +286,7 @@ export function ProfilSheet({
                   const r = await enablePush();
                   setPushBusy(false);
                   setPerm(pushPermission());
-                  if (!r.ok && r.error) alert("Hat nicht geklappt: " + r.error);
+                  if (!r.ok && r.error) meldeFehler("Hat nicht geklappt: " + r.error);
                 }}
                 className="mt-2 rounded-lg bg-brand px-3.5 py-2 text-sm font-bold text-white disabled:opacity-40"
               >
@@ -293,6 +294,7 @@ export function ProfilSheet({
               </button>
             </>
           )}
+          <Pushpruefung />
         </div>
       )}
 
@@ -366,7 +368,7 @@ export function ProfilSheet({
         {hasSupabase && (
           <button
             className={`${row} text-red-600 dark:text-red-400`}
-            onClick={() => confirm("Wirklich abmelden?") && void abmelden()}
+            onClick={() => void frage("Wirklich abmelden?", "Abmelden", true).then((ok) => { if (ok) void abmelden(); })}
           >
             <span>↩</span> Abmelden
           </button>
@@ -376,6 +378,7 @@ export function ProfilSheet({
       <div className="mt-5">
         <RechtLinks />
       </div>
+      <Versionszeile />
 
       <button className="btn-primary mt-4" onClick={onClose}>
         Fertig
@@ -389,5 +392,46 @@ export function ProfilSheet({
         />
       )}
     </Sheet>
+  );
+}
+
+/**
+ * "Kommt bei mir nichts an?" – aufklappbar, damit es niemanden stört, der kein
+ * Problem hat. Bis eben verschluckte die App jeden Fehler beim Versenden (siehe
+ * sendePush in src/lib/push.ts); jetzt steht hier, woran es hängt.
+ */
+function Pushpruefung() {
+  const [offen, setOffen] = useState(false);
+  const [text, setText] = useState("Wird geprüft …");
+
+  useEffect(() => {
+    if (!offen) return;
+    let aktuell = true;
+    setText("Wird geprüft …");
+    void pushDiagnose().then((t) => aktuell && setText(t));
+    return () => {
+      aktuell = false;
+    };
+  }, [offen]);
+
+  return (
+    <div className="mt-2">
+      <button onClick={() => setOffen((v) => !v)} className="text-[12px] font-semibold text-tinte-leise underline">
+        {offen ? "Prüfung ausblenden" : "Kommt nichts an? Hier prüfen"}
+      </button>
+      {offen && <p className="mt-1.5 text-[12px] leading-relaxed text-tinte-matt">{text}</p>}
+    </div>
+  );
+}
+
+/** Welcher Stand läuft gerade? Hilft bei der Fehlersuche ("ist das schon live?"). */
+function Versionszeile() {
+  const commit = typeof __BAU_COMMIT__ === "string" ? __BAU_COMMIT__ : "dev";
+  const zeit = typeof __BAU_ZEIT__ === "string" ? __BAU_ZEIT__ : "";
+  const datum = zeit ? new Date(zeit).toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" }) : "";
+  return (
+    <p className="mt-3 text-center text-[11px] text-tinte-leise">
+      Stand {datum} · Version {commit}
+    </p>
   );
 }

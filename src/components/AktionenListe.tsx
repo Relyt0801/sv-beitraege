@@ -8,6 +8,7 @@ import { Sheet } from "./Sheet";
 import { Avatar } from "./Avatar";
 import { abHeute, tagLang, uhr, zeitText, type Aktion, type Termin } from "../lib/termine";
 
+import { frage } from "../lib/melder";
 /**
  * Die ausgeschriebenen Aktionen im Events-Reiter.
  *
@@ -282,8 +283,8 @@ function SchichtSheet({
                   {z.zugeteilt ? "eingeteilt ✓" : "einteilen"}
                 </button>
                 <button
-                  onClick={() => {
-                    if (!confirm(`${z.name} von der Meldung für diese Schicht streichen?`)) return;
+                  onClick={async () => {
+                    if (!(await frage(`${z.name} von der Meldung für diese Schicht streichen?`, "Streichen", true))) return;
                     if (z.zugeteilt && z.sid) void zuteilen(schicht.id, z.sid, false);
                     void bewerbungEntfernen(schicht.id, z.uid);
                   }}
@@ -381,8 +382,8 @@ function SchichtSheet({
           Mich selbst dazu melden
         </button>
         <button
-          onClick={() => {
-            if (confirm(`Diese Schicht am ${tagLang(schicht.datum)} ganz löschen? Eingeteilte verlieren sie aus dem Kalender.`)) {
+          onClick={async () => {
+            if (await frage(`Diese Schicht am ${tagLang(schicht.datum)} ganz löschen? Eingeteilte verlieren sie aus dem Kalender.`, "Löschen", true)) {
               void loeschen(schicht.id);
               onSchliessen();
             }
