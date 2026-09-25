@@ -112,15 +112,17 @@ export async function pushAnTeam(title: string, body: string, url = "./#events")
 }
 
 /**
- * Meldung an Schüler UND ihre Eltern, z. B. "Q1.1 bezahlt" oder "Mithilfe
- * eingetragen". Je Person eigener Text; der Server sucht Konten und Eltern.
+ * Meldung an Schüler und ihre Eltern, z. B. "Q1.1 bezahlt". Je Person eigener
+ * Text; der Server sucht Konten und Eltern. ohneEltern: nur die Person selbst
+ * (Beitragshilfen / Mithilfe – das geht die Eltern nichts an).
  */
 export async function pushAnPersonen(
   liste: { student_id: string; title: string; body: string }[],
   url = "./#kasse",
+  opt?: { ohneEltern?: boolean },
 ): Promise<void> {
   if (!liste.length) return;
-  await sendePush({ an_personen: liste, url });
+  await sendePush({ an_personen: liste, url, ...(opt?.ohneEltern ? { ohne_eltern: true } : {}) });
 }
 
 /** Push zu einem Termin an alle, die ihn sehen dürfen. */

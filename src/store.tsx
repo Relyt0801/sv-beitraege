@@ -475,7 +475,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             id: c.id, student_id: c.student_id, titel: c.titel, punkte: c.punkte, datum: c.datum,
           }),
         );
-        void pushAnPersonen([hilfeText(c, studentsRef.current)]);
+        void pushAnPersonen([hilfeText(c, studentsRef.current)], "./#kasse", { ohneEltern: true });
       }
     },
     [mode],
@@ -499,7 +499,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             neu.map((c) => ({ id: c.id, student_id: c.student_id, titel: c.titel, punkte: c.punkte, datum: c.datum })),
           ),
         );
-        void pushAnPersonen(neu.map((c) => hilfeText(c, studentsRef.current)));
+        void pushAnPersonen(neu.map((c) => hilfeText(c, studentsRef.current)), "./#kasse", { ohneEltern: true });
       }
     },
     [mode],

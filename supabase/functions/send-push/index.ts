@@ -43,10 +43,12 @@ Deno.serve(async (req) => {
       return json({ passt });
     }
 
-    const { probe, auch_selbst, event_id, termin_id, an_team, user_ids, chat_item_id, angepinnt, an_personen, eltern_info_id, title: directTitle, body: directBody, url: wunschUrl } = koerper as {
+    const { probe, auch_selbst, ohne_eltern, event_id, termin_id, an_team, user_ids, chat_item_id, angepinnt, an_personen, eltern_info_id, title: directTitle, body: directBody, url: wunschUrl } = koerper as {
       probe?: boolean;
       /** Bestätigung an sich selbst (z. B. sich selbst in eine Schicht eingeteilt). */
       auch_selbst?: boolean;
+      /** an_personen: nur die Person selbst, nicht ihre Eltern (Beitragshilfen). */
+      ohne_eltern?: boolean;
       eltern_info_id?: string;
       an_personen?: { student_id: string; title: string; body: string }[];
       chat_item_id?: string;
@@ -192,13 +194,18 @@ Deno.serve(async (req) => {
       body = kurz(info.text, 200);
       ziel = "./#infos";
     } else if (Array.isArray(an_personen) && an_personen.length) {
-      // Zahlung / Beitragshilfe eingetragen: an die Person selbst und ihre Eltern.
+      // Zahlung eingetragen: an die Person selbst und ihre Eltern.
+      // Beitragshilfe/Mithilfe (ohne_eltern): nur an die Person selbst.
       // Auslösen darf nur das Team oder wer die passende Befugnis hat.
       if (!verwaltet) return json({ error: "nicht erlaubt" }, 403);
       const liste = an_personen.slice(0, 300);
       const sids = [...new Set(liste.map((x) => String(x.student_id)))];
       const { data: pr } = await supabase.from("profiles").select("user_id, student_id").in("student_id", sids);
-      const { data: pc } = await supabase.from("parent_children").select("user_id, student_id").in("student_id", sids);
+      // Auch ältere App-Versionen ohne ohne_eltern: Mithilfe-Meldungen beginnen mit 🙌.
+      const nurPerson = Boolean(ohne_eltern) || liste.every((x) => String(x.title || "").startsWith("🙌"));
+      const { data: pc } = nurPerson
+        ? { data: [] as { user_id: string; student_id: string }[] }
+        : await supabase.from("parent_children").select("user_id, student_id").in("student_id", sids);
       const wer = (sid: string) => [
         ...(pr || []).filter((x: { student_id: string }) => x.student_id === sid),
         ...(pc || []).filter((x: { student_id: string }) => x.student_id === sid),

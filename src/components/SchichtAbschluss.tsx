@@ -75,6 +75,8 @@ export function SchichtAbschluss() {
           title: `🙌 Mithilfe eingetragen (+${a.prozent} %)`,
           body: `${a.titel} am ${tagLang(t.datum)}${vornamen.get(sid) ? ` – ${vornamen.get(sid)}` : ""}. Danke fürs Mithelfen!`,
         })),
+        "./#kasse",
+        { ohneEltern: true },
       );
     }
   }
