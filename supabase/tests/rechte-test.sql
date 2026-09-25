@@ -1,7 +1,7 @@
 -- ============================================================
 -- Rechte-Test: Wer darf was? (Stand 24.09.2026)
 --
--- Spielt 106 Angriffe und erlaubte Aktionen mit echten Konten JEDER Rolle
+-- Spielt 110 Angriffe und erlaubte Aktionen mit echten Konten JEDER Rolle
 -- durch – direkt in der Datenbank, genau so, wie es ein Angreifer über die
 -- Schnittstelle versuchen würde (Rolle "authenticated" bzw. "anon" mit der
 -- Kennung der Person, Zugriffsregeln greifen wie in der App).
@@ -144,6 +144,10 @@ insert into faelle values
   ('kassenwart', 'Automatische Buchung löschen', 'delete from kasse_buchungen where id=''{AUTO}''', 'V'),
   ('kassenwart', 'Sicherung zurückspielen', 'select snapshot_zuruecksetzen(''{SNAP}'')', 'V'),
   ('kassenwart', 'Eltern-Info schreiben', 'insert into eltern_infos(titel,text,angeheftet,autor) values (''x'',''x'',false,auth.uid())', 'E'),
+  ('stufenteam', 'Event an alle anlegen', 'insert into events(type,title,body,audience,created_by) values (''info'',''x'',''x'',''all'',auth.uid())', 'E'),
+  ('kassenwart', 'Event an alle anlegen', 'insert into events(type,title,body,audience,created_by) values (''info'',''x'',''x'',''all'',auth.uid())', 'E'),
+  ('stufenteam', 'Rote Warnung senden', 'insert into events(type,title,body,audience,is_warning,created_by) values (''nachricht'',''x'',''x'',''all'',true,auth.uid())', 'V'),
+  ('kassenwart', 'Rote Warnung senden', 'insert into events(type,title,body,audience,is_warning,created_by) values (''nachricht'',''x'',''x'',''all'',true,auth.uid())', 'E'),
   ('stufenteam', 'IBAN ändern', 'update bank_konto set iban=iban where true', 'V'),
   ('kassenwart', 'IBAN ändern', 'update bank_konto set iban=iban where true', 'E'),
   ('kassenwart', 'Beitrag eintragen', 'update students set terms = jsonb_set(terms,''{Q1.1,status}'',''"bezahlt"'') where id=''{S_FREMD}''', 'E'),

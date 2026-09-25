@@ -25,7 +25,7 @@ cd ..
 ## Rechte-Test (Supabase)
 
 Supabase → SQL Editor → Inhalt von `supabase/tests/rechte-test.sql` einfügen → Run.
-Oben steht die Summe. Erwartet: `105 ok / 0 Abweichungen / 0 unklar / 1 Hinweise`.
+Oben steht die Summe. Erwartet: `109 ok / 0 Abweichungen / 0 unklar / 1 Hinweise`.
 Jede Zeile mit `!! ABWEICHUNG` ist eine Lücke – sofort melden.
 Der eine Hinweis (Kassenwart kann eine Buchung als „automatisch“ markieren) ist bekannt.
 

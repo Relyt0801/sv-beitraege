@@ -16,7 +16,8 @@ interface EventsValue {
   /** eventId -> Stimmen mit Person, für die Initialen-Kreise */
   voters: Record<string, { option_id: string; user_id: string }[]>;
   reads: Set<string>;
-  createEvent: (e: NewEvent) => Promise<void>;
+  /** melden: Mitteilung an alle, die das Event sehen (Standard: ja). */
+  createEvent: (e: NewEvent, opt?: { melden?: boolean }) => Promise<void>;
   deleteEvent: (id: string) => Promise<void>;
   vote: (eventId: string, optionId: string, multiple: boolean) => Promise<void>;
   markRead: (eventId: string) => void;
@@ -177,7 +178,7 @@ export function EventsProvider({ children }: { children: ReactNode }) {
 
   // ---------- actions ----------
   const createEvent = useCallback(
-    async (e: NewEvent) => {
+    async (e: NewEvent, opt?: { melden?: boolean }) => {
       if (!hasSupabase) {
         const item: EventItem = {
           id: uuid(),
@@ -233,7 +234,7 @@ export function EventsProvider({ children }: { children: ReactNode }) {
         await supabase!.from("event_committees").insert(e.tags.map((tag) => ({ event_id: ev.id, tag })));
       // Push-Benachrichtigung auslösen. Scheitert sie, bleibt das Event trotzdem
       // stehen – der Fehler erscheint in der Prüfung im Profil.
-      await sendePush({ event_id: ev.id });
+      if (opt?.melden !== false) await sendePush({ event_id: ev.id });
       await loadAll();
     },
     [loadAll, myVotes, reads, saveLocal],

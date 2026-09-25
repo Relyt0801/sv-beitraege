@@ -35,6 +35,7 @@ export function EventComposer({
   const [showResults, setShowResults] = useState(true);
   const [anon, setAnon] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [melden, setMelden] = useState(true);
 
   const list = useMemo(() => {
     const n = normalize(q);
@@ -45,6 +46,7 @@ export function EventComposer({
     setType("info"); setTitle(""); setBody(""); setIsWarning(false);
     setAudience("all"); setTargets(new Set()); setTags(new Set()); setQ("");
     setOptions(["", ""]); setMultiple(false); setMinOne(true); setShowResults(true); setAnon(true);
+    setMelden(true);
   }
 
   function selectUnpaid() {
@@ -69,7 +71,7 @@ export function EventComposer({
       poll_show_results: showResults,
       poll_anon: anon,
       options: type === "umfrage" ? options.map((o) => o.trim()).filter(Boolean) : [],
-    });
+    }, { melden });
     setBusy(false);
     reset();
     onClose();
@@ -237,6 +239,15 @@ export function EventComposer({
           <div className="px-2 pt-1 text-xs text-tinte-leise">{targets.size} ausgewählt</div>
         </div>
       )}
+
+      <div className="mb-2 mt-1 grid gap-1">
+        <Toggle label="Mitteilung an alle, die es sehen" on={melden} set={setMelden} />
+        <p className="text-[11px] leading-relaxed text-tinte-leise">
+          {melden
+            ? "Kommt bei allen an, die Mitteilungen erlaubt haben."
+            : "Still veröffentlichen: steht nur im Reiter Events, niemand bekommt ein Pop-up."}
+        </p>
+      </div>
 
       <button className="btn-primary mt-2" disabled={busy || !title.trim()} onClick={submit}>
         {busy ? "…" : "Veröffentlichen"}

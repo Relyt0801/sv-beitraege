@@ -691,7 +691,7 @@ function Main() {
         </button>
       )}
 
-      {tab === "events" && canEditData && (
+      {tab === "events" && isStaff && (
         <button
           onClick={() => setShowComposer(true)}
           className="fixed bottom-[calc(var(--leiste)+1rem)] right-4 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-brand text-white shadow-[0_8px_24px_-6px_rgb(var(--brand)/.6)] transition duration-200 ease-ios active:scale-90 sm:right-6 lg:bottom-8"

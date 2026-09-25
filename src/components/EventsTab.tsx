@@ -17,7 +17,7 @@ import { PrivatTerminSheet } from "./KalenderSyncSheet";
 import { frage } from "../lib/melder";
 export function EventsTab() {
   const { events, ready, myVotes, voteCounts, voters, reads, vote, deleteEvent, markRead } = useEvents();
-  const { canEditData, isStaff, can } = useRole();
+  const { isStaff, can } = useRole();
   const { anfrageEntscheiden, termineGesehen } = useTermine();
 
   // Kalender und Terminformular liegen ueber dem Reiter, nicht darin.
@@ -152,9 +152,9 @@ export function EventsTab() {
           mine={myVotes[e.id] || []}
           counts={voteCounts[e.id] || {}}
           stimmen={voters[e.id] || []}
-          canSeeResults={e.poll_show_results || canEditData}
+          canSeeResults={e.poll_show_results || isStaff}
           zeigeWaehler={!e.poll_anon || isStaff}
-          canDelete={canEditData}
+          canDelete={isStaff}
           onVote={(optId) => vote(e.id, optId, e.poll_multiple)}
           onDelete={async () => {
             if (await frage("Dieses Event wirklich löschen?", "Löschen", true)) void deleteEvent(e.id);

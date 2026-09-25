@@ -749,3 +749,17 @@ Ausführlich: `docs/TESTBERICHT-2026-09-24.md`.
 - Termin ändern: Schalter „Änderung als Mitteilung schicken“ (Standard aus).
   An = alle, die den Termin sehen, bekommen „Geändert: Datum · Zeit · Ort“.
 - Schichten aus Aktionsvorlagen melden sich wie bisher immer.
+
+## Events: ganzes Team, auch still
+
+- Events (Info, Nachricht, Umfrage) legt jetzt das **ganze Team** an:
+  Stufenteam, Kassenwart, Admin, Sprecher, stv. Sprecher – in der App (Knopf)
+  und in der Datenbank gleich (`supabase/events-ganzes-team.sql`, eingespielt).
+  Vorher: Knopf nur für Admin/Sprecher, Datenbank nur für Stufenteam/
+  Kassenwart/Admin – Sprecher bekamen einen Fehler.
+- Schüler und Eltern legen keine Events und Termine an. Eigene Termine sehen
+  sie nur über die Kalender-Verbindung zum eigenen Handy (nur auf ihrem Gerät).
+- Rote Warnungen weiterhin nur Kassenwart und Admin.
+- Beim Veröffentlichen: Schalter „Mitteilung an alle, die es sehen“
+  (Standard an) – aus = still, nur im Reiter Events.
+- Rechte-Test um 4 Fälle erweitert (Events Team, Warnungen).
