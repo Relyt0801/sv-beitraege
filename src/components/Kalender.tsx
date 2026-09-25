@@ -9,6 +9,8 @@ import {
 import { Icon } from "./Icon";
 import { TerminZeile } from "./Wochenstreifen";
 
+import { usePrivatTermine, useKalenderDemo } from "../lib/kalender-sync";
+import { KalenderSyncSheet } from "./KalenderSyncSheet";
 type Ansicht = "monat" | "woche" | "tag";
 
 /** Was auf dem Umschalter steht und was die Pfeile bewegen. */
@@ -40,7 +42,15 @@ export function Kalender({
   onNeu?: (datum: string) => void;
   onOeffnen: (t: Termin) => void;
 }) {
-  const { termine, meineKomitees, meineStudentIds } = useTermine();
+  const { termine: stufenTermine, meineKomitees, meineStudentIds } = useTermine();
+  // Testphase: eigene Termine aus dem Handy-Kalender grau dazu (nur Testkonten)
+  const kalenderDemo = useKalenderDemo();
+  const privat = usePrivatTermine(kalenderDemo);
+  const termine = useMemo(
+    () => (privat.termine.length ? [...stufenTermine, ...privat.termine] : stufenTermine),
+    [stufenTermine, privat.termine],
+  );
+  const [syncOffen, setSyncOffen] = useState(false);
   const { can, isStaff } = useRole();
   const darfAnlegen = Boolean(onNeu) && (isStaff || can("termine.manage"));
 
@@ -116,7 +126,7 @@ export function Kalender({
                 key={a}
                 onClick={() => setAnsicht(a)}
                 aria-pressed={ansicht === a}
-                className={`rounded-lg px-3 py-1.5 text-[12px] font-bold transition ${
+                className={`rounded-lg px-2.5 py-1.5 text-[12px] font-bold transition min-[380px]:px-3 ${
                   ansicht === a
                     ? "bg-white text-brand-dark shadow-card dark:bg-slate-900 dark:text-brand-soft"
                     : "text-tinte-matt dark:text-slate-300"
@@ -128,16 +138,19 @@ export function Kalender({
           </div>
           <button
             onClick={() => setAnker(heute)}
-            className="ml-auto rounded-lg border border-papier-linie px-3 py-1.5 text-[12px] font-semibold text-tinte-matt transition active:scale-95 dark:border-slate-700 dark:text-slate-300"
+            className="ml-auto shrink-0 rounded-lg border border-papier-linie px-3 py-1.5 text-[12px] font-semibold text-tinte-matt transition active:scale-95 dark:border-slate-700 dark:text-slate-300"
           >
             Heute
           </button>
           {darfAnlegen && (
             <button
               onClick={() => onNeu!(anker)}
-              className="flex items-center gap-1.5 rounded-lg bg-brand px-3 py-1.5 text-[12px] font-bold text-white transition active:scale-95"
+              aria-label="Termin eintragen"
+              className="flex shrink-0 items-center gap-1 whitespace-nowrap rounded-lg bg-brand px-3 py-1.5 text-[12px] font-bold text-white transition active:scale-95"
             >
-              ＋ Termin
+              {/* Auf schmalen Handys (iPhone SE) nur das Plus – sonst fällt der
+                  Knopf rechts aus dem Bild. */}
+              ＋<span className="hidden min-[380px]:inline">Termin</span>
             </button>
           )}
         </div>
@@ -146,6 +159,21 @@ export function Kalender({
       {/* ------------------------------------------------ Inhalt */}
       <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] sm:px-5">
         <div className="mx-auto max-w-5xl">
+          {/* Testphase: Kalender-Verbindung, nur für die Testkonten */}
+          {kalenderDemo && (
+            <button
+              onClick={() => setSyncOffen(true)}
+              className="mb-2.5 flex w-full items-center gap-2 rounded-xl border border-dashed border-brand/40 px-3 py-2 text-left text-[12px] font-semibold text-brand-dark transition active:scale-[0.99] dark:text-brand-soft"
+            >
+              <span aria-hidden>📱⇄</span>
+              <span className="min-w-0 flex-1 truncate">
+                {privat.termine.length
+                  ? `Mit deinem Kalender verbunden · eigene Termine gestrichelt`
+                  : "Mit deinem Handy-Kalender verbinden"}
+              </span>
+              <span className="shrink-0 rounded-full bg-brand/10 px-2 py-0.5 text-[10px] font-bold">Test</span>
+            </button>
+          )}
           {ansicht === "monat" && (
             <MonatsAnsicht
               anker={anker}
@@ -176,6 +204,7 @@ export function Kalender({
           )}
         </div>
       </div>
+      {kalenderDemo && <KalenderSyncSheet open={syncOffen} onClose={() => setSyncOffen(false)} />}
     </div>
   );
 }
@@ -249,7 +278,9 @@ function MonatsAnsicht({
                     {liste.slice(0, 4).map((t) => (
                       <span
                         key={t.id}
-                        className={`h-1.5 w-1.5 rounded-full ${meins(t) ? "bg-brand" : "bg-tinte-leise/60"}`}
+                        className={`h-1.5 w-1.5 rounded-full ${
+                          t.privat ? "border border-tinte-leise/70" : meins(t) ? "bg-brand" : "bg-tinte-leise/60"
+                        }`}
                       />
                     ))}
                   </span>
@@ -258,9 +289,11 @@ function MonatsAnsicht({
                       <span
                         key={t.id}
                         className={`truncate rounded px-1 py-0.5 text-[10px] font-semibold leading-tight ${
-                          meins(t)
-                            ? "bg-brand text-white"
-                            : "bg-papier-matt text-tinte-matt dark:bg-slate-800 dark:text-slate-300"
+                          t.privat
+                            ? "border border-dashed border-tinte-leise/50 bg-transparent text-tinte-matt dark:text-slate-300"
+                            : meins(t)
+                              ? "bg-brand text-white"
+                              : "bg-papier-matt text-tinte-matt dark:bg-slate-800 dark:text-slate-300"
                         }`}
                       >
                         {t.icon ? `${t.icon} ` : t.von ? `${uhr(t.von)} ` : ""}
@@ -337,13 +370,15 @@ function WochenAnsicht({
                     key={t.id}
                     onClick={() => onOeffnen(t)}
                     className={`min-w-0 rounded-lg px-1.5 py-1 text-left transition active:scale-[.98] ${
-                      meins(t)
-                        ? "bg-brand text-white"
-                        : "bg-papier-matt text-tinte dark:bg-slate-800 dark:text-slate-200"
+                      t.privat
+                        ? "border border-dashed border-tinte-leise/50 bg-transparent text-tinte-matt dark:text-slate-300"
+                        : meins(t)
+                          ? "bg-brand text-white"
+                          : "bg-papier-matt text-tinte dark:bg-slate-800 dark:text-slate-200"
                     }`}
                   >
                     <span className="block truncate text-[11px] font-bold leading-tight">
-                      {t.icon ? `${t.icon} ` : ""}
+                      {t.privat ? "📱 " : t.icon ? `${t.icon} ` : ""}
                       {t.titel}
                     </span>
                     <span
@@ -395,7 +430,7 @@ function TagesAnsicht({
               <button
                 onClick={() => onOeffnen(t)}
                 className={`card flex w-full items-start gap-3 p-4 text-left transition active:scale-[.99] ${
-                  meins(t) ? "!border-brand/40 bg-brand/5 dark:bg-brand/10" : ""
+                  t.privat ? "!border-dashed !border-tinte-leise/40 !bg-transparent !shadow-none" : meins(t) ? "!border-brand/40 bg-brand/5 dark:bg-brand/10" : ""
                 }`}
               >
                 <span className="zahl w-[4.6rem] shrink-0 pt-0.5 text-[13px] font-bold text-brand">
@@ -406,7 +441,9 @@ function TagesAnsicht({
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="block text-[15px] font-bold leading-tight">
-                    {t.icon ? (
+                    {t.privat ? (
+                      <span className="mr-1" aria-hidden>📱</span>
+                    ) : t.icon ? (
                       <span className="mr-1">{t.icon}</span>
                     ) : (
                       t.sichtbar === "komitee" && t.tags[0] && (
@@ -418,7 +455,11 @@ function TagesAnsicht({
                   <span className="mt-0.5 block text-[12px] text-tinte-matt">
                     {[
                       t.ort,
-                      t.plaetze ? `${t.personen.length}/${t.plaetze} eingeteilt` : umfangText(t, committeeLabel),
+                      t.privat
+                        ? "aus deinem Kalender – nur du siehst ihn"
+                        : t.plaetze
+                          ? `${t.personen.length}/${t.plaetze} eingeteilt`
+                          : umfangText(t, committeeLabel),
                     ]
                       .filter(Boolean)
                       .join(" · ")}

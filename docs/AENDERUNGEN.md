@@ -11,6 +11,43 @@ ausführlich (auf Deutsch); hier steht der Überblick dazu.
 
 ---
 
+
+## Testphase 25.09.2026: Termine mit dem eigenen Handy-Kalender verbinden
+
+**Nur für die Testkonten `admin.test` / `test.admin`** (und im Demo-Modus) –
+alle anderen sehen nichts davon, auch die Function lehnt sie ab.
+
+Eine Web-App darf den Kalender des Handys nicht direkt lesen oder beschreiben
+(dafür gibt es im Browser keine Schnittstelle). Deshalb zwei Richtungen über
+den offenen iCal-Standard, den iPhone, Google und Outlook alle können:
+
+- **App → Handy (Abo):** `supabase/functions/kalender` liefert unter einem
+  persönlichen Link (`webcal://…/functions/v1/kalender?u=…&t=…`) alle Termine,
+  die diese Person in der App sieht – dieselbe Regel wie `kann_termin_sehen()`.
+  Im Link steckt ein HMAC-Schlüssel (mit dem service_role-Key gebildet), weil
+  Kalender-Apps sich nicht anmelden können. Das iPhone holt neue und geänderte
+  Termine selbst ab (etwa stündlich), Google alle paar Stunden.
+- **Handy → App:** Der iCal-Link des eigenen Kalenders (iCloud „Öffentlicher
+  Kalender“, Google „Privatadresse“, Outlook „ICS-Link“) wird im Browser
+  gespeichert; die Function holt ihn (nur von iCloud/Google/Outlook, kein
+  offener Proxy) und gibt die Termine zurück. Sie stehen gestrichelt mit 📱 im
+  Wochenstreifen und im Kalender – nur für diese Person, nur auf diesem Gerät,
+  nur zum Ansehen.
+- **Einzelner Termin:** „In meinen Kalender übernehmen“ im Termin lädt eine
+  `.ics`-Datei, das Handy bietet dann „Hinzufügen“ an.
+- Ändern geht jeweils nur dort, wo ein Termin herkommt. Echtes Zwei-Wege-
+  Bearbeiten bräuchte einen eigenen Kalender-Server (CalDAV) – bewusst nicht
+  Teil dieser Testphase.
+- `supabase/functions/kalender/ics.ts`: iCal schreiben und lesen ohne
+  Abhängigkeiten – Zeitzone Europe/Berlin, Wiederholungen (täglich,
+  wöchentlich auch an mehreren Tagen, monatlich, jährlich, COUNT/UNTIL,
+  EXDATE, verschobene Einzeltermine), über die Zeitumstellung hinweg richtig.
+- Nebenbei: Im großen Kalender passt „＋ Termin“ jetzt auch aufs iPhone SE.
+
+Deploy der Function: `supabase functions deploy kalender --no-verify-jwt`
+(ohne JWT-Prüfung, weil Kalender-Apps keinen Login schicken; die Function
+prüft selbst).
+
 ## Nachtrag 3 (24.09.2026): Übernommen aus dem alten Entwurf PR #1
 
 PR #1 (18.09.) lag noch auf einem viel älteren Stand und ließ sich nicht mehr

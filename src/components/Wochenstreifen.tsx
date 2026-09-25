@@ -6,6 +6,8 @@ import {
   tagLang, umfangText, zeitText, type Termin,
 } from "../lib/termine";
 import { Icon } from "./Icon";
+import { usePrivatTermine, useKalenderDemo } from "../lib/kalender-sync";
+import { KalenderSyncSheet } from "./KalenderSyncSheet";
 
 /**
  * Die kleine Übersicht ganz oben im Events-Reiter.
@@ -22,7 +24,15 @@ export function Wochenstreifen({
   /** Termin antippen: ansehen – und fürs Team ändern oder löschen */
   onOeffnen?: (t: Termin) => void;
 }) {
-  const { termine, meineKomitees, meineStudentIds, ready, neueTermine } = useTermine();
+  const { termine: stufenTermine, meineKomitees, meineStudentIds, ready, neueTermine } = useTermine();
+  // Testphase: eigene Termine aus dem Handy-Kalender grau dazu (nur Testkonten)
+  const kalenderDemo = useKalenderDemo();
+  const privat = usePrivatTermine(kalenderDemo);
+  const termine = useMemo(
+    () => (privat.termine.length ? [...stufenTermine, ...privat.termine] : stufenTermine),
+    [stufenTermine, privat.termine],
+  );
+  const [syncOffen, setSyncOffen] = useState(false);
   // Das früheste Neue – dorthin springt der Hinweis
   const erstesNeues = useMemo(
     () => termine.filter((t) => neueTermine.has(t.id)).sort((a, b) => a.datum.localeCompare(b.datum))[0] || null,
@@ -96,6 +106,21 @@ export function Wochenstreifen({
         </button>
       </div>
 
+      {/* Testphase: Kalender-Verbindung, nur für die Testkonten */}
+      {kalenderDemo && (
+        <button
+          onClick={() => setSyncOffen(true)}
+          className="mb-2.5 flex w-full items-center gap-2 rounded-xl border border-dashed border-brand/40 px-3 py-2 text-left text-[12px] font-semibold text-brand-dark transition active:scale-[0.99] dark:text-brand-soft"
+        >
+          <span aria-hidden>📱⇄</span>
+          <span className="min-w-0 flex-1 truncate">
+            {privat.termine.length ? `Mit deinem Kalender verbunden · ${privat.termine.length} eigene Termine` : "Mit deinem Handy-Kalender verbinden"}
+          </span>
+          <span className="shrink-0 rounded-full bg-brand/10 px-2 py-0.5 text-[10px] font-bold">Test</span>
+        </button>
+      )}
+      {kalenderDemo && <KalenderSyncSheet open={syncOffen} onClose={() => setSyncOffen(false)} />}
+
       {/* Neu dazugekommen? Dann ein Tipp direkt dorthin. */}
       {erstesNeues && (
         <button
@@ -144,7 +169,15 @@ export function Wochenstreifen({
                   <span
                     key={t.id}
                     className={`h-1.5 w-1.5 rounded-full ${
-                      neueTermine.has(t.id) ? "bg-red-500" : aktiv ? "bg-white/80" : meins(t) ? "bg-brand" : "bg-tinte-leise/50"
+                      neueTermine.has(t.id)
+                        ? "bg-red-500"
+                        : aktiv
+                          ? "bg-white/80"
+                          : t.privat
+                            ? "border border-tinte-leise/70"
+                            : meins(t)
+                              ? "bg-brand"
+                              : "bg-tinte-leise/50"
                     }`}
                   />
                 ))}
@@ -201,7 +234,9 @@ export function TerminZeile({ t, meins, onClick }: { t: Termin; meins: boolean; 
       </span>
       <span className="min-w-0 flex-1">
         <span className="block truncate text-[13px] font-semibold">
-          {t.icon ? (
+          {t.privat ? (
+            <span className="mr-1" aria-hidden>📱</span>
+          ) : t.icon ? (
             <span className="mr-1">{t.icon}</span>
           ) : (
             t.sichtbar === "komitee" && t.tags[0] && (
@@ -213,7 +248,11 @@ export function TerminZeile({ t, meins, onClick }: { t: Termin; meins: boolean; 
         <span className="block truncate text-[11px] text-tinte-leise">
           {[
             t.ort,
-            t.plaetze ? `${t.personen.length}/${t.plaetze} eingeteilt` : umfangText(t, committeeLabel),
+            t.privat
+              ? "dein Kalender"
+              : t.plaetze
+                ? `${t.personen.length}/${t.plaetze} eingeteilt`
+                : umfangText(t, committeeLabel),
           ]
             .filter(Boolean)
             .join(" · ")}
@@ -228,7 +267,11 @@ export function TerminZeile({ t, meins, onClick }: { t: Termin; meins: boolean; 
   );
 
   const klasse = `flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left ${
-    meins ? "bg-brand/5 dark:bg-brand/10" : "bg-papier-matt dark:bg-slate-800/60"
+    t.privat
+      ? "border border-dashed border-tinte-leise/40"
+      : meins
+        ? "bg-brand/5 dark:bg-brand/10"
+        : "bg-papier-matt dark:bg-slate-800/60"
   }`;
 
   return (
