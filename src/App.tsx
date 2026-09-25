@@ -34,6 +34,7 @@ import { useKostenAnfragen } from "./lib/kosten";
 import { KassenKopf } from "./components/KassenKopf";
 import { EventComposer } from "./components/EventComposer";
 import { AktionSheet } from "./components/AktionSheet";
+import { SchichtAbschluss } from "./components/SchichtAbschluss";
 import { ElternProvider, useEltern } from "./eltern-store";
 import { ElternApp } from "./components/ElternApp";
 import { Icon, type IconName } from "./components/Icon";
@@ -763,6 +764,8 @@ function Main() {
       {/* Nicht zwei Begrüßungen übereinander: erst die Einführung, danach der
           Hinweis zum Home-Bildschirm. */}
       {!showTour && <InstallOverlay />}
+      {/* Schicht vorbei: Stufenteam vergibt die Beitragspunkte mit einem Tipp */}
+      {!showTour && <SchichtAbschluss />}
       <Tour
         open={showTour}
         steps={

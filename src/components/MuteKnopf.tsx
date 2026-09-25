@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { useRole, type Profile } from "../auth/RoleProvider";
+import { hasSupabase, supabase } from "../lib/supabase";
+import { meldeFehler } from "../lib/melder";
 import { Sheet } from "./Sheet";
 
 /** Wie lange eine Chat-Sperre laeuft. Rollen-Reiter und Chat teilen sich die Liste. */
@@ -24,8 +26,16 @@ export const isBanned = (p: Pick<Profile, "chat_banned_until" | "chat_ban_perman
  * wenn das Profil der Person nicht sichtbar ist (dann scheitert das Sperren
  * ohnehin an der RLS).
  */
-export function MuteKnopf({ userId, name, icon = false }: { userId: string | null; name?: string; icon?: boolean }) {
-  const { can, uid, profiles, opUserId, setBan } = useRole();
+export function MuteKnopf({
+  userId, name, icon = false, topicId,
+}: {
+  userId: string | null;
+  name?: string;
+  icon?: boolean;
+  /** Im Chat gesperrt: dann steht dort eine Zeile „… wurde gesperrt“. */
+  topicId?: string;
+}) {
+  const { can, uid, profiles, opUserId, setBan, refreshProfiles } = useRole();
   const [offen, setOffen] = useState(false);
 
   const ziel = profiles.find((p) => p.user_id === userId);
@@ -38,7 +48,19 @@ export function MuteKnopf({ userId, name, icon = false }: { userId: string | nul
 
   function sperren(ms: number | null) {
     setOffen(false);
-    void setBan(zielId, ms ? new Date(Date.now() + ms).toISOString() : null, ms === null);
+    const bis = ms ? new Date(Date.now() + ms).toISOString() : null;
+    if (!topicId || !hasSupabase) {
+      void setBan(zielId, bis, ms === null);
+      return;
+    }
+    // Sperre und Chat-Zeile in einem Schritt auf dem Server – die Zeile kann
+    // so niemand fälschen, und das geschützte Konto lässt sich nicht sperren.
+    void supabase!
+      .rpc("chat_sperren", { ziel: zielId, bis, dauerhaft: ms === null, topic: topicId })
+      .then(({ error }) => {
+        if (error) meldeFehler("Sperren hat nicht geklappt: " + error.message);
+        else refreshProfiles();
+      });
   }
 
   function entsperren() {

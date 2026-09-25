@@ -27,6 +27,7 @@ export function ChatBlasen({
     <div className="space-y-2 py-3">
       {liste.length === 0 && <p className="py-12 text-center text-sm text-tinte-leise">{leerText}</p>}
       {liste.map((m) => {
+        if (m.type === "system") return <SystemZeile key={m.id} m={m} darfLoeschen={darfLoeschen} onDelete={onDelete} />;
         const meins = m.created_by === uid;
         return (
           <div key={m.id} className={`flex items-end gap-2 ${meins ? "justify-end" : "justify-start"}`}>
@@ -65,7 +66,7 @@ export function ChatBlasen({
                     löschen
                   </button>
                 )}
-                {!meins && <MuteKnopf userId={m.created_by} name={m.author} />}
+                {!meins && <MuteKnopf userId={m.created_by} name={m.author} topicId={m.topic_id} />}
               </div>
             </div>
           </div>
@@ -76,6 +77,33 @@ export function ChatBlasen({
           dahinter (vorher lag der Freiraum als padding hinter der Marke). */}
       <div aria-hidden className="h-[calc(var(--leiste)+5rem)] lg:h-24" />
       <div ref={ende} />
+    </div>
+  );
+}
+
+/**
+ * Zeile ohne Absender, mitten im Verlauf: „… wurde gesperrt“. Schmal, kursiv,
+ * in Serifenschrift – damit sie niemand für eine Nachricht hält.
+ */
+export function SystemZeile({
+  m, darfLoeschen, onDelete,
+}: { m: TopicItem; darfLoeschen: boolean; onDelete: (id: string) => void }) {
+  return (
+    <div className="flex justify-center px-6 py-1" role="status">
+      <p className="max-w-[34rem] text-center font-serif text-[12px] italic leading-snug tracking-wide text-tinte-leise">
+        {m.body}
+        <span className="ml-1.5 not-italic opacity-70">
+          · {new Date(m.created_at).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })}
+        </span>
+        {darfLoeschen && (
+          <button
+            onClick={() => void frage("Diese Zeile entfernen?", "Entfernen", true).then((ok) => { if (ok) onDelete(m.id); })}
+            className="ml-1.5 not-italic underline opacity-70"
+          >
+            entfernen
+          </button>
+        )}
+      </p>
     </div>
   );
 }

@@ -1,7 +1,7 @@
 -- ============================================================
--- Rechte-Test: Wer darf was? (Stand 24.09.2026)
+-- Rechte-Test: Wer darf was? (Stand 25.09.2026)
 --
--- Spielt 115 Angriffe und erlaubte Aktionen mit echten Konten JEDER Rolle
+-- Spielt 125 Angriffe und erlaubte Aktionen mit echten Konten JEDER Rolle
 -- durch – direkt in der Datenbank, genau so, wie es ein Angreifer über die
 -- Schnittstelle versuchen würde (Rolle "authenticated" bzw. "anon" mit der
 -- Kennung der Person, Zugriffsregeln greifen wie in der App).
@@ -162,7 +162,17 @@ insert into faelle values
   ('admin', 'Protokoll löschen', 'delete from audit_log where true', 'V'),
   ('admin', 'Protokoll ändern', 'update audit_log set klartext=''x'' where true', 'V'),
   ('admin', 'Protokoll lesen', 'select 1 from audit_log limit 1', 'E'),
-  ('admin', 'Rolle vergeben', 'update profiles set role=''stufenteam'' where user_id=''{UID_SCHUELER}''', 'E');
+  ('admin', 'Rolle vergeben', 'update profiles set role=''stufenteam'' where user_id=''{UID_SCHUELER}''', 'E'),
+  ('schueler', 'Schicht-Punkte selbst vergeben', 'select schicht_abschliessen(''00000000-0000-4000-8000-000000000000''::uuid, true)', 'V'),
+  ('schueler', 'Jemanden im Chat sperren', 'select chat_sperren(''{UID_ADMIN}''::uuid, now() + interval ''1 hour'', false, null)', 'V'),
+  ('eltern', 'Schicht-Punkte selbst vergeben', 'select schicht_abschliessen(''00000000-0000-4000-8000-000000000000''::uuid, true)', 'V'),
+  ('eltern', 'Jemanden im Chat sperren', 'select chat_sperren(''{UID_ADMIN}''::uuid, now() + interval ''1 hour'', false, null)', 'V'),
+  ('anon', 'Schicht-Punkte selbst vergeben', 'select schicht_abschliessen(''00000000-0000-4000-8000-000000000000''::uuid, true)', 'V'),
+  ('anon', 'Jemanden im Chat sperren', 'select chat_sperren(''{UID_ADMIN}''::uuid, now() + interval ''1 hour'', false, null)', 'V'),
+  ('stufenteam', 'Geschütztes OP-Konto sperren', 'select chat_sperren(op_user(), null, true, null)', 'V'),
+  ('admin', 'Geschütztes OP-Konto sperren', 'select chat_sperren(op_user(), null, true, null)', 'V'),
+  ('s_komitee', 'Sperr-Zeile im Chat fälschen', 'insert into topic_items(topic_id,type,body,author,created_by) values (''{CHAT_EIGEN}'',''system'',''x wurde gesperrt'','''',auth.uid())', 'V'),
+  ('s_komitee', 'Fremde Nachricht umschreiben', 'update topic_items set body=''x'' where topic_id=''{CHAT_EIGEN}'' and created_by is distinct from auth.uid() and type <> ''todo''', 'V');
 
 create temp table erg (rolle text, fall text, erwartet text, ergebnis text, detail text) on commit drop;
 grant insert, select on erg to authenticated, anon;

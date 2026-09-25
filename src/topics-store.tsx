@@ -11,7 +11,8 @@ async function chatPush(itemId: string, angepinnt = false): Promise<void> {
   await sendePush({ chat_item_id: itemId, angepinnt });
 }
 
-export type TopicItemType = "nachricht" | "todo" | "umfrage";
+/** "system": Zeile ohne Absender, z. B. „… wurde gesperrt“ – schreibt nur der Server. */
+export type TopicItemType = "nachricht" | "todo" | "umfrage" | "system";
 
 export type Visibility = "privat" | "personen" | "stufenteam" | "komitee" | "custom";
 export type TopicKind = "ordner" | "chat" | "ticket";

@@ -1,5 +1,5 @@
 // Supabase Edge Function: verschickt Web-Push bei einem neuen Event.
-// Deploy:  supabase functions deploy send-push
+// Deploy:  supabase functions deploy send-push   (JWT-Prüfung bleibt an)
 // Secrets: supabase secrets set VAPID_PUBLIC_KEY=... VAPID_PRIVATE_KEY=... VAPID_SUBJECT=mailto:du@example.com
 // (SUPABASE_URL und SUPABASE_SERVICE_ROLE_KEY sind in Edge Functions automatisch gesetzt.)
 
@@ -43,8 +43,10 @@ Deno.serve(async (req) => {
       return json({ passt });
     }
 
-    const { probe, event_id, termin_id, an_team, user_ids, chat_item_id, angepinnt, an_personen, eltern_info_id, title: directTitle, body: directBody, url: wunschUrl } = koerper as {
+    const { probe, auch_selbst, event_id, termin_id, an_team, user_ids, chat_item_id, angepinnt, an_personen, eltern_info_id, title: directTitle, body: directBody, url: wunschUrl } = koerper as {
       probe?: boolean;
+      /** Bestätigung an sich selbst (z. B. sich selbst in eine Schicht eingeteilt). */
+      auch_selbst?: boolean;
       eltern_info_id?: string;
       an_personen?: { student_id: string; title: string; body: string }[];
       chat_item_id?: string;
@@ -65,6 +67,44 @@ Deno.serve(async (req) => {
       oeffentlich,
       privat,
     );
+
+    // Schicht vorbei (Aufruf kommt alle 5 Minuten aus der Datenbank, pg_cron).
+    // Nimmt keinen Text und keine Empfänger an: der Server sucht die beendeten
+    // Schichten selbst und markiert sie, jede Meldung geht also genau einmal
+    // raus. Darum reicht hier der öffentliche Schlüssel (JWT-Prüfung der
+    // Plattform bleibt an), eine Anmeldung als Person braucht es nicht.
+    if (koerper.schicht_ende === true) {
+      const { data: offen, error: offenFehler } = await supabase.rpc("schicht_enden_offen");
+      if (offenFehler) return json({ error: offenFehler.message }, 500);
+      const liste = (offen || []) as { id: string; titel: string; icon: string | null; datum: string; personen: number }[];
+      if (!liste.length) return json({ sent: 0 });
+      // Sofort markieren – ein zweiter Aufruf findet sie nicht mehr.
+      await supabase.from("termine").update({ abschluss_gemeldet_at: new Date().toISOString() }).in("id", liste.map((x) => x.id));
+      const { data: team } = await supabase.from("profiles").select("user_id").or("role.in.(stufenteam,kassenwart,admin,sprecher,stv_sprecher),is_op.eq.true");
+      const ids = [...new Set((team || []).map((p: { user_id: string }) => p.user_id))];
+      const { data: subs } = ids.length ? await supabase.from("push_subscriptions").select("*").in("user_id", ids) : { data: [] };
+      const erste = liste[0];
+      const payload = JSON.stringify({
+        title: liste.length === 1 ? `${erste.icon ? erste.icon + " " : ""}Schicht vorbei: ${erste.titel}`.slice(0, 80) : `${liste.length} Schichten sind vorbei`,
+        body: liste.length === 1
+          ? `${erste.personen} ${erste.personen === 1 ? "Person war" : "Personen waren"} eingeteilt. Beitragspunkte jetzt vergeben?`
+          : "Beitragspunkte für die Eingeteilten jetzt vergeben?",
+        url: "./#events",
+        tag: "schicht-ende",
+      });
+      let sent = 0;
+      await Promise.all((subs || []).map(async (s: { endpoint: string; subscription: unknown }) => {
+        try {
+          await webpush.sendNotification(s.subscription as webpush.PushSubscription, payload, { TTL: 86400, urgency: "high" });
+          sent++;
+        } catch (err) {
+          const code = (err as { statusCode?: number })?.statusCode;
+          if (code === 403 || code === 404 || code === 410) await supabase.from("push_subscriptions").delete().eq("endpoint", s.endpoint);
+        }
+      }));
+      console.log("Schicht-Ende gemeldet:", liste.length, "| gesendet:", sent);
+      return json({ sent, schichten: liste.length });
+    }
 
     // Nur angemeldete Personen dürfen Benachrichtigungen auslösen. Vorher
     // reichte der öffentliche Schlüssel der App – damit hätte jeder beliebigen
@@ -300,7 +340,9 @@ Deno.serve(async (req) => {
     }
 
     // Niemand bekommt eine Benachrichtigung über die eigene Nachricht.
-    userIds = userIds.filter((u) => u !== selbst);
+    // Ausnahme: eine Bestätigung im Direkt-Modus (z. B. man teilt sich selbst ein).
+    const selbstErlaubt = Boolean(auch_selbst) && Array.isArray(user_ids) && user_ids.length > 0;
+    if (!selbstErlaubt) userIds = userIds.filter((u) => u !== selbst);
     const pakete = einzeln ?? [{ ids: userIds, title, body }];
     const alleIds = [...new Set(pakete.flatMap((p) => p.ids))];
 

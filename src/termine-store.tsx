@@ -40,6 +40,9 @@ interface TermineValue {
   bewerbungEntfernen: (terminId: string, userId: string) => Promise<void>;
   /** Stufenteam: viele Termine auf einmal löschen (z. B. eine ganze Reihe). */
   loeschenViele: (ids: string[]) => Promise<void>;
+  /** Schicht vorbei: Beitragspunkte an die Eingeteilten vergeben (oder bewusst nicht).
+   *  Gibt die Zahl der Einträge zurück, oder einen Fehlertext. */
+  abschliessen: (terminId: string, vergeben: boolean) => Promise<number | string>;
   /** Wer bin ich? Fuer "habe ich mich schon eingetragen". */
   meineUid: string | null;
 
@@ -265,7 +268,9 @@ export function TermineProvider({ children }: { children: ReactNode }) {
   const felder = (t: NeuerTermin) => ({
     aktion_id: t.aktion_id ?? null,
     plaetze: t.plaetze ?? null,
-    icon: t.icon ?? null,
+    icon: t.icon?.trim() || null,
+    farbe: t.farbe || null,
+    frei: Boolean(t.frei),
     titel: t.titel.trim(),
     beschreibung: t.beschreibung.trim(),
     ort: t.ort.trim(),
@@ -486,6 +491,7 @@ export function TermineProvider({ children }: { children: ReactNode }) {
       const empfaenger = (p || []).map((x: { user_id: string }) => x.user_id);
       if (t && empfaenger.length) {
         const wann = `${kurzDatum(t.datum)}${t.von ? ` (${uhr(t.von)}${t.bis ? `–${uhr(t.bis)}` : ""})` : ""}`;
+        // auchSelbst: wer sich selbst einteilt, bekommt die Bestätigung trotzdem.
         void pushToUsers(
           empfaenger,
           `${t.icon ? t.icon + " " : ""}${t.titel}`,
@@ -493,6 +499,7 @@ export function TermineProvider({ children }: { children: ReactNode }) {
             ? `Das Stufenteam hat dich für ${wann} eingeteilt.`
             : `Das Stufenteam hat dich für ${wann} wieder ausgetragen.`,
           "./#events",
+          { auchSelbst: true },
         );
       }
     },
@@ -514,6 +521,21 @@ export function TermineProvider({ children }: { children: ReactNode }) {
       }
     },
     [laden],
+  );
+
+  const abschliessen = useCallback<TermineValue["abschliessen"]>(
+    async (terminId, vergeben) => {
+      const t = termineRef.current.find((x) => x.id === terminId);
+      if (!hasSupabase) {
+        setTermine((prev) => prev.map((x) => (x.id === terminId ? { ...x, abschluss: vergeben ? "vergeben" : "ohne" } : x)));
+        return vergeben && t ? t.personen.length : 0;
+      }
+      const { data, error } = await supabase!.rpc("schicht_abschliessen", { tid: terminId, vergeben });
+      if (error) return error.message;
+      setTermine((prev) => prev.map((x) => (x.id === terminId ? { ...x, abschluss: vergeben ? "vergeben" : "ohne" } : x)));
+      return Number(data) || 0;
+    },
+    [],
   );
 
   const loeschenViele = useCallback<TermineValue["loeschenViele"]>(
@@ -713,6 +735,7 @@ export function TermineProvider({ children }: { children: ReactNode }) {
         zuteilen,
         bewerbungEntfernen,
         loeschenViele,
+        abschliessen,
         meineUid,
         vorsitz,
         meineVorsitze,

@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useTermine } from "../termine-store";
+import { useStore } from "../store";
+import { frage } from "../lib/melder";
 import { Sheet } from "./Sheet";
 import {
   WOCHENTAG_WAHL, heuteKey, plusTage, tagLang, uhr, wiederholungsTage,
@@ -22,7 +24,14 @@ const ICONS = ["🧇", "🍰", "🥣", "☕", "🍪", "🎪", "🧹", "📦", "�
  * ohne dass die ganze Reihe auseinanderfällt.
  */
 export function AktionSheet({ offen, onSchliessen }: { offen: boolean; onSchliessen: () => void }) {
-  const { aktionen, aktionAnlegen, aktionAendern, anlegenViele } = useTermine();
+  const { aktionen, termine: alleTermine, aktionAnlegen, aktionAendern, aktionLoeschen, anlegenViele } = useTermine();
+  // Wie viel eine Schicht zählt, kommt aus dem Beiträge-Reiter – so passen
+  // Aktionen und eingetragene Mithilfe immer zusammen.
+  const { templates } = useStore();
+  const vorlagen = useMemo(
+    () => [...templates].sort((a, b) => a.sort - b.sort || a.punkte - b.punkte),
+    [templates],
+  );
 
   const [aktionId, setAktionId] = useState<string>("");
   const [neuTitel, setNeuTitel] = useState("");
@@ -164,6 +173,32 @@ export function AktionSheet({ offen, onSchliessen }: { offen: boolean; onSchlies
         ))}
       </div>
 
+      {gewaehlt && (
+        <AktionVerwalten
+          aktion={gewaehlt}
+          vorlagen={vorlagen}
+          schichtenAb={alleTermine.filter((t) => t.aktion_id === gewaehlt.id && t.datum >= heuteKey()).length}
+          schichtenGesamt={alleTermine.filter((t) => t.aktion_id === gewaehlt.id).length}
+          onProzent={(p) => void aktionAendern(gewaehlt.id, { prozent: p })}
+          onEntfernen={async () => {
+            const alle = alleTermine.filter((t) => t.aktion_id === gewaehlt.id).length;
+            if (alle === 0) {
+              if (await frage(`Die Vorlage „${gewaehlt.titel}" löschen?`, "Löschen", true)) {
+                await aktionLoeschen(gewaehlt.id);
+                setAktionId("");
+              }
+              return;
+            }
+            // Mit Schichten: nicht löschen (sonst verschwinden sie samt
+            // Einteilung), sondern aus der Auswahl nehmen.
+            if (await frage(`„${gewaehlt.titel}" aus der Auswahl nehmen? Die ${alle} vorhandenen Schichten bleiben stehen.`, "Entfernen", true)) {
+              await aktionAendern(gewaehlt.id, { geschlossen: true });
+              setAktionId("");
+            }
+          }}
+        />
+      )}
+
       {!aktionId && (
         <div className="mb-3 rounded-2xl border border-papier-linie p-3 dark:border-slate-700">
           <div className="mb-1.5 text-[12px] font-semibold text-tinte-leise">… oder neue Aktion</div>
@@ -187,19 +222,8 @@ export function AktionSheet({ offen, onSchliessen }: { offen: boolean; onSchlies
               </button>
             ))}
           </div>
-          <label className="flex items-center gap-2">
-            <span className="text-[12px] font-semibold text-tinte-leise">Zählt als</span>
-            <input
-              type="number"
-              min={0}
-              max={100}
-              className="w-16 rounded-lg border border-papier-linie bg-white px-2 py-1.5 text-center text-[14px] font-bold text-brand dark:border-slate-700 dark:bg-slate-800"
-              value={neuProzent}
-              onChange={(e) => setNeuProzent(e.target.value)}
-            />
-            <span className="text-[12px] font-bold text-brand">%</span>
-            <span className="text-[11px] text-tinte-leise">Mithilfe je Schicht</span>
-          </label>
+          <div className="mb-1 text-[12px] font-semibold text-tinte-leise">Zählt wie (aus dem Beiträge-Reiter)</div>
+          <ProzentWahl vorlagen={vorlagen} wert={Number(neuProzent) || 0} setzen={(p) => setNeuProzent(String(p))} />
         </div>
       )}
 
@@ -377,3 +401,76 @@ export function AktionSheet({ offen, onSchliessen }: { offen: boolean; onSchlies
 }
 
 export type { Aktion };
+
+type Vorlage = { id: string; titel: string; punkte: number };
+
+/** Prozent aus den Beitrags-Vorlagen wählen – keine freie Zahl mehr. */
+function ProzentWahl({ vorlagen, wert, setzen }: { vorlagen: Vorlage[]; wert: number; setzen: (p: number) => void }) {
+  if (!vorlagen.length) {
+    return <p className="text-[12px] text-tinte-leise">Im Beiträge-Reiter sind noch keine Möglichkeiten angelegt.</p>;
+  }
+  const passt = vorlagen.some((v) => v.punkte === wert);
+  return (
+    <div className="grid gap-1">
+      {vorlagen.map((v) => (
+        <button
+          key={v.id}
+          onClick={() => setzen(v.punkte)}
+          className={`flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[12px] font-semibold transition ${
+            v.punkte === wert ? "bg-brand/10 text-brand ring-1 ring-brand/40" : "bg-papier-matt dark:bg-slate-800"
+          }`}
+        >
+          <span className="min-w-0 flex-1 truncate">{v.titel}</span>
+          <span className="zahl shrink-0 font-bold text-brand">+{v.punkte} %</span>
+        </button>
+      ))}
+      {!passt && (
+        <p className="text-[11px] font-semibold text-amber-600">
+          Zählt gerade +{wert} % – das steht so nicht im Beiträge-Reiter. Bitte eine Zeile wählen.
+        </p>
+      )}
+    </div>
+  );
+}
+
+/** Gewählte Aktion: Prozent angleichen oder aus der Liste nehmen. */
+function AktionVerwalten({
+  aktion, vorlagen, schichtenAb, schichtenGesamt, onProzent, onEntfernen,
+}: {
+  aktion: Aktion;
+  vorlagen: Vorlage[];
+  schichtenAb: number;
+  schichtenGesamt: number;
+  onProzent: (p: number) => void;
+  onEntfernen: () => void;
+}) {
+  const [offen, setOffen] = useState(false);
+  const passt = vorlagen.some((v) => v.punkte === aktion.prozent);
+  return (
+    <div className="mb-3 rounded-2xl border border-papier-linie p-3 dark:border-slate-700">
+      <div className="flex items-center gap-2">
+        <span className="min-w-0 flex-1 text-[12px] text-tinte-leise">
+          {schichtenAb > 0 ? `${schichtenAb} kommende Schicht${schichtenAb === 1 ? "" : "en"}` : "keine kommenden Schichten"}
+          {" · zählt "}
+          <span className={`font-bold ${passt ? "text-brand" : "text-amber-600"}`}>+{aktion.prozent} %</span>
+        </span>
+        <button onClick={() => setOffen(!offen)} className="shrink-0 text-[12px] font-bold text-brand">
+          {offen ? "fertig" : "anpassen"}
+        </button>
+      </div>
+      {!passt && !offen && (
+        <p className="mt-1 text-[11px] font-semibold text-amber-600">
+          Passt nicht zum Beiträge-Reiter – unter „anpassen" angleichen.
+        </p>
+      )}
+      {offen && (
+        <div className="mt-2">
+          <ProzentWahl vorlagen={vorlagen} wert={aktion.prozent} setzen={onProzent} />
+          <button onClick={onEntfernen} className="mt-2 w-full rounded-lg py-2 text-[12px] font-bold text-red-500">
+            {schichtenGesamt === 0 ? "Vorlage löschen" : "Aus der Auswahl nehmen"}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}

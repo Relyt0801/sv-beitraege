@@ -127,9 +127,9 @@ function AktionKarte({
                     ? "bg-bezahlt-grund text-bezahlt dark:bg-emerald-500/20 dark:text-emerald-300"
                     : "bg-white text-tinte-matt dark:bg-slate-900 dark:text-slate-300"
                 }`}
-                title="eingeteilt von Plätzen"
+                title={voll ? "Alle Plätze sind vergeben" : "eingeteilt von Plätzen"}
               >
-                {belegt}/{plaetze}
+                {voll ? `voll · ${belegt}/${plaetze}` : `${belegt}/${plaetze}`}
               </span>
 
               {darfVerteilen ? (
@@ -142,6 +142,10 @@ function AktionKarte({
               ) : t.personen.some((sid) => meineStudentIds.includes(sid)) ? (
                 <span className="shrink-0 rounded-lg bg-bezahlt-grund px-2.5 py-1.5 text-[12px] font-bold text-bezahlt dark:bg-emerald-500/20 dark:text-emerald-300">
                   du bist eingeteilt ✓
+                </span>
+              ) : voll && !ich ? (
+                <span className="shrink-0 rounded-lg px-2.5 py-1.5 text-[12px] font-bold text-tinte-leise">
+                  voll belegt
                 </span>
               ) : (
                 <button
@@ -185,7 +189,7 @@ function SchichtSheet({
   aktion: Aktion | null;
   onSchliessen: () => void;
 }) {
-  const { bewerbungen, zuteilen, bewerben, bewerbungEntfernen, loeschen } = useTermine();
+  const { termine, aktionen, bewerbungen, zuteilen, bewerben, bewerbungEntfernen, loeschen } = useTermine();
   const [suche, setSuche] = useState("");
   const { profiles } = useRole();
   const { students, punkte, settings } = useStore();
@@ -202,6 +206,21 @@ function SchichtSheet({
 
   const nachId = useMemo(() => new Map(students.map((s) => [s.id, s])), [students]);
 
+  // Punkte, die schon "unterwegs" sind: wer in anderen, noch nicht
+  // abgeschlossenen Schichten eingeteilt ist, bekommt sie ja noch. Ohne das
+  // stünde jemand mit drei geplanten Schichten weiter ganz oben.
+  const eingeplant = useMemo(() => {
+    const prozent = new Map(aktionen.map((a) => [a.id, a.prozent]));
+    const m: Record<string, number> = {};
+    for (const t of termine) {
+      if (t.id === schicht.id || !t.aktion_id || t.abschluss) continue;
+      const p = prozent.get(t.aktion_id) || 0;
+      if (!p) continue;
+      for (const sid of t.personen) m[sid] = (m[sid] || 0) + p;
+    }
+    return m;
+  }, [termine, aktionen, schicht.id]);
+
   const liste = useMemo(() => {
     const zeilen = gemeldet.map((uid) => {
       const sid = studentVon.get(uid) || null;
@@ -210,7 +229,8 @@ function SchichtSheet({
         uid,
         sid,
         name: s ? `${s.nachname}, ${s.vorname}` : profile[uid]?.anzeigename || "Unbekannt",
-        prozent: sid ? prozentVon(punkte[sid] || 0, settings) : 0,
+        prozent: sid ? prozentVon((punkte[sid] || 0) + (eingeplant[sid] || 0), settings) : 0,
+        geplant: sid ? eingeplant[sid] || 0 : 0,
         zugeteilt: Boolean(sid && schicht.personen.includes(sid)),
       };
     });
@@ -218,7 +238,7 @@ function SchichtSheet({
     return zeilen.sort(
       (a, b) => Number(b.zugeteilt) - Number(a.zugeteilt) || a.prozent - b.prozent || a.name.localeCompare(b.name, "de"),
     );
-  }, [gemeldet, studentVon, nachId, profile, punkte, settings, schicht.personen]);
+  }, [gemeldet, studentVon, nachId, profile, punkte, settings, schicht.personen, eingeplant]);
 
   // Zugeteilte, die sich nie gemeldet haben (vom Team direkt gesetzt)
   const ohneMeldung = schicht.personen.filter((sid) => !liste.some((z) => z.sid === sid));
@@ -241,12 +261,25 @@ function SchichtSheet({
         </button>
       </div>
 
-      <div className="mb-3 flex items-center gap-2 rounded-xl bg-papier-matt px-3 py-2.5 dark:bg-slate-800">
-        <span className="text-[13px] font-semibold text-tinte-matt">Eingeteilt</span>
+      <div
+        className={`mb-3 flex items-center gap-2 rounded-xl px-3 py-2.5 ${
+          schicht.personen.length >= plaetze
+            ? "bg-bezahlt-grund text-bezahlt dark:bg-emerald-500/20 dark:text-emerald-300"
+            : "bg-papier-matt dark:bg-slate-800"
+        }`}
+      >
+        <span className="text-[13px] font-semibold">
+          {schicht.personen.length >= plaetze ? "Voll belegt ✓" : "Eingeteilt"}
+        </span>
         <span className="zahl ml-auto text-[15px] font-extrabold">
           {schicht.personen.length} / {plaetze}
         </span>
       </div>
+      {schicht.personen.length >= plaetze && (
+        <p className="-mt-1.5 mb-3 text-[11px] leading-relaxed text-tinte-leise">
+          Alle Plätze sind vergeben. Wer eingeteilt ist, lässt sich mit „eingeteilt ✓" wieder austragen.
+        </p>
+      )}
 
       {liste.length === 0 && ohneMeldung.length === 0 ? (
         <p className="rounded-xl border border-dashed border-papier-linie py-8 text-center text-[13px] text-tinte-leise dark:border-slate-700">
@@ -256,7 +289,7 @@ function SchichtSheet({
         <>
           <div className="mb-1.5 flex items-baseline justify-between">
             <h3 className="text-[13px] font-semibold text-tinte-matt">Gemeldet</h3>
-            <span className="text-[11px] text-tinte-leise">wenig Mithilfe zuerst</span>
+            <span className="text-[11px] text-tinte-leise">wenig Mithilfe zuerst · geplante Schichten zählen mit</span>
           </div>
           <ul className="grid gap-1.5">
             {liste.map((z) => (
@@ -270,7 +303,8 @@ function SchichtSheet({
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-[13px] font-semibold">{z.name}</span>
                   <span className="block text-[11px] text-tinte-leise">
-                    bisher <span className="zahl font-semibold">{z.prozent} %</span> Mithilfe
+                    <span className="zahl font-semibold">{z.prozent} %</span> Mithilfe
+                    {z.geplant > 0 && <span> · davon {z.geplant} % eingeplant</span>}
                   </span>
                 </span>
                 <button
@@ -355,7 +389,7 @@ function SchichtSheet({
                         {st.nachname}, {st.vorname}
                       </span>
                       <span className="zahl shrink-0 text-[11px] text-tinte-leise">
-                        {prozentVon(punkte[st.id] || 0, settings)} %
+                        {prozentVon((punkte[st.id] || 0) + (eingeplant[st.id] || 0), settings)} %
                       </span>
                       <span className="shrink-0 text-brand">+ einteilen</span>
                     </button>

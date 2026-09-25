@@ -6,6 +6,7 @@ import { committeeIcon, committeeLabel } from "../lib/committees";
 import { WerHatGestimmt } from "./WerHatGestimmt";
 import { Avatar, PersonName } from "./Avatar";
 import { MuteKnopf } from "./MuteKnopf";
+import { SystemZeile } from "./ChatBlasen";
 import { BannHinweis } from "./BannHinweis";
 import { Sheet } from "./Sheet";
 import { useChatEnde } from "../lib/gescrollt";
@@ -35,7 +36,7 @@ export function KomiteePage({ topic, onBack }: { topic: Topic; onBack: () => voi
   const pins = alle.filter((i) => i.type === "nachricht" && i.pinned);
   const umfragen = alle.filter((i) => i.type === "umfrage");
   const todos = alle.filter((i) => i.type === "todo");
-  const chat = alle.filter((i) => i.type === "nachricht" && !i.pinned);
+  const chat = alle.filter((i) => (i.type === "nachricht" && !i.pinned) || i.type === "system");
 
   // Kommt eine fremde Nachricht, während man auf der Übersicht ist: mitzählen.
   const bisher = useRef(0);
@@ -102,9 +103,23 @@ export function KomiteePage({ topic, onBack }: { topic: Topic; onBack: () => voi
                   <PersonName userId={p.created_by} name={p.author} role={p.author_role} koms={p.author_koms} className="text-[11px] font-semibold" />
                 </div>
                 {(p.created_by === uid || darfLoeschen) && (
-                  <button onClick={() => void frage("Nicht mehr anpinnen?", "Loslösen").then((ok) => { if (ok) void updateItem(p.id, { pinned: false }); })} className="text-tinte-leise">
-                    ✕
-                  </button>
+                  <span className="flex shrink-0 flex-col items-end gap-1.5">
+                    <button
+                      onClick={() => void frage("Nicht mehr anpinnen? Die Nachricht wandert in den Chat.", "Loslösen").then((ok) => { if (ok) void updateItem(p.id, { pinned: false }); })}
+                      className="text-[12px] font-semibold text-tinte-leise"
+                      aria-label="Loslösen"
+                      title="Loslösen – bleibt im Chat"
+                    >
+                      📌✕
+                    </button>
+                    <button
+                      onClick={() => void frage("Diese angepinnte Nachricht ganz löschen?", "Löschen", true).then((ok) => { if (ok) void deleteItem(p.id); })}
+                      className="text-[12px] font-bold text-red-500"
+                      aria-label="Löschen"
+                    >
+                      löschen
+                    </button>
+                  </span>
                 )}
               </div>
             ))}
@@ -333,6 +348,7 @@ function ChatBereich({
       <div className="space-y-2.5 py-3">
         {liste.length === 0 && <p className="py-12 text-center text-sm text-tinte-leise">Noch keine Nachricht.</p>}
         {liste.map((m) => {
+          if (m.type === "system") return <SystemZeile key={m.id} m={m} darfLoeschen={darfLoeschen} onDelete={(id) => void deleteItem(id)} />;
           const meins = m.created_by === uid;
           return (
             <div key={m.id} className={`flex items-end gap-2 ${meins ? "justify-end" : "justify-start"}`}>
@@ -364,7 +380,7 @@ function ChatBereich({
                       löschen
                     </button>
                   )}
-                  {!meins && <MuteKnopf userId={m.created_by} name={m.author} />}
+                  {!meins && <MuteKnopf userId={m.created_by} name={m.author} topicId={m.topic_id} />}
                 </div>
               </div>
             </div>

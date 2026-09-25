@@ -6,7 +6,7 @@ import { useTermine } from "../termine-store";
 import { useRole } from "../auth/RoleProvider";
 import { Sheet } from "./Sheet";
 import {
-  WOCHENTAG_WAHL, heuteKey, plusTage, tagLang, uhr, wiederholungsTage, zeitText,
+  FARBEN, STUNDEN, SYMBOLE, WOCHENTAG_WAHL, heuteKey, istKuerzel, plusTage, tagLang, uhr, wiederholungsTage, zeitText,
   type NeuerTermin, type Sichtbarkeit, type Termin,
 } from "../lib/termine";
 import { committeeLabel } from "../lib/committees";
@@ -67,6 +67,9 @@ export function TerminSheet({
   const [busy, setBusy] = useState(false);
   // Neuer Termin: standardmäßig Mitteilung. Änderung: standardmäßig still.
   const [melden, setMelden] = useState(true);
+  const [farbe, setFarbe] = useState<string | null>(null);
+  const [symbol, setSymbol] = useState("");
+  const [frei, setFrei] = useState(false);
 
   // Beim Öffnen befüllen – bearbeiten heißt: alles steht schon drin.
   useEffect(() => {
@@ -86,6 +89,9 @@ export function TerminSheet({
       setFuerEltern(termin.fuer_eltern);
       setTags(new Set(termin.tags));
       setPersonen(new Set(termin.personen));
+      setFarbe(termin.farbe ?? null);
+      setSymbol(termin.icon ?? "");
+      setFrei(Boolean(termin.frei));
     } else if (entwurf) {
       // Aus einer Anfrage übernommen: alles steht schon drin, das Team
       // muss nur noch prüfen und auf "Eintragen" drücken.
@@ -102,6 +108,9 @@ export function TerminSheet({
       setFuerEltern(entwurf.fuer_eltern);
       setTags(new Set(entwurf.tags));
       setPersonen(new Set(entwurf.personen));
+      setFarbe(entwurf.farbe ?? null);
+      setSymbol(entwurf.icon ?? "");
+      setFrei(Boolean(entwurf.frei));
     } else {
       setTitel("");
       setOrt("");
@@ -116,6 +125,9 @@ export function TerminSheet({
       setFuerEltern(false);
       setTags(new Set());
       setPersonen(new Set());
+      setFarbe(null);
+      setSymbol("");
+      setFrei(false);
     }
     setMelden(!termin);
     setWiederholt(false);
@@ -166,6 +178,13 @@ export function TerminSheet({
       fuer_eltern: fuerEltern,
       tags: sichtbar === "komitee" ? [...tags] : [],
       personen: sichtbar === "personen" ? [...personen] : [],
+      icon: symbol.trim() || null,
+      farbe,
+      frei,
+      // Beim Ändern einer Schicht die Verbindung zur Aktion behalten –
+      // vorher wurde sie hier stillschweigend gelöscht.
+      aktion_id: termin?.aktion_id ?? entwurf?.aktion_id ?? null,
+      plaetze: termin?.plaetze ?? entwurf?.plaetze ?? null,
     };
 
     setBusy(true);
@@ -332,6 +351,101 @@ export function TerminSheet({
             </label>
           </div>
         )}
+
+        {!ganztaegig && (
+          <StundenWahl
+            von={von}
+            bis={bis}
+            setzen={(v, b) => {
+              setVon(v);
+              setBis(b);
+            }}
+          />
+        )}
+      </div>
+
+      {/* ------------------------------------------------ Aussehen */}
+      <div className="mb-3 rounded-2xl border border-papier-linie p-3 dark:border-slate-700">
+        <div className="mb-1.5 text-[12px] font-semibold text-tinte-leise">Farbe im Kalender</div>
+        <div className="mb-3 flex flex-wrap gap-1.5" role="radiogroup" aria-label="Farbe">
+          <button
+            role="radio"
+            aria-checked={farbe === null}
+            onClick={() => setFarbe(null)}
+            className={`flex h-8 items-center rounded-full border px-2.5 text-[12px] font-bold ${
+              farbe === null ? "border-brand text-brand" : "border-papier-linie text-tinte-leise dark:border-slate-700"
+            }`}
+          >
+            Standard
+          </button>
+          {FARBEN.map((f) => (
+            <button
+              key={f.key}
+              role="radio"
+              aria-checked={farbe === f.key}
+              aria-label={f.name}
+              title={f.name}
+              onClick={() => setFarbe(f.key)}
+              className={`h-8 w-8 rounded-full ${f.punkt} transition ${
+                farbe === f.key ? "ring-2 ring-brand ring-offset-2 dark:ring-offset-slate-900" : ""
+              }`}
+            />
+          ))}
+        </div>
+
+        <div className="mb-1.5 text-[12px] font-semibold text-tinte-leise">Zeichen</div>
+        <div className="mb-2 flex flex-wrap gap-1">
+          <button
+            onClick={() => setSymbol("")}
+            className={`h-9 rounded-lg px-2.5 text-[12px] font-bold ${
+              !symbol ? "bg-brand text-white" : "bg-papier-matt text-tinte-matt dark:bg-slate-800 dark:text-slate-300"
+            }`}
+          >
+            keins
+          </button>
+          {SYMBOLE.map((z) => (
+            <button
+              key={z}
+              onClick={() => setSymbol(z)}
+              aria-label={`Zeichen ${z}`}
+              className={`h-9 w-9 rounded-lg text-[18px] leading-none transition ${
+                symbol === z ? "bg-brand/15 ring-2 ring-brand" : "bg-papier-matt dark:bg-slate-800"
+              }`}
+            >
+              {z}
+            </button>
+          ))}
+        </div>
+        <label className="flex items-center gap-2">
+          <span className="shrink-0 text-[12px] font-semibold text-tinte-leise">oder Kürzel</span>
+          <input
+            className="min-w-0 flex-1 rounded-lg border border-papier-linie bg-white px-2.5 py-2 text-[14px] font-bold uppercase dark:border-slate-700 dark:bg-slate-800"
+            placeholder="z. B. M, EK, F7"
+            maxLength={4}
+            value={istKuerzel(symbol) ? symbol : ""}
+            onChange={(e) => setSymbol(e.target.value.replace(/[^A-Za-z0-9]/g, "").toUpperCase().slice(0, 4))}
+          />
+        </label>
+        <p className="mt-1 text-[11px] leading-relaxed text-tinte-leise">
+          Ein Fach-Kürzel steht als kleines Schild im Kalender – gut für Klausuren.
+        </p>
+
+        <div className="mt-3">
+          <Haken
+            an={frei}
+            setzen={(v) => {
+              setFrei(v);
+              if (v) {
+                setGanztaegig(true);
+                if (!farbe) setFarbe("gruen");
+              }
+            }}
+            text="Ferien / unterrichtsfrei"
+          />
+          <p className="mt-1 pl-7 text-[11px] leading-relaxed text-tinte-leise">
+            Färbt die Tage im Kalender durchgehend ein – auch über mehrere Wochen.
+          </p>
+        </div>
       </div>
 
       {/* ------------------------------------------------ Wer */}
@@ -505,6 +619,46 @@ export function TerminSheet({
   );
 }
 
+/** Schnellwahl nach Schulstunden: erste Wahl = Beginn, zweite = Ende. */
+function StundenWahl({ von, bis, setzen }: { von: string; bis: string; setzen: (von: string, bis: string) => void }) {
+  const ab = STUNDEN.find((s) => s.von === von)?.nr ?? null;
+  const bisNr = STUNDEN.find((s) => s.bis === bis)?.nr ?? null;
+  const [warteAufEnde, setWarteAufEnde] = useState(false);
+  return (
+    <div className="mt-2">
+      <div className="mb-1 text-[11px] font-semibold text-tinte-leise">
+        {warteAufEnde ? "Bis zu welcher Stunde?" : "Nach Schulstunden (tippen: Beginn, dann Ende)"}
+      </div>
+      <div className="grid grid-cols-5 gap-1 sm:grid-cols-10">
+        {STUNDEN.map((s) => {
+          const drin = ab !== null && bisNr !== null && s.nr >= ab && s.nr <= bisNr;
+          return (
+            <button
+              key={s.nr}
+              title={`${s.nr}. Stunde: ${s.von}–${s.bis}`}
+              onClick={() => {
+                if (warteAufEnde && ab !== null && s.nr >= ab) {
+                  setzen(STUNDEN[ab - 1].von, s.bis);
+                  setWarteAufEnde(false);
+                } else {
+                  setzen(s.von, s.bis);
+                  setWarteAufEnde(true);
+                }
+              }}
+              className={`rounded-lg py-1.5 text-center leading-tight transition ${
+                drin ? "bg-brand text-white" : "bg-papier-matt text-tinte-matt dark:bg-slate-800 dark:text-slate-300"
+              }`}
+            >
+              <span className="block text-[12px] font-extrabold">{s.nr}.</span>
+              <span className={`block text-[9px] ${drin ? "text-white/85" : "text-tinte-leise"}`}>{s.von}</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function Haken({
   an, setzen, text,
 }: { an: boolean; setzen: (v: boolean) => void; text: string }) {
@@ -555,9 +709,11 @@ export function TerminAnsehen({
           <span className="block font-zahl text-[1.25rem] font-extrabold leading-tight tracking-[-0.02em]">
             {termin_.titel}
           </span>
-          <span className="mt-0.5 block text-[12px] text-tinte-leise">
-            {umfangText(termin_, committeeLabel)}
-          </span>
+          {umfangText(termin_, committeeLabel) && (
+            <span className="mt-0.5 block text-[12px] text-tinte-leise">
+              {umfangText(termin_, committeeLabel)}
+            </span>
+          )}
         </span>
         <button className="iconbtn shrink-0" onClick={onSchliessen} aria-label="Schließen">
           ✕

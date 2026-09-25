@@ -266,6 +266,8 @@ const kette = (st: Staffel) => st.map((x) => `${x.ab} % → ${x.betrag} €`).jo
 /** Schüler: die eigene Kasse, Events, Chats, Profil. */
 export function schuelerSchritte(staffel: Staffel): TourStep[] {
   const voll = staffel[0]?.betrag ?? 50;
+  // Betrag ab 100 % – steht in der Staffel, meist 0 €
+  const bei100 = [...staffel].filter((x) => x.ab <= 100).sort((a, b) => b.ab - a.ab)[0]?.betrag ?? 0;
   return [
     {
       zeichen: "👋",
@@ -283,7 +285,7 @@ export function schuelerSchritte(staffel: Staffel): TourStep[] {
       tab: "kasse",
       anchor: "meine-punkte",
       title: "Mithelfen lohnt sich",
-      text: `Hilfst du bei Aktionen mit, sammelst du Prozent. Je mehr Prozent, desto kleiner der Aufschlag auf dein Abiball-Ticket – ohne Mithilfe ${voll} €, bei 100 % keiner.`,
+      text: `Hilfst du bei Aktionen mit, sammelst du Prozent. Je mehr Prozent, desto kleiner der Aufschlag auf dein Abiball-Ticket – ohne Mithilfe ${voll} €, bei 100 % ${bei100} €.`,
     },
     { tab: "events", anchor: "tab-events", title: "Events", text: "Termine, Aktionen und Abstimmungen vom Stufenteam. Für Aktionen trägst du dich hier ein." },
     { tab: "themen", anchor: "tab-themen", title: "Chats", text: "Hier chattest du mit deinem Komitee und stellst dem Stufenteam Fragen." },

@@ -129,9 +129,11 @@ export async function pushZuTermin(termin_id: string, title?: string, body?: str
 }
 
 /** Push direkt an bestimmte Nutzer senden (via Edge Function). */
-export async function pushToUsers(user_ids: string[], title: string, body: string, url = "./"): Promise<void> {
+export async function pushToUsers(
+  user_ids: string[], title: string, body: string, url = "./", opt?: { auchSelbst?: boolean },
+): Promise<void> {
   if (!user_ids.length) return;
-  await sendePush({ user_ids, title, body, url });
+  await sendePush({ user_ids, title, body, url, ...(opt?.auchSelbst ? { auch_selbst: true } : {}) });
 }
 
 /**

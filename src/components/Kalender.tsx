@@ -3,9 +3,10 @@ import { useTermine } from "../termine-store";
 import { useRole } from "../auth/RoleProvider";
 import { committeeIcon, committeeLabel } from "../lib/committees";
 import {
-  MONATE, WOCHENTAGE, anTag, ausKey, betrifftMich, heuteKey, laeuftAn, monatLang,
+  MONATE, WOCHENTAGE, anTag, ausKey, betrifftMich, farbeVon, freiAn, heuteKey, istKlausur, laeuftAn, monatLang,
   montagVon, plusTage, tagKey, tagLang, uhr, umfangText, zeitText, type Termin,
 } from "../lib/termine";
+import { KuerzelLeiste, Zeichen, chipKlasse, punktKlasse } from "./TerminZeichen";
 import { Icon } from "./Icon";
 import { TerminZeile } from "./Wochenstreifen";
 
@@ -251,18 +252,30 @@ function MonatsAnsicht({
       <div className="grid gap-1 sm:gap-1.5">
         {wochen.map((zeile, i) => (
           <div key={i} className="grid grid-cols-7 gap-1 sm:gap-1.5">
-            {zeile.map((k) => {
-              const liste = anTag(termine, k);
+            {zeile.map((k, spalte) => {
+              const alle = anTag(termine, k);
+              // Ferien laufen als Farbband durch, Klausuren als Kürzel-Zeile –
+              // beides nimmt den normalen Terminen keinen Platz weg.
+              const ferien = freiAn(termine, k);
+              const klausuren = alle.filter((t) => !t.frei && istKlausur(t));
+              const liste = alle.filter((t) => !t.frei && !istKlausur(t));
+              const platz = klausuren.length ? 2 : 3;
               const imMonat = ausKey(k).getMonth() === monat;
               const istHeute = k === heute;
+              const band = ferien ? farbeVon(ferien)?.band ?? "bg-emerald-200/60 dark:bg-emerald-500/20" : "";
+              // Name der Ferien am ersten Tag und am Wochenanfang
+              const ferienName = ferien && (k === ferien.datum || spalte === 0) ? ferien.titel : "";
               return (
                 <button
                   key={k}
                   onClick={() => onTag(k)}
+                  aria-label={`${tagLang(k)}${ferien ? `, ${ferien.titel}` : ""}${alle.length ? `, ${alle.length} Termine` : ""}`}
                   className={`flex min-h-[3.2rem] min-w-0 flex-col gap-0.5 rounded-xl border p-1.5 text-left transition active:scale-[.98] sm:min-h-[6.5rem] sm:p-2 ${
                     istHeute
-                      ? "border-brand bg-brand/5 dark:bg-brand/10"
-                      : "border-papier-linie bg-white hover:bg-papier-matt dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
+                      ? `border-brand ${ferien ? band : "bg-brand/5 dark:bg-brand/10"}`
+                      : ferien
+                        ? `border-transparent ${band}`
+                        : "border-papier-linie bg-white hover:bg-papier-matt dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
                   } ${imMonat ? "" : "opacity-40"}`}
                 >
                   <span
@@ -275,34 +288,31 @@ function MonatsAnsicht({
                   {/* Handy: nur Punkte. In eine 50 px breite Zelle passt
                       "14:0…" – das sagt niemandem etwas. Ab sm die Titel. */}
                   <span className="mt-1 flex flex-wrap gap-0.5 sm:hidden">
-                    {liste.slice(0, 4).map((t) => (
-                      <span
-                        key={t.id}
-                        className={`h-1.5 w-1.5 rounded-full ${
-                          t.privat ? "border border-tinte-leise/70" : meins(t) ? "bg-brand" : "bg-tinte-leise/60"
-                        }`}
-                      />
+                    {klausuren.length > 0 && <span className="h-1.5 w-1.5 rounded-sm bg-tinte dark:bg-slate-200" />}
+                    {liste.slice(0, klausuren.length ? 3 : 4).map((t) => (
+                      <span key={t.id} className={`h-1.5 w-1.5 rounded-full ${punktKlasse(t, meins(t))}`} />
                     ))}
                   </span>
                   <span className="hidden min-w-0 flex-1 flex-col gap-0.5 overflow-hidden sm:flex">
-                    {liste.slice(0, 3).map((t) => (
+                    {ferienName && (
+                      <span className="truncate text-[10px] font-bold leading-tight text-tinte-matt dark:text-slate-200">
+                        {ferien?.icon && !istKlausur(ferien) ? `${ferien.icon} ` : ""}
+                        {ferienName}
+                      </span>
+                    )}
+                    {klausuren.length > 0 && <KuerzelLeiste liste={klausuren} klein max={3} />}
+                    {liste.slice(0, platz).map((t) => (
                       <span
                         key={t.id}
-                        className={`truncate rounded px-1 py-0.5 text-[10px] font-semibold leading-tight ${
-                          t.privat
-                            ? "border border-dashed border-tinte-leise/50 bg-transparent text-tinte-matt dark:text-slate-300"
-                            : meins(t)
-                              ? "bg-brand text-white"
-                              : "bg-papier-matt text-tinte-matt dark:bg-slate-800 dark:text-slate-300"
-                        }`}
+                        className={`truncate rounded px-1 py-0.5 text-[10px] font-semibold leading-tight ${chipKlasse(t, meins(t))}`}
                       >
                         {t.icon ? `${t.icon} ` : t.von ? `${uhr(t.von)} ` : ""}
                         {t.titel}
                       </span>
                     ))}
-                    {liste.length > 3 && (
+                    {liste.length > platz && (
                       <span className="px-1 text-[10px] font-semibold text-tinte-leise">
-                        +{liste.length - 3} weitere
+                        +{liste.length - platz} weitere
                       </span>
                     )}
                   </span>
@@ -337,7 +347,10 @@ function WochenAnsicht({
   return (
     <div className="grid gap-1.5 lg:grid-cols-7">
       {tage.map((k) => {
-        const liste = anTag(termine, k);
+        const alle = anTag(termine, k);
+        const ferien = freiAn(termine, k);
+        const klausuren = alle.filter((t) => !t.frei && istKlausur(t));
+        const liste = alle.filter((t) => !t.frei && !istKlausur(t));
         const istHeute = k === heute;
         const d = ausKey(k);
         return (
@@ -345,8 +358,10 @@ function WochenAnsicht({
             key={k}
             className={`flex min-w-0 gap-2 rounded-xl border p-2 lg:flex-col ${
               istHeute
-                ? "border-brand bg-brand/5 dark:bg-brand/10"
-                : "border-papier-linie bg-white dark:border-slate-800 dark:bg-slate-900"
+                ? `border-brand ${ferien ? farbeVon(ferien)?.band ?? "bg-emerald-200/60 dark:bg-emerald-500/20" : "bg-brand/5 dark:bg-brand/10"}`
+                : ferien
+                  ? `border-transparent ${farbeVon(ferien)?.band ?? "bg-emerald-200/60 dark:bg-emerald-500/20"}`
+                  : "border-papier-linie bg-white dark:border-slate-800 dark:bg-slate-900"
             }`}
           >
             <button
@@ -361,29 +376,35 @@ function WochenAnsicht({
               </span>
             </button>
 
-            {liste.length === 0 ? (
+            {liste.length === 0 && klausuren.length === 0 && !ferien ? (
               <span className="flex-1 self-center text-[11px] text-tinte-leise lg:py-2 lg:text-center">–</span>
             ) : (
               <div className="flex min-w-0 flex-1 flex-col gap-1">
+                {ferien && (
+                  <button
+                    onClick={() => onOeffnen(ferien)}
+                    className="min-w-0 truncate text-left text-[11px] font-bold text-tinte-matt dark:text-slate-200"
+                  >
+                    {ferien.icon && !istKlausur(ferien) ? `${ferien.icon} ` : ""}
+                    {ferien.titel}
+                  </button>
+                )}
+                {klausuren.length > 0 && (
+                  <KlausurKarte liste={klausuren} onOeffnen={onOeffnen} />
+                )}
                 {liste.map((t) => (
                   <button
                     key={t.id}
                     onClick={() => onOeffnen(t)}
-                    className={`min-w-0 rounded-lg px-1.5 py-1 text-left transition active:scale-[.98] ${
-                      t.privat
-                        ? "border border-dashed border-tinte-leise/50 bg-transparent text-tinte-matt dark:text-slate-300"
-                        : meins(t)
-                          ? "bg-brand text-white"
-                          : "bg-papier-matt text-tinte dark:bg-slate-800 dark:text-slate-200"
-                    }`}
+                    className={`min-w-0 rounded-lg px-1.5 py-1 text-left transition active:scale-[.98] ${chipKlasse(t, meins(t))}`}
                   >
                     <span className="block truncate text-[11px] font-bold leading-tight">
-                      {t.privat ? "📱 " : t.icon ? `${t.icon} ` : ""}
+                      {t.privat ? "📱 " : <Zeichen icon={t.icon} auf={meins(t)} klein />}
                       {t.titel}
                     </span>
                     <span
                       className={`block truncate text-[10px] ${
-                        meins(t) ? "text-white/90" : "text-tinte-leise"
+                        meins(t) ? "text-white/90" : "opacity-75"
                       }`}
                     >
                       {[t.von ? zeitText(t) : "ganztägig", t.ort].filter(Boolean).join(" · ")}
@@ -429,10 +450,13 @@ function TagesAnsicht({
             <li key={t.id}>
               <button
                 onClick={() => onOeffnen(t)}
-                className={`card flex w-full items-start gap-3 p-4 text-left transition active:scale-[.99] ${
+                className={`card relative flex w-full items-start gap-3 overflow-hidden p-4 text-left transition active:scale-[.99] ${
                   t.privat ? "!border-dashed !border-tinte-leise/40 !bg-transparent !shadow-none" : meins(t) ? "!border-brand/40 bg-brand/5 dark:bg-brand/10" : ""
                 }`}
               >
+                {farbeVon(t) && !t.privat && (
+                  <span aria-hidden className={`absolute inset-y-0 left-0 w-1.5 ${farbeVon(t)!.punkt}`} />
+                )}
                 <span className="zahl w-[4.6rem] shrink-0 pt-0.5 text-[13px] font-bold text-brand">
                   {t.von ? uhr(t.von) : "ganztägig"}
                   {t.von && t.bis && (
@@ -444,7 +468,7 @@ function TagesAnsicht({
                     {t.privat ? (
                       <span className="mr-1" aria-hidden>📱</span>
                     ) : t.icon ? (
-                      <span className="mr-1">{t.icon}</span>
+                      <Zeichen icon={t.icon} />
                     ) : (
                       t.sichtbar === "komitee" && t.tags[0] && (
                         <span className="mr-1">{committeeIcon(t.tags[0])}</span>
@@ -480,6 +504,38 @@ function TagesAnsicht({
           ))}
         </ul>
       )}
+    </div>
+  );
+}
+
+/** Alle Klausuren eines Tages in einem Kärtchen: Kürzel antippen = Details. */
+function KlausurKarte({ liste, onOeffnen }: { liste: Termin[]; onOeffnen: (t: Termin) => void }) {
+  // Je Kürzel der früheste Termin – M GK und M LK sind ein Schild.
+  const je = new Map<string, Termin>();
+  for (const t of liste) {
+    const k = (t.icon || "").toUpperCase();
+    if (!je.has(k)) je.set(k, t);
+  }
+  const beginn = liste.map((t) => uhr(t.von)).filter(Boolean).sort()[0];
+  return (
+    <div className="min-w-0 rounded-lg bg-papier-matt px-1.5 py-1 dark:bg-slate-800">
+      <span className="mb-0.5 block text-[10px] font-bold text-tinte-leise">
+        {liste.length === 1 ? "Klausur" : `${liste.length} Klausuren`}
+        {beginn ? ` · ab ${beginn}` : ""}
+      </span>
+      <span className="flex flex-wrap gap-0.5">
+        {[...je.entries()].map(([k, t]) => (
+          <button
+            key={k}
+            onClick={() => onOeffnen(t)}
+            className="rounded bg-tinte/85 px-1 py-[3px] font-zahl text-[10px] font-extrabold leading-none text-white transition active:scale-95 dark:bg-slate-200 dark:text-slate-900"
+            aria-label={t.titel}
+            title={`${t.titel} · ${zeitText(t)}`}
+          >
+            {k}
+          </button>
+        ))}
+      </span>
     </div>
   );
 }

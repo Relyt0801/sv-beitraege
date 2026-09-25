@@ -2,9 +2,10 @@ import { useMemo, useState } from "react";
 import { useTermine } from "../termine-store";
 import { committeeIcon, committeeLabel } from "../lib/committees";
 import {
-  WOCHENTAGE, anTag, ausKey, betrifftMich, heuteKey, montagVon, plusTage, tagKey,
+  WOCHENTAGE, anTag, ausKey, betrifftMich, farbeVon, freiAn, heuteKey, montagVon, plusTage, tagKey,
   tagLang, umfangText, zeitText, type Termin,
 } from "../lib/termine";
+import { Zeichen, punktKlasse } from "./TerminZeichen";
 import { Icon } from "./Icon";
 import { usePrivatTermine, useKalenderDemo } from "../lib/kalender-sync";
 import { KalenderSyncSheet } from "./KalenderSyncSheet";
@@ -147,16 +148,20 @@ export function Wochenstreifen({
           const aktiv = k === gewaehlt;
           const tag = ausKey(k);
           const fuerMich = liste.some(meins);
+          const ferien = freiAn(termine, k);
           return (
             <button
               key={k}
               onClick={() => setGewaehlt(k)}
+              title={ferien ? ferien.titel : undefined}
               className={`flex min-w-0 flex-col items-center gap-1 rounded-xl border py-1.5 transition active:scale-95 ${
                 aktiv
                   ? "border-brand bg-brand text-white"
                   : istHeute
                     ? "border-brand/40 bg-brand/5 dark:bg-brand/10"
-                    : "border-transparent hover:bg-papier-matt dark:hover:bg-slate-800"
+                    : ferien
+                      ? `border-transparent ${farbeVon(ferien)?.band ?? "bg-emerald-200/60 dark:bg-emerald-500/20"}`
+                      : "border-transparent hover:bg-papier-matt dark:hover:bg-slate-800"
               }`}
             >
               <span className={`text-[10px] font-semibold ${aktiv ? "text-white/90" : "text-tinte-leise"}`}>
@@ -167,19 +172,11 @@ export function Wochenstreifen({
               </span>
               {/* Punkte: höchstens drei, damit die Spalte schmal bleibt */}
               <span className="flex h-1.5 items-center gap-0.5">
-                {liste.slice(0, 3).map((t) => (
+                {liste.filter((t) => !t.frei).slice(0, 3).map((t) => (
                   <span
                     key={t.id}
                     className={`h-1.5 w-1.5 rounded-full ${
-                      neueTermine.has(t.id)
-                        ? "bg-red-500"
-                        : aktiv
-                          ? "bg-white/80"
-                          : t.privat
-                            ? "border border-tinte-leise/70"
-                            : meins(t)
-                              ? "bg-brand"
-                              : "bg-tinte-leise/50"
+                      neueTermine.has(t.id) ? "bg-red-500" : aktiv ? "bg-white/80" : punktKlasse(t, meins(t))
                     }`}
                   />
                 ))}
@@ -239,7 +236,7 @@ export function TerminZeile({ t, meins, onClick }: { t: Termin; meins: boolean; 
           {t.privat ? (
             <span className="mr-1" aria-hidden>📱</span>
           ) : t.icon ? (
-            <span className="mr-1">{t.icon}</span>
+            <Zeichen icon={t.icon} klein />
           ) : (
             t.sichtbar === "komitee" && t.tags[0] && (
               <span className="mr-1">{committeeIcon(t.tags[0])}</span>
@@ -268,7 +265,8 @@ export function TerminZeile({ t, meins, onClick }: { t: Termin; meins: boolean; 
     </>
   );
 
-  const klasse = `flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left ${
+  const f = t.privat ? null : farbeVon(t);
+  const klasse = `flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left ${f ? "border-l-4 " + f.rand : ""} ${
     t.privat
       ? "border border-dashed border-tinte-leise/40"
       : meins

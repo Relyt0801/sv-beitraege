@@ -1,4 +1,4 @@
-# Änderungen – Stand 24.09.2026
+# Änderungen – Stand 25.09.2026
 
 Diese Datei erklärt, was sich in den letzten Runden geändert hat, **wo** es im
 Code steht und **warum** es so gebaut ist. Die Kommentare im Code selbst sind
@@ -8,6 +8,73 @@ ausführlich (auf Deutsch); hier steht der Überblick dazu.
 > Bankdaten, der `service_role`-Schlüssel und der VAPID Private Key liegen nur
 > in der Datenbank bzw. als Supabase-Secret. `privat/` ist per `.gitignore`
 > ausgeschlossen. Bitte so beibehalten.
+
+---
+
+
+## 25.09.2026: Termine in Farbe, Ferien, Klausuren, Schicht-Abschluss, Chat-Sperren
+
+SQL dazu: `supabase/termine-schichten-chat.sql` (in der Datenbank eingespielt).
+
+**Termine**
+- Neue Spalten `termine.farbe` (8 Farben, `FARBEN` in `src/lib/termine.ts`) und
+  `termine.frei` (Ferien/unterrichtsfrei). Im Formular (`TerminSheet.tsx`):
+  Farbe, Zeichen (Bildzeichen oder Fach-Kürzel wie „M“, „EK“, „F7“) und der
+  Haken „Ferien / unterrichtsfrei“.
+- Ferien laufen als Farbband durch Monat, Woche und Wochenstreifen (`freiAn()`),
+  statt als Kärtchen jeden Tag Platz zu nehmen.
+- Klausuren = Termine mit Kürzel als Zeichen (`istKlausur()`). Mehrere an einem
+  Tag stehen als eine Zeile Schilder (`KuerzelLeiste`, `KlausurKarte` in
+  `TerminZeichen.tsx` / `Kalender.tsx`): „BI CH PH +1“ statt fünf Kacheln.
+- Stunden-Schnellwahl im Formular (`STUNDEN`: 7:35 … 15:30, je 45 Minuten):
+  erst Beginn, dann Ende antippen.
+- „ganze Stufe · auch Eltern“ steht nicht mehr unter jedem Termin
+  (`umfangText()` liefert für „alle“ nichts mehr).
+- Behoben: Wer eine Schicht über „Ändern“ bearbeitete, löste sie still von
+  ihrer Aktion (und damit von Plätzen und Punkten). Jetzt bleiben `aktion_id`
+  und `plaetze` erhalten.
+- Eingetragen (direkt in der Datenbank, ohne Mitteilung): alle Klausuren Q1
+  2026/27 aus dem Klausurplan (Zeiten nach dem Stundenraster: 45 Minuten
+  je Stunde, Pausen dazwischen verschieben das Ende), Kommunikationsprüfungen, Herbst- und Weihnachtsferien,
+  Studientag 30.11., Mr. Wissen to go, Crash-Kurs NRW, Berufs- und
+  Studienorientierung, Praktikum. Damit kein „138 neue Termine“-Hinweis
+  aufgeht, steht ihr `created_at` auf dem 01.09.2026.
+
+**Schichten**
+- „voll“ an jeder Schicht, Eintragen gesperrt, wenn alle Plätze vergeben sind;
+  Eingeteilte lassen sich weiter austragen.
+- Sortierung beim Verteilen rechnet geplante Punkte mit: wer schon in anderen,
+  noch nicht abgeschlossenen Schichten steht, rückt nach unten.
+- Schicht vorbei → Pop-up fürs Stufenteam (`SchichtAbschluss.tsx`): „Punkte
+  vergeben“ trägt allen Eingeteilten die Prozente der Aktion ein – über
+  `schicht_abschliessen()` genau einmal, auch bei zwei gleichzeitigen Tipps.
+  Zusätzlich Push ans Team: `pg_cron` (alle 5 Minuten) → `pg_net` →
+  `send-push` mit `{"schicht_ende": true}`; der Server sucht die Schichten
+  selbst (`schicht_enden_offen()`), der Aufruf trägt keinen Text.
+- Bestätigungs-Push beim Einteilen kam nicht an, wenn man sich selbst einteilte
+  (Absender wurde immer herausgefiltert). Jetzt `auch_selbst` im Direkt-Modus.
+- Aktionen: Prozent kommen aus dem Beiträge-Reiter (Auswahl statt freier Zahl),
+  Abweichungen werden angezeigt. Vorlagen lassen sich löschen (ohne Schichten)
+  bzw. aus der Auswahl nehmen (mit Schichten – die bleiben stehen).
+
+**Chats**
+- Angepinnte Nachrichten: Loslösen oder ganz löschen – für die Person selbst
+  und alle mit `chats.delete_messages`.
+- Sperren im Chat (`chat_sperren()`): Sperre und eine kursive Zeile ohne
+  Absender („… wurde von Moderator … gesperrt“) in einem Schritt. Das
+  geschützte OP-Konto lässt sich nicht sperren; sperrt es selbst, heißt die
+  Zeile „Relyt hat … in die stille Ecke verbannt“. Systemzeilen kann niemand
+  selbst schreiben (`type <> 'system'` in der Einfüge-Regel).
+- Lücke geschlossen: Jeder mit Zugriff auf einen Chat durfte bisher fremde
+  Einträge ändern (Text, Pins). Jetzt nur Verfasser, Team und Moderation;
+  alle anderen dürfen fremde To-dos nur abhaken (`guard_topic_item_update`).
+
+**Sonst**
+- Einführung: „bei 100 % 0 €“ statt „keiner“ (Wert aus der Staffel).
+- Impressum: Verantwortlich ist der Ersteller/Verwalter der Datenbank
+  (schulintern); Hinweis zu den Auftragsverarbeitungsverträgen.
+- Rechte-Test: 125 Fälle (neu: Punkte selbst vergeben, fremd sperren,
+  OP sperren, Sperr-Zeile fälschen, fremde Nachricht umschreiben).
 
 ---
 

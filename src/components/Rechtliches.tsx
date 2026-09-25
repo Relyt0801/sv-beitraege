@@ -75,6 +75,7 @@ function Impressum() {
 
       <H>Verantwortlich für den Inhalt</H>
       <P>
+        Verantwortlich für den Inhalt ist immer der Ersteller bzw. Verwalter der Datenbank (schulintern):{" "}
         <Wert v={BETREIBER.name} fehlt="Name" />, Anschrift wie oben.
       </P>
 
@@ -171,9 +172,9 @@ function Datenschutz() {
         jeweiligen Browserherstellers stellt die Nachricht zu. Der Inhalt ist dabei verschlüsselt.
       </P>
       <P>
-        <Lueck>
-          Auftragsverarbeitungsverträge mit Supabase, Vercel und IONOS abschließen und hier bestätigen
-        </Lueck>
+        Mit Supabase und Vercel gilt jeweils deren Auftragsverarbeitungsvertrag (Data Processing Addendum),
+        der Bestandteil der Nutzungsbedingungen ist. IONOS stellt nur die Domain und die DNS-Einträge bereit
+        und verarbeitet dabei keine Daten aus der App.
       </P>
 
       <H>5. Wie lange?</H>
