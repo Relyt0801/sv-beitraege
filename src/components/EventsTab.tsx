@@ -12,6 +12,7 @@ import { anfrageAlsEntwurf, heuteKey, type NeuerTermin, type Termin, type Termin
 import { AktionenListe } from "./AktionenListe";
 import { AnfragenFuerTeam, MeineAnfragen } from "./TerminAnfragen";
 import { useTermine } from "../termine-store";
+import { PrivatTerminSheet } from "./KalenderSyncSheet";
 
 import { frage } from "../lib/melder";
 export function EventsTab() {
@@ -23,7 +24,11 @@ export function EventsTab() {
   const [kalenderOffen, setKalenderOffen] = useState(false);
   const [formOffen, setFormOffen] = useState(false);
   const [bearbeite, setBearbeite] = useState<Termin | null>(null);
-  const [angesehen, setAngesehen] = useState<Termin | null>(null);
+  const [angesehenRoh, setAngesehen] = useState<Termin | null>(null);
+  // Termine aus dem eigenen Handy-Kalender (Testphase) nur ansehen – nie ins
+  // Formular zum Ändern oder Löschen, die gibt es in der Datenbank ja nicht.
+  const angesehen = angesehenRoh && !angesehenRoh.privat ? angesehenRoh : null;
+  const privatAngesehen = angesehenRoh?.privat ? angesehenRoh : null;
   const [startDatum, setStartDatum] = useState(heuteKey());
   const [kalenderTag, setKalenderTag] = useState(heuteKey());
   // Aus einer übernommenen Anfrage vorausgefüllt – und die Anfrage, die
@@ -98,6 +103,8 @@ export function EventsTab() {
           setAusAnfrage(null);
         }}
       />
+
+      <PrivatTerminSheet termin={privatAngesehen} onClose={() => setAngesehen(null)} />
 
       {angesehen && !formOffen && (
         <TerminAnsehen

@@ -13,6 +13,7 @@ import { committeeLabel } from "../lib/committees";
 import { umfangText } from "../lib/termine";
 
 import { frage } from "../lib/melder";
+import { terminAlsDatei, useKalenderDemo } from "../lib/kalender-sync";
 const seg = "flex-1 rounded-lg py-2 text-[13px] font-bold transition";
 
 /**
@@ -511,6 +512,7 @@ export function TerminAnsehen({
   const { students } = useStore();
   const { isStaff, can } = useRole();
   const darf = isStaff || can("termine.manage");
+  const kalenderDemo = useKalenderDemo();
   // Immer den frischen Stand zeigen (z. B. nach dem Austragen einer Person)
   const t = termin ? termine.find((x) => x.id === termin.id) ?? termin : null;
 
@@ -610,6 +612,13 @@ export function TerminAnsehen({
             </button>
           )}
         </div>
+      )}
+
+      {/* Testphase: einzelnen Termin in den eigenen Kalender übernehmen */}
+      {kalenderDemo && (
+        <button onClick={() => terminAlsDatei(termin_)} className="btn-grau mt-4 gap-2 !text-[15px]">
+          <span aria-hidden>📱</span> In meinen Kalender übernehmen
+        </button>
       )}
 
       <div className="mt-4 flex gap-2">

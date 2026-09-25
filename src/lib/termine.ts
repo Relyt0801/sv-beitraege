@@ -91,6 +91,8 @@ export interface Termin {
   plaetze: number | null;
   /** eigenes Zeichen im Kalender, z. B. 🧇 */
   icon: string | null;
+  /** Nur im Browser: kommt aus dem eigenen Handy-Kalender (grau, nur ansehen). */
+  privat?: boolean;
 }
 
 export interface NeuerTermin {
