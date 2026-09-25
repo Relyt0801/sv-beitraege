@@ -4,6 +4,7 @@ import { useStore } from "../store";
 import { Sheet } from "./Sheet";
 import { PunkteBar, StaffelTabelle } from "./PunkteBar";
 import { prozentVon, ticketBetrag } from "../lib/logic";
+import { useProfiles } from "../profiles-store";
 
 import { frage } from "../lib/melder";
 /**
@@ -25,6 +26,7 @@ export function PunkteSheet({
   onClose: () => void;
 }) {
   const { contributions, templates, addContribution, updateContribution, removeContribution } = useStore();
+  const { profile } = useProfiles();
   // gewählte Vorlage + ggf. angepasster Wert + Datum der Hilfe
   const [gewaehlt, setGewaehlt] = useState<string | null>(null);
   const [wert, setWert] = useState("5");
@@ -174,6 +176,9 @@ export function PunkteSheet({
               key={c.id}
               c={c}
               editable={editable}
+              // Fürs Team: wer hat das eingetragen? Steht bei Einträgen, seit die
+              // Datenbank das mitschreibt (supabase/mithilfe-nachvollziehen.sql).
+              von={editable && c.created_by ? profile[c.created_by]?.anzeigename || "Unbekannt" : ""}
               onChange={(patch) => updateContribution(c.id, patch)}
               onDelete={async () => {
                 if (await frage(`„${c.titel}" wirklich löschen?`, "Löschen", true)) removeContribution(c.id);
@@ -194,11 +199,13 @@ export function PunkteSheet({
 function Zeile({
   c,
   editable,
+  von,
   onChange,
   onDelete,
 }: {
   c: Contribution;
   editable: boolean;
+  von: string;
   onChange: (patch: Partial<Pick<Contribution, "titel" | "punkte">>) => void;
   onDelete: () => void;
 }) {
@@ -245,7 +252,9 @@ function Zeile({
     <li className="flex items-center gap-3 bg-white px-3.5 py-3 dark:bg-slate-900">
       <div className="min-w-0 flex-1">
         <div className="truncate text-[15px] font-semibold">{c.titel}</div>
-        {datum && <div className="text-[11px] text-tinte-leise">{datum}</div>}
+        {(datum || von) && (
+          <div className="truncate text-[11px] text-tinte-leise">{[datum, von && `von ${von}`].filter(Boolean).join(" · ")}</div>
+        )}
       </div>
       <span className="shrink-0 rounded-full bg-brand/12 px-2.5 py-1 text-sm font-extrabold text-brand">
         +{c.punkte}

@@ -336,8 +336,10 @@ function Main() {
     if (roleReady && !reiterErlaubt) setTab("kasse");
   }, [roleReady, reiterErlaubt, setTab]);
 
+  // Im Auswahl-Modus ist die Leiste unten höher (Namen der Ausgewählten) –
+  // sonst verdeckt sie die letzten Personen der Liste.
   return (
-    <div className="mx-auto max-w-5xl px-3 pb-36 sm:px-5 lg:pb-16">
+    <div className={`mx-auto max-w-5xl px-3 sm:px-5 ${massMode ? "pb-72" : "pb-36 lg:pb-16"}`}>
       {/* Kopf wie eine iOS-Navigationsleiste: oben die Knöpfe, darunter der
           große Titel. Scrollt der Titel weg, erscheint er klein in der nun
           milchigen Leiste (Glas). */}
@@ -705,6 +707,7 @@ function Main() {
       {massMode && (
         <MassBar
           selected={selected}
+          onAbwaehlen={waehleAus}
           onDone={() => {
             setMassMode(false);
             setSelected(new Set());

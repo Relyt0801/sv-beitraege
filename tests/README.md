@@ -7,7 +7,7 @@ Test-Konten gibst du nur beim Aufruf als Umgebungsvariable mit.
 
 | Test | Was | Wo | Ändert Daten? |
 |---|---|---|---|
-| `supabase/tests/rechte-test.sql` | 125 Angriffe/erlaubte Aktionen, jede Rolle | Supabase → SQL Editor | nein (alles zurückgerollt) |
+| `supabase/tests/rechte-test.sql` | 127 Angriffe/erlaubte Aktionen, jede Rolle | Supabase → SQL Editor | nein (alles zurückgerollt) |
 | `edge-check.mjs` | Push- und Anlege-Funktion gegen Missbrauch | PowerShell | nein (Push nur im Probelauf) |
 | `last-test.mjs` | bis zu 260 Personen öffnen gleichzeitig die App | PowerShell | nein (nur lesend) |
 | `ui-check.mjs` | alle Rollen × 4 Größen × hell/dunkel × jeder Reiter, Barrierefreiheit | PowerShell | nein (Demo-Modus) |
@@ -25,7 +25,7 @@ cd ..
 ## Rechte-Test (Supabase)
 
 Supabase → SQL Editor → Inhalt von `supabase/tests/rechte-test.sql` einfügen → Run.
-Oben steht die Summe. Erwartet: `124 ok / 0 Abweichungen / 0 unklar / 1 Hinweise`.
+Oben steht die Summe. Erwartet: `126 ok / 0 Abweichungen / 0 unklar / 1 Hinweise` (ohne laufende Schicht: 1 übersprungen).
 Jede Zeile mit `!! ABWEICHUNG` ist eine Lücke – sofort melden.
 Der eine Hinweis (Kassenwart kann eine Buchung als „automatisch“ markieren) ist bekannt.
 

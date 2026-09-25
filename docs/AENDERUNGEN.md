@@ -12,6 +12,46 @@ ausführlich (auf Deutsch); hier steht der Überblick dazu.
 ---
 
 
+## 25.09.2026 (abends): Mithilfe, ohne eingetragen zu sein
+
+Anlass: Eine Schülerin bekam „🙌 Mithilfe eingetragen … Danke fürs Mithelfen!“
+und 5 % angerechnet, ohne sich für eine Schicht eingetragen zu haben. Mithilfe
+entsteht nur auf drei Wegen: einzeln im Blatt einer Person, über „Mehrere
+auswählen“ in der Kasse oder über „Punkte vergeben“ nach einer Schicht. Welcher
+es war, ließ sich nicht klären – dafür fehlte in der Datenbank jede Spur.
+
+**Mehrere auswählen** (`MassBar.tsx`)
+- Im Auswahl-Modus wählt ein Tipp irgendwo auf eine Zeile (Name, Betrag,
+  Prozent) die Person aus, und eine Auswahl bleibt stehen, wenn Suche oder
+  Filter sie ausblenden. Die Leiste zeigte nur „5 ausgewählt“. Ein Fehltipp
+  fiel so nicht auf – und die Person bekam Mithilfe samt Mitteilung.
+- Jetzt stehen die Namen aller Ausgewählten in der Leiste, auch der
+  ausgeblendeten; ein Tipp auf einen Namen wählt ab. Vor „Eintragen“ steht
+  noch einmal „Mithilfe für N Personen – alle bekommen sofort eine
+  Mitteilung“.
+
+**Nachvollziehbar** (`supabase/mithilfe-nachvollziehen.sql` – muss im SQL
+Editor eingespielt werden)
+- `created_by`/`created_at` setzt die Datenbank selbst. Vorher schrieb die
+  App bei Mithilfe keinen Urheber mit.
+- Mithilfe eintragen, ändern, löschen steht im Protokoll (neuer Filter
+  „🙌 Mithilfe“). Mehrere auf einmal = eine Zeile mit allen Namen.
+- Im Blatt „Gesammelte Prozent“ sieht das Team bei jedem Eintrag „von …“.
+- „Punkte vergeben“ geht erst nach Schichtende, auch direkt über die
+  Datenbank (`schicht_abschliessen`). Im Protokoll steht dann „Schicht
+  abgeschlossen – …“.
+- Am Ende der Datei zwei Abfragen (nur lesen), mit denen sich für ältere
+  Einträge klären lässt, ob sie von Hand, im Rutsch mit anderen oder über
+  eine Schicht kamen.
+- Rechte-Test: 127 Fälle (neu: Mithilfe unter fremdem Namen, Punkte für
+  laufende Schicht).
+
+Den einen falschen Eintrag löscht das Team in der App: Kasse → Person →
+„Mitgeholfen“ → ✎ → Löschen.
+
+---
+
+
 ## 25.09.2026: Termine in Farbe, Ferien, Klausuren, Schicht-Abschluss, Chat-Sperren
 
 SQL dazu: `supabase/termine-schichten-chat.sql` (in der Datenbank eingespielt).

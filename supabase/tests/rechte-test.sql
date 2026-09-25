@@ -1,7 +1,7 @@
 -- ============================================================
 -- Rechte-Test: Wer darf was? (Stand 25.09.2026)
 --
--- Spielt 125 Angriffe und erlaubte Aktionen mit echten Konten JEDER Rolle
+-- Spielt 127 Angriffe und erlaubte Aktionen mit echten Konten JEDER Rolle
 -- durch – direkt in der Datenbank, genau so, wie es ein Angreifer über die
 -- Schnittstelle versuchen würde (Rolle "authenticated" bzw. "anon" mit der
 -- Kennung der Person, Zugriffsregeln greifen wie in der App).
@@ -43,7 +43,11 @@ select s.*,
   (select id from public.topics where kind = 'chat' and tag = 'abiball' limit 1) as chat_fremd,
   (select t.id from public.topics t join public.tag_members g on g.tag = t.tag and g.user_id = s.uid_s_komitee where t.kind = 'chat' limit 1) as chat_eigen,
   (select id from public.kasse_buchungen where automatisch limit 1) as auto,
-  (select id from public.daten_snapshots order by erstellt_at limit 1) as snap
+  (select id from public.daten_snapshots order by erstellt_at limit 1) as snap,
+  -- eine Schicht, die noch nicht vorbei ist (Punkte dürfen dafür noch nicht raus)
+  (select t.id from public.termine t join public.aktionen a on a.id = t.aktion_id
+    where t.abschluss is null and coalesce(a.prozent, 0) > 0 and public.termin_ende(t) > now()
+    order by t.datum limit 1) as schicht_offen
 from s;
 
 create temp table faelle (rolle text, fall text, sql text, erwartet text) on commit drop;
@@ -172,7 +176,10 @@ insert into faelle values
   ('stufenteam', 'Geschütztes OP-Konto sperren', 'select chat_sperren(op_user(), null, true, null)', 'V'),
   ('admin', 'Geschütztes OP-Konto sperren', 'select chat_sperren(op_user(), null, true, null)', 'V'),
   ('s_komitee', 'Sperr-Zeile im Chat fälschen', 'insert into topic_items(topic_id,type,body,author,created_by) values (''{CHAT_EIGEN}'',''system'',''x wurde gesperrt'','''',auth.uid())', 'V'),
-  ('s_komitee', 'Fremde Nachricht umschreiben', 'update topic_items set body=''x'' where topic_id=''{CHAT_EIGEN}'' and created_by is distinct from auth.uid() and type <> ''todo''', 'V');
+  ('s_komitee', 'Fremde Nachricht umschreiben', 'update topic_items set body=''x'' where topic_id=''{CHAT_EIGEN}'' and created_by is distinct from auth.uid() and type <> ''todo''', 'V'),
+  -- Mithilfe: der Urheber steht fest (mithilfe-nachvollziehen.sql). "erlaubt" hieße: gefälschter Name bleibt stehen.
+  ('stufenteam', 'Mithilfe unter fremdem Namen eintragen', 'with x as (insert into contributions(student_id,titel,punkte,created_by) values (''{S_FREMD}'',''x'',5,''{UID_ADMIN}'') returning created_by) select 1 from x where created_by = ''{UID_ADMIN}''', 'V'),
+  ('stufenteam', 'Punkte für laufende Schicht vergeben', 'select schicht_abschliessen(''{SCHICHT_OFFEN}''::uuid, true)', 'V');
 
 create temp table erg (rolle text, fall text, erwartet text, ergebnis text, detail text) on commit drop;
 grant insert, select on erg to authenticated, anon;
@@ -192,12 +199,14 @@ begin
               '{CHAT_EIGEN}', coalesce(t.chat_eigen::text, '')), '{AUTO}', coalesce(t.auto::text, '')),
               '{SNAP}', coalesce(t.snap::text, '')), '{UID_ADMIN}', coalesce(t.uid_admin::text, '')),
               '{UID_SCHUELER}', coalesce(t.uid_schueler::text, '')), '{UID_ELTERN}', coalesce(t.uid_eltern::text, ''));
+    stmt := replace(stmt, '{SCHICHT_OFFEN}', coalesce(t.schicht_offen::text, ''));
     if (c.rolle <> 'anon' and uid is null)
        or (c.sql like '%{S_EIGEN}%' and t.s_eigen is null) or (c.sql like '%{S_FREMD}%' and t.s_fremd is null)
        or (c.sql like '%{KIND}%' and t.kind is null) or (c.sql like '%{CHAT_FREMD}%' and t.chat_fremd is null)
        or (c.sql like '%{CHAT_EIGEN}%' and t.chat_eigen is null) or (c.sql like '%{AUTO}%' and t.auto is null)
        or (c.sql like '%{SNAP}%' and t.snap is null) or (c.sql like '%{UID_ADMIN}%' and t.uid_admin is null)
-       or (c.sql like '%{UID_SCHUELER}%' and t.uid_schueler is null) or (c.sql like '%{UID_ELTERN}%' and t.uid_eltern is null) then
+       or (c.sql like '%{UID_SCHUELER}%' and t.uid_schueler is null) or (c.sql like '%{UID_ELTERN}%' and t.uid_eltern is null)
+       or (c.sql like '%{SCHICHT_OFFEN}%' and t.schicht_offen is null) then
       insert into erg values (c.rolle, c.fall, c.erwartet, 'übersprungen', 'keine passende Testperson/Testdaten');
       continue;
     end if;
