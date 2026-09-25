@@ -166,7 +166,7 @@ function Main() {
   // Komitee-Vorsitzende für ihre Kostenanfragen.
   const kosten = useKostenAnfragen(roleReady);
   const showFinanzen =
-    can("finanzen.view") || can("finanzen.manage") || kosten.aufsichtsrat || meineVorsitze.length > 0;
+    can("finanzen.basis") || can("finanzen.view") || can("finanzen.manage") || kosten.aufsichtsrat || meineVorsitze.length > 0;
   const offeneKosten = can("finanzen.manage") ? kosten.anfragen.filter((a) => a.status === "offen").length : 0;
   // Roter Zähler am App-Symbol: ungelesene Chats und Events zusammen.
   useEffect(() => appZaehler(topicsUnread + unread), [topicsUnread, unread]);

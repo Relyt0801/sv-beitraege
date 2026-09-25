@@ -10,6 +10,7 @@ import { BeitragsListe } from "./BeitragsListe";
 import { TicketErklaerung } from "./TicketErklaerung";
 import { Icon, type IconName } from "./Icon";
 import { ElternInfosTab } from "./ElternInfosTab";
+import { FinanzStandard } from "./FinanzStandard";
 import { KontoTab } from "./KontoTab";
 import { ProfilSheet } from "./ProfilSheet";
 import { Tour, elternSchritte } from "./Tour";
@@ -21,9 +22,9 @@ import { InstallKarte } from "./InstallHinweis";
 import { abmelden, appZaehler } from "../lib/push";
 
 import { frage } from "../lib/melder";
-type Reiter = "uebersicht" | "infos" | "konto";
+type Reiter = "uebersicht" | "infos" | "finanzen" | "konto";
 
-const TITEL: Record<Reiter, string> = { uebersicht: "Stufenkasse", infos: "Infos", konto: "Kontodaten" };
+const TITEL: Record<Reiter, string> = { uebersicht: "Stufenkasse", infos: "Infos", finanzen: "Finanzen der Stufe", konto: "Kontodaten" };
 const TOUR_MERKER = "sv:tour:v3:eltern";
 
 /**
@@ -55,7 +56,7 @@ export function ElternApp() {
     () => (zuordnungFehlt ? students.map((s) => s.id) : zugeordnet),
     [zuordnungFehlt, students, zugeordnet],
   );
-  const { tourResetAt } = useRole();
+  const { tourResetAt, can } = useRole();
   usePushAuffrischen();
 
   // Nur die zugeordneten Kinder – auch wenn die Datenbank mehr liefern sollte.
@@ -117,6 +118,8 @@ export function ElternApp() {
   const NAV: { key: Reiter; label: string; icon: IconName; zahl?: number }[] = [
     { key: "uebersicht", label: "Übersicht", icon: "haus" },
     { key: "infos", label: "Infos", icon: "pin", zahl: ungelesen },
+    // Standard-Ansicht der Finanzen: nur Summen, keine Namen
+    ...(can("finanzen.basis") ? [{ key: "finanzen" as const, label: "Finanzen", icon: "finanzen" as const }] : []),
     { key: "konto", label: "Konto", icon: "bank" },
   ];
 
@@ -268,6 +271,11 @@ export function ElternApp() {
         {reiter === "infos" && (
           <div key="infos" className="mx-auto max-w-3xl animate-fadeIn">
             <ElternInfosTab />
+          </div>
+        )}
+        {reiter === "finanzen" && (
+          <div key="finanzen" className="mx-auto max-w-3xl animate-fadeIn lg:max-w-5xl">
+            <FinanzStandard />
           </div>
         )}
         {reiter === "konto" && (

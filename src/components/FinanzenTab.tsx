@@ -4,6 +4,7 @@ import { useRole } from "../auth/RoleProvider";
 import { useTermine } from "../termine-store";
 import { useProfiles } from "../profiles-store";
 import { basisOffen } from "../lib/logic";
+import { FinanzStandard } from "./FinanzStandard";
 import { useNachschub } from "../lib/liste";
 import { COMMITTEES, committeeIcon, committeeLabel } from "../lib/committees";
 import {
@@ -56,6 +57,9 @@ export function FinanzenTab({ kosten }: { kosten: KostenValue }) {
   const { aktionen, meineVorsitze } = useTermine();
   const [buchen, setBuchen] = useState<"ein" | "aus" | null>(null);
   const [einstellungen, setEinstellungen] = useState(false);
+  const darfStandard = can("finanzen.basis");
+  // Wer alles sieht, kann zur Kontrolle auf die Ansicht für alle umschalten.
+  const [ansicht, setAnsicht] = useState<"standard" | "erweitert">("erweitert");
 
   const aktionName = (id: string) => aktionen.find((a) => a.id === id)?.titel || "";
 
@@ -97,6 +101,19 @@ export function FinanzenTab({ kosten }: { kosten: KostenValue }) {
     return { cent, personen };
   }, [students, settings]);
 
+  // Standard-Ansicht: Summen ohne Namen (Schüler, Eltern – oder zur Kontrolle)
+  if ((!darfSehen && darfStandard) || (darfSehen && ansicht === "standard")) {
+    return (
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-3">
+        {darfSehen && <AnsichtWahl ansicht={ansicht} setAnsicht={setAnsicht} />}
+        <FinanzStandard aktionName={aktionName} />
+        {!darfSehen && meineVorsitze.length > 0 && (
+          <KostenKarte kosten={kosten} darfEntscheiden={false} vorsitze={meineVorsitze} />
+        )}
+      </div>
+    );
+  }
+
   // Nur Vorsitz, keine Finanzrechte: nur die Kostenanfragen
   if (!darfSehen) {
     return (
@@ -125,6 +142,9 @@ export function FinanzenTab({ kosten }: { kosten: KostenValue }) {
 
   return (
     <div className="grid grid-cols-[minmax(0,1fr)] gap-3 pb-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-start">
+      <div className="lg:col-span-2">
+        <AnsichtWahl ansicht={ansicht} setAnsicht={setAnsicht} />
+      </div>
       {nurLesen && (
         <div className="flex items-center gap-2 rounded-2xl bg-[rgb(118_118_128/0.1)] px-4 py-2.5 text-[14px] text-tinte-matt dark:text-slate-300 lg:col-span-2">
           <Icon name="info" size={17} />
@@ -186,6 +206,29 @@ export function FinanzenTab({ kosten }: { kosten: KostenValue }) {
           />
         </>
       )}
+    </div>
+  );
+}
+
+// ==================================================================== Ansicht wählen
+
+/** Standard (was alle sehen) oder Erweitert (alle Buchungen) – nur für wer alles sieht. */
+function AnsichtWahl({ ansicht, setAnsicht }: { ansicht: "standard" | "erweitert"; setAnsicht: (a: "standard" | "erweitert") => void }) {
+  return (
+    <div className="flex gap-1 rounded-xl bg-[rgb(118_118_128/0.12)] p-1" role="tablist" aria-label="Ansicht der Finanzen">
+      {([["standard", "Standard – wie alle"], ["erweitert", "Erweitert – alle Buchungen"]] as const).map(([k, label]) => (
+        <button
+          key={k}
+          role="tab"
+          aria-selected={ansicht === k}
+          onClick={() => setAnsicht(k)}
+          className={`min-w-0 flex-1 truncate rounded-lg px-2 py-2 text-[13px] font-semibold transition ${
+            ansicht === k ? "bg-white text-tinte shadow-sm dark:bg-slate-700 dark:text-white" : "text-tinte-matt dark:text-slate-300"
+          }`}
+        >
+          {label}
+        </button>
+      ))}
     </div>
   );
 }

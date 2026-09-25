@@ -12,6 +12,9 @@ import { PERM_CATEGORIES, PERM_ROLES, ALL_PERMS, ROLE_DEFAULTS, ROLLE_KURZ, rech
 import { meldeFehler } from "../lib/melder";
 type Matrix = Record<string, Record<string, boolean>>;
 
+/** Für Rechte, die auch Eltern bekommen können (z. B. Finanzen – Standard). */
+const MIT_ELTERN = [...PERM_ROLES, { key: "eltern" as const, label: "Eltern" }];
+
 // Kurzlabels für die Rollen-Pills, damit alle 4 auch auf schmalen Handys nebeneinander passen.
 
 
@@ -27,9 +30,9 @@ export function PermissionsTab() {
   useEffect(() => {
     (async () => {
       const rm: Matrix = {};
-      for (const r of PERM_ROLES) { rm[r.key] = {}; for (const p of ALL_PERMS) rm[r.key][p] = false; }
+      for (const r of MIT_ELTERN) { rm[r.key] = {}; for (const p of ALL_PERMS) rm[r.key][p] = false; }
       if (!hasSupabase) {
-        for (const r of PERM_ROLES) for (const p of ALL_PERMS) rm[r.key][p] = ROLE_DEFAULTS[r.key].includes(p);
+        for (const r of MIT_ELTERN) for (const p of ALL_PERMS) rm[r.key][p] = ROLE_DEFAULTS[r.key].includes(p);
         setRoleMatrix(rm); setOverrides({}); setLoaded(true); return;
       }
       const { data: rp } = await supabase!.from("role_permissions").select("*");
@@ -117,8 +120,8 @@ export function PermissionsTab() {
               <div key={perm.key}>
                 <div className="text-[15px] font-semibold">{perm.label}</div>
                 <div className="mb-1.5 text-[11px] leading-snug text-tinte-leise">{perm.desc}</div>
-                <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-5">
-                  {PERM_ROLES.map((r) => {
+                <div className={`grid grid-cols-3 gap-1.5 ${perm.eltern ? "sm:grid-cols-6" : "sm:grid-cols-5"}`}>
+                  {(perm.eltern ? MIT_ELTERN : PERM_ROLES).map((r) => {
                     const on = !!roleMatrix[r.key]?.[perm.key];
                     const locked = r.key === "admin";
                     return (

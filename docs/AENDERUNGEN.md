@@ -763,3 +763,21 @@ Ausführlich: `docs/TESTBERICHT-2026-09-24.md`.
 - Beim Veröffentlichen: Schalter „Mitteilung an alle, die es sehen“
   (Standard an) – aus = still, nur im Reiter Events.
 - Rechte-Test um 4 Fälle erweitert (Events Team, Warnungen).
+
+## Finanzen: Standard- und Erweiterte Ansicht
+
+- Neues Recht **„Finanzen ansehen – Standard“** (im Rechte-Reiter, auch für
+  Eltern schaltbar). Standard an für Schüler, Eltern und Team. Zeigt nur
+  Summen: Kontostand, Anteil am Geldziel, offene Beiträge (Betrag, keine
+  Namen), Stufenbeiträge je EF / Q1 / Q2 und jede Aktion mit Einnahmen,
+  Ausgaben und Total. Spenden und Ausgaben ohne Aktion nur als Summe.
+- **„Finanzen ansehen – Erweitert“** (bisher „Finanzen ansehen“): das komplette
+  Kassenbuch mit Namen und Einzelbuchungen. Standard an für Stufenteam,
+  Sprecher, Kassenwart, Admin; der Aufsichtsrat automatisch.
+- Die Standard-Ansicht liest das Kassenbuch nicht selbst, sondern bekommt
+  fertige Summen aus `finanz_uebersicht()` – Namen kommen gar nicht erst aufs
+  Handy (`supabase/finanzen-standard-ansicht.sql`, eingespielt).
+- Eltern haben dafür einen neuen Reiter „Finanzen“. Wer die erweiterte Ansicht
+  hat, kann oben auf „Standard – wie alle“ umschalten und prüfen, was die
+  Stufe sieht.
+- Rechte-Test um 5 Fälle erweitert (114 ok).

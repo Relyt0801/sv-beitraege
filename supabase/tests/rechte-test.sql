@@ -1,7 +1,7 @@
 -- ============================================================
 -- Rechte-Test: Wer darf was? (Stand 24.09.2026)
 --
--- Spielt 110 Angriffe und erlaubte Aktionen mit echten Konten JEDER Rolle
+-- Spielt 115 Angriffe und erlaubte Aktionen mit echten Konten JEDER Rolle
 -- durch – direkt in der Datenbank, genau so, wie es ein Angreifer über die
 -- Schnittstelle versuchen würde (Rolle "authenticated" bzw. "anon" mit der
 -- Kennung der Person, Zugriffsregeln greifen wie in der App).
@@ -132,6 +132,11 @@ insert into faelle values
   ('eltern', 'Anfrage im Namen anderer', 'insert into eltern_tickets(user_id,betreff) values (''{UID_SCHUELER}'',''Test'')', 'V'),
   ('eltern', 'Selbst in Komitee', 'insert into tag_members(tag,user_id) values (''abiball'',auth.uid())', 'V'),
   ('eltern', 'Beitrag des eigenen Kindes ändern', 'update students set terms = jsonb_set(terms,''{Q1.1,status}'',''"bezahlt"'') where id=''{KIND}''', 'V'),
+  ('schueler', 'Finanzen Standard-Ansicht abrufen', 'select finanz_uebersicht()', 'E'),
+  ('schueler', 'Einzelbuchungen im Kassenbuch lesen', 'select 1 from kasse_buchungen limit 1', 'V'),
+  ('eltern', 'Finanzen Standard-Ansicht abrufen', 'select finanz_uebersicht()', 'E'),
+  ('eltern', 'Einzelbuchungen im Kassenbuch lesen', 'select 1 from kasse_buchungen limit 1', 'V'),
+  ('anon', 'Finanzen Standard-Ansicht abrufen', 'select finanz_uebersicht()', 'V'),
   ('stufenteam', 'Jemanden zum Admin machen', 'update profiles set role=''admin'' where user_id=''{UID_SCHUELER}''', 'V'),
   ('stufenteam', 'Kind zuordnen', 'insert into parent_children(user_id,student_id) values (''{UID_ELTERN}'',''{S_FREMD}'')', 'V'),
   ('stufenteam', 'Protokoll lesen', 'select 1 from audit_log limit 1', 'V'),

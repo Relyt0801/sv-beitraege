@@ -11,12 +11,14 @@ export type PermKey =
   | "hilfen.edit"
   | "beitraege.manage"
   | "termine.manage"
+  | "finanzen.basis"
   | "finanzen.view"
   | "finanzen.manage"
   | "roles.manage"
   | "perms.manage";
 
-export interface PermDef { key: PermKey; label: string; desc: string }
+/** eltern: Das Recht lässt sich auch Elternzugängen geben (eigene Schaltfläche im Rechte-Reiter). */
+export interface PermDef { key: PermKey; label: string; desc: string; eltern?: boolean }
 export interface PermCategory { label: string; icon: string; perms: PermDef[] }
 
 export const PERM_CATEGORIES: PermCategory[] = [
@@ -52,7 +54,8 @@ export const PERM_CATEGORIES: PermCategory[] = [
   },
   {
     label: "Finanzen", icon: "💰", perms: [
-      { key: "finanzen.view", label: "Finanzen ansehen", desc: "Den Reiter Finanzen lesen: Kontostand, Ziel, Einnahmen und Verlauf. (Der Aufsichtsrat darf das automatisch.)" },
+      { key: "finanzen.basis", label: "Finanzen ansehen – Standard", desc: "Kontostand, Anteil am Geldziel, Summe der offenen Beiträge, Stufenbeiträge je EF/Q1/Q2 und jede Aktion mit Einnahmen, Ausgaben und Saldo. Keine Namen, keine einzelnen Buchungen.", eltern: true },
+      { key: "finanzen.view", label: "Finanzen ansehen – Erweitert", desc: "Das komplette Kassenbuch: jede Buchung mit Namen, Verlauf, Kostenanfragen, Bankabgleich. (Der Aufsichtsrat darf das automatisch.)" },
       { key: "finanzen.manage", label: "Kassenbuch führen", desc: "Buchungen eintragen und löschen, Kostenanfragen entscheiden, Ziel setzen, mit der Bank abgleichen." },
     ],
   },
@@ -127,14 +130,14 @@ export function rollenDerZeile(key: string): string[] {
 }
 
 // Standard-Rechte je Rolle (Fallback im Client, Seeds in permissions.sql identisch)
-const TEAM_STANDARD: PermKey[] = ["chats.view_all", "chats.delete_messages", "chats.manage", "komitees.assign", "data.edit", "hilfen.edit", "termine.manage", "mod.timeout"];
+const TEAM_STANDARD: PermKey[] = ["chats.view_all", "chats.delete_messages", "chats.manage", "komitees.assign", "data.edit", "hilfen.edit", "termine.manage", "mod.timeout", "finanzen.basis", "finanzen.view"];
 
 export const ROLE_DEFAULTS: Record<string, PermKey[]> = {
-  schueler: [],
-  eltern: [], // Elternzugang bekommt keine der Befugnisse
+  schueler: ["finanzen.basis"],
+  eltern: ["finanzen.basis"], // Elternzugang: nur die Standard-Ansicht der Finanzen
   sprecher: [...TEAM_STANDARD],
   stv_sprecher: [...TEAM_STANDARD],
   stufenteam: [...TEAM_STANDARD],
-  kassenwart: [...TEAM_STANDARD, "kasse.edit", "beitraege.manage", "finanzen.view", "finanzen.manage"],
+  kassenwart: [...TEAM_STANDARD, "kasse.edit", "beitraege.manage", "finanzen.manage"],
   admin: [...ALL_PERMS],
 };
