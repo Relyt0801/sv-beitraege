@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState, ty
 import { hasSupabase, supabase } from "./lib/supabase";
 import { abonniere } from "./lib/realtime";
 import type { BankKonto } from "./lib/types";
-import { pushToUsers } from "./lib/push";
+import { pushToUsers, sendePush } from "./lib/push";
 import { DEMO_KONTO, demoRolle, demoUid, demoZuordnung } from "./lib/demo";
 import { useStore } from "./store";
 
@@ -356,11 +356,20 @@ export function ElternProvider({ children }: { children: ReactNode }) {
 
   const infoAnlegen = useCallback<ElternCtx["infoAnlegen"]>(async (titel, text, angeheftet) => {
     if (!hasSupabase || !uid.current) return;
-    const { error } = await supabase!
+    const { data, error } = await supabase!
       .from("eltern_infos")
-      .insert({ titel: titel.trim(), text: text.trim(), angeheftet, autor: uid.current });
-    if (error) meldeFehler("Die Info konnte nicht gespeichert werden: " + error.message);
-    else void laden();
+      .insert({ titel: titel.trim(), text: text.trim(), angeheftet, autor: uid.current })
+      .select("id")
+      .single();
+    if (error) {
+      meldeFehler("Die Info konnte nicht gespeichert werden: " + error.message);
+      return;
+    }
+    void laden();
+    // Alle Elternzugänge mit zugeordnetem Kind bekommen eine Mitteilung.
+    // Die Empfänger rechnet der Server aus – im Browser sieht das Team die
+    // Elternkonten nicht zuverlässig vollständig.
+    if (data?.id) void sendePush({ eltern_info_id: data.id });
   }, [laden]);
 
   const infoLoeschen = useCallback<ElternCtx["infoLoeschen"]>(async (id) => {

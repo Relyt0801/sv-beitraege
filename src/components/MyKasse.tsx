@@ -139,7 +139,7 @@ export function MyKasse({
                 }`}
               >
                 <div className="zahl text-[13px] font-bold leading-none">{stufe.ab} %</div>
-                <div className="zahl mt-1 text-[11px] font-medium leading-none opacity-90">+{stufe.betrag} €</div>
+                <div className="zahl mt-1 text-[11px] font-medium leading-none">+{stufe.betrag} €</div>
               </div>
             );
           })}

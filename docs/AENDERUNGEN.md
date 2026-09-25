@@ -644,8 +644,8 @@ Löschkonzept – und warum der App Store für eine PWA nicht der richtige Weg i
 - „+ Person hinzufügen“: Startpasswort für Schüler- und Elternzugang wird von
   Hand eingetippt (mind. 8 Zeichen), mit Knopf „🎲 Vorschlag“ für ein
   zufälliges 8-stelliges Passwort ohne Verwechsler (0/O, 1/l/I).
-- Schreibweise korrigiert: Liebehenz (Personenliste, beide Zugänge, Nutzernamen
-  `liebehenz.tobias` / `tobias.liebehenz`).
+- Schreibweise eines Nachnamens korrigiert (Personenliste, beide Zugänge,
+  Nutzernamen).
 
 ## Impressum ausgefüllt, Schriften ohne Google
 
@@ -660,3 +660,38 @@ Löschkonzept – und warum der App Store für eine PWA nicht der richtige Weg i
   Schnitte sind im Offline-Speicher der App.
 - GitHub Pages baut nicht mehr bei jedem Push mit (nur noch von Hand), die App
   läuft auf Vercel.
+
+## Testphase 24./25.09.: doppelte Komitees, Eltern-Pop-ups, Sicherheit, Tempo
+
+Ausführlich: `docs/TESTBERICHT-2026-09-24.md`.
+
+- **Doppelte Komitee-Chats** zusammengeführt. Die Datenbank lässt keine
+  zweiten mehr zu (Trigger und eindeutiger Index). Fehlende Chats legt die App
+  nur noch an, wer alle Chats sieht.
+- **„Infos für Eltern“ kommen als Pop-up** – an alle Elternzugänge mit Kind,
+  die Mitteilungen erlaubt haben. Neuer Modus `eltern_info_id` in `send-push`,
+  nur für das Team. Doppeltipp-Schutz beim Veröffentlichen.
+- **Sicherheitslücken geschlossen**
+  - Aufsichtsrat nicht mehr selbst wählbar (auch nicht über die
+    Schnittstelle).
+  - `send-push` verschickt keinen beliebigen Text mehr an beliebige Handys.
+  - Ohne Anmeldung lässt sich das Betreiber-Konto nicht mehr ermitteln.
+- **Zugriffsregeln 30- bis 95-mal schneller**, inhaltlich unverändert. Die
+  Aufrufe sind so eingepackt, dass Postgres sie einmal pro Abfrage statt
+  einmal pro Zeile rechnet.
+- **Oberfläche**
+  - Lange Namen und Links sprengen das Layout nicht mehr.
+  - Kontrast verbessert (442 → 30 knappe Stellen).
+  - Fehlende Beschriftungen ergänzt, größere Tippflächen.
+- **Datenschutz im Repo:** Echte Namen aus Kommentaren, Beispielen und diesem
+  Protokoll durch erfundene ersetzt. Die Geschwister-Liste für
+  `scripts/eltern-anlegen.mjs` steht jetzt in `privat/geschwister.json`.
+- **Tests zum Wiederholen:** `supabase/tests/rechte-test.sql` (106 Fälle) und
+  `tests/` (Oberfläche, Massendaten, Last, Edge Functions), Anleitung in
+  `tests/README.md`.
+- **Eingespielt**
+  - `supabase/komitee-chats-eindeutig.sql`
+  - `supabase/aufsichtsrat-schutz.sql`
+  - `supabase/rls-schneller.sql`
+  - `supabase/anon-abdichten.sql`
+  - `send-push` v19

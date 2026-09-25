@@ -132,7 +132,7 @@ export function Wochenstreifen({
                     : "border-transparent hover:bg-papier-matt dark:hover:bg-slate-800"
               }`}
             >
-              <span className={`text-[10px] font-semibold ${aktiv ? "text-white/70" : "text-tinte-leise"}`}>
+              <span className={`text-[10px] font-semibold ${aktiv ? "text-white/90" : "text-tinte-leise"}`}>
                 {WOCHENTAGE[(tag.getDay() + 6) % 7]}
               </span>
               <span className={`zahl text-[15px] font-bold leading-none ${aktiv ? "" : istHeute ? "text-brand" : ""}`}>

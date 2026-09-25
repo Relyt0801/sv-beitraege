@@ -722,7 +722,7 @@ function Main() {
                 onClick={() => setTab(n.key)}
                 aria-current={tab === n.key ? "page" : undefined}
                 className={`relative flex min-w-0 flex-1 flex-col items-center gap-0.5 rounded-[1.5rem] px-0.5 pb-1.5 pt-2 text-[10px] font-semibold tracking-[-0.01em] transition duration-300 ease-ios active:scale-90 ${
-                  tab === n.key ? "bg-black/[0.06] text-brand dark:bg-white/[0.12]" : "text-tinte dark:text-slate-100"
+                  tab === n.key ? "bg-black/[0.06] text-brand dark:bg-white/[0.12] dark:text-brand-dark" : "text-tinte dark:text-slate-100"
                 }`}
                 aria-label={n.label}
               >

@@ -98,7 +98,7 @@ function StudentCardRoh({
       {/* Offen */}
       <button
         onClick={() => (selectable ? onToggleSelect(student.id) : onOpen(student.id))}
-        className={`zahl shrink-0 text-right text-[17px] font-bold sm:w-16 ${
+        className={`zahl -my-2 min-w-[2.75rem] shrink-0 py-2 text-right text-[17px] font-bold sm:w-16 ${
           betrag > 0 ? "text-offen dark:text-amber-300" : "text-bezahlt dark:text-emerald-300"
         }`}
       >
@@ -106,7 +106,9 @@ function StudentCardRoh({
       </button>
 
       {/* Halbjahre */}
-      <div className="order-last flex w-full gap-1.5 sm:order-none sm:w-auto sm:max-w-[13rem] sm:flex-1">
+      {/* sm:min-w: auf dem Tablet waren die sechs Kästchen nur 20 px breit –
+          zu klein zum sicheren Tippen (ein Fehltipp ändert den Zahlstatus). */}
+      <div className="order-last flex w-full gap-1.5 sm:order-none sm:w-auto sm:min-w-[12.5rem] sm:max-w-[15rem] sm:flex-1">
         {HY.map((h, i) => (
           <TermChip
             key={h}
@@ -123,7 +125,7 @@ function StudentCardRoh({
       {/* Mithilfe */}
       <button
         onClick={() => (selectable ? onToggleSelect(student.id) : onOpen(student.id))}
-        className="flex shrink-0 items-center gap-1.5"
+        className="-my-2 flex shrink-0 items-center gap-1.5 py-3"
         aria-label={`Mithilfe ${prozent} Prozent`}
       >
         <span className="hidden h-1.5 w-12 overflow-hidden rounded-full bg-papier-matt dark:bg-slate-800 sm:block">

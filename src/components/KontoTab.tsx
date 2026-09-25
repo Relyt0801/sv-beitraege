@@ -73,7 +73,7 @@ export function KontoTab() {
           mehreren Kindern bitte für jedes Kind einzeln überweisen.
         </p>
 
-        <dl className="mt-4 grid grid-cols-1 gap-2" data-tour="konto-daten">
+        <div className="mt-4 grid grid-cols-1 gap-2" data-tour="konto-daten">
           <Zeile label="Empfänger" wert={konto.inhaber} onKopieren={() => kopieren(konto.inhaber, "inhaber")} kopiert={kopiert === "inhaber"} />
           <Zeile
             label="IBAN"
@@ -84,7 +84,7 @@ export function KontoTab() {
           />
           <Zeile label="BIC" wert={konto.bic} onKopieren={() => kopieren(konto.bic, "bic")} kopiert={kopiert === "bic"} />
           <Zeile label="Bank" wert={konto.bank} />
-        </dl>
+        </div>
 
         {/* Verwendungszweck zum Kopieren – je Kind eine Zeile */}
         <ul className="mt-2 grid grid-cols-1 gap-2">
@@ -139,7 +139,7 @@ function Zeile({
     <button
       onClick={onKopieren}
       className={`shrink-0 rounded-full px-3.5 py-2 text-[13px] font-semibold transition duration-200 active:scale-95 ${
-        kopiert ? "bg-bezahlt text-white" : "bg-white text-brand-dark shadow-[0_1px_3px_rgba(0,0,0,.08)] dark:bg-slate-700 dark:text-brand"
+        kopiert ? "bg-bezahlt text-white" : "bg-white text-brand-dark shadow-[0_1px_3px_rgba(0,0,0,.08)] dark:bg-slate-700 dark:text-brand-dark"
       }`}
     >
       {kopiert ? "✓ kopiert" : "kopieren"}
@@ -151,21 +151,21 @@ function Zeile({
     return (
       <div className="rounded-xl bg-papier-matt px-3.5 py-2.5 dark:bg-slate-800">
         <div className="flex items-center gap-3">
-          <dt className="min-w-0 flex-1 break-words text-[11px] font-semibold uppercase tracking-wide text-tinte-leise">{label}</dt>
+          <div className="min-w-0 flex-1 break-words text-[11px] font-semibold uppercase tracking-wide text-tinte-leise">{label}</div>
           {knopf}
         </div>
         {/* Ab 12 px passt die IBAN auch aufs iPhone SE (320 px). Reicht es
             trotzdem nicht, scrollt nur diese Zeile, nie die ganze Seite. */}
-        <dd className="no-scrollbar mt-1 overflow-x-auto whitespace-nowrap text-[clamp(12px,3.75vw,18px)] font-semibold tabular-nums tracking-[0.03em] text-tinte dark:text-slate-100">
+        <div className="no-scrollbar mt-1 overflow-x-auto whitespace-nowrap text-[clamp(12px,3.75vw,18px)] font-semibold tabular-nums tracking-[0.03em] text-tinte dark:text-slate-100">
           {wert}
-        </dd>
+        </div>
       </div>
     );
   return (
     <div className="flex items-center gap-3 rounded-xl bg-papier-matt px-3.5 py-2.5 dark:bg-slate-800">
       <div className="min-w-0 flex-1">
-        <dt className="text-[11px] font-semibold uppercase tracking-wide text-tinte-leise">{label}</dt>
-        <dd className="mt-0.5 break-words text-[15px] font-semibold text-tinte dark:text-slate-100">{wert}</dd>
+        <div className="text-[11px] font-semibold uppercase tracking-wide text-tinte-leise">{label}</div>
+        <div className="mt-0.5 break-words text-[15px] font-semibold text-tinte dark:text-slate-100">{wert}</div>
       </div>
       {knopf}
     </div>

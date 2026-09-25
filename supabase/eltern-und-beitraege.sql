@@ -67,7 +67,7 @@ $$;
 
 -- ------------------------------------------------------------
 -- 4) Welche Kinder gehören zu welchem Eltern-Konto
---    Geschwister hängen am selben Konto (z. B. Liv und Enni Icking).
+--    Geschwister hängen am selben Konto (z. B. Mia und Ben Muster).
 -- ------------------------------------------------------------
 create table if not exists public.parent_children (
   user_id uuid not null references auth.users(id) on delete cascade,

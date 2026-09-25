@@ -1,11 +1,11 @@
 // Namens-Schema (angelehnt an die Schulmail vorname.nachname@…):
 //   - Bindestrich-Vornamen bleiben:            Anna-Lena        -> anna-lena
 //   - Zweitname mit Leerzeichen fällt weg:     Juli Charlotte   -> juli
-//   - Mehrteilige Nachnamen zusammengezogen:   von Laszewski    -> vonlaszewski
-//   - Umlaute ae/oe/ue, ß->ss, Akzente weg:    Knüsting -> knuesting, Gâta -> gata
+//   - Mehrteilige Nachnamen zusammengezogen:   von Beispiel     -> vonbeispiel
+//   - Umlaute ae/oe/ue, ß->ss, Akzente weg:    Brüning -> bruening, Lefèvre -> lefevre
 //
-// App-Nutzername:  nachname.vorname   -> ebbing.anna-lena, vonlaszewski.juli
-// Schulmail:       vorname.nachname@… -> anna-lena.ebbing@…, juli.vonlaszewski@…
+// App-Nutzername:  nachname.vorname   -> muster.lea-marie, vonbeispiel.jan
+// Schulmail:       vorname.nachname@… -> lea-marie.muster@…, jan.vonbeispiel@…
 
 function clean(s: string): string {
   return (s || "")

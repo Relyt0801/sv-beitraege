@@ -1,0 +1,18 @@
+{
+  "name": "sv-beitraege-tests",
+  "private": true,
+  "type": "module",
+  "description": "Test-Skripte (getrennt von der App, damit Vercel nichts davon installiert)",
+  "scripts": {
+    "rechte": "echo Rechte-Test: supabase/tests/rechte-test.sql im Supabase SQL Editor ausfuehren",
+    "edge": "node edge-check.mjs",
+    "last": "node last-test.mjs",
+    "ui": "node ui-check.mjs",
+    "masse": "node masse-check.mjs"
+  },
+  "dependencies": {
+    "axe-core": "^4.10.0",
+    "playwright": "^1.47.0",
+    "undici": "^6.19.0"
+  }
+}

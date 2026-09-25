@@ -53,7 +53,7 @@ function pruefePw(p: unknown): { pw: string; fehler?: string } {
 
 const sauber = (s: unknown) => String(s ?? "").replace(/\s+/g, " ").trim();
 
-/** Wie scripts/eltern-anlegen.mjs: "Liv Icking" -> "liv.icking" (Kind andersherum). */
+/** Wie scripts/eltern-anlegen.mjs: "Mia Muster" -> "mia.muster" (Kind andersherum). */
 function schlicht(s: string): string {
   return (s || "")
     .toLowerCase()

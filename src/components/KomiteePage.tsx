@@ -98,7 +98,7 @@ export function KomiteePage({ topic, onBack }: { topic: Topic; onBack: () => voi
             {pins.map((p) => (
               <div key={p.id} className="card flex items-start gap-2 p-3">
                 <div className="min-w-0 flex-1">
-                  <div className="text-[15px] font-semibold">{p.body}</div>
+                  <div className="text-[15px] font-semibold [overflow-wrap:anywhere]">{p.body}</div>
                   <PersonName userId={p.created_by} name={p.author} role={p.author_role} koms={p.author_koms} className="text-[11px] font-semibold" />
                 </div>
                 {(p.created_by === uid || darfLoeschen) && (
@@ -130,7 +130,7 @@ export function KomiteePage({ topic, onBack }: { topic: Topic; onBack: () => voi
                 >
                   {t.done ? "✓" : ""}
                 </span>
-                <span className={`min-w-0 flex-1 text-[15px] ${t.done ? "text-tinte-leise line-through" : "font-semibold"}`}>
+                <span className={`min-w-0 flex-1 text-[15px] [overflow-wrap:anywhere] ${t.done ? "text-tinte-leise line-through" : "font-semibold"}`}>
                   {t.body}
                 </span>
                 <PersonName userId={t.created_by} name={t.author} role={t.author_role} koms={t.author_koms} className="shrink-0 text-[11px] font-semibold" />
@@ -216,7 +216,7 @@ function UmfrageKarte({
     <div className="card p-4">
       <div className="flex items-start gap-2">
         <div className="min-w-0 flex-1">
-          <div className="text-[15px] font-bold">{item.body}</div>
+          <div className="text-[15px] font-bold [overflow-wrap:anywhere]">{item.body}</div>
           <div className="mt-0.5 flex flex-wrap gap-1.5 text-[11px] text-tinte-leise">
             <span>{item.poll_multi ? "Mehrfachwahl" : "Einfachwahl"}</span>
             <span>·</span>
@@ -231,9 +231,11 @@ function UmfrageKarte({
             )}
           </div>
         </div>
-        <span className="flex shrink-0 items-center gap-1.5 text-[11px] text-tinte-leise">
+        {/* Name höchstens 40 % breit – sonst blieb der Frage auf schmalen
+            Handys nur eine schmale Spalte. */}
+        <span className="flex min-w-0 max-w-[40%] items-center gap-1.5 text-[11px] text-tinte-leise">
           <Avatar userId={item.created_by} name={item.author} size={20} />
-          <PersonName userId={item.created_by} name={item.author} role={item.author_role} koms={item.author_koms} className="font-semibold" />
+          <PersonName userId={item.created_by} name={item.author} role={item.author_role} koms={item.author_koms} className="block min-w-0 truncate font-semibold" />
         </span>
         {kannLoeschen && (
           <button onClick={() => void frage("Abstimmung löschen?", "Löschen", true).then((ok) => { if (ok) void onDelete(); })} className="shrink-0 text-tinte-leise">
@@ -355,7 +357,7 @@ function ChatBereich({
                     ⚠ Nicht gesendet – bitte noch einmal schreiben
                   </div>
                 )}
-                <div className={`mt-1 text-right text-[10px] ${meins ? "text-white/70" : "text-tinte-leise"}`}>
+                <div className={`mt-1 text-right text-[10px] ${meins ? "text-white/90" : "text-tinte-leise"}`}>
                   {new Date(m.created_at).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })}
                   {(meins || darfLoeschen) && (
                     <button onClick={() => void frage("Nachricht löschen?", "Löschen", true).then((ok) => { if (ok) void deleteItem(m.id); })} className="ml-2 underline">

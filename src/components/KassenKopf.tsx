@@ -135,7 +135,7 @@ function KassenKopfRoh({
           <h2 className="text-[13px] font-semibold text-tinte-matt">Die sechs Halbjahre</h2>
           <span className="text-[11px] text-tinte-leise">Anteil bezahlt</span>
         </div>
-        <div className="no-scrollbar -mx-3 flex gap-1.5 overflow-x-auto px-3 sm:mx-0 sm:grid sm:grid-cols-6 sm:overflow-visible sm:px-0">
+        <div tabIndex={0} aria-label="Die sechs Halbjahre" className="no-scrollbar -mx-3 flex gap-1.5 overflow-x-auto px-3 sm:mx-0 sm:grid sm:grid-cols-6 sm:overflow-visible sm:px-0">
           {halbjahre.map((h) => (
             <div
               key={h.name}

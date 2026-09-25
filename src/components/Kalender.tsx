@@ -348,7 +348,7 @@ function WochenAnsicht({
                     </span>
                     <span
                       className={`block truncate text-[10px] ${
-                        meins(t) ? "text-white/70" : "text-tinte-leise"
+                        meins(t) ? "text-white/90" : "text-tinte-leise"
                       }`}
                     >
                       {[t.von ? zeitText(t) : "ganztägig", t.ort].filter(Boolean).join(" · ")}

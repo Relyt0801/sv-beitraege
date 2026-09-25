@@ -43,8 +43,9 @@ Deno.serve(async (req) => {
       return json({ passt });
     }
 
-    const { probe, event_id, termin_id, an_team, user_ids, chat_item_id, angepinnt, an_personen, title: directTitle, body: directBody, url: wunschUrl } = koerper as {
+    const { probe, event_id, termin_id, an_team, user_ids, chat_item_id, angepinnt, an_personen, eltern_info_id, title: directTitle, body: directBody, url: wunschUrl } = koerper as {
       probe?: boolean;
+      eltern_info_id?: string;
       an_personen?: { student_id: string; title: string; body: string }[];
       chat_item_id?: string;
       angepinnt?: boolean;
@@ -85,29 +86,75 @@ Deno.serve(async (req) => {
     let einzeln: { ids: string[]; title: string; body: string }[] | null = null;
 
     const TEAM = ["stufenteam", "kassenwart", "admin", "sprecher", "stv_sprecher"];
+    // Befugnisse, mit denen jemand anderen etwas zuteilt, freigibt oder
+    // entscheidet – wer eine davon hat, darf auch direkt benachrichtigen.
+    const VERWALTEN = [
+      "chats.manage", "termine.manage", "kasse.edit", "hilfen.edit", "data.edit",
+      "finanzen.manage", "komitees.assign", "beitraege.manage",
+    ];
+    const kurz = (x: unknown, n: number) => String(x ?? "").slice(0, n);
+
+    // Wer schickt? Einmal nachsehen, alle Zweige nutzen es.
+    const { data: ich } = await supabase.from("profiles").select("role, is_op").eq("user_id", selbst).maybeSingle();
+    const meineRolle = String(ich?.role || "");
+    let verwaltet = Boolean(ich?.is_op) || TEAM.includes(meineRolle);
+    if (!verwaltet) {
+      const [{ data: up }, { data: rp }] = await Promise.all([
+        supabase.from("user_permissions").select("perm").eq("user_id", selbst).eq("allowed", true).in("perm", VERWALTEN),
+        supabase.from("role_permissions").select("perm").eq("role", meineRolle).eq("allowed", true).in("perm", VERWALTEN),
+      ]);
+      verwaltet = Boolean((up && up.length) || (rp && rp.length));
+    }
 
     if (Array.isArray(user_ids) && user_ids.length) {
-      // Direkt-Modus (z. B. Themen-Benachrichtigungen, Schicht-Zuteilung)
-      userIds = user_ids;
-      title = String(directTitle || "Stufenkasse");
-      body = String(directBody || "");
+      // Direkt-Modus (z. B. Themen-Benachrichtigungen, Schicht-Zuteilung).
+      // Wer nichts verwaltet (Schüler, Eltern), darf so nur das Team und die
+      // Finanzverwaltung erreichen – vorher konnte jedes Konto beliebigen
+      // Text an beliebige Handys schicken.
+      let ziele = [...new Set(user_ids.map(String))].slice(0, 500);
+      if (!verwaltet) {
+        const [{ data: tm }, { data: fv }] = await Promise.all([
+          supabase.from("profiles").select("user_id").in("role", TEAM),
+          supabase.rpc("finanz_verwalter_ids"),
+        ]);
+        const erlaubt = new Set<string>([
+          ...(tm || []).map((p: { user_id: string }) => p.user_id),
+          ...((Array.isArray(fv) ? fv : []) as unknown[]).map((x) => String(x)),
+        ]);
+        const vorher = ziele.length;
+        ziele = ziele.filter((u) => erlaubt.has(u));
+        if (ziele.length < vorher) console.log("Direkt-Modus: nicht erlaubte Empfänger entfernt:", vorher - ziele.length);
+      }
+      userIds = ziele;
+      title = kurz(directTitle || "Stufenkasse", 80);
+      body = kurz(directBody, 200);
     } else if (an_team) {
       // An das Stufenteam, z. B. eine neue Terminanfrage
       const { data } = await supabase.from("profiles").select("user_id").in("role", TEAM);
       userIds = (data || []).map((p: { user_id: string }) => p.user_id);
-      title = String(directTitle || "Stufenkasse");
-      body = String(directBody || "");
+      title = kurz(directTitle || "Stufenkasse", 80);
+      body = kurz(directBody, 200);
+    } else if (eltern_info_id) {
+      // Neue "Info für die Eltern": an alle Elternzugänge mit zugeordnetem
+      // Kind (ohne Kind sehen sie die Info ohnehin nicht). Auslösen darf nur,
+      // wer Infos schreiben darf (Datenbank-Regel "infos schreiben" = Team).
+      if (!(Boolean(ich?.is_op) || TEAM.includes(meineRolle))) return json({ error: "nicht erlaubt" }, 403);
+      const { data: info } = await supabase.from("eltern_infos")
+        .select("id, titel, text, angeheftet").eq("id", String(eltern_info_id)).maybeSingle();
+      if (!info) return json({ error: "info not found" }, 404);
+      const { data: pc } = await supabase.from("parent_children").select("user_id");
+      const mitKind = [...new Set((pc || []).map((x: { user_id: string }) => x.user_id))];
+      const { data: el } = mitKind.length
+        ? await supabase.from("profiles").select("user_id").eq("role", "eltern").in("user_id", mitKind)
+        : { data: [] };
+      userIds = (el || []).map((x: { user_id: string }) => x.user_id);
+      title = (info.angeheftet ? "📌 " : "📣 ") + kurz(info.titel || "Neue Info vom Stufenteam", 70);
+      body = kurz(info.text, 200);
+      ziel = "./#infos";
     } else if (Array.isArray(an_personen) && an_personen.length) {
       // Zahlung / Beitragshilfe eingetragen: an die Person selbst und ihre Eltern.
       // Auslösen darf nur das Team oder wer die passende Befugnis hat.
-      const { data: ich } = await supabase.from("profiles").select("role, is_op").eq("user_id", selbst).maybeSingle();
-      let darf = Boolean(ich?.is_op) || TEAM.includes(ich?.role || "");
-      if (!darf) {
-        const { data: up } = await supabase.from("user_permissions").select("perm")
-          .eq("user_id", selbst).eq("allowed", true).in("perm", ["kasse.edit", "hilfen.edit"]);
-        darf = Boolean(up && up.length);
-      }
-      if (!darf) return json({ error: "nicht erlaubt" }, 403);
+      if (!verwaltet) return json({ error: "nicht erlaubt" }, 403);
       const liste = an_personen.slice(0, 300);
       const sids = [...new Set(liste.map((x) => String(x.student_id)))];
       const { data: pr } = await supabase.from("profiles").select("user_id, student_id").in("student_id", sids);
@@ -133,8 +180,9 @@ Deno.serve(async (req) => {
       const { data: alle } = await supabase.from("profiles").select("user_id, role");
       const rolle = new Map<string, string>((alle || []).map((p: { user_id: string; role: string }) => [p.user_id, p.role] as [string, string]));
       const istTeam = (u: string) => TEAM.includes(rolle.get(u) || "");
-      // Auslösen darf nur, wer die Nachricht geschrieben hat – oder das Team (Anheften).
-      if (it.created_by !== selbst && !istTeam(selbst as string)) return json({ error: "nicht erlaubt" }, 403);
+      // Auslösen darf nur, wer die Nachricht geschrieben hat – oder wer Chats
+      // verwaltet (Anheften).
+      if (it.created_by !== selbst && !verwaltet) return json({ error: "nicht erlaubt" }, 403);
 
       const { data: mm } = await supabase.from("topic_members").select("user_id").eq("topic_id", tp.id);
       const mitglieder = (mm || []).map((x: { user_id: string }) => x.user_id);
@@ -209,8 +257,11 @@ Deno.serve(async (req) => {
       }
       // Das Team sieht ohnehin alles; es bekommt die Meldung nur, wenn es selbst gemeint ist.
       userIds = [...new Set(userIds)];
-      title = String(directTitle || (t.icon ? t.icon + " " : "") + t.titel);
-      body = String(directBody || "Neuer Termin im Kalender");
+      // Eigener Text nur von denen, die Termine verwalten – sonst hätte jedes
+      // Konto über irgendeinen Termin beliebigen Text an alle schicken können.
+      const eigenerText = verwaltet || t.created_by === selbst;
+      title = kurz((eigenerText && directTitle) || (t.icon ? t.icon + " " : "") + t.titel, 80);
+      body = kurz((eigenerText && directBody) || "Neuer Termin im Kalender", 200);
       if (ziel === "./") ziel = "./#events";
     } else {
       const { data: ev, error: evErr } = await supabase.from("events").select("*").eq("id", event_id).single();
@@ -219,6 +270,8 @@ Deno.serve(async (req) => {
         return json({ error: "event not found" }, 404);
       }
       console.log("Event:", ev.title, "| audience:", ev.audience);
+      // Nur wer das Event angelegt hat (oder das Team) löst die Meldung aus.
+      if (ev.created_by !== selbst && !verwaltet) return json({ error: "nicht erlaubt" }, 403);
       if (ev.audience === "all") {
         // Eltern sehen keine Events – also bekommen sie auch keine Meldung dazu.
         const { data } = await supabase.from("profiles").select("user_id, role");
@@ -268,7 +321,7 @@ Deno.serve(async (req) => {
         title: paket.title,
         body: paket.body.slice(0, 120),
         url: ziel,
-        tag: event_id ? `event-${event_id}` : termin_id ? `termin-${termin_id}` : undefined,
+        tag: event_id ? `event-${event_id}` : termin_id ? `termin-${termin_id}` : eltern_info_id ? `eltern-info-${eltern_info_id}` : undefined,
       });
       await Promise.all(
         (subs || [])

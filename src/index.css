@@ -9,7 +9,7 @@
  */
 :root {
   color-scheme: light dark;
-  --brand: 0 113 227;          /* #0071E3 */
+  --brand: 0 102 204;          /* #0066CC – 5,6:1 auf Weiß, 4,7:1 auf Grau (#ECECED) */
   --brand-soft: 64 156 255;
   --brand-dark: 0 102 204;     /* #0066CC – Text auf getoentem Grund */
   --papier: 242 242 247;       /* systemGroupedBackground */
@@ -31,7 +31,12 @@
   --glas: 255 255 255;
 }
 .dark {
-  --brand: 10 132 255;         /* #0A84FF */
+  /* Blaue SCHRIFT auf Schwarz/Dunkelgrau: #409CFF (6:1 auf #1C1C1E, 4,5:1
+     auf #323233). Das iOS-Original #0A84FF hat dort nur 3,5–4,4:1. */
+  --brand: 64 156 255;         /* #409CFF */
+  /* Gefüllte blaue KNÖPFE mit weißer Schrift brauchen ein dunkleres Blau
+     (weiß auf #0A84FF = 3,6:1, auf #0071E3 = 4,7:1). */
+  --brand-fuell: 0 113 227;    /* #0071E3 */
   --brand-soft: 64 156 255;
   --brand-dark: 100 170 255;
   --papier: 0 0 0;
@@ -40,7 +45,7 @@
   --matt: 44 44 46;
   --tinte: 242 242 247;
   --tinte-matt: 174 174 178;
-  --tinte-leise: 142 142 147;
+  --tinte-leise: 152 152 157;   /* #98989D – 4,8:1 auch auf #2C2C2E */
   --bezahlt: 48 209 88;
   --bezahlt-grund: 20 48 28;
   --bezahlt-rand: 32 80 44;
@@ -95,6 +100,9 @@ body {
   -webkit-font-smoothing: antialiased;
   overscroll-behavior-y: none;
   font-feature-settings: "kern";
+  /* Lange Wörter und Links (eingefügte URLs, "xxxxxxxx…") brechen um,
+     statt die Seite breiter als den Bildschirm zu machen. */
+  overflow-wrap: break-word;
 }
 .dark body {
   @apply bg-slate-950 text-slate-100;
@@ -118,6 +126,15 @@ button:not(:disabled) {
 }
 
 @layer components {
+  /* Gitter ohne feste Spalten (z. B. "grid gap-2 lg:grid-cols-2") hatten
+     eine Spalte in Inhaltsbreite: Ein langer Name in einer Auswahl oder ein
+     langer Link in einer Umfrage machte die GANZE Seite breiter als das
+     Handy – die Tab-Leiste rutschte aus dem Bild (Stresstest 24.09.2026).
+     minmax(0, 1fr) hält die Spalte in der Breite des Behälters. */
+  .grid {
+    grid-auto-columns: minmax(0, 1fr);
+  }
+
   /* Eine Zelle/Karte: weiss auf grauem Grund, ohne harten Rand. */
   .card {
     @apply rounded-[1.25rem] border border-black/[0.04] bg-white shadow-card transition
@@ -208,4 +225,12 @@ button:not(:disabled) {
     transition-duration: 1ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+/* Dunkelmodus: gefüllte Flächen in Markenblau (Knöpfe, Auswahl) nehmen das
+   dunklere Füllblau, damit weiße Schrift darauf lesbar bleibt (WCAG 4,5:1).
+   Blaue Schrift, Rahmen und Ringe bleiben beim helleren --brand. */
+.dark .bg-brand {
+  --tw-bg-opacity: 1;
+  background-color: rgb(var(--brand-fuell) / var(--tw-bg-opacity));
 }

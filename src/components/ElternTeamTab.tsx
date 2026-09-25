@@ -32,6 +32,7 @@ export function ElternTeamTab() {
   const [titel, setTitel] = useState("");
   const [text, setText] = useState("");
   const [anheften, setAnheften] = useState(false);
+  const [sendet, setSendet] = useState(false);
   const [offen, setOffen] = useState<string | null>(null);
   const [neuOffen, setNeuOffen] = useState(false);
   const [schreibOffen, setSchreibOffen] = useState(false);
@@ -63,7 +64,8 @@ export function ElternTeamTab() {
           </button>
         </div>
         <p className="mt-0.5 text-[13px] leading-relaxed text-tinte-matt dark:text-slate-400">
-          Was hier steht, sehen alle Eltern in ihrem Reiter Infos.
+          Was hier steht, sehen alle Eltern in ihrem Reiter Infos. Wer Mitteilungen erlaubt hat, bekommt
+          sie zusätzlich aufs Handy.
         </p>
 
         {neuOffen && (
@@ -90,17 +92,24 @@ export function ElternTeamTab() {
               Ganz oben anheften
             </label>
             <button
-              disabled={!titel.trim() || !text.trim()}
+              disabled={!titel.trim() || !text.trim() || sendet}
               onClick={async () => {
-                await infoAnlegen(titel, text, anheften);
-                setTitel("");
-                setText("");
-                setAnheften(false);
-                setNeuOffen(false);
+                // Doppeltipp: sonst entsteht die Info zweimal (und zwei Mitteilungen).
+                if (sendet) return;
+                setSendet(true);
+                try {
+                  await infoAnlegen(titel, text, anheften);
+                  setTitel("");
+                  setText("");
+                  setAnheften(false);
+                  setNeuOffen(false);
+                } finally {
+                  setSendet(false);
+                }
               }}
               className="rounded-xl bg-brand py-2.5 text-sm font-bold text-white disabled:opacity-40"
             >
-              Veröffentlichen
+              {sendet ? "Wird veröffentlicht …" : "Veröffentlichen"}
             </button>
           </div>
         )}

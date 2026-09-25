@@ -1,7 +1,10 @@
 # ── Build / Abhängigkeiten ────────────────────────────────────
 node_modules
 dist
+dist-demo
 dist-ssr
+tests/ergebnisse/
+tests/package-lock.json
 *.local
 .DS_Store
 .vscode/*

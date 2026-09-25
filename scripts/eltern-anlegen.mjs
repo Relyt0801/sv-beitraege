@@ -1,8 +1,8 @@
 // ============================================================
 // Legt für jedes Kind einen Elternzugang an.
 //
-// Der Nutzername ist der des Kindes, nur andersherum: aus "icking.liv" wird
-// "liv.icking". So ist sofort klar, zu wem ein Zugang gehört, und gleiche
+// Der Nutzername ist der des Kindes, nur andersherum: aus "muster.mia" wird
+// "mia.muster". So ist sofort klar, zu wem ein Zugang gehört, und gleiche
 // Nachnamen können nicht durcheinandergeraten.
 //
 // Geschwister bekommen trotzdem je einen eigenen Nutzernamen. Sie stehen unten
@@ -19,15 +19,15 @@
 //   $env:SUPABASE_SERVICE_ROLE_KEY="sb_secret_..."
 //   node scripts/eltern-anlegen.mjs                     # Probelauf, zeigt nur an
 //   node scripts/eltern-anlegen.mjs --wirklich          # Konten anlegen
-//   node scripts/eltern-anlegen.mjs --nur icking        # nur diese Nachnamen
+//   node scripts/eltern-anlegen.mjs --nur muster        # nur diese Nachnamen
 //   node scripts/eltern-anlegen.mjs --entfernen --wirklich
 //
 // Die Zugangsdaten landen in privat/eltern-zugaenge.csv. Der Ordner privat/
 // ist von Git ausgeschlossen – die Liste gehört nicht ins Repo.
 // ============================================================
 import { createClient } from "@supabase/supabase-js";
-import { writeFileSync } from "node:fs";
-import { privOut } from "./privat.mjs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { priv, privOut } from "./privat.mjs";
 import { startpasswort } from "./passwoerter.mjs";
 
 const URL = process.env.SUPABASE_URL;
@@ -53,11 +53,19 @@ const email = (nutzername) => `${nutzername}@sv-beitraege.local`;
  * teilen sich ein Passwort.
  *
  * Die Schreibweise muss genau so wie in der Personenliste sein.
- * Weitere Faelle einfach hier ergaenzen.
+ *
+ * Echte Namen gehoeren nicht ins Repo: die Liste steht in
+ * privat/geschwister.json (von Git ausgeschlossen), zum Beispiel
+ *   [{ "nachname": "Muster", "vornamen": ["Mia", "Ben"] }]
  */
-const ZUSAMMEN = [
-  { nachname: "Iking", vornamen: ["Liv", "Enni"] },
-];
+const ZUSAMMEN = (() => {
+  const datei = priv("geschwister.json");
+  if (!existsSync(datei)) {
+    console.warn("! privat/geschwister.json fehlt - Geschwister bekommen getrennte Passwoerter.");
+    return [];
+  }
+  return JSON.parse(readFileSync(datei, "utf8"));
+})();
 
 /** Umlaute und Sonderzeichen raus, damit der Nutzername überall funktioniert. */
 function schlicht(s) {
@@ -142,7 +150,7 @@ const belegtVonEltern = new Set(
 
 const geplant = [];
 for (const [key, fam] of familien) {
-  // "liv.icking" – der Nutzername des Kindes, nur andersherum.
+  // "mia.muster" – der Nutzername des Kindes, nur andersherum.
   geplant.push({
     nutzername: key,
     nachname: fam.nachname,
@@ -223,7 +231,7 @@ for (const g of neu) {
     continue;
   }
 
-  // Anzeigename und Kürzel: "Familie Icking" mit IC
+  // Anzeigename und Kürzel: "Familie Muster" mit MU
   await db.from("public_profiles").upsert({
     user_id: u.user.id,
     anzeigename: `Familie ${g.nachname}`,

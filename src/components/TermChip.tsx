@@ -70,7 +70,8 @@ export function TermChip({
         clickable ? "cursor-pointer active:scale-95" : "cursor-default"
       }`}
     >
-      <span className={`font-semibold opacity-70 ${kompakt ? "text-[8px] leading-none" : "text-[10px] lg:text-[12px]"}`}>{h}</span>
+      {/* Früher 8 px mit 70 % Deckkraft – kaum lesbar (Kontrast 3,1:1). */}
+      <span className={`font-semibold ${kompakt ? "text-[9px] leading-none" : "text-[10px] lg:text-[12px]"}`}>{h}</span>
       <span
         className={`${kompakt ? "text-[12px]" : "text-base"} ${
           t.status === "erlassen" && !inactive ? (kompakt ? "font-black" : "text-lg font-black") : ""

@@ -82,7 +82,12 @@ export function schriftAuf(hex: string): string {
   const b = parseInt(h.slice(4, 6), 16) / 255;
   const kanal = (c: number) => (c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4));
   const L = 0.2126 * kanal(r) + 0.7152 * kanal(g) + 0.0722 * kanal(b);
-  return L > 0.45 ? "#111827" : "#ffffff";
+  // Die Schrift nehmen, die mehr Kontrast hat (WCAG-Formel). Die alte Grenze
+  // L > 0.45 setzte weiße Initialen auch auf Gelb, Türkis oder die hellen
+  // Dunkelmodus-Farben – Kontrast teils nur 2,5:1.
+  const gegenWeiss = 1.05 / (L + 0.05);
+  const gegenDunkel = (L + 0.05) / (0.0106 + 0.05); // #111827
+  return gegenDunkel > gegenWeiss ? "#111827" : "#ffffff";
 }
 
 /** Kontur für Weiß auf Hell bzw. Schwarz auf Dunkel, sonst nichts. */
@@ -119,7 +124,7 @@ export function initialen(name: string): string {
 
 /**
  * Aus dem Nutzernamen eines Elternzugangs den Nachnamen holen.
- * Die Konten heissen "eltern.icking", daraus wird "Icking".
+ * Die Konten heissen "eltern.muster", daraus wird "Muster".
  */
 export function elternNachname(username: string): string {
   const roh = (username || "").trim().replace(/^eltern[._-]/i, "").split(/[._-]/)[0] || "";
@@ -129,7 +134,7 @@ export function elternNachname(username: string): string {
 
 /**
  * Kuerzel eines Elternzugangs: die ersten beiden Buchstaben des Nachnamens.
- * Aus "Familie Icking" wird also IC, nicht FI.
+ * Aus "Familie Muster" wird also MU, nicht FM.
  */
 export function familienKuerzel(anzeigename: string): string {
   const nachname = (anzeigename || "").replace(/^Familie\s+/i, "").trim();

@@ -84,6 +84,7 @@ export function BeitraegeTab() {
         <div className="mt-3 min-w-0 rounded-2xl border border-dashed border-brand/50 p-2.5">
           <div className="flex min-w-0 items-center gap-2">
             <input
+              aria-label="Neue Bezeichnung"
               className="w-0 min-w-0 flex-1 rounded-lg bg-papier-matt px-2.5 py-2 text-[15px] dark:bg-slate-800"
               placeholder="Noch etwas, z. B. Fotobox betreut"
               value={titel}
@@ -96,6 +97,7 @@ export function BeitraegeTab() {
                 min={0}
                 max={100}
                 inputMode="numeric"
+                aria-label="Prozent für den neuen Eintrag"
                 className="w-12 bg-transparent text-right text-[15px] font-bold text-brand outline-none"
                 value={punkte}
                 onChange={(e) => setPunkte(e.target.value)}
@@ -211,6 +213,7 @@ function VorlagenZeile({
     <li className="min-w-0 rounded-2xl border border-papier-linie p-2.5 dark:border-slate-700">
       <div className="flex min-w-0 items-center gap-2">
         <input
+          aria-label="Wofür (Bezeichnung)"
           className="w-0 min-w-0 flex-1 rounded-lg bg-papier-matt px-2.5 py-2 text-[15px] font-semibold dark:bg-slate-800"
           value={titel.wert}
           onChange={(e) => titel.aendern(e.target.value)}
@@ -222,6 +225,7 @@ function VorlagenZeile({
             min={0}
             max={100}
             inputMode="numeric"
+            aria-label="Prozent"
             className="w-10 bg-transparent text-right text-[15px] font-bold text-brand outline-none"
             value={punkte.wert}
             onChange={(e) => punkte.aendern(Math.max(0, Math.min(100, Number(e.target.value) || 0)))}

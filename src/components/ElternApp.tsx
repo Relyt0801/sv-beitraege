@@ -98,14 +98,14 @@ export function ElternApp() {
   }, [laedt, ohneKind, kinder.length, tourResetAt]);
 
   const punkte = useMemo(() => punkteIndex(contributions), [contributions]);
-  // "Familie Buja" statt "Mein Zugang". Bei Geschwistern mit verschiedenen
+  // "Familie Muster" statt "Mein Zugang". Bei Geschwistern mit verschiedenen
   // Nachnamen stehen beide da, getrennt durch einen Schraegstrich.
   const familienName = useMemo(() => {
     const namen = [...new Set(kinder.map((k) => k.nachname).filter(Boolean))];
     return namen.length ? `Familie ${namen.join(" / ")}` : "Mein Zugang";
   }, [kinder]);
 
-  // Zwei Buchstaben fuer den runden Profilknopf: "Familie Buja" -> "BU"
+  // Zwei Buchstaben fuer den runden Profilknopf: "Familie Muster" -> "MU"
   const familienKuerzel = useMemo(() => {
     const namen = [...new Set(kinder.map((k) => k.nachname).filter(Boolean))];
     if (namen.length > 1) return namen.slice(0, 2).map((n) => n[0]).join("").toUpperCase();
@@ -287,7 +287,7 @@ export function ElternApp() {
               onClick={() => setReiter(n.key)}
               aria-current={reiter === n.key ? "page" : undefined}
               className={`relative flex flex-1 flex-col items-center gap-0.5 rounded-[1.5rem] pb-1.5 pt-2 text-[11px] font-semibold transition duration-300 ease-ios active:scale-90 ${
-                reiter === n.key ? "bg-black/[0.06] text-brand dark:bg-white/[0.12]" : "text-tinte dark:text-slate-100"
+                reiter === n.key ? "bg-black/[0.06] text-brand dark:bg-white/[0.12] dark:text-brand-dark" : "text-tinte dark:text-slate-100"
               }`}
             >
               <span className="relative flex h-[22px] items-center leading-none">
@@ -383,7 +383,7 @@ function KindKarte({
           <span>✓ bezahlt</span>
           <span>€ offen</span>
           <span>/ erlassen</span>
-          <span className="text-tinte-leise/80">grau = später fällig</span>
+          <span className="text-tinte-leise">grau = später fällig</span>
         </div>
       </section>
 
@@ -415,7 +415,7 @@ function KindKarte({
                   }`}
                 >
                   <div className="zahl text-[13px] font-bold leading-none">{stufe.ab} %</div>
-                  <div className="zahl mt-1 text-[11px] font-medium leading-none opacity-90">+{stufe.betrag} €</div>
+                  <div className="zahl mt-1 text-[11px] font-medium leading-none">+{stufe.betrag} €</div>
                 </div>
               );
             })}

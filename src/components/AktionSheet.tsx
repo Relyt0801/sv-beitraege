@@ -155,11 +155,11 @@ export function AktionSheet({ offen, onSchliessen }: { offen: boolean; onSchlies
             <span>{a.icon}</span>
             {a.titel}
             {(a.vorlage_von || a.vorlage_ganztaegig) && (
-              <span className={a.id === aktionId ? "text-white/70" : "text-tinte-leise"}>
+              <span className={a.id === aktionId ? "text-white/90" : "text-tinte-leise"}>
                 {a.vorlage_ganztaegig ? "ganztägig" : uhr(a.vorlage_von ?? null)}
               </span>
             )}
-            <span className={a.id === aktionId ? "text-white/70" : "text-brand"}>+{a.prozent} %</span>
+            <span className={a.id === aktionId ? "text-white/90" : "text-brand"}>+{a.prozent} %</span>
           </button>
         ))}
       </div>

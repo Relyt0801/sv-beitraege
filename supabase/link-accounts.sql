@@ -16,7 +16,7 @@ alter table public.profiles add column if not exists terms_accepted_at timestamp
 -- Namens-Normalisierung (Spiegel der JS-Logik in src/lib/username.ts),
 -- angelehnt an die Schulmail vorname.nachname@…:
 --   Bindestrich-Vornamen bleiben (anna-lena), Zweitname mit Leerzeichen fällt weg (juli),
---   mehrteilige Nachnamen zusammengezogen (vonlaszewski, grossekleimann),
+--   mehrteilige Nachnamen zusammengezogen (vonbeispiel, grossemusterkamp),
 --   ä->ae ö->oe ü->ue ß->ss, Akzente -> Grundbuchstabe.
 create or replace function public.name_clean(s text) returns text
   language sql immutable as $$

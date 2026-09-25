@@ -55,7 +55,7 @@ export function ChatBlasen({
                   ⚠ Nicht gesendet – bitte noch einmal schreiben
                 </div>
               )}
-              <div className={`mt-0.5 text-right text-[10px] ${meins ? "text-white/70" : "text-tinte-leise"}`}>
+              <div className={`mt-0.5 text-right text-[10px] ${meins ? "text-white/90" : "text-tinte-leise"}`}>
                 {new Date(m.created_at).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })}
                 {(meins || darfLoeschen) && (
                   <button

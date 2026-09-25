@@ -27,6 +27,12 @@ export function ChatsTab() {
   const { can, isStaff } = useRole();
   const [anschreiben, setAnschreiben] = useState(false);
   const darfVerwalten = can("chats.manage");
+  // Nur wer ALLE Chats sieht, kann erkennen, welcher wirklich fehlt. Wer nur
+  // einen Teil sieht (z. B. direkt nach einem Rollenwechsel, solange die Liste
+  // noch aus der alten Sicht stammt), hielte unsichtbare Chats für fehlend –
+  // so entstanden am 24.09.2026 doppelte Komitee-Chats. Zusätzlich überspringt
+  // die Datenbank Doppelte selbst (supabase/komitee-chats-eindeutig.sql).
+  const siehtAlle = can("chats.view_all");
   const [openId, setOpenId] = useState<string | null>(null);
   const [teamOffen, setTeamOffen] = useState(false);
   const [ticketListe, setTicketListe] = useState(false);
@@ -38,7 +44,7 @@ export function ChatsTab() {
 
   // Fehlende Chats einmalig anlegen – nur wer Chats verwalten darf, kann das.
   useEffect(() => {
-    if (!ready || !darfVerwalten || angelegt.current) return;
+    if (!ready || !darfVerwalten || !siehtAlle || angelegt.current) return;
     const fehlend = COMMITTEES.filter((c) => !chats.some((t) => t.tag === c.slug));
     const brauchtTeam = !teamChat;
     if (!fehlend.length && !brauchtTeam) return;
@@ -51,7 +57,7 @@ export function ChatsTab() {
         await createTopic({ title: TEAM_CHAT_TITLE, tag: "", visibility: "stufenteam", memberIds: [], komiteeSlugs: [], kind: "chat" });
       }
     })();
-  }, [ready, darfVerwalten, topics, chats, teamChat, createTopic]);
+  }, [ready, darfVerwalten, siehtAlle, topics, chats, teamChat, createTopic]);
 
   const tickets = useMemo(
     // Schüler: eigene Fragen UND Gespräche, die das Team mit ihnen begonnen hat

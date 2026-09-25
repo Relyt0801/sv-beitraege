@@ -67,9 +67,13 @@ export function KomiteeZugriff() {
         Lesen = mitlesen. Schreiben = mitreden, abstimmen, To-dos abhaken.
       </p>
 
-      <div className="mb-3 grid gap-2 sm:grid-cols-4">
+      {/* grid-cols-1 + w-full/min-w-0: sonst wird die Auswahl so breit wie der
+          längste Name darin – bei langen Namen schob das die ganze Seite
+          (und die Tab-Leiste) aus dem Bildschirm. */}
+      <div className="mb-3 grid grid-cols-1 gap-2 sm:grid-cols-4">
         <select
-          className="rounded-xl border border-papier-linie bg-papier-matt px-2.5 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"
+          aria-label="Komitee"
+          className="w-full min-w-0 rounded-xl border border-papier-linie bg-papier-matt px-2.5 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"
           value={tag}
           onChange={(e) => setTag(e.target.value)}
         >
@@ -79,7 +83,8 @@ export function KomiteeZugriff() {
         </select>
 
         <select
-          className="rounded-xl border border-papier-linie bg-papier-matt px-2.5 py-2 text-sm sm:col-span-2 dark:border-slate-700 dark:bg-slate-800"
+          aria-label="Wer bekommt Zugriff"
+          className="w-full min-w-0 rounded-xl border border-papier-linie bg-papier-matt px-2.5 py-2 text-sm sm:col-span-2 dark:border-slate-700 dark:bg-slate-800"
           value={wer}
           onChange={(e) => setWer(e.target.value)}
         >

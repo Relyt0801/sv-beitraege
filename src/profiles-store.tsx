@@ -114,7 +114,7 @@ export function ProfilesProvider({ children }: { children: ReactNode }) {
       if (st) name = `${st.vorname} ${st.nachname}`.trim();
 
       // Elternzugaenge heissen immer "Familie <Nachname>". Die Kuerzel sind die
-      // ersten beiden Buchstaben des Nachnamens, also IC fuer Familie Icking.
+      // ersten beiden Buchstaben des Nachnamens, also MU fuer Familie Muster.
       const istEltern = (prof as { role?: string } | null)?.role === "eltern";
       if (istEltern) {
         const nachname = elternNachname((prof?.username as string) || "");

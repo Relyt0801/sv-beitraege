@@ -90,7 +90,7 @@ Eine typische Liste hat Spalten wie **Nachname · Vorname · 1. Zahlung · 2. Za
 5. **Bemerkung „Verlässt die Schule"** → `"verlaesst_ab"` auf das Halbjahr setzen, **ab dem** die Person weg ist. Ist sie das aktuelle Halbjahr noch dabei und geht danach, nimm das nächste Halbjahr.
 6. **Neuzugang** (kommt erst später dazu) → `"beigetreten_ab"` auf das Beitritts-Halbjahr; frühere Halbjahre bleiben `"offen"` (sie werden von der App automatisch ausgegraut und nicht berechnet).
 7. **Beteiligungen** nur setzen, wenn die Liste dazu Angaben macht, sonst `0`.
-8. Namen **nicht** verändern (Umlaute/Akzente behalten), nicht kürzen, Doppelnamen als ein Feld lassen (z. B. Vorname `"Anna-Lena"`, Nachname `"Große Kleimann"`).
+8. Namen **nicht** verändern (Umlaute/Akzente behalten), nicht kürzen, Doppelnamen als ein Feld lassen (z. B. Vorname `"Anna-Lena"`, Nachname `"Große Musterkamp"`).
 
 ---
 

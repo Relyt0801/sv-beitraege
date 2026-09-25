@@ -10,7 +10,7 @@
 //   $env:SUPABASE_SERVICE_ROLE_KEY="sb_secret_..."
 //   node scripts/reset-alle.mjs                      # Probelauf über alle
 //   node scripts/reset-alle.mjs --wirklich            # setzt ALLE zurück
-//   node scripts/reset-alle.mjs eichberger.lorenz brinckmann.carlotta --wirklich
+//   node scripts/reset-alle.mjs mustermann.max beispiel.lea --wirklich
 //                                                     # nur diese Konten
 // ============================================================
 import { readFileSync } from "node:fs";

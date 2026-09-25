@@ -59,7 +59,7 @@ const NACHNAMEN = [
   "Brinkmann", "Schulte", "Terhorst", "Wewers", "Böckmann", "Lammers", "Hövelmann", "Rensing",
   "Elsbernd", "Wiggering", "Nienhaus", "Tenbrink", "Determann", "Kortenbusch", "Siebers",
   "Wilmering", "Hemker", "Bültmann", "Overmann", "Reinke", "Schwering", "Kuhlmann", "Gerdes",
-  "Holtkamp", "Rickert", "Nuszkowski", "Feldmann", "Averbeck", "Dirksen", "Lohmann",
+  "Holtkamp", "Reckfort", "Nuszkowski", "Feldmann", "Averbeck", "Dirksen", "Lohmann",
 ];
 const HY = ["EF.1", "EF.2", "Q1.1", "Q1.2", "Q2.1", "Q2.2"];
 // Vorlagen-Katalog in Prozent – identisch zu supabase/prozent-staffel.sql
