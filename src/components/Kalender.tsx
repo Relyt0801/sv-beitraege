@@ -168,8 +168,8 @@ export function Kalender({
               <span aria-hidden>📱⇄</span>
               <span className="min-w-0 flex-1 truncate">
                 {privat.termine.length
-                  ? `Mit deinem Kalender verbunden · eigene Termine gestrichelt`
-                  : "Mit deinem Handy-Kalender verbinden"}
+                  ? `Kalender verbunden · eigene Termine gestrichelt`
+                  : "Stufen-Termine ins Handy übernehmen"}
               </span>
               <span className="shrink-0 rounded-full bg-brand/10 px-2 py-0.5 text-[10px] font-bold">Test</span>
             </button>

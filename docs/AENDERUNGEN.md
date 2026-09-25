@@ -38,6 +38,14 @@ den offenen iCal-Standard, den iPhone, Google und Outlook alle können:
 - Ändern geht jeweils nur dort, wo ein Termin herkommt. Echtes Zwei-Wege-
   Bearbeiten bräuchte einen eigenen Kalender-Server (CalDAV) – bewusst nicht
   Teil dieser Testphase.
+- **Ein-Klick-Knöpfe (nur Stufe → Handy):** Im Blatt „Stufen-Termine ins Handy“
+  (`src/components/KalenderSyncSheet.tsx`) je ein Knopf für iPhone-Kalender
+  (`webcal://`), Google Kalender (`calendar.google.com/calendar/render?cid=…`)
+  und Outlook (`outlook.live.com/…/addfromweb`). Ein Tippen öffnet direkt
+  „Abonnieren“. Gekennzeichnet ist das an drei Stellen: der Kalender heißt im
+  Handy „Stufen-Termine (Stufenkasse)“, jeder Termin hat die Kategorie „Stufe“
+  und in der Beschreibung den Satz „Stufen-Termin aus der Stufenkasse-App.
+  Ändern geht nur dort.“ Eigene Handy-Termine gehen dabei nicht in die App.
 - `supabase/functions/kalender/ics.ts`: iCal schreiben und lesen ohne
   Abhängigkeiten – Zeitzone Europe/Berlin, Wiederholungen (täglich,
   wöchentlich auch an mehreren Tagen, monatlich, jährlich, COUNT/UNTIL,

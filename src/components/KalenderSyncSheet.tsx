@@ -55,35 +55,60 @@ export function KalenderSyncSheet({ open, onClose }: { open: boolean; onClose: (
 
       {/* ---------------------------------------------- App → Handy */}
       <section className="rounded-2xl bg-papier-matt p-4 dark:bg-slate-800/70">
-        <h3 className="text-[15px] font-bold">Termine der Stufe in deinem Kalender</h3>
+        {/* Klar gekennzeichnet: nur die Termine der STUFE, nur in EINE Richtung. */}
+        <div className="flex flex-wrap items-center gap-2">
+          <h3 className="text-[15px] font-bold">Stufen-Termine ins Handy</h3>
+          <span className="rounded-full bg-brand/10 px-2 py-0.5 text-[11px] font-bold text-brand-dark dark:bg-brand/20 dark:text-brand-soft">
+            nur Stufe → Handy
+          </span>
+        </div>
         <p className="mt-1 text-[13px] leading-relaxed text-tinte-matt dark:text-slate-300">
-          Einmal abonnieren: Neue und geänderte Termine kommen danach von selbst in deinen Handy-Kalender. Du siehst
-          dort genau die Termine, die du auch hier siehst.
+          Einmal antippen und bestätigen: Die Termine der Stufe erscheinen als eigener Kalender{" "}
+          <b>„Stufen-Termine (Stufenkasse)“</b> in deinem Handy. Neue und geänderte Termine kommen von selbst nach.
+          Deine eigenen Termine gehen dabei nicht in die App.
         </p>
         {linkFehler ? (
           <p className="mt-3 text-[13px] font-semibold text-offen">{linkFehler}</p>
         ) : (
           <div className="mt-3 grid grid-cols-1 gap-2">
-            <a
-              href={link?.webcal || undefined}
-              aria-disabled={!link}
-              className={`btn-primary !text-[16px] ${link ? "" : "pointer-events-none opacity-40"}`}
-            >
-              Im iPhone-Kalender abonnieren
-            </a>
-            <button onClick={kopieren} disabled={!link} className="btn-grau !text-[16px]">
-              {kopiert ? "✓ Link kopiert" : "Link kopieren (Google, Outlook)"}
+            <AboKnopf
+              href={link?.webcal}
+              zeichen="📱"
+              titel="iPhone-Kalender"
+              unter="Stufen-Termine abonnieren"
+              haupt
+            />
+            <AboKnopf
+              href={link ? googleLink(link) : undefined}
+              neuesFenster
+              zeichen="G"
+              titel="Google Kalender"
+              unter="Stufen-Termine abonnieren · im Browser"
+            />
+            <AboKnopf
+              href={link ? outlookLink(link) : undefined}
+              neuesFenster
+              zeichen="O"
+              titel="Outlook"
+              unter="Stufen-Termine abonnieren"
+            />
+            <button onClick={kopieren} disabled={!link} className="mt-0.5 text-[13px] font-semibold text-brand-dark underline disabled:opacity-40 dark:text-brand-soft">
+              {kopiert ? "✓ Link kopiert" : "Anderer Kalender? Link kopieren"}
             </button>
           </div>
         )}
         <details className="mt-3 text-[12px] leading-relaxed text-tinte-leise">
-          <summary className="cursor-pointer font-semibold">So geht&apos;s bei Google und Outlook</summary>
+          <summary className="cursor-pointer font-semibold">Gut zu wissen</summary>
           <p className="mt-1.5">
-            <b>Google Kalender</b> (am Computer): links bei „Weitere Kalender“ auf ＋ → „Per URL“ → Link einfügen.
+            <b>iPhone</b>: Das iPhone fragt „Abonnieren?“ – bestätigen, fertig. Wie oft es nachsieht, stellst du unter
+            Einstellungen → Kalender → Accounts ein.
             <br />
-            <b>Outlook</b>: „Kalender hinzufügen“ → „Aus dem Internet abonnieren“ → Link einfügen.
+            <b>Google</b>: Öffnet Google Kalender im Browser mit fertig ausgefülltem Link – dort „Hinzufügen“ tippen.
+            Danach stehen die Termine auch in der Google-App. Google holt neue Termine nur alle paar Stunden.
             <br />
-            Der Link gehört nur dir. Wer ihn hat, sieht deine Termine – also nicht weitergeben.
+            <b>Outlook</b>: Öffnet Outlook im Browser – dort „Importieren“ bzw. „Hinzufügen“ bestätigen.
+            <br />
+            Der Link gehört nur dir. Wer ihn hat, sieht deine Stufen-Termine – also nicht weitergeben.
           </p>
         </details>
       </section>
@@ -169,6 +194,64 @@ export function KalenderSyncSheet({ open, onClose }: { open: boolean; onClose: (
         Fertig
       </button>
     </Sheet>
+  );
+}
+
+/** Google Kalender mit fertig ausgefülltem Abo öffnen ("Kalender hinzufügen?"). */
+function googleLink(l: AboLink): string {
+  return `https://calendar.google.com/calendar/render?cid=${encodeURIComponent(l.webcal)}`;
+}
+
+/** Outlook im Browser mit fertig ausgefülltem Abo öffnen. */
+function outlookLink(l: AboLink): string {
+  return `https://outlook.live.com/calendar/0/addfromweb?url=${encodeURIComponent(l.https)}&name=${encodeURIComponent(
+    "Stufen-Termine (Stufenkasse)",
+  )}`;
+}
+
+/** Ein Abo-Knopf: Zeichen des Dienstes, Name und darunter klar, was passiert. */
+function AboKnopf({
+  href,
+  zeichen,
+  titel,
+  unter,
+  haupt,
+  neuesFenster,
+}: {
+  href?: string;
+  zeichen: string;
+  titel: string;
+  unter: string;
+  haupt?: boolean;
+  neuesFenster?: boolean;
+}) {
+  return (
+    <a
+      href={href}
+      aria-disabled={!href}
+      {...(neuesFenster ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+      className={`flex min-h-[3.25rem] items-center gap-3 rounded-2xl px-4 py-2 transition active:scale-[.98] ${
+        haupt
+          ? "bg-brand text-white"
+          : "bg-white text-tinte shadow-card dark:bg-slate-900 dark:text-slate-100"
+      } ${href ? "" : "pointer-events-none opacity-40"}`}
+    >
+      <span
+        aria-hidden
+        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[15px] font-bold ${
+          haupt ? "bg-white/20" : "bg-[rgb(118_118_128/0.12)]"
+        }`}
+      >
+        {zeichen}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-[16px] font-semibold leading-tight">{titel}</span>
+        <span className={`block text-[12px] leading-tight ${haupt ? "text-white/90" : "text-tinte-leise"}`}>{unter}</span>
+      </span>
+      <span aria-hidden className={haupt ? "text-white/80" : "text-tinte-leise"}>
+        ›
+      </span>
+    </a>
   );
 }
 

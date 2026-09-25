@@ -32,6 +32,10 @@ import { kalenderIcs, leseIcs } from "./ics.ts";
 
 const DEMO_KONTEN = ["admin.test", "test.admin"];
 
+/** So heißt der Kalender im Handy – daran erkennt man die Stufen-Termine. */
+const KALENDER_NAME = "Stufen-Termine (Stufenkasse)";
+const HINWEIS = "Stufen-Termin aus der Stufenkasse-App. Ändern geht nur dort.";
+
 const cors = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -162,7 +166,12 @@ Deno.serve(async (req) => {
     const p = await profilVon(uid);
     if (!p || !istDemo(p)) return new Response("Kalender-Abo ist für dieses Konto nicht freigeschaltet.", { status: 403, headers: cors });
     const termine = await sichtbareTermine(p);
-    const ics = kalenderIcs(termine as any, { name: "Stufenkasse – Termine" });
+    // Gekennzeichnet: eigener Kalendername, Kategorie "Stufe" und ein Satz in
+    // jeder Beschreibung – so sieht man im Handy sofort, woher ein Termin kommt.
+    const ics = kalenderIcs(
+      termine.map((t) => ({ ...t, hinweis: HINWEIS })) as any,
+      { name: KALENDER_NAME },
+    );
     return new Response(ics, {
       headers: {
         ...cors,
