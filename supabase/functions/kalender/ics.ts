@@ -371,8 +371,17 @@ export function leseIcs(ics: string, von: string, bis: string, maxAnzahl = 2000)
       if (t) ergebnis.push(t);
     };
 
-    // Höchstens 3000 Schritte – reicht für Jahre täglicher Termine.
-    for (let i = 0; i < 3000 && !fertig && ergebnis.length < maxAnzahl; i++) {
+    // Serien ohne COUNT, die lange vor dem Zeitraum begonnen haben (tägliche
+    // Erinnerung seit 2015): direkt kurz vor den Zeitraum springen, statt jeden
+    // Tag seit damals durchzuzählen. Mit COUNT muss ab dem Start gezählt werden.
+    let i0 = 0;
+    if (anzahl === Infinity && (freq === "DAILY" || freq === "WEEKLY")) {
+      const schritt = freq === "DAILY" ? intervall : 7 * intervall;
+      const tage = Math.round((Date.parse(von) - Date.parse(wand.datum)) / 86400000);
+      i0 = Math.max(0, Math.floor(tage / schritt) - 1);
+    }
+    // Höchstens 3000 Schritte ab dort – reicht für Jahre täglicher Termine.
+    for (let i = i0; i < i0 + 3000 && !fertig && ergebnis.length < maxAnzahl; i++) {
       if (freq === "DAILY") nimm(plusTageKey(wand.datum, i * intervall));
       else if (freq === "WEEKLY") {
         const basis = plusTageKey(wand.datum, i * 7 * intervall);
