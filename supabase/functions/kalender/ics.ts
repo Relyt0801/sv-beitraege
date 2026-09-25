@@ -11,6 +11,8 @@
 
 export interface IcsTermin {
   id: string;
+  /** Zusatzzeile unter der Beschreibung, z. B. "Stufen-Termin aus der Stufenkasse". */
+  hinweis?: string | null;
   titel: string;
   beschreibung?: string | null;
   ort?: string | null;
@@ -114,7 +116,9 @@ function vevent(t: IcsTermin, domain: string, jetzt: Date): string[] {
   }
   zeilen.push(`SUMMARY:${icsText(titel)}`);
   if (t.ort) zeilen.push(`LOCATION:${icsText(t.ort)}`);
-  if (t.beschreibung) zeilen.push(`DESCRIPTION:${icsText(t.beschreibung)}`);
+  const text = [t.beschreibung, t.hinweis].filter(Boolean).join("\n\n");
+  if (text) zeilen.push(`DESCRIPTION:${icsText(text)}`);
+  if (t.hinweis) zeilen.push("CATEGORIES:Stufe");
   zeilen.push("END:VEVENT");
   return zeilen;
 }
