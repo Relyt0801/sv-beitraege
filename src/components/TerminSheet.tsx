@@ -65,6 +65,8 @@ export function TerminSheet({
   const [wochentage, setWochentage] = useState<Set<number>>(new Set());
   const [fehler, setFehler] = useState("");
   const [busy, setBusy] = useState(false);
+  // Neuer Termin: standardmäßig Mitteilung. Änderung: standardmäßig still.
+  const [melden, setMelden] = useState(true);
 
   // Beim Öffnen befüllen – bearbeiten heißt: alles steht schon drin.
   useEffect(() => {
@@ -115,6 +117,7 @@ export function TerminSheet({
       setTags(new Set());
       setPersonen(new Set());
     }
+    setMelden(!termin);
     setWiederholt(false);
     setWdhBis("");
     setWochentage(new Set());
@@ -169,10 +172,10 @@ export function TerminSheet({
     // Wiederholung heißt: echte Einzeltermine, sofort ausgerechnet. Fällt
     // eine Woche aus, löscht man diesen einen Tag – der Rest bleibt stehen.
     const f = termin
-      ? await aendern(termin.id, daten)
+      ? await aendern(termin.id, daten, { melden })
       : wiederholt
-        ? await anlegenViele(wdhTage.map((tag) => ({ ...daten, datum: tag, bis_datum: null })))
-        : await anlegen(daten);
+        ? await anlegenViele(wdhTage.map((tag) => ({ ...daten, datum: tag, bis_datum: null })), { melden })
+        : await anlegen(daten, { melden });
     setBusy(false);
     if (f) setFehler("Speichern hat nicht geklappt: " + f);
     else {
@@ -456,6 +459,21 @@ export function TerminSheet({
           onChange={(e) => setBeschreibung(e.target.value)}
         />
       </label>
+
+      <div className="mb-3">
+        <Haken
+          an={melden}
+          setzen={setMelden}
+          text={termin ? "Änderung als Mitteilung schicken" : "Mitteilung an alle, die ihn sehen"}
+        />
+        <p className="mt-1 pl-7 text-[11px] leading-relaxed text-tinte-leise">
+          {termin
+            ? "Aus: Der Termin ändert sich still im Kalender. An, wenn sich Zeit, Datum oder Ort ändern."
+            : melden
+              ? "Kommt bei allen an, die Mitteilungen erlaubt haben."
+              : "Still eintragen: Der Termin steht nur im Kalender, niemand bekommt ein Pop-up."}
+        </p>
+      </div>
 
       {fehler && <p className="mb-2 text-[13px] font-semibold text-amber-600">{fehler}</p>}
 

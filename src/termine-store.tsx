@@ -22,10 +22,12 @@ interface TermineValue {
   meineKomitees: string[];
   /** student_ids, die zu mir gehoeren – eigener Eintrag und Kinder */
   meineStudentIds: string[];
-  anlegen: (t: NeuerTermin) => Promise<string | null>;
+  /** melden: Mitteilung an alle, die den Termin sehen (Standard: ja). */
+  anlegen: (t: NeuerTermin, opt?: { melden?: boolean }) => Promise<string | null>;
   /** Mehrere Schichten auf einmal – fuer Wiederholungen. */
-  anlegenViele: (liste: NeuerTermin[]) => Promise<string | null>;
-  aendern: (id: string, t: NeuerTermin) => Promise<string | null>;
+  anlegenViele: (liste: NeuerTermin[], opt?: { melden?: boolean }) => Promise<string | null>;
+  /** melden: Änderung als Mitteilung verschicken (Standard: nein). */
+  aendern: (id: string, t: NeuerTermin, opt?: { melden?: boolean }) => Promise<string | null>;
   loeschen: (id: string) => Promise<void>;
   aktionAnlegen: (a: Omit<Aktion, "id" | "created_at"> & { id?: string }) => Promise<string | null>;
   aktionAendern: (id: string, patch: Partial<Aktion>) => Promise<void>;
@@ -276,7 +278,7 @@ export function TermineProvider({ children }: { children: ReactNode }) {
   });
 
   const anlegen = useCallback<TermineValue["anlegen"]>(
-    async (t) => {
+    async (t, opt) => {
       if (!hasSupabase) {
         const neu: Termin = {
           id: uuid(),
@@ -301,14 +303,14 @@ export function TermineProvider({ children }: { children: ReactNode }) {
       if (error) return error.message;
       await zuordnungSchreiben(data.id, t);
       await laden();
-      void pushZuTermin(data.id, undefined, terminZeile(t));
+      if (opt?.melden !== false) void pushZuTermin(data.id, undefined, terminZeile(t));
       return null;
     },
     [laden, lokalSpeichern, zuordnungSchreiben],
   );
 
   const aendern = useCallback<TermineValue["aendern"]>(
-    async (id, t) => {
+    async (id, t, opt) => {
       if (!hasSupabase) {
         setTermine((prev) => {
           const next = prev
@@ -323,6 +325,8 @@ export function TermineProvider({ children }: { children: ReactNode }) {
       if (error) return error.message;
       await zuordnungSchreiben(id, t);
       await laden();
+      // Nur auf Wunsch: sonst bekäme jede Tippfehler-Korrektur eine Mitteilung.
+      if (opt?.melden) void pushZuTermin(id, undefined, "Geändert: " + terminZeile(t));
       return null;
     },
     [laden, lokalSpeichern, zuordnungSchreiben],
@@ -384,10 +388,10 @@ export function TermineProvider({ children }: { children: ReactNode }) {
 
   /** Mehrere Schichten in einem Rutsch – Wiederholungen erzeugen viele. */
   const anlegenViele = useCallback<TermineValue["anlegenViele"]>(
-    async (liste) => {
+    async (liste, opt) => {
       if (!liste.length) return null;
       if (!hasSupabase) {
-        for (const t of liste) await anlegen(t);
+        for (const t of liste) await anlegen(t, opt);
         return null;
       }
       const { data, error } = await supabase!
@@ -409,7 +413,7 @@ export function TermineProvider({ children }: { children: ReactNode }) {
           .insert(ids.flatMap((id) => erster.personen.map((student_id) => ({ termin_id: id, student_id }))));
       await laden();
       // EINE Meldung für die ganze Reihe, nicht zwölf.
-      if (ids.length) {
+      if (ids.length && opt?.melden !== false) {
         const letzter = liste[liste.length - 1];
         const schicht = Boolean(erster.aktion_id);
         const text = schicht

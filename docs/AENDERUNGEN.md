@@ -740,3 +740,12 @@ Ausführlich: `docs/TESTBERICHT-2026-09-24.md`.
   - `supabase/rls-schneller.sql`
   - `supabase/anon-abdichten.sql`
   - `send-push` v19
+
+## Termine still eintragen, Änderungen auf Wunsch melden
+
+- Neuer Termin: Schalter „Mitteilung an alle, die ihn sehen“ (Standard an).
+  Aus = der Termin steht nur im Kalender, niemand bekommt ein Pop-up. Gilt
+  auch für Wiederholungen (eine Reihe = eine Mitteilung).
+- Termin ändern: Schalter „Änderung als Mitteilung schicken“ (Standard aus).
+  An = alle, die den Termin sehen, bekommen „Geändert: Datum · Zeit · Ort“.
+- Schichten aus Aktionsvorlagen melden sich wie bisher immer.
