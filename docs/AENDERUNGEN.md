@@ -12,6 +12,35 @@ ausführlich (auf Deutsch); hier steht der Überblick dazu.
 ---
 
 
+## 28.09.2026 (abends): Live-Verbindung, Chats, Kalender
+
+SQL dazu: `supabase/chat-eintraege-loeschen.sql` (Migration
+`chat_eintraege_loeschen`, eingespielt). Keine Mitteilung, keine neue Einführung.
+
+- **„Keine Live-Verbindung“ repariert sich selbst** (`lib/realtime.ts`):
+  Bisher wurden nur die Kanäle neu angemeldet – über eine tote Leitung. Jetzt
+  wird gemacht, was ein Neustart macht: Sitzung/Token erneuern, die
+  WebSocket-Leitung trennen und neu aufbauen, alle Kanäle neu anmelden.
+  Automatisch, wenn die App länger als 20 s im Hintergrund war, wenn ein
+  Kanal dreimal scheitert und wenn die Verbindung 15 s weg ist (Wächter alle
+  5 s). Bleibt sie 90 s weg, lädt die App neu (höchstens alle 5 Minuten, nie
+  beim Tippen). Der Knopf „Neu verbinden“ macht dasselbe sofort und lädt neu,
+  wenn es nach 8 s immer noch nicht klappt.
+- **Chats:** der Kreis mit den Initialen steht oben neben dem Namen statt
+  unten an der Blase (`ChatBlasen.tsx`).
+- **To-dos, Abstimmungen, Angepinntes löschen:** neues Recht
+  `chats.delete_items` („To-dos & Abstimmungen löschen“, Rechte-Reiter →
+  Chats & Übersicht). Standard: alle, die fremde Nachrichten löschen dürfen
+  (Rollen und Einzelrechte übernommen). Eigene To-dos darf jeder löschen –
+  neuer Mülleimer an jedem To-do. Zugriffsregel `titems delete` angepasst.
+  Rechte-Test: 1 neuer Fall (137).
+- **Kalender, Monat auf dem Handy:** statt bloßer Punkte kleine Schilder in
+  der Farbe des Termins mit Bildzeichen und Anfang des Titels (🧇 Waffe…),
+  Klausuren als Kürzel (M, EK); bis zu zwei je Tag, dazu „+n“.
+
+---
+
+
 ## 28.09.2026: Buchen wie gewohnt, Geplante Aktionen, immer neueste Version
 
 SQL dazu: `supabase/finanzen-geplant.sql` (neu) und `supabase/finanzen-kategorien.sql`

@@ -2,6 +2,7 @@
 export type PermKey =
   | "chats.view_all"
   | "chats.delete_messages"
+  | "chats.delete_items"
   | "chats.manage"
   | "komitees.assign"
   | "komitees.access"
@@ -26,6 +27,7 @@ export const PERM_CATEGORIES: PermCategory[] = [
     label: "Chats & Übersicht", icon: "📋", perms: [
       { key: "chats.view_all", label: "Alle Chats sehen", desc: "Zugriff auf alle Ordner/Chats (außer vom Admin gesperrte)." },
       { key: "chats.delete_messages", label: "Nachrichten löschen", desc: "Beiträge anderer Personen löschen." },
+      { key: "chats.delete_items", label: "To-dos & Abstimmungen löschen", desc: "To-dos, Abstimmungen und Angepinntes anderer Personen in der Übersicht eines Chats löschen. Eigene gehen immer." },
       { key: "chats.manage", label: "Ordner verwalten", desc: "Ordner erstellen, umbenennen, anheften, Personen verwalten." },
     ],
   },
@@ -130,7 +132,7 @@ export function rollenDerZeile(key: string): string[] {
 }
 
 // Standard-Rechte je Rolle (Fallback im Client, Seeds in permissions.sql identisch)
-const TEAM_STANDARD: PermKey[] = ["chats.view_all", "chats.delete_messages", "chats.manage", "komitees.assign", "data.edit", "hilfen.edit", "termine.manage", "mod.timeout", "finanzen.basis", "finanzen.view"];
+const TEAM_STANDARD: PermKey[] = ["chats.view_all", "chats.delete_messages", "chats.delete_items", "chats.manage", "komitees.assign", "data.edit", "hilfen.edit", "termine.manage", "mod.timeout", "finanzen.basis", "finanzen.view"];
 
 export const ROLE_DEFAULTS: Record<string, PermKey[]> = {
   schueler: ["finanzen.basis"],

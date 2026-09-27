@@ -5,7 +5,7 @@ import { MuteKnopf } from "./MuteKnopf";
 
 import { frage } from "../lib/melder";
 /**
- * Nachrichtenliste im WhatsApp-Stil: fremde Nachrichten links mit Kreis und
+ * Nachrichtenliste im WhatsApp-Stil: fremde Nachrichten links mit Kreis (oben, auf Höhe des Namens) und
  * farbigem Namen in der Blase, eigene rechts ohne Namen.
  */
 export function ChatBlasen({
@@ -30,8 +30,9 @@ export function ChatBlasen({
         if (m.type === "system") return <SystemZeile key={m.id} m={m} darfLoeschen={darfLoeschen} onDelete={onDelete} />;
         const meins = m.created_by === uid;
         return (
-          <div key={m.id} className={`flex items-end gap-2 ${meins ? "justify-end" : "justify-start"}`}>
-            {!meins && <Avatar userId={m.created_by} name={m.author} size={28} />}
+          <div key={m.id} className={`flex items-start gap-2 ${meins ? "justify-end" : "justify-start"}`}>
+            {/* Kreis oben neben dem Namen – dort, wo man zuerst hinschaut */}
+            {!meins && <span className="mt-0.5 shrink-0"><Avatar userId={m.created_by} name={m.author} size={28} /></span>}
             <div
               className={`max-w-[80%] rounded-2xl px-3.5 py-2 sm:max-w-[65%] lg:max-w-[50%] ${
                 meins ? "bg-brand text-white" : "bg-white shadow-card dark:bg-slate-900 dark:shadow-cardDark"

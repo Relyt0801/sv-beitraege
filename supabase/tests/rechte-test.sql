@@ -1,7 +1,7 @@
 -- ============================================================
 -- Rechte-Test: Wer darf was? (Stand 28.09.2026)
 --
--- Spielt 136 Angriffe und erlaubte Aktionen mit echten Konten JEDER Rolle
+-- Spielt 137 Angriffe und erlaubte Aktionen mit echten Konten JEDER Rolle
 -- durch – direkt in der Datenbank, genau so, wie es ein Angreifer über die
 -- Schnittstelle versuchen würde (Rolle "authenticated" bzw. "anon" mit der
 -- Kennung der Person, Zugriffsregeln greifen wie in der App).
@@ -189,7 +189,9 @@ insert into faelle values
   ('eltern', 'Geplante Aktion eintragen', 'insert into kasse_geplant(titel) values (''x'')', 'V'),
   ('anon', 'Geplante Aktion eintragen', 'insert into kasse_geplant(titel) values (''x'')', 'V'),
   ('stufenteam', 'Geplante Aktion ändern', 'update kasse_geplant set titel=''x'' where true', 'V'),
-  ('kassenwart', 'Geplante Aktion eintragen', 'insert into kasse_geplant(titel) values (''x'')', 'E');
+  ('kassenwart', 'Geplante Aktion eintragen', 'insert into kasse_geplant(titel) values (''x'')', 'E'),
+  -- To-dos/Abstimmungen anderer löschen: nur mit chats.delete_items (chat-eintraege-loeschen.sql)
+  ('s_komitee', 'Fremdes To-do löschen', 'delete from topic_items where type in (''todo'',''umfrage'') and created_by is distinct from auth.uid()', 'V');
 
 create temp table erg (rolle text, fall text, erwartet text, ergebnis text, detail text) on commit drop;
 grant insert, select on erg to authenticated, anon;

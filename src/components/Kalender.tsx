@@ -6,7 +6,7 @@ import {
   MONATE, WOCHENTAGE, anTag, ausKey, betrifftMich, farbeVon, freiAn, heuteKey, istKlausur, laeuftAn, monatLang,
   montagVon, plusTage, tagKey, tagLang, uhr, umfangText, zeitText, type Termin,
 } from "../lib/termine";
-import { KuerzelLeiste, Zeichen, chipKlasse, punktKlasse } from "./TerminZeichen";
+import { KuerzelLeiste, Zeichen, chipKlasse } from "./TerminZeichen";
 import { Icon } from "./Icon";
 import { TerminZeile } from "./Wochenstreifen";
 
@@ -270,7 +270,7 @@ function MonatsAnsicht({
                   key={k}
                   onClick={() => onTag(k)}
                   aria-label={`${tagLang(k)}${ferien ? `, ${ferien.titel}` : ""}${alle.length ? `, ${alle.length} Termine` : ""}`}
-                  className={`flex min-h-[3.2rem] min-w-0 flex-col gap-0.5 rounded-xl border p-1.5 text-left transition active:scale-[.98] sm:min-h-[6.5rem] sm:p-2 ${
+                  className={`flex min-h-[4.25rem] min-w-0 flex-col gap-0.5 rounded-xl border p-1 sm:p-1.5 text-left transition active:scale-[.98] sm:min-h-[6.5rem] sm:p-2 ${
                     istHeute
                       ? `border-brand ${ferien ? band : "bg-brand/5 dark:bg-brand/10"}`
                       : ferien
@@ -285,13 +285,25 @@ function MonatsAnsicht({
                   >
                     {ausKey(k).getDate()}
                   </span>
-                  {/* Handy: nur Punkte. In eine 50 px breite Zelle passt
-                      "14:0…" – das sagt niemandem etwas. Ab sm die Titel. */}
-                  <span className="mt-1 flex flex-wrap gap-0.5 sm:hidden">
-                    {klausuren.length > 0 && <span className="h-1.5 w-1.5 rounded-sm bg-tinte dark:bg-slate-200" />}
-                    {liste.slice(0, klausuren.length ? 3 : 4).map((t) => (
-                      <span key={t.id} className={`h-1.5 w-1.5 rounded-full ${punktKlasse(t, meins(t))}`} />
+                  {/* Handy: statt bloßer Punkte kleine Schilder in der Farbe des
+                      Termins – mit Bildzeichen und Anfang des Titels, Klausuren
+                      als Kürzel. So sieht man grob, was an dem Tag ist. */}
+                  <span className="mt-0.5 flex min-w-0 flex-col gap-[2px] sm:hidden" aria-hidden>
+                    {klausuren.length > 0 && <MiniKuerzel liste={klausuren} />}
+                    {liste.slice(0, klausuren.length ? 1 : 2).map((t) => (
+                      <span
+                        key={t.id}
+                        className={`block min-w-0 overflow-hidden whitespace-nowrap rounded-[4px] px-[3px] py-[2px] text-[9px] font-semibold leading-[1.1] ${chipKlasse(t, meins(t))}`}
+                      >
+                        {t.icon && <span className="mr-[1px]">{t.icon}</span>}
+                        {t.titel}
+                      </span>
                     ))}
+                    {liste.length > (klausuren.length ? 1 : 2) && (
+                      <span className="px-[2px] text-[9px] font-bold leading-none text-tinte-leise">
+                        +{liste.length - (klausuren.length ? 1 : 2)}
+                      </span>
+                    )}
                   </span>
                   <span className="hidden min-w-0 flex-1 flex-col gap-0.5 overflow-hidden sm:flex">
                     {ferienName && (
@@ -323,6 +335,24 @@ function MonatsAnsicht({
         ))}
       </div>
     </div>
+  );
+}
+
+/** Handy-Monat: die Klausur-Kürzel eines Tages in einer winzigen Zeile. */
+function MiniKuerzel({ liste }: { liste: Termin[] }) {
+  const kuerzel = [...new Set(liste.map((t) => (t.icon || "").toUpperCase()).filter(Boolean))];
+  return (
+    <span className="flex min-w-0 items-center gap-[2px] overflow-hidden">
+      {kuerzel.slice(0, 2).map((k) => (
+        <span
+          key={k}
+          className="shrink-0 rounded-[3px] bg-tinte/85 px-[2px] py-[2px] font-zahl text-[8px] font-extrabold uppercase leading-none text-white dark:bg-slate-200 dark:text-slate-900"
+        >
+          {k}
+        </span>
+      ))}
+      {kuerzel.length > 2 && <span className="text-[8px] font-bold leading-none text-tinte-leise">+{kuerzel.length - 2}</span>}
+    </span>
   );
 }
 

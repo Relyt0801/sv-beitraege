@@ -11,6 +11,7 @@ import { BannHinweis } from "./BannHinweis";
 import { Sheet } from "./Sheet";
 import { useChatEnde } from "../lib/gescrollt";
 import { VorsitzZeile } from "./VorsitzSheet";
+import { Icon } from "./Icon";
 
 import { frage } from "../lib/melder";
 type Neu = "pin" | "umfrage" | "todo" | null;
@@ -23,6 +24,8 @@ export function KomiteePage({ topic, onBack }: { topic: Topic; onBack: () => voi
   const { items, postItem, updateItem, deleteItem, markRead, uid, committeesOf, unreadCount } = useTopics();
   const { role, can, banned } = useRole();
   const darfLoeschen = can("chats.delete_messages");
+  // To-dos, Abstimmungen und Angepinntes anderer löschen (eigenes Recht, 28.09.)
+  const darfEintraege = can("chats.delete_items");
   const [neu, setNeu] = useState<Neu>(null);
   const [tab, setTab] = useState<"uebersicht" | "chat">("uebersicht");
   // Wie viel im Chat neu ist – gemerkt beim Öffnen, denn "gelesen" wird die
@@ -102,16 +105,16 @@ export function KomiteePage({ topic, onBack }: { topic: Topic; onBack: () => voi
                   <div className="text-[15px] font-semibold [overflow-wrap:anywhere]">{p.body}</div>
                   <PersonName userId={p.created_by} name={p.author} role={p.author_role} koms={p.author_koms} className="text-[11px] font-semibold" />
                 </div>
-                {(p.created_by === uid || darfLoeschen) && (
+                {(p.created_by === uid || darfLoeschen || darfEintraege) && (
                   <span className="flex shrink-0 flex-col items-end gap-1.5">
-                    <button
+                    {(p.created_by === uid || darfLoeschen) && <button
                       onClick={() => void frage("Nicht mehr anpinnen? Die Nachricht wandert in den Chat.", "Loslösen").then((ok) => { if (ok) void updateItem(p.id, { pinned: false }); })}
                       className="text-[12px] font-semibold text-tinte-leise"
                       aria-label="Loslösen"
                       title="Loslösen – bleibt im Chat"
                     >
                       📌✕
-                    </button>
+                    </button>}
                     <button
                       onClick={() => void frage("Diese angepinnte Nachricht ganz löschen?", "Löschen", true).then((ok) => { if (ok) void deleteItem(p.id); })}
                       className="text-[12px] font-bold text-red-500"
@@ -127,29 +130,40 @@ export function KomiteePage({ topic, onBack }: { topic: Topic; onBack: () => voi
 
           <Abschnitt titel="Abstimmungen" icon="🗳️" leer="Keine Abstimmung offen.">
             {umfragen.map((u) => (
-              <UmfrageKarte key={u.id} item={u} kannLoeschen={u.created_by === uid || darfLoeschen} onDelete={() => deleteItem(u.id)} />
+              <UmfrageKarte key={u.id} item={u} kannLoeschen={u.created_by === uid || darfEintraege} onDelete={() => deleteItem(u.id)} />
             ))}
           </Abschnitt>
 
           <Abschnitt titel="To-dos" icon="✅" leer="Keine offenen Aufgaben.">
             {todos.map((t) => (
-              <button
-                key={t.id}
-                onClick={() => !banned && updateItem(t.id, { done: !t.done })}
-                className="card flex w-full items-center gap-3 p-3 text-left"
-              >
-                <span
-                  className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border-2 text-sm text-white ${
-                    t.done ? "border-emerald-500 bg-emerald-500" : "border-papier-linie dark:border-slate-600"
-                  }`}
+              <div key={t.id} className="card flex w-full items-center gap-1 p-1.5">
+                <button
+                  onClick={() => !banned && updateItem(t.id, { done: !t.done })}
+                  className="flex min-w-0 flex-1 items-center gap-3 rounded-xl p-1.5 text-left"
                 >
-                  {t.done ? "✓" : ""}
-                </span>
-                <span className={`min-w-0 flex-1 text-[15px] [overflow-wrap:anywhere] ${t.done ? "text-tinte-leise line-through" : "font-semibold"}`}>
-                  {t.body}
-                </span>
-                <PersonName userId={t.created_by} name={t.author} role={t.author_role} koms={t.author_koms} className="shrink-0 text-[11px] font-semibold" />
-              </button>
+                  <span
+                    className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border-2 text-sm text-white ${
+                      t.done ? "border-emerald-500 bg-emerald-500" : "border-papier-linie dark:border-slate-600"
+                    }`}
+                  >
+                    {t.done ? "✓" : ""}
+                  </span>
+                  <span className={`min-w-0 flex-1 text-[15px] [overflow-wrap:anywhere] ${t.done ? "text-tinte-leise line-through" : "font-semibold"}`}>
+                    {t.body}
+                  </span>
+                  <PersonName userId={t.created_by} name={t.author} role={t.author_role} koms={t.author_koms} className="shrink-0 text-[11px] font-semibold" />
+                </button>
+                {(t.created_by === uid || darfEintraege) && (
+                  <button
+                    onClick={() => void frage("To-do löschen?", "Löschen", true).then((ok) => { if (ok) void deleteItem(t.id); })}
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-tinte-leise transition active:scale-90"
+                    aria-label="To-do löschen"
+                    title="To-do löschen"
+                  >
+                    <Icon name="muell" size={16} />
+                  </button>
+                )}
+              </div>
             ))}
           </Abschnitt>
 

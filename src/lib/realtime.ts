@@ -69,9 +69,108 @@ export function aufVerbindung(fn: (v: Verbindung) => void): () => void {
 /** Alle offenen Kanäle – damit "jetzt neu verbinden" alle auf einmal erreicht. */
 const offen = new Set<() => void>();
 
-/** Von Hand neu verbinden (Knopf im Verbindungshinweis). */
+/*
+ * ---------------------------------------------------------------------------
+ * Die Leitung selbst neu aufbauen (28.09.)
+ * ---------------------------------------------------------------------------
+ * Nur die Kanäle neu anzumelden reichte nicht: Nach dem Sperren des Handys ist
+ * oft die ganze WebSocket-Leitung tot (oder ihr Anmelde-Token abgelaufen), und
+ * jede neue Anmeldung darüber läuft ins Leere – bis man die App neu startet.
+ * Darum wird hier das gemacht, was ein Neustart macht:
+ *   1. Sitzung holen (erneuert das Token, falls abgelaufen) und der
+ *      Live-Verbindung das frische Token geben,
+ *   2. die Leitung trennen und neu aufbauen,
+ *   3. alle Kanäle neu anmelden.
+ * Das passiert automatisch, wenn die App länger im Hintergrund war, wenn ein
+ * Kanal wiederholt scheitert, und wenn die Verbindung trotz allem länger weg
+ * bleibt (Wächter). Der Knopf „Neu verbinden“ macht dasselbe sofort; hilft
+ * auch das nicht, lädt er die App neu.
+ */
+let letzterNeuaufbau = 0;
+let neuaufbauLaeuft: Promise<void> | null = null;
+
+async function leitungNeu(): Promise<void> {
+  if (!supabase) return;
+  if (neuaufbauLaeuft) return neuaufbauLaeuft;
+  neuaufbauLaeuft = (async () => {
+    letzterNeuaufbau = Date.now();
+    try {
+      const { data } = await supabase!.auth.getSession();
+      if (data.session?.access_token) await supabase!.realtime.setAuth(data.session.access_token);
+    } catch {
+      /* ohne Sitzung: Kanäle scheitern ohnehin, der Wächter versucht es später */
+    }
+    try {
+      await Promise.race([supabase!.realtime.disconnect(), new Promise((r) => setTimeout(r, 1500))]);
+    } catch {
+      /* war schon getrennt */
+    }
+    // Hängt das Trennen noch, kurz warten – sonst ignoriert connect() den Aufruf
+    for (let i = 0; i < 15 && supabase!.realtime.connectionState() === "closing"; i++) await new Promise((r) => setTimeout(r, 200));
+    supabase!.realtime.connect();
+    for (const fn of [...offen]) fn();
+  })().finally(() => {
+    neuaufbauLaeuft = null;
+  });
+  return neuaufbauLaeuft;
+}
+
+const tipptGerade = () => {
+  const el = document.activeElement as HTMLElement | null;
+  return Boolean(el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable));
+};
+
+/** Letzter Ausweg: die App neu laden (höchstens alle 5 Minuten, nie beim Tippen). */
+function neuStarten(): void {
+  try {
+    const zuletztNeu = Number(sessionStorage.getItem("sv:rt-neustart") || 0);
+    if (Date.now() - zuletztNeu < 5 * 60_000) return;
+    sessionStorage.setItem("sv:rt-neustart", String(Date.now()));
+  } catch {
+    /* ohne Speicher trotzdem */
+  }
+  window.location.reload();
+}
+
+/** Von Hand neu verbinden (Knopf im Verbindungshinweis). Hilft das nicht, neu laden. */
 export function neuVerbinden(): void {
-  for (const fn of [...offen]) fn();
+  void leitungNeu();
+  setTimeout(() => {
+    if (gesamt() !== "verbunden" && navigator.onLine) window.location.reload();
+  }, 8000);
+}
+
+// Einmal für alle Kanäle: Rückkehr aus dem Hintergrund und ein Wächter.
+if (typeof document !== "undefined") {
+  let versteckt = 0;
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") {
+      versteckt = Date.now();
+      return;
+    }
+    // Länger als 20 s weg: der Leitung nicht trauen, auch wenn sie "verbunden" sagt
+    if (kanaele.size && (gesamt() !== "verbunden" || (versteckt && Date.now() - versteckt > 20_000))) void leitungNeu();
+    versteckt = 0;
+  });
+  window.addEventListener("online", () => {
+    if (kanaele.size) void leitungNeu();
+  });
+  let wegSeit = 0;
+  setInterval(() => {
+    if (!kanaele.size || document.visibilityState !== "visible" || !navigator.onLine) {
+      wegSeit = 0;
+      return;
+    }
+    if (gesamt() === "verbunden") {
+      wegSeit = 0;
+      return;
+    }
+    if (!wegSeit) wegSeit = Date.now();
+    const weg = Date.now() - wegSeit;
+    // nach 15 s: Leitung neu (höchstens alle 20 s); nach 90 s: App neu laden
+    if (weg > 15_000 && Date.now() - letzterNeuaufbau > 20_000) void leitungNeu();
+    if (weg > 90_000 && !tipptGerade()) neuStarten();
+  }, 5000);
 }
 
 interface Optionen {
@@ -121,7 +220,9 @@ export function abonniere({ name, aufbauen, nachholen }: Optionen): () => void {
     versuche++;
     timer = setTimeout(() => {
       timer = null;
-      starten();
+      // Scheitert es wiederholt, liegt es meist an der Leitung selbst
+      if (versuche >= 3 && Date.now() - letzterNeuaufbau > 20_000) void leitungNeu();
+      else starten();
     }, wartezeit);
   };
 
@@ -163,22 +264,14 @@ export function abonniere({ name, aufbauen, nachholen }: Optionen): () => void {
   };
   offen.add(sofortNochmal);
 
-  // Zurück aus dem Hintergrund oder wieder online: nachsehen, ob die Leitung
-  // noch steht. Ein gesperrtes Handy kappt die Verbindung stillschweigend.
-  const beiRueckkehr = () => {
-    if (document.visibilityState !== "visible") return;
-    if (kanaele.get(id) !== "verbunden") sofortNochmal();
-  };
-  document.addEventListener("visibilitychange", beiRueckkehr);
-  window.addEventListener("online", sofortNochmal);
+  // Rückkehr aus dem Hintergrund / wieder online: erledigt der gemeinsame
+  // Wächter oben (leitungNeu), der dann alle Kanäle neu anmeldet.
 
   starten();
 
   return () => {
     beendet = true;
     offen.delete(sofortNochmal);
-    document.removeEventListener("visibilitychange", beiRueckkehr);
-    window.removeEventListener("online", sofortNochmal);
     abbauen();
     kanaele.delete(id);
     melden();
