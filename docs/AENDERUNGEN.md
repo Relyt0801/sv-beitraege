@@ -12,6 +12,47 @@ ausführlich (auf Deutsch); hier steht der Überblick dazu.
 ---
 
 
+## 28.09.2026: Buchen wie gewohnt, Geplante Aktionen, immer neueste Version
+
+SQL dazu: `supabase/finanzen-geplant.sql` (neu) und `supabase/finanzen-kategorien.sql`
+(Spalte `kasse_buchungen.farbe`, `finanz_uebersicht()` mit Unterpunkten) –
+Migration `finanzen_geplant_farbe_unterpunkte`, eingespielt. Keine Mitteilung,
+keine neue Einführung.
+
+- **Keine Mitteilungen mehr bei Zahlungen/Buchungen:** „bezahlt“/„erlassen“
+  schickt Schülern und Eltern nichts mehr (einzeln und in der
+  Massenbearbeitung, `store.tsx`). Kassenbuchungen haben nie etwas geschickt.
+- **Immer die neueste Version** (`main.tsx`): Die App prüft alle 5 Minuten
+  und beim Zurückholen in den Vordergrund, ob es einen neuen Stand gibt, und
+  lädt dann einmal neu. Wer gerade in ein Feld tippt, wird nicht unterbrochen
+  – neu geladen wird, sobald das Feld verlassen wird oder die App im
+  Hintergrund ist.
+- **Ring:** die Stufen-Striche sind genau so lang, wie der Ring dick ist –
+  nichts steht mehr über.
+- **Buchen (ein Formular für alles, `BuchungSheet` in `FinanzBereiche.tsx`):**
+  „+ Einnahme“ / „− Ausgabe“ → Betrag → **Wofür?** (eine Kategorie wie
+  „Lehrerkarten“, „Sonstiges“ oder „+ Neue Kategorie“) → **Bezeichnung
+  (Pflicht)**, z. B. „Verpackungsmaterial“ → Tag. Die Farbe kommt von der
+  Kategorie und lässt sich für diesen Eintrag ändern („Farbe · ändern“).
+  Dasselbe Formular öffnet sich aus dem Detail einer Kategorie – dort ist
+  die Kategorie schon gewählt; danach springt es zurück ins Detail.
+- **Detail einer Kategorie:** Einnahmen (+), Ausgaben (−), Gewinn/Verlust,
+  darunter die Einträge mit Bezeichnung und Tag. Alle sehen die Einträge
+  (zusammengefasst je Tag und Bezeichnung) – darum beim Buchen der Hinweis
+  „Für alle sichtbar – bitte keine Namen“. Elternbeiträge (mit Namen im
+  Titel) tauchen dort nie auf.
+- **Übersicht:** Einnahmen mit „+“, Ausgaben mit „−“ – in den Kacheln und an
+  jeder Zeile.
+- **Kein eigener Ausgaben-Bereich mehr:** Ausgaben gehören zu ihrer
+  Kategorie; Ausgaben ohne Kategorie zählen zu „Sonstiges“ (grau).
+- **Geplante Aktionen** (`kasse_geplant`): anstehende Geldaktionen mit
+  Titel, Tag, Infos, erwartetem Betrag und – freiwillig – Kategorie. Alle mit
+  Finanzen sehen sie (vorbei = ausgeblendet), eintragen/ändern/löschen nur
+  „Kassenbuch führen“. Rechte-Test: 5 neue Fälle (136).
+
+---
+
+
 ## 27.09.2026 (abends): Finanzen in zwei Bereichen, Posten mit Gewinn
 
 SQL dazu: `supabase/finanzen-kategorien.sql`, Funktion `finanz_uebersicht()`

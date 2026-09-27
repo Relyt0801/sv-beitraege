@@ -33,6 +33,8 @@ export interface Buchung {
   created_at: string;
   /** Selbst gewählte Kategorie mit Farbe (null = nach Quelle) */
   kategorie_id?: string | null;
+  /** Eigene Farbe dieser Buchung (null = Farbe der Kategorie) */
+  farbe?: string | null;
 }
 
 /** Eine Kategorie fürs Kassenbuch: Name + Farbe. Mehrere dürfen dieselbe Farbe haben. */
@@ -73,6 +75,7 @@ export function farbHex(key: string | null | undefined, dunkel = false): string 
 
 /** Farbe einer Buchung: Kategorie vor Herkunft. */
 export function buchungFarbe(b: Buchung, kategorien: KassenKategorie[]): string {
+  if (b.farbe) return b.farbe;
   const k = b.kategorie_id ? kategorien.find((x) => x.id === b.kategorie_id) : null;
   if (k) return k.farbe;
   if (b.cent < 0) return b.komitee ? "lila" : "grau";
@@ -155,6 +158,7 @@ export interface FinanzenValue {
     aktion_id?: string | null;
     komitee?: string | null;
     kategorie_id?: string | null;
+    farbe?: string | null;
   }) => Promise<string | null>;
   loeschen: (id: string) => Promise<string | null>;
   zielSetzen: (z: KassenZiel) => Promise<string | null>;
@@ -236,6 +240,7 @@ export function useFinanzen(aktiv: boolean): FinanzenValue {
           aktion_id: b.aktion_id ?? null,
           komitee: b.komitee ?? null,
           kategorie_id: b.kategorie_id ?? null,
+          farbe: b.farbe ?? null,
           student_id: null,
           halbjahr: null,
           anfrage_id: null,
@@ -255,6 +260,7 @@ export function useFinanzen(aktiv: boolean): FinanzenValue {
         aktion_id: b.aktion_id ?? null,
         komitee: b.komitee ?? null,
         kategorie_id: b.kategorie_id ?? null,
+        ...(b.farbe ? { farbe: b.farbe } : {}),
         created_by: s.session?.user.id ?? null,
       });
       if (error) return error.message;
@@ -384,8 +390,8 @@ export interface FinanzPosten {
   zuletzt: string;
   /** "ein": Aktionen, Beiträge und Sonstiges · "aus": reine Ausgaben */
   bereich?: "ein" | "aus";
-  /** Summen je Tag – für „einzelne Termine“ in der Detailansicht */
-  termine?: { datum: string; ein_cent: number; aus_cent: number }[] | null;
+  /** Unterpunkte: Summe je Tag und Bezeichnung (z. B. „Verpackungsmaterial“) */
+  eintraege?: { datum: string; titel: string; cent: number }[] | null;
   /** Nur in der App (Kassenwart): woran neue Buchungen dieses Postens hängen */
   ref?: PostenRef;
   /** Nur in der App (Kassenwart): die einzelnen Buchungen */
@@ -438,7 +444,7 @@ export function uebersichtAus(
   let letzte: string | null = null;
   const phasen: Record<string, number> = {};
   const posten = new Map<string, FinanzPosten>();
-  const tage = new Map<string, Map<string, { ein_cent: number; aus_cent: number }>>();
+  const unter = new Map<string, Map<string, { datum: string; titel: string; cent: number }>>();
   for (const b of buchungen) {
     stand += b.cent;
     if (!letzte || b.datum > letzte) letzte = b.datum;
@@ -460,10 +466,11 @@ export function uebersichtAus(
       : b.quelle === "spende" ? ["spende", "Spenden", "Spenden", { typ: "spende" }]
       : b.quelle === "sonstiges" ? ["sonstiges", "Sonstiges", "Sonstiges", { typ: "sonstiges" }]
       : b.komitee ? ["komitee", b.komitee, b.komitee, { typ: "komitee", komitee: b.komitee }]
-      : ["ausgabe", "Sonstige Ausgaben", "Sonstige Ausgaben", { typ: "ausgabe" }];
+      // Ausgabe ohne Posten: gehört zu Sonstiges (es gibt keinen eigenen Ausgaben-Bereich)
+      : ["sonstiges", "Sonstiges", "Sonstiges", { typ: "sonstiges" }];
     const k = `${art}|${schluessel}`;
     const farbe = kat ? kat.farbe : art === "sonstiges" ? "grau" : null;
-    const bereich = art === "komitee" || art === "ausgabe" || kat?.art === "aus" ? "aus" : "ein";
+    const bereich = art === "komitee" || kat?.art === "aus" ? "aus" : "ein";
     const p = posten.get(k) || {
       art, titel, farbe, bereich, ein_cent: 0, aus_cent: 0, anzahl: 0, zuletzt: b.datum,
       ...(mitBuchungen ? { ref, buchungen: [] as Buchung[] } : {}),
@@ -473,14 +480,16 @@ export function uebersichtAus(
     if (b.datum > p.zuletzt) p.zuletzt = b.datum;
     p.buchungen?.push(b);
     posten.set(k, p);
-    const t = tage.get(k) || new Map();
-    const tag = t.get(b.datum) || { ein_cent: 0, aus_cent: 0 };
-    if (b.cent > 0) tag.ein_cent += b.cent; else tag.aus_cent += -b.cent;
-    t.set(b.datum, tag);
-    tage.set(k, t);
+    // wie in finanz_uebersicht(): je Tag, Bezeichnung und Vorzeichen zusammengefasst
+    const u = unter.get(k) || new Map();
+    const uk = `${b.datum}|${b.titel}|${Math.sign(b.cent)}`;
+    const e = u.get(uk) || { datum: b.datum, titel: b.titel, cent: 0 };
+    e.cent += b.cent;
+    u.set(uk, e);
+    unter.set(k, u);
   }
   for (const [k, p] of posten)
-    p.termine = [...(tage.get(k) || new Map()).entries()].sort(([a], [b]) => (a < b ? -1 : 1)).map(([datum, v]) => ({ datum, ...v }));
+    p.eintraege = [...(unter.get(k) || new Map()).values()].sort((a, b) => (a.datum < b.datum ? 1 : a.datum > b.datum ? -1 : b.cent - a.cent));
   // Elternbeiträge netto je Phase
   for (const c of Object.values(phasen)) {
     if (c > 0) ein += c; else aus += -c;
@@ -492,7 +501,7 @@ export function uebersichtAus(
       if (!posten.has(k))
         posten.set(k, {
           art: "kategorie", titel: kat.name, farbe: kat.farbe, bereich: kat.art === "aus" ? "aus" : "ein",
-          ein_cent: 0, aus_cent: 0, anzahl: 0, zuletzt: "9999", termine: [],
+          ein_cent: 0, aus_cent: 0, anzahl: 0, zuletzt: "9999", eintraege: [],
           ref: { typ: "kategorie", id: kat.id, art: kat.art }, buchungen: [],
         });
     }
@@ -567,4 +576,102 @@ export function schuljahrVon(halbjahr: string): string {
   const phase = halbjahr.slice(0, 2);
   const ende = ABI_JAHR - (phase === "Q2" ? 0 : phase === "Q1" ? 1 : 2);
   return `${ende - 1}/${String(ende).slice(2)}`;
+}
+
+// ==================================================================== Geplante Aktionen
+
+/** Eine anstehende Geldaktion – Titel, Tag, Infos, erwarteter Betrag. */
+export interface KassenGeplant {
+  id: string;
+  titel: string;
+  datum: string | null;
+  info: string;
+  /** erwarteter Betrag in Cent (+ Einnahme, − Ausgabe), freiwillig */
+  erwartet_cent: number | null;
+  kategorie_id: string | null;
+}
+
+const DEMO_GEPLANT: KassenGeplant[] = (() => {
+  const tag = (n: number) => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10);
+  return [
+    { id: "demo-g1", titel: "Lehrerkarten Winter", datum: tag(18), info: "Verkauf in beiden Pausen, Druck ist bestellt.", erwartet_cent: 45000, kategorie_id: "demo-k1" },
+    { id: "demo-g2", titel: "Waffelverkauf Elternsprechtag", datum: tag(32), info: "", erwartet_cent: 20000, kategorie_id: "demo-k2" },
+  ];
+})();
+
+/**
+ * Geplante Aktionen laden und live halten. Lesen dürfen alle mit Finanzen,
+ * schreiben nur „Kassenbuch führen“ (Zugriffsregeln in finanzen-geplant.sql).
+ */
+export function useGeplant(aktiv: boolean): {
+  liste: KassenGeplant[];
+  speichern: (g: Omit<KassenGeplant, "id"> & { id?: string }) => Promise<string | null>;
+  loeschen: (id: string) => Promise<string | null>;
+} {
+  const [liste, setListe] = useState<KassenGeplant[]>(hasSupabase ? [] : DEMO_GEPLANT);
+
+  const laden = useCallback(async () => {
+    if (!hasSupabase) return;
+    const { data, error } = await supabase!
+      .from("kasse_geplant")
+      .select("id, titel, datum, info, erwartet_cent, kategorie_id")
+      .order("datum", { ascending: true, nullsFirst: false })
+      .order("created_at");
+    if (!error) setListe((data as KassenGeplant[]) || []);
+  }, []);
+
+  useEffect(() => {
+    if (!aktiv || !hasSupabase) return;
+    void laden();
+    const abmelden = abonniere({
+      name: "sv-geplant",
+      nachholen: () => void laden(),
+      aufbauen: (kanal) => kanal.on("postgres_changes", { event: "*", schema: "public", table: "kasse_geplant" }, () => void laden()),
+    });
+    return abmelden;
+  }, [aktiv, laden]);
+
+  const speichern = useCallback(
+    async (g: Omit<KassenGeplant, "id"> & { id?: string }) => {
+      const zeile = {
+        titel: g.titel.trim().slice(0, 80),
+        datum: g.datum || null,
+        info: g.info.trim().slice(0, 1000),
+        erwartet_cent: g.erwartet_cent,
+        kategorie_id: g.kategorie_id,
+      };
+      if (!zeile.titel) return "Bitte einen Titel eingeben.";
+      if (!hasSupabase) {
+        setListe((prev) =>
+          (g.id ? prev.map((x) => (x.id === g.id ? { ...x, ...zeile } : x)) : [...prev, { id: crypto.randomUUID(), ...zeile }]).sort(
+            (a, b) => (a.datum ?? "9999").localeCompare(b.datum ?? "9999"),
+          ),
+        );
+        return null;
+      }
+      const { error } = g.id
+        ? await supabase!.from("kasse_geplant").update(zeile).eq("id", g.id)
+        : await supabase!.from("kasse_geplant").insert(zeile);
+      if (error) return error.message;
+      await laden();
+      return null;
+    },
+    [laden],
+  );
+
+  const loeschen = useCallback(
+    async (id: string) => {
+      setListe((prev) => prev.filter((x) => x.id !== id));
+      if (!hasSupabase) return null;
+      const { error } = await supabase!.from("kasse_geplant").delete().eq("id", id);
+      if (error) {
+        void laden();
+        return error.message;
+      }
+      return null;
+    },
+    [laden],
+  );
+
+  return { liste, speichern, loeschen };
 }

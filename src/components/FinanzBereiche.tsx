@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { committeeLabel } from "../lib/committees";
 import {
-  KASSEN_FARBEN, centAus, euro, euroKurz, farbHex, postenFarbe, schuljahrVon,
-  type Buchung, type FinanzPosten, type FinanzUebersicht, type FinanzenValue, type Quelle,
+  KASSEN_FARBEN, centAus, euro, euroKurz, farbHex, postenFarbe, schuljahrVon, useGeplant,
+  type FinanzPosten, type FinanzUebersicht, type FinanzenValue, type KassenGeplant, type PostenRef, type Quelle,
 } from "../lib/finanzen";
 import { useDunkel } from "../lib/dunkel";
 import { frage, meldeFehler } from "../lib/melder";
@@ -10,25 +10,21 @@ import { Sheet, SheetKopf } from "./Sheet";
 import { Icon } from "./Icon";
 
 /**
- * Finanzen in zwei Bereichen:
- *  1. „Aktionen, Beiträge und Sonstiges“ – Elternbeiträge (blau), jede Aktion
- *     bzw. jeder Posten in seiner Farbe, Spenden, Sonstiges (grau).
- *  2. „Ausgaben“ – was keiner Aktion gehört (Komitees, sonstige Ausgaben).
- * Jede Zeile lässt sich antippen: Einnahmen, Ausgaben, Gewinn und – wenn es
- * mehrere Tage gab – die einzelnen Termine.
+ * Finanzen unter dem Kontostand:
+ *  1. „Aktionen, Beiträge und Sonstiges“ – alles, was Geld bewegt: Elternbeiträge
+ *     (blau), jede Aktion/Kategorie in ihrer Farbe mit ihren Ausgaben verrechnet,
+ *     Komitees, Spenden, Sonstiges (grau). Jede Zeile antippbar (ⓘ).
+ *  2. „Geplante Aktionen“ – was noch ansteht, mit Tag, Infos und Erwartung.
  *
- * Mit `fin` (Kassenwart/Admin, „Kassenbuch führen“) kann man im Detail
- * direkt Einnahmen/Ausgaben hinzufügen, Einträge löschen, Name und Farbe
- * ändern – und über „＋ Neu“ einen Posten anlegen.
+ * Mit `fin` (Kassenwart/Admin, „Kassenbuch führen“) wird gebucht, gelöscht,
+ * umbenannt und geplant – immer mit demselben Buchungsformular.
  */
 
-const PHASEN: [string, string][] = [
-  ["EF", "Einführungsphase (EF)"],
-  ["Q1", "Qualifikationsphase 1 (Q1)"],
-  ["Q2", "Qualifikationsphase 2 (Q2)"],
-];
+const PHASEN = ["EF", "Q1", "Q2"] as const;
 
 type Auswahl = { typ: "beitraege" } | { typ: "posten"; key: string } | null;
+/** Was das Buchungsformular vorbelegt: Seite und – falls aus einem Posten geöffnet – der Posten. */
+export type BuchungStart = { typ: "ein" | "aus"; ref?: PostenRef; name?: string; zurueck?: string };
 
 export function postenKey(p: FinanzPosten): string {
   if (p.ref?.typ === "kategorie") return `k:${p.ref.id}`;
@@ -40,25 +36,30 @@ function anzeigeName(p: FinanzPosten): string {
   return p.art === "komitee" ? committeeLabel(p.titel) : p.titel;
 }
 
-const REIHENFOLGE: Record<FinanzPosten["art"], number> = { kategorie: 0, aktion: 0, spende: 1, sonstiges: 2, komitee: 0, ausgabe: 1 };
+const REIHENFOLGE: Record<FinanzPosten["art"], number> = { kategorie: 0, aktion: 0, komitee: 1, spende: 2, ausgabe: 3, sonstiges: 4 };
+
+/** "+12,00 €" / "−12,00 €" – Einnahmen und Ausgaben auf einen Blick. */
+export function mitVorzeichen(cent: number, kurz = false): string {
+  const f = kurz ? euroKurz : euro;
+  return cent > 0 ? `+${f(cent)}` : cent < 0 ? `−${f(-cent)}` : f(0);
+}
 
 export function PostenBereiche({ d, fin }: { d: FinanzUebersicht; fin?: FinanzenValue | null }) {
   const dunkel = useDunkel();
   const [auswahl, setAuswahl] = useState<Auswahl>(null);
-  const [neu, setNeu] = useState<"ein" | "aus" | null>(null);
+  const [neu, setNeu] = useState(false);
+  const [buchung, setBuchung] = useState<BuchungStart | null>(null);
 
   const beitraegeSumme = d.beitraege.reduce((n, b) => n + b.cent, 0);
-  const sortiert = (liste: FinanzPosten[], wert: (p: FinanzPosten) => number) =>
-    [...liste].sort((a, b) => REIHENFOLGE[a.art] - REIHENFOLGE[b.art] || wert(b) - wert(a));
-  const einnahmen = sortiert(d.posten.filter((p) => (p.bereich ?? "ein") === "ein"), (p) => p.ein_cent);
-  const ausgaben = sortiert(d.posten.filter((p) => p.bereich === "aus"), (p) => p.aus_cent);
+  const liste = [...d.posten].sort(
+    (a, b) => REIHENFOLGE[a.art] - REIHENFOLGE[b.art] || Math.abs(b.ein_cent - b.aus_cent) - Math.abs(a.ein_cent - a.aus_cent),
+  );
   const gewaehlt = auswahl?.typ === "posten" ? d.posten.find((p) => postenKey(p) === auswahl.key) ?? null : null;
 
   return (
     <>
-      {/* ------------------------------------------------ Bereich 1 */}
       <section className="card p-5">
-        <BereichKopf titel="Aktionen, Beiträge und Sonstiges" onNeu={fin ? () => setNeu("ein") : undefined} />
+        <BereichKopf titel="Aktionen, Beiträge und Sonstiges" onNeu={fin ? () => setNeu(true) : undefined} neuText="Kategorie" />
         <ul className="grid gap-1.5">
           <PostenZeile
             hex={farbHex("blau", dunkel)}
@@ -67,7 +68,7 @@ export function PostenBereiche({ d, fin }: { d: FinanzUebersicht; fin?: Finanzen
             betrag={beitraegeSumme}
             onClick={() => setAuswahl({ typ: "beitraege" })}
           />
-          {einnahmen.map((p) => (
+          {liste.map((p) => (
             <PostenZeile
               key={postenKey(p)}
               hex={farbHex(postenFarbe(p), dunkel)}
@@ -80,54 +81,54 @@ export function PostenBereiche({ d, fin }: { d: FinanzUebersicht; fin?: Finanzen
         </ul>
       </section>
 
-      {/* ------------------------------------------------ Bereich 2 */}
-      <section className="card p-5">
-        <BereichKopf titel="Ausgaben" onNeu={fin ? () => setNeu("aus") : undefined} />
-        {ausgaben.length === 0 ? (
-          <p className="text-[13px] text-tinte-leise">Noch keine Ausgaben.</p>
-        ) : (
-          <ul className="grid gap-1.5">
-            {ausgaben.map((p) => (
-              <PostenZeile
-                key={postenKey(p)}
-                hex={farbHex(postenFarbe(p), dunkel)}
-                name={anzeigeName(p)}
-                unter={unterzeile(p)}
-                betrag={p.ein_cent - p.aus_cent}
-                neutral
-                onClick={() => setAuswahl({ typ: "posten", key: postenKey(p) })}
-              />
-            ))}
-          </ul>
-        )}
-      </section>
+      <GeplantKarte darf={Boolean(fin)} fin={fin ?? null} />
 
       <BeitraegeDetail open={auswahl?.typ === "beitraege"} d={d} onClose={() => setAuswahl(null)} />
-      <PostenDetail p={gewaehlt} fin={fin ?? null} onClose={() => setAuswahl(null)} onUmgezogen={(key) => setAuswahl({ typ: "posten", key })} />
+      <PostenDetail
+        p={gewaehlt}
+        fin={fin ?? null}
+        onClose={() => setAuswahl(null)}
+        onUmgezogen={(key) => setAuswahl({ typ: "posten", key })}
+        onBuchen={(start) => {
+          setAuswahl(null);
+          setBuchung(start);
+        }}
+      />
       {fin && (
-        <NeuSheet
-          bereich={neu}
-          fin={fin}
-          onClose={() => setNeu(null)}
-          onAngelegt={(id) => {
-            setNeu(null);
-            setAuswahl({ typ: "posten", key: `k:${id}` });
-          }}
-        />
+        <>
+          <NeuSheet
+            open={neu}
+            fin={fin}
+            onClose={() => setNeu(false)}
+            onAngelegt={(id) => {
+              setNeu(false);
+              setAuswahl({ typ: "posten", key: `k:${id}` });
+            }}
+          />
+          <BuchungSheet
+            start={buchung}
+            fin={fin}
+            onClose={() => {
+              const zurueck = buchung?.zurueck;
+              setBuchung(null);
+              if (zurueck) setAuswahl({ typ: "posten", key: zurueck });
+            }}
+          />
+        </>
       )}
     </>
   );
 }
 
 function unterzeile(p: FinanzPosten): string | undefined {
-  const tage = p.termine?.length ?? 0;
-  if (p.ein_cent > 0 && p.aus_cent > 0) return `${euroKurz(p.ein_cent)} rein · ${euroKurz(p.aus_cent)} raus`;
-  if (tage > 1) return `${tage} Termine`;
-  if (p.anzahl === 0) return "noch leer – antippen zum Füllen";
+  if (p.ein_cent > 0 && p.aus_cent > 0) return `${mitVorzeichen(p.ein_cent, true)} · ${mitVorzeichen(-p.aus_cent, true)}`;
+  const n = p.eintraege?.length ?? 0;
+  if (n > 1) return `${n} Einträge`;
+  if (p.anzahl === 0) return "noch leer – antippen";
   return undefined;
 }
 
-function BereichKopf({ titel, onNeu }: { titel: string; onNeu?: () => void }) {
+function BereichKopf({ titel, onNeu, neuText = "Neu" }: { titel: string; onNeu?: () => void; neuText?: string }) {
   return (
     <div className="mb-3 flex items-center gap-2">
       <h2 className="min-w-0 flex-1 text-[17px] font-bold leading-tight">{titel}</h2>
@@ -135,10 +136,11 @@ function BereichKopf({ titel, onNeu }: { titel: string; onNeu?: () => void }) {
         <button
           type="button"
           onClick={onNeu}
-          className="flex shrink-0 items-center gap-1 rounded-full bg-brand/10 px-3 py-1.5 text-[13px] font-bold text-brand active:scale-95 dark:bg-brand/20"
+          aria-label={`${neuText} anlegen`}
+          className="flex shrink-0 items-center gap-1 rounded-full bg-brand/10 px-3 py-1.5 text-[13px] font-bold text-brand active:scale-95 dark:bg-brand/20 dark:text-blue-300"
         >
           <Icon name="plus" size={14} strich={2.4} />
-          Neu
+          {neuText}
         </button>
       )}
     </div>
@@ -149,25 +151,19 @@ function Punkt({ hex, gross }: { hex: string; gross?: boolean }) {
   return <span aria-hidden className={`${gross ? "h-3.5 w-3.5" : "h-2.5 w-2.5"} shrink-0 rounded-full`} style={{ background: hex }} />;
 }
 
-/** Betrag mit Minus; rot nur, wo ein Minus eine Warnung ist (Verlust). */
-function Vorzeichen({ cent, className = "", neutral }: { cent: number; className?: string; neutral?: boolean }) {
-  return (
-    <span className={`zahl ${cent < 0 && !neutral ? "text-red-600 dark:text-red-400" : ""} ${className}`}>
-      {cent < 0 ? "−" : ""}
-      {euro(Math.abs(cent))}
-    </span>
-  );
+/** Betrag mit + / −; rot nur beim Verlust eines Postens. */
+function Betrag({ cent, className = "", warnen }: { cent: number; className?: string; warnen?: boolean }) {
+  return <span className={`zahl ${warnen && cent < 0 ? "text-red-600 dark:text-red-400" : ""} ${className}`}>{mitVorzeichen(cent)}</span>;
 }
 
 function PostenZeile({
-  hex, name, unter, betrag, onClick, neutral,
+  hex, name, unter, betrag, onClick,
 }: {
   hex: string;
   name: string;
   unter?: string;
   betrag: number;
   onClick: () => void;
-  neutral?: boolean;
 }) {
   return (
     <li>
@@ -179,9 +175,9 @@ function PostenZeile({
         <Punkt hex={hex} />
         <span className="min-w-0 flex-1">
           <span className="block truncate text-[14px] font-semibold">{name}</span>
-          {unter && <span className="block truncate text-[12px] text-tinte-leise">{unter}</span>}
+          {unter && <span className="zahl block truncate text-[12px] text-tinte-leise">{unter}</span>}
         </span>
-        <Vorzeichen cent={betrag} neutral={neutral} className="shrink-0 text-[15px] font-bold" />
+        <Betrag cent={betrag} className="shrink-0 text-[15px] font-bold" />
         <span className="shrink-0 text-tinte-leise" aria-hidden>
           <Icon name="info" size={17} />
         </span>
@@ -215,67 +211,49 @@ function BeitraegeDetail({ open, d, onClose }: { open: boolean; d: FinanzUebersi
       <Kopf hex={farbHex("blau", dunkel)} titel="Elternbeiträge" onClose={onClose} />
       <div className="rounded-2xl bg-papier-matt p-4 dark:bg-slate-800">
         <ul className="grid gap-2.5">
-          {PHASEN.map(([k, name]) => {
+          {PHASEN.map((k) => {
             const c = d.beitraege.find((b) => b.phase === k)?.cent ?? 0;
             return (
               <li key={k} className="flex items-baseline gap-3 text-[15px]">
                 <span className={`min-w-0 flex-1 ${c ? "font-semibold" : "text-tinte-leise"}`}>Elternbeiträge der {k}</span>
-                <span className={`zahl shrink-0 ${c ? "font-bold" : "text-tinte-leise"}`}>{c ? euro(c) : "–"}</span>
-                <span className="sr-only">{name}</span>
+                <span className={`zahl shrink-0 ${c ? "font-bold" : "text-tinte-leise"}`}>{c ? mitVorzeichen(c) : "–"}</span>
               </li>
             );
           })}
         </ul>
         <div className="mt-3 flex items-baseline gap-3 border-t border-papier-linie pt-3 dark:border-slate-700">
           <span className="min-w-0 flex-1 text-[15px] font-bold">Zusammen</span>
-          <span className="zahl shrink-0 text-[1.5rem] font-bold tracking-tight">{euro(summe)}</span>
+          <span className="zahl shrink-0 text-[1.5rem] font-bold tracking-tight">{mitVorzeichen(summe)}</span>
         </div>
       </div>
       <p className="mt-3 text-center text-[12px] text-tinte-leise">
-        Offen bis {d.halbjahr} ({schuljahrVon(d.halbjahr)}): {euroKurz(d.offen_cent)}
+        Noch offen bis {d.halbjahr} ({schuljahrVon(d.halbjahr)}): {euroKurz(d.offen_cent)}
       </p>
     </Sheet>
   );
 }
 
-/** Welche Seiten ein Posten beim Hinzufügen anbietet. */
+/** Welche Seiten ein Posten beim Buchen anbietet. */
 function seiten(p: FinanzPosten): ("ein" | "aus")[] {
   const r = p.ref;
-  if (!r) return [];
+  if (!r || r.typ === "aktionTitel") return [];
   if (r.typ === "kategorie") return r.art === "ein" ? ["ein"] : r.art === "aus" ? ["aus"] : ["ein", "aus"];
-  if (r.typ === "aktion") return ["ein", "aus"];
   if (r.typ === "komitee" || r.typ === "ausgabe") return ["aus"];
-  return ["ein"];
+  if (r.typ === "spende") return ["ein"];
+  return ["ein", "aus"];
 }
 
-/** Neue Buchung passend zum Posten. */
-function buchungFuer(p: FinanzPosten, seite: "ein" | "aus", cent: number, datum: string) {
-  const r = p.ref!;
-  const aus = seite === "aus";
-  const basis = { datum, cent: aus ? -cent : cent, titel: anzeigeName(p) };
-  const q = (ein: Quelle): Quelle => (aus ? "ausgabe" : ein);
-  switch (r.typ) {
-    case "kategorie": return { ...basis, quelle: q("aktion"), kategorie_id: r.id };
-    case "aktion": return { ...basis, quelle: q("aktion"), aktion_id: r.id };
-    case "aktionTitel": return { ...basis, quelle: q("aktion"), titel: r.titel };
-    case "spende": return { ...basis, quelle: "spende" as Quelle, titel: "Spende" };
-    case "sonstiges": return { ...basis, quelle: "sonstiges" as Quelle, titel: "Sonstiges" };
-    case "komitee": return { ...basis, quelle: "ausgabe" as Quelle, komitee: r.komitee };
-    case "ausgabe": return { ...basis, quelle: "ausgabe" as Quelle, titel: "Ausgabe" };
-  }
-}
-
-const heute = () => new Date().toISOString().slice(0, 10);
 const tagKurz = (d: string) =>
   new Date(d + "T12:00:00").toLocaleDateString("de-DE", { weekday: "short", day: "2-digit", month: "2-digit", year: "2-digit" });
 
 function PostenDetail({
-  p, fin, onClose, onUmgezogen,
+  p, fin, onClose, onUmgezogen, onBuchen,
 }: {
   p: FinanzPosten | null;
   fin: FinanzenValue | null;
   onClose: () => void;
   onUmgezogen: (key: string) => void;
+  onBuchen: (start: BuchungStart) => void;
 }) {
   const dunkel = useDunkel();
   const [bearbeiten, setBearbeiten] = useState(false);
@@ -283,14 +261,16 @@ function PostenDetail({
   const letzter = useRef<FinanzPosten | null>(null);
   if (p) letzter.current = p;
   const x = p ?? letzter.current;
-  useEffect(() => setBearbeiten(false), [p && postenKey(p)]); // eslint-disable-line react-hooks/exhaustive-deps
+  const key = p ? postenKey(p) : "";
+  useEffect(() => setBearbeiten(false), [key]);
 
   if (!x) return null;
   const gewinn = x.ein_cent - x.aus_cent;
   const hex = farbHex(postenFarbe(x), dunkel);
   const darf = Boolean(fin && x.ref);
   const umbenennbar = darf && (x.ref!.typ === "kategorie" || x.ref!.typ === "aktion");
-  const nurAus = x.bereich === "aus";
+  const moeglich = darf ? seiten(x) : [];
+  const start = (typ: "ein" | "aus") => onBuchen({ typ, ref: x.ref, name: anzeigeName(x), zurueck: postenKey(x) });
 
   return (
     <Sheet open={p !== null} onClose={onClose}>
@@ -300,11 +280,7 @@ function PostenDetail({
         onClose={onClose}
         rechts={
           umbenennbar && !bearbeiten ? (
-            <button
-              type="button"
-              onClick={() => setBearbeiten(true)}
-              className="ml-auto shrink-0 rounded-full px-2.5 py-1 text-[13px] font-bold text-brand"
-            >
+            <button type="button" onClick={() => setBearbeiten(true)} className="ml-auto shrink-0 rounded-full px-2.5 py-1 text-[13px] font-bold text-brand">
               Ändern
             </button>
           ) : null
@@ -315,40 +291,49 @@ function PostenDetail({
 
       {/* Die Rechnung: Einnahmen − Ausgaben = Gewinn */}
       <div className="rounded-2xl bg-papier-matt p-4 dark:bg-slate-800">
-        {nurAus && x.ein_cent === 0 ? (
+        <Balken ein={x.ein_cent} aus={x.aus_cent} hex={hex} />
+        <dl className="mt-3 grid gap-1.5 text-[15px]">
           <div className="flex items-baseline gap-3">
-            <span className="min-w-0 flex-1 text-[15px] font-bold">Ausgaben</span>
-            <span className="zahl shrink-0 text-[1.5rem] font-bold tracking-tight">{euro(x.aus_cent)}</span>
+            <dt className="min-w-0 flex-1 font-semibold">Einnahmen</dt>
+            <dd className="zahl shrink-0 font-semibold">{mitVorzeichen(x.ein_cent)}</dd>
           </div>
-        ) : (
-          <>
-            <Balken ein={x.ein_cent} aus={x.aus_cent} hex={hex} />
-            <dl className="mt-3 grid gap-1.5 text-[15px]">
-              <div className="flex items-baseline gap-3">
-                <dt className="min-w-0 flex-1 font-semibold">Einnahmen</dt>
-                <dd className="zahl shrink-0 font-semibold">{euro(x.ein_cent)}</dd>
-              </div>
-              <div className="flex items-baseline gap-3">
-                <dt className="min-w-0 flex-1 font-semibold">Ausgaben</dt>
-                <dd className="zahl shrink-0 font-semibold">{x.aus_cent ? "−" : ""}{euro(x.aus_cent)}</dd>
-              </div>
-            </dl>
-            <div className="mt-3 flex items-baseline gap-3 border-t border-papier-linie pt-3 dark:border-slate-700">
-              <span className="min-w-0 flex-1 text-[15px] font-bold">{gewinn < 0 ? "Verlust" : "Gewinn"}</span>
-              <Vorzeichen cent={gewinn} className="shrink-0 text-[1.5rem] font-bold tracking-tight" />
-            </div>
-          </>
-        )}
+          <div className="flex items-baseline gap-3">
+            <dt className="min-w-0 flex-1 font-semibold">Ausgaben</dt>
+            <dd className="zahl shrink-0 font-semibold">{mitVorzeichen(-x.aus_cent)}</dd>
+          </div>
+        </dl>
+        <div className="mt-3 flex items-baseline gap-3 border-t border-papier-linie pt-3 dark:border-slate-700">
+          <span className="min-w-0 flex-1 text-[15px] font-bold">{gewinn < 0 ? "Verlust" : "Gewinn"}</span>
+          <Betrag cent={gewinn} warnen className="shrink-0 text-[1.5rem] font-bold tracking-tight" />
+        </div>
       </div>
 
-      {darf && fin ? (
-        <>
-          <Hinzufuegen p={x} fin={fin} />
-          <Eintraege buchungen={x.buchungen ?? []} fin={fin} />
-        </>
-      ) : (
-        (x.termine?.length ?? 0) > 1 && <Termine termine={x.termine!} />
+      {moeglich.length > 0 && (
+        <div className={`mt-4 grid gap-2 ${moeglich.length > 1 ? "grid-cols-2" : "grid-cols-1"}`}>
+          {moeglich.includes("ein") && (
+            <button
+              type="button"
+              onClick={() => start("ein")}
+              className="flex min-h-[3rem] items-center justify-center gap-1.5 rounded-full bg-bezahlt/[0.12] text-[15px] font-semibold text-bezahlt active:scale-[.97]"
+            >
+              <Icon name="plus" size={16} strich={2.4} />
+              Einnahme
+            </button>
+          )}
+          {moeglich.includes("aus") && (
+            <button
+              type="button"
+              onClick={() => start("aus")}
+              className="flex min-h-[3rem] items-center justify-center gap-1.5 rounded-full bg-red-500/[0.12] text-[15px] font-semibold text-red-600 active:scale-[.97] dark:text-red-400"
+            >
+              <span className="text-[18px] leading-none">−</span>
+              Ausgabe
+            </button>
+          )}
+        </div>
       )}
+
+      <Unterpunkte p={x} fin={darf ? fin : null} />
     </Sheet>
   );
 }
@@ -366,120 +351,46 @@ function Balken({ ein, aus, hex }: { ein: number; aus: number; hex: string }) {
   );
 }
 
-function Termine({ termine }: { termine: { datum: string; ein_cent: number; aus_cent: number }[] }) {
+/**
+ * Die Unterpunkte eines Postens (Bezeichnung, Tag, Betrag). Alle sehen die
+ * Summen je Tag und Bezeichnung; der Kassenwart sieht jede Buchung einzeln und
+ * kann sie löschen.
+ */
+function Unterpunkte({ p, fin }: { p: FinanzPosten; fin: FinanzenValue | null }) {
+  const dunkel = useDunkel();
+  const einzeln = fin && p.buchungen
+    ? [...p.buchungen]
+        .sort((a, b) => (a.datum < b.datum ? 1 : a.datum > b.datum ? -1 : a.created_at < b.created_at ? 1 : -1))
+        .map((b) => ({ key: b.id, datum: b.datum, titel: b.titel, cent: b.cent, farbe: b.farbe, buchung: b }))
+    : (p.eintraege ?? []).map((e, i) => ({ key: String(i), datum: e.datum, titel: e.titel, cent: e.cent, farbe: null, buchung: null }));
+  if (!einzeln.length) return null;
   return (
     <>
-      <h3 className="mb-1.5 mt-5 text-[13px] font-semibold uppercase tracking-wide text-tinte-leise">Einzelne Termine</h3>
-      <ul className="grid gap-1">
-        {[...termine].reverse().map((t) => (
-          <li key={t.datum} className="flex items-baseline gap-3 rounded-xl px-1 py-1.5 text-[14px]">
-            <span className="min-w-0 flex-1 truncate">{tagKurz(t.datum)}</span>
-            {t.ein_cent > 0 && t.aus_cent > 0 && (
-              <span className="zahl shrink-0 text-[12px] text-tinte-leise">
-                {euroKurz(t.ein_cent)} − {euroKurz(t.aus_cent)}
-              </span>
-            )}
-            <Vorzeichen cent={t.ein_cent - t.aus_cent} className="shrink-0 font-bold" />
-          </li>
-        ))}
-      </ul>
-    </>
-  );
-}
-
-/** Kassenwart: Betrag + Tag → fertig. Einzelne Termine oder alles auf einmal. */
-function Hinzufuegen({ p, fin }: { p: FinanzPosten; fin: FinanzenValue }) {
-  const moeglich = seiten(p);
-  const [seite, setSeite] = useState<"ein" | "aus">(moeglich[0] ?? "ein");
-  const [betrag, setBetrag] = useState("");
-  const [datum, setDatum] = useState(heute());
-  const [busy, setBusy] = useState(false);
-  const [ok, setOk] = useState(false);
-  useEffect(() => {
-    setSeite(moeglich[0] ?? "ein");
-    setBetrag("");
-  }, [postenKey(p)]); // eslint-disable-line react-hooks/exhaustive-deps
-  if (!moeglich.length) return null;
-
-  async function los() {
-    const c = centAus(betrag);
-    if (!c || c <= 0) return meldeFehler("Bitte einen Betrag über 0 eingeben.");
-    setBusy(true);
-    const f = await fin.buchen(buchungFuer(p, seite, c, datum));
-    setBusy(false);
-    if (f) return meldeFehler("Hat nicht geklappt: " + f);
-    setBetrag("");
-    setOk(true);
-    setTimeout(() => setOk(false), 1500);
-  }
-
-  const aus = seite === "aus";
-  return (
-    <div className="mt-5">
-      {moeglich.length > 1 && (
-        <div className="seg mb-2" role="radiogroup" aria-label="Einnahme oder Ausgabe">
-          <button role="radio" aria-checked={!aus} onClick={() => setSeite("ein")} className={`seg-item !py-2 !text-[14px] ${!aus ? "seg-aktiv !text-bezahlt" : ""}`}>
-            ＋ Einnahme
-          </button>
-          <button role="radio" aria-checked={aus} onClick={() => setSeite("aus")} className={`seg-item !py-2 !text-[14px] ${aus ? "seg-aktiv !text-red-600 dark:!text-red-400" : ""}`}>
-            − Ausgabe
-          </button>
-        </div>
-      )}
-      <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,9.5rem)] gap-2">
-        <div className="flex min-w-0 items-center gap-1 rounded-xl bg-[rgb(118_118_128/0.12)] px-3 dark:bg-[rgb(118_118_128/0.24)]">
-          <span className={`zahl text-[1.1rem] font-bold ${aus ? "text-red-600 dark:text-red-400" : "text-bezahlt"}`}>{aus ? "−" : "+"}</span>
-          <input
-            className="zahl min-w-0 flex-1 bg-transparent py-2.5 text-[1.1rem] font-bold outline-none"
-            inputMode="decimal"
-            placeholder="0,00"
-            aria-label="Betrag in Euro"
-            value={betrag}
-            onChange={(e) => setBetrag(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && void los()}
-          />
-          <span className="font-bold text-tinte-matt">€</span>
-        </div>
-        <input type="date" aria-label="Tag" className="field h-full min-w-0" value={datum} onChange={(e) => setDatum(e.target.value)} />
-      </div>
-      <button disabled={busy} onClick={() => void los()} className="btn-primary mt-2 disabled:opacity-50">
-        {busy ? "…" : ok ? "✓ Hinzugefügt" : aus ? "Ausgabe hinzufügen" : "Einnahme hinzufügen"}
-      </button>
-    </div>
-  );
-}
-
-/** Kassenwart: die einzelnen Buchungen des Postens, mit Löschen. */
-function Eintraege({ buchungen, fin }: { buchungen: Buchung[]; fin: FinanzenValue }) {
-  if (!buchungen.length) return null;
-  const liste = [...buchungen].sort((a, b) => (a.datum < b.datum ? 1 : a.datum > b.datum ? -1 : a.created_at < b.created_at ? 1 : -1));
-  return (
-    <>
-      <h3 className="mb-1.5 mt-5 text-[13px] font-semibold uppercase tracking-wide text-tinte-leise">
-        {liste.length === 1 ? "Eintrag" : `${liste.length} Einträge`}
+      <h3 className="mb-1 mt-5 text-[13px] font-semibold uppercase tracking-wide text-tinte-leise">
+        {einzeln.length === 1 ? "Eintrag" : `${einzeln.length} Einträge`}
       </h3>
-      <ul className="grid gap-1">
-        {liste.map((b) => (
-          <li key={b.id} className="flex items-center gap-2 rounded-xl px-1 py-1 text-[14px]">
+      <ul className="divide-y divide-papier-linie dark:divide-slate-800">
+        {einzeln.map((e) => (
+          <li key={e.key} className="flex items-center gap-2.5 py-2">
+            {e.farbe && <Punkt hex={farbHex(e.farbe, dunkel)} />}
             <span className="min-w-0 flex-1">
-              <span className="block truncate">{tagKurz(b.datum)}</span>
+              <span className="block truncate text-[14px] font-semibold">{e.titel}</span>
+              <span className="block text-[12px] text-tinte-leise">{tagKurz(e.datum)}</span>
             </span>
-            <Vorzeichen cent={b.cent} neutral className="shrink-0 font-bold" />
-            {!b.automatisch && b.quelle !== "abgleich" ? (
+            <Betrag cent={e.cent} className="shrink-0 text-[14px] font-bold" />
+            {fin && e.buchung && !e.buchung.automatisch && e.buchung.quelle !== "abgleich" && (
               <button
                 type="button"
                 aria-label="Eintrag löschen"
                 onClick={async () => {
-                  if (!(await frage(`Eintrag vom ${tagKurz(b.datum)} über ${euro(Math.abs(b.cent))} löschen?`, "Löschen", true))) return;
-                  const f = await fin.loeschen(b.id);
+                  if (!(await frage(`„${e.titel}“ (${mitVorzeichen(e.cent)}) löschen?`, "Löschen", true))) return;
+                  const f = await fin.loeschen(e.buchung!.id);
                   if (f) meldeFehler("Löschen hat nicht geklappt: " + f);
                 }}
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-tinte-leise active:bg-papier-matt dark:active:bg-slate-800"
+                className="-mr-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-tinte-leise active:bg-papier-matt dark:active:bg-slate-800"
               >
                 <Icon name="muell" size={16} />
               </button>
-            ) : (
-              <span className="h-8 w-8 shrink-0" />
             )}
           </li>
         ))}
@@ -488,7 +399,7 @@ function Eintraege({ buchungen, fin }: { buchungen: Buchung[]; fin: FinanzenValu
   );
 }
 
-/** Name und Farbe ändern. Eine Aktion bekommt dabei einen eigenen Posten mit Farbe. */
+/** Name und Farbe ändern. Eine Aktion bekommt dabei eine eigene Kategorie mit Farbe. */
 function Bearbeiten({
   p, fin, onFertig, onUmgezogen, onGeloescht,
 }: {
@@ -509,7 +420,7 @@ function Bearbeiten({
     if (r.typ === "kategorie") {
       f = await fin.kategorieSpeichern({ id: r.id, name, farbe, art: r.art });
     } else {
-      // Aktion → eigener Posten mit Farbe; die bisherigen Buchungen ziehen mit
+      // Aktion → eigene Kategorie mit Farbe; die bisherigen Buchungen ziehen mit
       const neu = await fin.postenAnlegen(name, farbe);
       f = neu.fehler;
       if (neu.id) {
@@ -540,9 +451,9 @@ function Bearbeiten({
         {r.typ === "kategorie" && (
           <button
             type="button"
-            aria-label="Posten löschen"
+            aria-label="Kategorie löschen"
             onClick={async () => {
-              if (!(await frage(`„${p.titel}“ löschen? Die Einträge bleiben im Kassenbuch, nur ohne Posten.`, "Löschen", true))) return;
+              if (!(await frage(`„${p.titel}“ löschen? Die Einträge bleiben im Kassenbuch, nur ohne Kategorie.`, "Löschen", true))) return;
               const f = await fin.kategorieLoeschen(r.id);
               if (f) return meldeFehler("Löschen hat nicht geklappt: " + f);
               onGeloescht();
@@ -557,42 +468,36 @@ function Bearbeiten({
   );
 }
 
-/** Neuer Posten: Name + Farbe, sonst nichts. Danach öffnet er sich zum Füllen. */
-function NeuSheet({
-  bereich, fin, onClose, onAngelegt,
-}: {
-  bereich: "ein" | "aus" | null;
-  fin: FinanzenValue;
-  onClose: () => void;
-  onAngelegt: (id: string) => void;
-}) {
-  const vorschlag = useMemo(() => {
-    const belegt = new Set(fin.kategorien.map((k) => k.farbe));
-    return KASSEN_FARBEN.find((f) => !["blau", "grau"].includes(f.key) && !belegt.has(f.key))?.key ?? "orange";
-  }, [fin.kategorien]);
+function freieFarbe(fin: FinanzenValue): string {
+  const belegt = new Set(fin.kategorien.map((k) => k.farbe));
+  return KASSEN_FARBEN.find((f) => !["blau", "grau"].includes(f.key) && !belegt.has(f.key))?.key ?? "orange";
+}
+
+/** Neue Kategorie: Name + Farbe, sonst nichts. Danach öffnet sie sich. */
+function NeuSheet({ open, fin, onClose, onAngelegt }: { open: boolean; fin: FinanzenValue; onClose: () => void; onAngelegt: (id: string) => void }) {
   const [name, setName] = useState("");
-  const [farbe, setFarbe] = useState(vorschlag);
+  const [farbe, setFarbe] = useState("orange");
   const [busy, setBusy] = useState(false);
   useEffect(() => {
-    if (!bereich) return;
+    if (!open) return;
     setName("");
-    setFarbe(bereich === "aus" ? "lila" : vorschlag);
-  }, [bereich]); // eslint-disable-line react-hooks/exhaustive-deps
+    setFarbe(freieFarbe(fin));
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function anlegen() {
     setBusy(true);
-    const r = await fin.postenAnlegen(name, farbe, bereich === "aus" ? "aus" : "beide");
+    const r = await fin.postenAnlegen(name, farbe, "beide");
     setBusy(false);
     if (r.fehler) return meldeFehler(r.fehler);
     if (r.id) onAngelegt(r.id);
   }
 
   return (
-    <Sheet open={bereich !== null} onClose={onClose}>
-      <SheetKopf titel={bereich === "aus" ? "Neue Ausgabe" : "Neue Aktion"} onClose={onClose} />
+    <Sheet open={open} onClose={onClose}>
+      <SheetKopf titel="Neue Kategorie" onClose={onClose} />
       <input
         className="field"
-        placeholder={bereich === "aus" ? "z. B. Deko, Druck" : "z. B. Lehrerkarten, Kuchenverkauf"}
+        placeholder="z. B. Lehrerkarten, Kuchenverkauf"
         maxLength={40}
         value={name}
         autoFocus
@@ -601,7 +506,197 @@ function NeuSheet({
       />
       <FarbWahl wert={farbe} setzen={setFarbe} />
       <button disabled={busy || !name.trim()} onClick={() => void anlegen()} className="btn-primary mt-4 disabled:opacity-40">
-        {busy ? "…" : "Weiter"}
+        {busy ? "…" : "Anlegen"}
+      </button>
+    </Sheet>
+  );
+}
+
+// ==================================================================== Buchen
+
+const heute = () => new Date().toISOString().slice(0, 10);
+
+/**
+ * Eine Einnahme oder Ausgabe buchen – überall dasselbe Formular:
+ * Betrag → Wofür (Kategorie, Sonstiges oder neue Kategorie) → Bezeichnung → Tag.
+ * Die Farbe kommt von der Kategorie und lässt sich für diesen Eintrag ändern.
+ */
+export function BuchungSheet({ start, fin, onClose }: { start: BuchungStart | null; fin: FinanzenValue; onClose: () => void }) {
+  const dunkel = useDunkel();
+  const [typ, setTyp] = useState<"ein" | "aus">("ein");
+  const [betrag, setBetrag] = useState("");
+  const [wahl, setWahl] = useState<string>(""); // "k:<id>" | "sonstiges" | "ref"
+  const [titel, setTitel] = useState("");
+  const [datum, setDatum] = useState(heute());
+  const [farbe, setFarbe] = useState<string | null>(null); // null = wie die Kategorie
+  const [farbeOffen, setFarbeOffen] = useState(false);
+  const [neuOffen, setNeuOffen] = useState(false);
+  const [neuName, setNeuName] = useState("");
+  const [neuFarbe, setNeuFarbe] = useState("orange");
+  const [busy, setBusy] = useState(false);
+  const [fehler, setFehler] = useState("");
+
+  useEffect(() => {
+    if (!start) return;
+    setTyp(start.typ);
+    setBetrag("");
+    setTitel("");
+    setDatum(heute());
+    setFarbe(null);
+    setFarbeOffen(false);
+    setNeuOffen(false);
+    setFehler("");
+    const r = start.ref;
+    setWahl(!r ? "" : r.typ === "kategorie" ? `k:${r.id}` : r.typ === "sonstiges" ? "sonstiges" : "ref");
+  }, [start]);
+
+  const aus = typ === "aus";
+  const kategorien = fin.kategorien.filter((k) => k.art === "beide" || k.art === typ || wahl === `k:${k.id}`);
+  const refFremd = start?.ref && start.ref.typ !== "kategorie" && start.ref.typ !== "sonstiges" ? start.ref : null;
+  const kat = wahl.startsWith("k:") ? fin.kategorien.find((k) => `k:${k.id}` === wahl) : null;
+  const vorschlag = kat ? kat.farbe : wahl === "sonstiges" ? "grau" : refFremd?.typ === "komitee" ? "lila" : refFremd ? "orange" : null;
+  const farbeJetzt = farbe ?? vorschlag;
+
+  async function neueKategorie() {
+    const r = await fin.postenAnlegen(neuName, neuFarbe, "beide");
+    if (r.fehler) return setFehler(r.fehler);
+    if (r.id) {
+      setWahl(`k:${r.id}`);
+      setFarbe(null);
+      setNeuOffen(false);
+      setNeuName("");
+    }
+  }
+
+  async function speichern() {
+    setFehler("");
+    const c = centAus(betrag);
+    if (!c || c <= 0) return setFehler("Bitte einen Betrag über 0 eingeben.");
+    if (!wahl) return setFehler("Wofür? Bitte eine Kategorie oder Sonstiges wählen.");
+    if (!titel.trim()) return setFehler("Bitte eine Bezeichnung eingeben.");
+    const cent = aus ? -c : c;
+    const q = (ein: Quelle): Quelle => (aus ? "ausgabe" : ein);
+    let b: Parameters<FinanzenValue["buchen"]>[0];
+    if (kat) b = { datum, cent, quelle: q("aktion"), titel, kategorie_id: kat.id };
+    else if (wahl === "sonstiges") b = { datum, cent, quelle: q("sonstiges"), titel };
+    else if (refFremd?.typ === "aktion") b = { datum, cent, quelle: q("aktion"), titel, aktion_id: refFremd.id };
+    else if (refFremd?.typ === "komitee") b = { datum, cent, quelle: "ausgabe", titel, komitee: refFremd.komitee };
+    else if (refFremd?.typ === "spende") b = { datum, cent, quelle: "spende", titel };
+    else b = { datum, cent, quelle: q("sonstiges"), titel };
+    // Eigene Farbe nur, wenn sie vom Vorschlag abweicht
+    if (farbe && farbe !== vorschlag) b.farbe = farbe;
+    setBusy(true);
+    const f = await fin.buchen(b);
+    setBusy(false);
+    if (f) return setFehler("Hat nicht geklappt: " + f);
+    onClose();
+  }
+
+  const chip = (aktiv: boolean) =>
+    `flex items-center gap-1.5 rounded-full border px-3 py-2 text-[14px] font-semibold transition active:scale-95 ${
+      aktiv ? "border-brand bg-brand/10 text-tinte dark:text-white" : "border-papier-linie dark:border-slate-700"
+    }`;
+
+  return (
+    <Sheet open={start !== null} onClose={onClose}>
+      <SheetKopf titel={aus ? "Ausgabe" : "Einnahme"} onClose={onClose} />
+
+      <div className="seg" role="radiogroup" aria-label="Einnahme oder Ausgabe">
+        <button role="radio" aria-checked={!aus} onClick={() => setTyp("ein")} className={`seg-item !py-2 !text-[14px] ${!aus ? "seg-aktiv !text-bezahlt" : ""}`}>
+          + Einnahme
+        </button>
+        <button role="radio" aria-checked={aus} onClick={() => setTyp("aus")} className={`seg-item !py-2 !text-[14px] ${aus ? "seg-aktiv !text-red-600 dark:!text-red-400" : ""}`}>
+          − Ausgabe
+        </button>
+      </div>
+
+      <div className="mt-3 flex items-center gap-1 rounded-2xl bg-[rgb(118_118_128/0.12)] px-4 dark:bg-[rgb(118_118_128/0.24)]">
+        <span className={`zahl text-[1.6rem] font-bold ${aus ? "text-red-600 dark:text-red-400" : "text-bezahlt"}`}>{aus ? "−" : "+"}</span>
+        <input
+          className="zahl min-w-0 flex-1 bg-transparent py-3 text-[1.75rem] font-bold outline-none"
+          inputMode="decimal"
+          placeholder="0,00"
+          aria-label="Betrag in Euro"
+          value={betrag}
+          onChange={(e) => setBetrag(e.target.value)}
+        />
+        <span className="text-xl font-bold text-tinte-matt">€</span>
+      </div>
+
+      <div className="mt-4 text-[13px] font-semibold text-tinte-leise">Wofür?</div>
+      <div className="mt-1.5 flex flex-wrap gap-1.5" role="radiogroup" aria-label="Wofür">
+        {refFremd && (
+          <button type="button" role="radio" aria-checked={wahl === "ref"} onClick={() => { setWahl("ref"); setFarbe(null); }} className={chip(wahl === "ref")}>
+            <Punkt hex={farbHex(refFremd.typ === "komitee" ? "lila" : "orange", dunkel)} />
+            {start?.name}
+          </button>
+        )}
+        {kategorien.map((k) => (
+          <button type="button" role="radio" aria-checked={wahl === `k:${k.id}`} key={k.id} onClick={() => { setWahl(`k:${k.id}`); setFarbe(null); }} className={chip(wahl === `k:${k.id}`)}>
+            <Punkt hex={farbHex(k.farbe, dunkel)} />
+            {k.name}
+          </button>
+        ))}
+        <button type="button" role="radio" aria-checked={wahl === "sonstiges"} onClick={() => { setWahl("sonstiges"); setFarbe(null); }} className={chip(wahl === "sonstiges")}>
+          <Punkt hex={farbHex("grau", dunkel)} />
+          Sonstiges
+        </button>
+        {!neuOffen && (
+          <button
+            type="button"
+            onClick={() => { setNeuOffen(true); setNeuFarbe(freieFarbe(fin)); }}
+            className="flex items-center gap-1 rounded-full px-3 py-2 text-[14px] font-bold text-brand"
+          >
+            <Icon name="plus" size={14} strich={2.4} />
+            Neue Kategorie
+          </button>
+        )}
+      </div>
+      {neuOffen && (
+        <div className="mt-2 rounded-2xl border border-papier-linie p-2.5 dark:border-slate-700">
+          <input className="field" placeholder="z. B. Lehrerkarten" maxLength={40} value={neuName} autoFocus onChange={(e) => setNeuName(e.target.value)} />
+          <FarbWahl wert={neuFarbe} setzen={setNeuFarbe} />
+          <div className="mt-2 flex gap-2">
+            <button type="button" disabled={!neuName.trim()} onClick={() => void neueKategorie()} className="flex-1 rounded-xl bg-brand py-2 text-[14px] font-bold text-white disabled:opacity-40">
+              Anlegen
+            </button>
+            <button type="button" onClick={() => setNeuOffen(false)} className="rounded-xl px-3 text-[14px] font-semibold text-tinte-leise">
+              Abbrechen
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className="mt-4 text-[13px] font-semibold text-tinte-leise">Bezeichnung</div>
+      <input
+        className="field mt-1.5"
+        placeholder={aus ? "z. B. Verpackungsmaterial" : "z. B. Verkauf 2. Pause"}
+        maxLength={80}
+        value={titel}
+        onChange={(e) => setTitel(e.target.value)}
+        onKeyDown={(e) => e.key === "Enter" && void speichern()}
+      />
+      <p className="mt-1 text-[12px] text-tinte-leise">Für alle sichtbar – bitte keine Namen.</p>
+
+      <div className="mt-3 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-2">
+        <input type="date" aria-label="Tag" className="field h-12 min-w-0" value={datum} onChange={(e) => setDatum(e.target.value)} />
+        <button
+          type="button"
+          disabled={!farbeJetzt}
+          onClick={() => setFarbeOffen(!farbeOffen)}
+          className="flex h-12 min-w-0 items-center gap-2 rounded-xl bg-[rgb(118_118_128/0.12)] px-3 text-[14px] font-semibold disabled:opacity-40 dark:bg-[rgb(118_118_128/0.24)]"
+          aria-expanded={farbeOffen}
+        >
+          <span className="h-5 w-5 shrink-0 rounded-full" style={{ background: farbeJetzt ? farbHex(farbeJetzt, dunkel) : "transparent" }} />
+          <span className="min-w-0 flex-1 truncate text-left">Farbe</span>
+          <span className="text-[13px] font-bold text-brand">{farbeOffen ? "fertig" : "ändern"}</span>
+        </button>
+      </div>
+      {farbeOffen && farbeJetzt && <FarbWahl wert={farbeJetzt} setzen={(f) => setFarbe(f)} />}
+
+      {fehler && <p className="mt-2 text-[13px] font-semibold text-amber-600">{fehler}</p>}
+      <button disabled={busy} onClick={() => void speichern()} className="btn-primary mt-4 disabled:opacity-50">
+        {busy ? "…" : aus ? "Ausgabe buchen" : "Einnahme buchen"}
       </button>
     </Sheet>
   );
@@ -630,11 +725,230 @@ export function FarbWahl({ wert, setzen }: { wert: string; setzen: (f: string) =
   );
 }
 
+// ==================================================================== Geplante Aktionen
+
+const heuteKey = () => new Date().toISOString().slice(0, 10);
+
+function GeplantKarte({ darf, fin }: { darf: boolean; fin: FinanzenValue | null }) {
+  const dunkel = useDunkel();
+  const { liste, speichern, loeschen } = useGeplant(true);
+  const [offen, setOffen] = useState<KassenGeplant | "neu" | null>(null);
+  const h = heuteKey();
+  // Vorbei ist vorbei – nur der Kassenwart sieht sie noch (zum Aufräumen)
+  const sichtbar = liste.filter((g) => darf || !g.datum || g.datum >= h);
+  const katFarbe = (id: string | null) => fin?.kategorien.find((k) => k.id === id)?.farbe ?? null;
+
+  return (
+    <section className="card p-5">
+      <BereichKopf titel="Geplante Aktionen" onNeu={darf ? () => setOffen("neu") : undefined} />
+      {sichtbar.length === 0 ? (
+        <p className="text-[13px] text-tinte-leise">Gerade ist nichts geplant.</p>
+      ) : (
+        <ul className="grid gap-1.5">
+          {sichtbar.map((g) => {
+            const vorbei = Boolean(g.datum && g.datum < h);
+            const d = g.datum ? new Date(g.datum + "T12:00:00") : null;
+            const f = katFarbe(g.kategorie_id);
+            return (
+              <li key={g.id}>
+                <button
+                  type="button"
+                  onClick={() => setOffen(g)}
+                  className={`flex w-full items-center gap-3 rounded-xl bg-papier-matt px-3 py-2.5 text-left transition active:scale-[.98] dark:bg-slate-800 ${vorbei ? "opacity-60" : ""}`}
+                >
+                  <span className="flex w-11 shrink-0 flex-col items-center rounded-lg bg-white py-1 leading-none dark:bg-slate-900">
+                    <span className="text-[10px] font-bold uppercase text-red-600 dark:text-red-400">
+                      {d ? d.toLocaleDateString("de-DE", { month: "short" }).replace(".", "") : "–"}
+                    </span>
+                    <span className="zahl mt-0.5 text-[17px] font-bold">{d ? d.getDate() : "?"}</span>
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="flex items-center gap-1.5">
+                      {f && <Punkt hex={farbHex(f, dunkel)} />}
+                      <span className="truncate text-[14px] font-semibold">{g.titel}</span>
+                    </span>
+                    <span className="block truncate text-[12px] text-tinte-leise">
+                      {[
+                        vorbei ? "vorbei" : null,
+                        g.erwartet_cent ? `ca. ${mitVorzeichen(g.erwartet_cent, true)}` : null,
+                        g.info || (!vorbei && d ? d.toLocaleDateString("de-DE", { weekday: "long" }) : null),
+                      ].filter(Boolean).join(" · ") || "Tag noch offen"}
+                    </span>
+                  </span>
+                  <span className="shrink-0 text-tinte-leise" aria-hidden>
+                    <Icon name="info" size={17} />
+                  </span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      <GeplantSheet
+        g={offen}
+        darf={darf}
+        fin={fin}
+        onClose={() => setOffen(null)}
+        onSpeichern={speichern}
+        onLoeschen={loeschen}
+      />
+    </section>
+  );
+}
+
+function GeplantSheet({
+  g, darf, fin, onClose, onSpeichern, onLoeschen,
+}: {
+  g: KassenGeplant | "neu" | null;
+  darf: boolean;
+  fin: FinanzenValue | null;
+  onClose: () => void;
+  onSpeichern: (g: Omit<KassenGeplant, "id"> & { id?: string }) => Promise<string | null>;
+  onLoeschen: (id: string) => Promise<string | null>;
+}) {
+  const dunkel = useDunkel();
+  const [titel, setTitel] = useState("");
+  const [datum, setDatum] = useState("");
+  const [info, setInfo] = useState("");
+  const [betrag, setBetrag] = useState("");
+  const [kategorie, setKategorie] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const letzter = useRef<KassenGeplant | "neu" | null>(null);
+  if (g) letzter.current = g;
+  const x = g ?? letzter.current;
+  const bestehend = x && x !== "neu" ? x : null;
+
+  useEffect(() => {
+    if (!g) return;
+    const v = g === "neu" ? null : g;
+    setTitel(v?.titel ?? "");
+    setDatum(v?.datum ?? "");
+    setInfo(v?.info ?? "");
+    setBetrag(v?.erwartet_cent ? String(v.erwartet_cent / 100).replace(".", ",") : "");
+    setKategorie(v?.kategorie_id ?? null);
+  }, [g]);
+
+  const kategorien = useMemo(() => fin?.kategorien ?? [], [fin]);
+
+  if (!x) return null;
+
+  // Nur lesen
+  if (!darf && bestehend) {
+    const d = bestehend.datum ? new Date(bestehend.datum + "T12:00:00") : null;
+    return (
+      <Sheet open={g !== null} onClose={onClose}>
+        <SheetKopf
+          titel={bestehend.titel}
+          unter={d ? d.toLocaleDateString("de-DE", { weekday: "long", day: "numeric", month: "long", year: "numeric" }) : "Tag noch offen"}
+          onClose={onClose}
+        />
+        {bestehend.erwartet_cent != null && bestehend.erwartet_cent !== 0 && (
+          <div className="mb-3 flex items-baseline gap-3 rounded-2xl bg-papier-matt p-4 dark:bg-slate-800">
+            <span className="min-w-0 flex-1 text-[15px] font-semibold">Erwartet</span>
+            <span className="zahl shrink-0 text-[1.4rem] font-bold">ca. {mitVorzeichen(bestehend.erwartet_cent)}</span>
+          </div>
+        )}
+        {bestehend.info ? (
+          <p className="whitespace-pre-line text-[15px] leading-relaxed">{bestehend.info}</p>
+        ) : (
+          <p className="text-[14px] text-tinte-leise">Noch keine weiteren Infos.</p>
+        )}
+      </Sheet>
+    );
+  }
+
+  async function speichern() {
+    setBusy(true);
+    const c = betrag.trim() ? centAus(betrag.replace(/^\+/, "")) : null;
+    const f = await onSpeichern({
+      id: bestehend?.id,
+      titel,
+      datum: datum || null,
+      info,
+      erwartet_cent: c,
+      kategorie_id: kategorie,
+    });
+    setBusy(false);
+    if (f) return meldeFehler(f);
+    onClose();
+  }
+
+  return (
+    <Sheet open={g !== null} onClose={onClose}>
+      <SheetKopf titel={bestehend ? "Geplante Aktion" : "Neue geplante Aktion"} onClose={onClose} />
+      <input className="field" placeholder="Titel, z. B. Lehrerkarten Winter" maxLength={80} value={titel} autoFocus={!bestehend} onChange={(e) => setTitel(e.target.value)} />
+      <div className="mt-2 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-2">
+        <input type="date" aria-label="Tag" className="field h-12 min-w-0" value={datum} onChange={(e) => setDatum(e.target.value)} />
+        <div className="flex h-12 min-w-0 items-center gap-1 rounded-xl bg-[rgb(118_118_128/0.12)] px-3 dark:bg-[rgb(118_118_128/0.24)]">
+          <span className="text-[13px] font-semibold text-tinte-leise">ca.</span>
+          <input
+            className="zahl min-w-0 flex-1 bg-transparent text-[16px] font-bold outline-none"
+            inputMode="decimal"
+            placeholder="Betrag"
+            aria-label="Erwarteter Betrag in Euro (freiwillig, Minus für Ausgaben)"
+            value={betrag}
+            onChange={(e) => setBetrag(e.target.value)}
+          />
+          <span className="font-bold text-tinte-matt">€</span>
+        </div>
+      </div>
+      <textarea
+        className="field mt-2 min-h-[5.5rem] resize-y"
+        placeholder="Infos (freiwillig): wo, wer macht mit, was fehlt noch …"
+        maxLength={1000}
+        value={info}
+        onChange={(e) => setInfo(e.target.value)}
+      />
+      {kategorien.length > 0 && (
+        <>
+          <div className="mt-3 text-[13px] font-semibold text-tinte-leise">Kategorie (freiwillig)</div>
+          <div className="mt-1.5 flex flex-wrap gap-1.5">
+            {kategorien.map((k) => (
+              <button
+                type="button"
+                key={k.id}
+                aria-pressed={kategorie === k.id}
+                onClick={() => setKategorie(kategorie === k.id ? null : k.id)}
+                className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[13px] font-semibold ${
+                  kategorie === k.id ? "border-brand bg-brand/10" : "border-papier-linie dark:border-slate-700"
+                }`}
+              >
+                <Punkt hex={farbHex(k.farbe, dunkel)} />
+                {k.name}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+      <div className="mt-4 flex items-center gap-2">
+        <button disabled={busy || !titel.trim()} onClick={() => void speichern()} className="btn-primary disabled:opacity-40">
+          {busy ? "…" : "Speichern"}
+        </button>
+        {bestehend && (
+          <button
+            type="button"
+            aria-label="Geplante Aktion löschen"
+            onClick={async () => {
+              if (!(await frage(`„${bestehend.titel}“ aus der Planung löschen?`, "Löschen", true))) return;
+              const f = await onLoeschen(bestehend.id);
+              if (f) return meldeFehler("Löschen hat nicht geklappt: " + f);
+              onClose();
+            }}
+            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-red-500"
+          >
+            <Icon name="muell" size={19} />
+          </button>
+        )}
+      </div>
+    </Sheet>
+  );
+}
+
 // ==================================================================== Kennzahlen
 
 /**
- * Einnahmen und Ausgaben als zwei ruhige Kacheln, darunter eine Zeile für die
- * offenen Elternbeiträge – statt dreier gequetschter Kacheln auf dem Handy.
+ * Einnahmen (+) und Ausgaben (−) als zwei ruhige Kacheln, darunter eine
+ * Zeile für die offenen Elternbeiträge.
  */
 export function Kennzahlen({
   ein, aus, offen,
@@ -646,8 +960,8 @@ export function Kennzahlen({
   return (
     <div className="mt-4 grid gap-2">
       <dl className="grid grid-cols-2 gap-2">
-        <Kachel icon="pfeil-rein" titel="Einnahmen" wert={euroKurz(ein)} />
-        <Kachel icon="pfeil-raus" titel="Ausgaben" wert={euroKurz(aus)} />
+        <Kachel icon="pfeil-rein" titel="Einnahmen" wert={mitVorzeichen(ein, true)} />
+        <Kachel icon="pfeil-raus" titel="Ausgaben" wert={mitVorzeichen(-aus, true)} />
       </dl>
       {offen && (
         <div className="flex items-center gap-3 rounded-xl bg-papier-matt px-3 py-2.5 dark:bg-slate-800">

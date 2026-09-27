@@ -6,13 +6,6 @@ import { abonniere } from "./lib/realtime";
 import { pushAnPersonen } from "./lib/push";
 
 import { hinweis, meldeFehler } from "./lib/melder";
-/** Text zu einem geänderten Halbjahr – nur bezahlt/erlassen wird gemeldet. */
-function zahlText(vorname: string, h: string, status: string): { title: string; body: string } | null {
-  if (status === "bezahlt") return { title: `✓ ${h} bezahlt`, body: `Der Stufenbeitrag für ${h} (${vorname}) ist als bezahlt eingetragen. Danke!` };
-  if (status === "erlassen") return { title: `${h} erlassen`, body: `Der Stufenbeitrag für ${h} (${vorname}) wurde erlassen.` };
-  return null;
-}
-
 function hilfeText(c: Contribution, alle: Student[]): { student_id: string; title: string; body: string } {
   const v = alle.find((s) => s.id === c.student_id)?.vorname || "";
   return {
@@ -446,17 +439,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const setTerm: StoreValue["setTerm"] = useCallback(
     (id, h, status) => {
-      const vorher = studentsRef.current.find((s) => s.id === id);
       mutate(
         id,
         (s) => ({ ...s, terms: { ...s.terms, [h]: { status } } }),
         (s) => ({ terms: s.terms }),
       );
-      // Schüler und Eltern bekommen Bescheid, wenn eine Zahlung eingetragen wird
-      const t = vorher && vorher.terms?.[h]?.status !== status ? zahlText(vorher.vorname, h, status) : null;
-      if (t && mode === "supabase") void pushAnPersonen([{ student_id: id, ...t }]);
+      // Keine Mitteilung bei Zahlungen/Buchungen (Wunsch 28.09.) – der Stand
+      // ist in der App sichtbar, das reicht.
     },
-    [mutate, mode],
+    [mutate],
   );
 
   const addContribution: StoreValue["addContribution"] = useCallback(
@@ -603,18 +594,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         merkeEigeneAenderung(`student:${id}`, cols);
         patchCols(id, cols);
       });
-      if (mode === "supabase") {
-        const meldungen = studentsRef.current
-          .filter((s) => map.has(s.id) && s.terms?.[h]?.status !== action)
-          .map((s) => {
-            const t = zahlText(s.vorname, h, action);
-            return t ? { student_id: s.id, ...t } : null;
-          })
-          .filter((x): x is { student_id: string; title: string; body: string } => Boolean(x));
-        void pushAnPersonen(meldungen);
-      }
+      // Keine Mitteilung bei Zahlungen/Buchungen (Wunsch 28.09.)
     },
-    [patchCols, mode],
+    [patchCols],
   );
 
   const exportData: StoreValue["exportData"] = useCallback(() => {

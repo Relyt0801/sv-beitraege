@@ -5,7 +5,7 @@
  * Strich quer durch den Ring (dunkel mit hellem Rand, damit er auf dem
  * gefüllten und dem leeren Teil gleich gut zu sehen ist). Der Strich der
  * aktuellen Stufe (aktuellAb) ist in der Markenfarbe wie die aktuelle
- * Kachel darunter und steht etwas über den Ring hinaus.
+ * Kachel darunter und etwas breiter. Kein Strich steht über den Ring hinaus.
  */
 export function Ring({
   pct, klein, stufen, aktuellAb,
@@ -15,10 +15,9 @@ export function Ring({
   stufen?: number[];
   aktuellAb?: number | null;
 }) {
-  const mitStrichen = Boolean(stufen?.length);
   const r = klein ? 26 : 34;
   const dicke = klein ? 7 : 9;
-  const rand = mitStrichen ? 4 : 0; // Platz für den überstehenden aktuellen Strich
+  const rand = 0; // die Striche bleiben im Ring – kein Platz außen nötig
   const groesse = (klein ? 68 : 88) + rand * 2;
   const mitte = groesse / 2;
   const umfang = 2 * Math.PI * r;
@@ -51,20 +50,20 @@ export function Ring({
           const cos = Math.cos(rad);
           const sin = Math.sin(rad);
           const aktuell = w === aktuellWinkel;
-          const ueber = aktuell ? 3 : 0.5;
+          // genau so lang wie der Ring dick ist – nichts steht über
           const pos = {
-            x1: mitte + (innen - ueber) * cos,
-            y1: mitte + (innen - ueber) * sin,
-            x2: mitte + (aussen + ueber) * cos,
-            y2: mitte + (aussen + ueber) * sin,
+            x1: mitte + innen * cos,
+            y1: mitte + innen * sin,
+            x2: mitte + aussen * cos,
+            y2: mitte + aussen * sin,
           };
           return (
             <g key={w}>
               {/* heller Rand in Kartenfarbe – trennt den Strich vom Ring */}
-              <line {...pos} strokeLinecap="round" strokeWidth={aktuell ? 6 : 4.5} className="stroke-white dark:stroke-slate-900" />
+              <line {...pos} strokeLinecap="butt" strokeWidth={aktuell ? 6 : 4.5} className="stroke-white dark:stroke-slate-900" />
               <line
                 {...pos}
-                strokeLinecap="round"
+                strokeLinecap="butt"
                 strokeWidth={aktuell ? 3 : 2}
                 className={aktuell ? "stroke-brand" : "stroke-tinte/70 dark:stroke-slate-300/80"}
               />

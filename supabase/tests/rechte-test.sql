@@ -1,7 +1,7 @@
 -- ============================================================
--- Rechte-Test: Wer darf was? (Stand 27.09.2026)
+-- Rechte-Test: Wer darf was? (Stand 28.09.2026)
 --
--- Spielt 131 Angriffe und erlaubte Aktionen mit echten Konten JEDER Rolle
+-- Spielt 136 Angriffe und erlaubte Aktionen mit echten Konten JEDER Rolle
 -- durch – direkt in der Datenbank, genau so, wie es ein Angreifer über die
 -- Schnittstelle versuchen würde (Rolle "authenticated" bzw. "anon" mit der
 -- Kennung der Person, Zugriffsregeln greifen wie in der App).
@@ -183,7 +183,13 @@ insert into faelle values
   ('schueler', 'Kassen-Kategorie anlegen', 'insert into kasse_kategorien(name,farbe) values (''x'',''rot'')', 'V'),
   ('eltern', 'Kassen-Kategorie anlegen', 'insert into kasse_kategorien(name,farbe) values (''x'',''rot'')', 'V'),
   ('anon', 'Kassen-Kategorie anlegen', 'insert into kasse_kategorien(name,farbe) values (''x'',''rot'')', 'V'),
-  ('kassenwart', 'Kassen-Kategorie anlegen', 'insert into kasse_kategorien(name,farbe) values (''x'',''rot'')', 'E');
+  ('kassenwart', 'Kassen-Kategorie anlegen', 'insert into kasse_kategorien(name,farbe) values (''x'',''rot'')', 'E'),
+  -- Geplante Aktionen (finanzen-geplant.sql): lesen alle mit Finanzen, eintragen nur Kassenbuch führen
+  ('schueler', 'Geplante Aktion eintragen', 'insert into kasse_geplant(titel) values (''x'')', 'V'),
+  ('eltern', 'Geplante Aktion eintragen', 'insert into kasse_geplant(titel) values (''x'')', 'V'),
+  ('anon', 'Geplante Aktion eintragen', 'insert into kasse_geplant(titel) values (''x'')', 'V'),
+  ('stufenteam', 'Geplante Aktion ändern', 'update kasse_geplant set titel=''x'' where true', 'V'),
+  ('kassenwart', 'Geplante Aktion eintragen', 'insert into kasse_geplant(titel) values (''x'')', 'E');
 
 create temp table erg (rolle text, fall text, erwartet text, ergebnis text, detail text) on commit drop;
 grant insert, select on erg to authenticated, anon;

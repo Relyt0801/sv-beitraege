@@ -18,6 +18,13 @@
 -- Beiträge und Sonstiges; 'aus' = reine Ausgaben) und Summen je Tag
 -- („einzelne Termine“) für die Detailansicht – nur Beträge und Tage, keine
 -- Namen, keine Bezeichnungen einzelner Buchungen.
+--
+-- Stand 28.09.: Ausgaben ohne Posten/Komitee zählen zu „Sonstiges“ (grau) –
+-- es gibt keinen eigenen Ausgaben-Bereich mehr. Statt Summen je Tag gibt es
+-- die Unterpunkte: Summen je Tag und Bezeichnung (die Bezeichnung ist beim
+-- Buchen Pflicht, z. B. „Verpackungsmaterial“ unter „Lehrerkarten“, und für
+-- alle sichtbar – darum beim Buchen der Hinweis „keine Namen“).
+-- Elternbeiträge (Namen im Titel) tauchen dort nie auf.
 -- =====================================================================
 
 create table if not exists public.kasse_kategorien (
@@ -41,6 +48,11 @@ create policy "kategorien pflegen" on public.kasse_kategorien for all to authent
 alter table public.kasse_buchungen
   add column if not exists kategorie_id uuid references public.kasse_kategorien(id) on delete set null;
 create index if not exists kasse_buchungen_kategorie_idx on public.kasse_buchungen (kategorie_id);
+
+-- Stand 28.09.: eigene Farbe je Buchung (null = Farbe der Kategorie).
+-- Vorgeschlagen wird die Farbe der Kategorie, man kann sie aber ändern.
+alter table public.kasse_buchungen
+  add column if not exists farbe text check (farbe is null or farbe ~ '^[a-z]{3,12}$');
 
 -- Live-Aktualisierung im Finanzen-Reiter
 do $$ begin
@@ -100,7 +112,7 @@ begin
         when b.quelle = 'spende' then 'spende'
         when b.quelle = 'sonstiges' then 'sonstiges'
         when b.komitee is not null then 'komitee'
-        else 'ausgabe'
+        else 'sonstiges'
       end as art,
       case
         when b.quelle = 'abgleich' then 'Sonstiges'
@@ -110,9 +122,12 @@ begin
         when b.quelle = 'spende' then 'Spenden'
         when b.quelle = 'sonstiges' then 'Sonstiges'
         when b.komitee is not null then b.komitee
-        else 'Sonstige Ausgaben'
+        else 'Sonstiges'
       end as titel,
-      case when k.id is not null then k.farbe when b.quelle in ('abgleich', 'sonstiges') then 'grau' end as farbe,
+      case when k.id is not null then k.farbe
+           when b.quelle in ('abgleich', 'sonstiges')
+             or (b.quelle = 'ausgabe' and b.komitee is null and b.aktion_id is null) then 'grau' end as farbe,
+      b.titel as bezeichnung,
       k.art as kart,
       case when k.id is not null then 'k:' || k.id::text
            when b.aktion_id is not null and b.quelle <> 'abgleich' then 'a:' || b.aktion_id::text end as gid,
@@ -151,14 +166,12 @@ begin
                'art', g.art, 'titel', g.titel, 'farbe', g.farbe,
                'bereich', case when g.art in ('komitee', 'ausgabe') or g.kart = 'aus' then 'aus' else 'ein' end,
                'ein_cent', g.ein, 'aus_cent', g.aus, 'anzahl', g.n, 'zuletzt', g.zuletzt,
-               'termine', (
-                 select jsonb_agg(jsonb_build_object('datum', t.datum, 'ein_cent', t.ein, 'aus_cent', t.aus) order by t.datum)
-                   from (select p.datum,
-                                coalesce(sum(p.cent) filter (where p.cent > 0), 0) as ein,
-                                coalesce(-sum(p.cent) filter (where p.cent < 0), 0) as aus
+               'eintraege', (
+                 select jsonb_agg(jsonb_build_object('datum', t.datum, 'titel', t.bezeichnung, 'cent', t.cent) order by t.datum desc, t.cent desc)
+                   from (select p.datum, p.bezeichnung, sum(p.cent) as cent
                            from posten p
                           where p.art = g.art and coalesce(p.gid, p.titel) = g.schluessel
-                          group by p.datum) t))
+                          group by p.datum, p.bezeichnung, sign(p.cent)) t))
              order by g.zuletzt desc)
         from gruppiert g), '[]'::jsonb)
   ) into ergebnis;

@@ -5,13 +5,13 @@ import { useTermine } from "../termine-store";
 import { useProfiles } from "../profiles-store";
 import { basisOffen } from "../lib/logic";
 import { FinanzStandard } from "./FinanzStandard";
-import { FarbWahl, Kennzahlen, PostenBereiche } from "./FinanzBereiche";
+import { BuchungSheet, FarbWahl, Kennzahlen, PostenBereiche } from "./FinanzBereiche";
 import { useNachschub } from "../lib/liste";
-import { COMMITTEES, committeeIcon, committeeLabel } from "../lib/committees";
+import { committeeIcon, committeeLabel } from "../lib/committees";
 import {
-  EINNAHME_QUELLEN, KASSEN_FARBEN, QUELLE_NAME, STANDARD_FARBE, buchungFarbe, centAus, euro, euroKurz, farbHex,
+  EINNAHME_QUELLEN, QUELLE_NAME, STANDARD_FARBE, buchungFarbe, centAus, euro, euroKurz, farbHex,
   uebersichtAus, useFinanzen,
-  type Buchung, type FinanzenValue, type KassenKategorie, type Quelle,
+  type Buchung, type FinanzenValue, type KassenKategorie,
 } from "../lib/finanzen";
 import type { KostenAnfrage, KostenValue } from "../lib/kosten";
 import { Sheet, SheetKopf } from "./Sheet";
@@ -192,14 +192,14 @@ export function FinanzenTab({ kosten }: { kosten: KostenValue }) {
               onClick={() => setBuchen("ein")}
               className="flex min-h-[3.125rem] items-center justify-center gap-1.5 rounded-full bg-bezahlt/[0.12] text-[16px] font-semibold text-bezahlt transition duration-200 ease-ios active:scale-[.97]"
             >
-              <Icon name="pfeil-rein" size={18} strich={2.2} />
+              <Icon name="plus" size={17} strich={2.4} />
               Einnahme
             </button>
             <button
               onClick={() => setBuchen("aus")}
               className="flex min-h-[3.125rem] items-center justify-center gap-1.5 rounded-full bg-red-500/[0.12] text-[16px] font-semibold text-red-600 transition duration-200 ease-ios active:scale-[.97] dark:text-red-400"
             >
-              <Icon name="pfeil-raus" size={18} strich={2.2} />
+              <span className="text-[20px] leading-none">−</span>
               Ausgabe
             </button>
           </div>
@@ -226,14 +226,7 @@ export function FinanzenTab({ kosten }: { kosten: KostenValue }) {
 
       {darfBuchen && (
         <>
-          <BuchungSheet
-            art={buchen}
-            onClose={() => setBuchen(null)}
-            onBuchen={fin.buchen}
-            aktionen={aktionen}
-            kategorien={fin.kategorien}
-            onKategorieNeu={fin.kategorieSpeichern}
-          />
+          <BuchungSheet start={buchen ? { typ: buchen } : null} fin={fin} onClose={() => setBuchen(null)} />
           <EinstellungenSheet
             open={einstellungen}
             onClose={() => setEinstellungen(false)}
@@ -359,240 +352,39 @@ function UebersichtKarte({
   );
 }
 
-// ==================================================================== Buchen
-
-/**
- * Eine Buchung in vier Angaben: Art, Betrag, Datum, wofür.
- * Die Beschreibung ist freiwillig – ohne steht dort die Zuordnung.
- */
-function BuchungSheet({
-  art, onClose, onBuchen, aktionen, kategorien, onKategorieNeu,
-}: {
-  art: "ein" | "aus" | null;
-  onClose: () => void;
-  onBuchen: FinanzenValue["buchen"];
-  aktionen: { id: string; titel: string; icon: string }[];
-  kategorien: KassenKategorie[];
-  onKategorieNeu: FinanzenValue["kategorieSpeichern"];
-}) {
-  const [kategorie, setKategorie] = useState<string | null>(null);
-  const [typ, setTyp] = useState<"ein" | "aus">("ein");
-  const [betrag, setBetrag] = useState("");
-  const [datum, setDatum] = useState(heute());
-  const [zu, setZu] = useState("");
-  const [titel, setTitel] = useState("");
-  const [fehler, setFehler] = useState("");
-  const [busy, setBusy] = useState(false);
-
-  useEffect(() => {
-    if (!art) return;
-    setTyp(art);
-    setBetrag("");
-    setDatum(heute());
-    setZu("");
-    setTitel("");
-    setFehler("");
-    setKategorie(null);
-  }, [art]);
-
-  // Zuordnung als "aktion:<id>", "komitee:<slug>" oder eine Quelle
-  function aufloesen(): { quelle: Quelle; aktion_id: string | null; komitee: string | null; name: string } | null {
-    if (!zu) return null;
-    const [k, v] = zu.split(":");
-    if (k === "aktion") {
-      const a = aktionen.find((x) => x.id === v);
-      return { quelle: typ === "aus" ? "ausgabe" : "aktion", aktion_id: v, komitee: null, name: a?.titel || "Aktion" };
-    }
-    if (k === "komitee")
-      return { quelle: typ === "aus" ? "ausgabe" : "sonstiges", aktion_id: null, komitee: v, name: committeeLabel(v) };
-    if (k === "spende" && typ !== "aus") return { quelle: "spende", aktion_id: null, komitee: null, name: "Spende" };
-    return { quelle: typ === "aus" ? "ausgabe" : "sonstiges", aktion_id: null, komitee: null, name: typ === "aus" ? "Ausgabe" : "Sonstiges" };
-  }
-
-  async function speichern() {
-    setFehler("");
-    const c = centAus(betrag);
-    if (!c || c <= 0) return setFehler("Bitte einen Betrag über 0 eingeben.");
-    const z = aufloesen();
-    if (!z) return setFehler("Wofür? Bitte eine Zuordnung wählen.");
-    setBusy(true);
-    const f = await onBuchen({
-      datum,
-      cent: typ === "aus" ? -c : c,
-      quelle: z.quelle,
-      titel: titel.trim() || z.name,
-      aktion_id: z.aktion_id,
-      komitee: z.komitee,
-      kategorie_id: kategorie,
-    });
-    setBusy(false);
-    if (f) return setFehler("Hat nicht geklappt: " + f);
-    onClose();
-  }
-
-  const seg = "seg-item !py-2 !text-[14px]";
-  const aus = typ === "aus";
-  return (
-    <Sheet open={art !== null} onClose={onClose}>
-      <SheetKopf titel="Neue Buchung" onClose={onClose} />
-
-      <div className="seg" role="radiogroup" aria-label="Art der Buchung">
-        <button role="radio" aria-checked={!aus} onClick={() => setTyp("ein")} className={`${seg} ${!aus ? "seg-aktiv !text-bezahlt" : ""}`}>
-          Einnahme
-        </button>
-        <button role="radio" aria-checked={aus} onClick={() => { setTyp("aus"); if (zu === "spende") setZu(""); }} className={`${seg} ${aus ? "seg-aktiv !text-red-600 dark:!text-red-400" : ""}`}>
-          Ausgabe
-        </button>
-      </div>
-
-      <label className="mt-4 block text-[13px] font-medium text-tinte-leise">Betrag</label>
-      <div className="mt-1 flex items-center gap-1 rounded-2xl bg-[rgb(118_118_128/0.12)] px-4 dark:bg-[rgb(118_118_128/0.24)]">
-        <span className={`zahl text-[1.6rem] font-bold ${aus ? "text-red-600 dark:text-red-400" : "text-bezahlt"}`}>{aus ? "−" : "+"}</span>
-        <input
-          className="zahl min-w-0 flex-1 bg-transparent py-3 text-[1.75rem] font-bold outline-none"
-          inputMode="decimal"
-          placeholder="0,00"
-          value={betrag}
-          autoFocus
-          onChange={(e) => setBetrag(e.target.value)}
-        />
-        <span className="text-xl font-bold text-tinte-matt">€</span>
-      </div>
-
-      <div className="mt-3 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-2">
-        <div className="min-w-0">
-          <label className="block text-[13px] font-medium text-tinte-leise">Datum</label>
-          <input type="date" className="field mt-1 h-12" value={datum} onChange={(e) => setDatum(e.target.value)} />
-        </div>
-        <div className="min-w-0">
-          <label className="block text-[13px] font-medium text-tinte-leise">Wofür</label>
-          <select className="field mt-1 h-12" value={zu} onChange={(e) => setZu(e.target.value)}>
-            <option value="">Bitte wählen …</option>
-            {aktionen.length > 0 && (
-              <optgroup label="Aktion">
-                {aktionen.map((a) => (
-                  <option key={a.id} value={`aktion:${a.id}`}>
-                    {a.icon} {a.titel}
-                  </option>
-                ))}
-              </optgroup>
-            )}
-            <optgroup label="Komitee">
-              {COMMITTEES.map((k) => (
-                <option key={k.slug} value={`komitee:${k.slug}`}>
-                  {k.icon} {k.label}
-                </option>
-              ))}
-            </optgroup>
-            <optgroup label="Sonst">
-              {!aus && <option value="spende">🤝 Spende / Sponsor</option>}
-              <option value="sonstiges">📌 Sonstiges</option>
-            </optgroup>
-          </select>
-        </div>
-      </div>
-
-      <label className="mt-3 block text-[13px] font-medium text-tinte-leise">Posten / Farbe (freiwillig)</label>
-      <KategorieWahl
-        kategorien={kategorien.filter((k) => k.art === "beide" || k.art === typ)}
-        wert={kategorie}
-        setzen={setKategorie}
-        onNeu={(name, farbe) => onKategorieNeu({ name, farbe, art: typ })}
-      />
-
-      <label className="mt-3 block text-[13px] font-medium text-tinte-leise">Bezeichnung (freiwillig)</label>
-      <input
-        className="field mt-1"
-        placeholder={aus ? "z. B. Waffelteig, Deko" : "z. B. Kuchenverkauf 2. Pause"}
-        value={titel}
-        onChange={(e) => setTitel(e.target.value)}
-        onKeyDown={(e) => e.key === "Enter" && void speichern()}
-      />
-
-      {fehler && <p className="mt-2 text-[13px] font-semibold text-amber-600">{fehler}</p>}
-      <button disabled={busy} onClick={speichern} className="btn-primary mt-5">
-        {busy ? "…" : aus ? "Ausgabe buchen" : "Einnahme buchen"}
-      </button>
-      <p className="mt-2 text-center text-[11px] text-tinte-leise">
-        Stufenbeiträge buchen sich von selbst, sobald sie auf „bezahlt“ stehen.
-      </p>
-    </Sheet>
-  );
-}
-
-/**
- * Kategorie wählen – oder gleich eine neue mit Farbe anlegen. Mehrere
- * Kategorien dürfen dieselbe Farbe haben (z. B. „Deko“ und „Druck“ beide lila).
- */
+/** Kategorie einer vorhandenen Buchung umhängen (Chips, eine Auswahl). */
 function KategorieWahl({
-  kategorien, wert, setzen, onNeu,
+  kategorien, wert, setzen,
 }: {
   kategorien: KassenKategorie[];
   wert: string | null;
   setzen: (id: string | null) => void;
-  onNeu?: (name: string, farbe: string) => Promise<string | null>;
 }) {
   const dunkel = useDunkel();
-  const [neu, setNeu] = useState(false);
-  const [name, setName] = useState("");
-  const [farbe, setFarbe] = useState("blau");
-  const [fehler, setFehler] = useState("");
   return (
-    <div className="mt-1">
-      <div className="flex flex-wrap gap-1.5">
+    <div className="mt-1 flex flex-wrap gap-1.5">
+      <button
+        type="button"
+        onClick={() => setzen(null)}
+        className={`rounded-full border px-3 py-1.5 text-[13px] font-semibold ${
+          wert === null ? "border-brand text-brand" : "border-papier-linie text-tinte-leise dark:border-slate-700"
+        }`}
+      >
+        Sonstiges
+      </button>
+      {kategorien.map((k) => (
         <button
           type="button"
-          onClick={() => setzen(null)}
-          className={`rounded-full border px-3 py-1.5 text-[13px] font-semibold ${
-            wert === null ? "border-brand text-brand" : "border-papier-linie text-tinte-leise dark:border-slate-700"
+          key={k.id}
+          onClick={() => setzen(k.id)}
+          className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[13px] font-semibold ${
+            wert === k.id ? "border-brand bg-brand/10" : "border-papier-linie dark:border-slate-700"
           }`}
         >
-          keine
+          <span className="h-2.5 w-2.5 rounded-full" style={{ background: farbHex(k.farbe, dunkel) }} />
+          {k.name}
         </button>
-        {kategorien.map((k) => (
-          <button
-            type="button"
-            key={k.id}
-            onClick={() => setzen(k.id)}
-            className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[13px] font-semibold ${
-              wert === k.id ? "border-brand bg-brand/10" : "border-papier-linie dark:border-slate-700"
-            }`}
-          >
-            <span className="h-2.5 w-2.5 rounded-full" style={{ background: farbHex(k.farbe, dunkel) }} />
-            {k.name}
-          </button>
-        ))}
-        {onNeu && !neu && (
-          <button type="button" onClick={() => setNeu(true)} className="rounded-full px-3 py-1.5 text-[13px] font-bold text-brand">
-            ＋ neue Kategorie
-          </button>
-        )}
-      </div>
-      {neu && onNeu && (
-        <div className="mt-2 rounded-2xl border border-papier-linie p-2.5 dark:border-slate-700">
-          <input className="field" placeholder="z. B. Deko, Druck, Getränke" maxLength={40} value={name} onChange={(e) => setName(e.target.value)} />
-          <FarbWahl wert={farbe} setzen={setFarbe} />
-          {fehler && <p className="mt-1 text-[12px] font-semibold text-amber-600">{fehler}</p>}
-          <div className="mt-2 flex gap-2">
-            <button
-              type="button"
-              onClick={async () => {
-                const f = await onNeu(name, farbe);
-                if (f) return setFehler(f);
-                setNeu(false);
-                setName("");
-                setFehler("");
-              }}
-              className="flex-1 rounded-xl bg-brand py-2 text-[14px] font-bold text-white"
-            >
-              Anlegen
-            </button>
-            <button type="button" onClick={() => setNeu(false)} className="rounded-xl px-3 text-[14px] font-semibold text-tinte-leise">
-              Abbrechen
-            </button>
-          </div>
-        </div>
-      )}
+      ))}
     </div>
   );
 }
@@ -1358,7 +1150,7 @@ function BuchungDetail({
 
       {darf && !b.automatisch && b.quelle !== "abgleich" && (
         <div className="mt-3 px-1">
-          <div className="text-[13px] font-medium text-tinte-leise">Kategorie und Farbe</div>
+          <div className="text-[13px] font-medium text-tinte-leise">Kategorie</div>
           <KategorieWahl
             kategorien={kategorien.filter((k) => k.art === "beide" || k.art === (b.cent < 0 ? "aus" : "ein"))}
             wert={b.kategorie_id ?? null}
