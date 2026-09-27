@@ -151,7 +151,7 @@ export function FinanzStandardInhalt({ d }: { d: FinanzUebersicht }) {
 
       {/* ------------------------------------------------ Aktionen und mehr */}
       <section className="card p-5">
-        <h2 className="text-[17px] font-bold">Aktionen und Ausgaben</h2>
+        <h2 className="text-[17px] font-bold">Aktionen, Ausgaben und Sonstiges</h2>
         <p className="mb-3 text-[12px] text-tinte-leise">Jede Aktion mit dem, was reinkam, was sie gekostet hat, und was übrig blieb.</p>
         {aktionen.length + weitere.length === 0 ? (
           <p className="text-[13px] text-tinte-leise">Noch keine Aktionen oder Ausgaben verbucht.</p>
@@ -198,9 +198,10 @@ function PostenZeile({ p, hex }: { p: FinanzPosten; hex: string }) {
 /** Zahlen ohne Wertung: Einnahmen, Ausgaben und Offenes in derselben Farbe. */
 function Kennzahl({ titel, wert, unter }: { titel: string; wert: string; unter?: string }) {
   return (
-    <div className="min-w-0 rounded-xl bg-papier-matt px-2 py-2.5 dark:bg-slate-800">
+    <div className="min-w-0 rounded-xl bg-papier-matt px-1.5 py-2.5 dark:bg-slate-800">
       <dt className="text-[12px] font-medium leading-tight text-tinte-leise">{titel}</dt>
-      <dd className="zahl mt-0.5 truncate text-[16px] font-bold">{wert}</dd>
+      {/* Beträge nie abschneiden – lieber etwas kleiner */}
+      <dd className="zahl mt-0.5 whitespace-nowrap text-[clamp(13px,3.6vw,16px)] font-bold tracking-tight">{wert}</dd>
       {unter && <dd className="text-[11px] leading-tight text-tinte-leise">{unter}</dd>}
     </div>
   );

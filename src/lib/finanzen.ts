@@ -62,7 +62,7 @@ export const KASSEN_FARBEN: { key: string; name: string; hell: string; dunkel: s
 
 /** Farbe ohne eigene Kategorie – nach Herkunft. */
 export const STANDARD_FARBE: Record<string, string> = {
-  beitrag: "blau", aktion: "orange", spende: "gruen", sonstiges: "gelb",
+  beitrag: "blau", aktion: "orange", spende: "gruen", sonstiges: "grau",
   komitee: "lila", ausgabe: "grau", abgleich: "grau", kategorie: "blau",
 };
 
@@ -93,7 +93,8 @@ export const EINNAHME_QUELLEN: { key: Exclude<Quelle, "ausgabe" | "abgleich">; l
   { key: "beitrag", label: "Stufenbeiträge", hell: "#2a78d6", dunkel: "#3987e5" },
   { key: "aktion", label: "Aktionen", hell: "#eb6834", dunkel: "#d95926" },
   { key: "spende", label: "Spenden", hell: "#1baf7a", dunkel: "#199e70" },
-  { key: "sonstiges", label: "Sonstiges", hell: "#eda100", dunkel: "#c98500" },
+  // Sonstiges (auch Bankabgleiche) bewusst grau – es ist keine eigene Quelle
+  { key: "sonstiges", label: "Sonstiges", hell: "#8e8e93", dunkel: "#98989f" },
 ];
 
 export const QUELLE_NAME: Record<Quelle, string> = {
@@ -396,26 +397,31 @@ export function uebersichtAus(
   for (const b of buchungen) {
     stand += b.cent;
     if (!letzte || b.datum > letzte) letzte = b.datum;
-    if (b.quelle === "abgleich") { abgleich += b.cent; continue; }
-    if (b.quelle === "beitrag") {
-      ein += b.cent;
+    // Brutto wie in finanz_uebersicht(): Einnahmen − Ausgaben = Kontostand
+    if (b.cent > 0) ein += b.cent; else aus += -b.cent;
+    if (b.quelle === "abgleich") abgleich += b.cent;
+    if (b.quelle === "beitrag" && b.cent > 0) {
       const p = b.halbjahr ? b.halbjahr.slice(0, 2) : "–";
       phasen[p] = (phasen[p] || 0) + b.cent;
       continue;
     }
-    if (b.cent > 0) ein += b.cent; else aus += -b.cent;
     const kat = b.kategorie_id ? kategorien.find((x) => x.id === b.kategorie_id) : null;
-    const [art, titel]: [FinanzPosten["art"], string] = kat
+    const [art, titel]: [FinanzPosten["art"], string] = b.quelle === "abgleich"
+      ? ["sonstiges", "Sonstiges"]
+      : b.quelle === "beitrag"
+      ? ["ausgabe", "Zurückgenommene Elternbeiträge"]
+      : kat
       ? ["kategorie", kat.name]
       : b.aktion_id
       ? ["aktion", aktionName(b.aktion_id) || "Aktion"]
       : b.quelle === "aktion" ? ["aktion", b.titel]
       : b.quelle === "spende" ? ["spende", "Spenden"]
-      : b.quelle === "sonstiges" ? ["sonstiges", "Sonstige Einnahmen"]
+      : b.quelle === "sonstiges" ? ["sonstiges", "Sonstiges"]
       : b.komitee ? ["komitee", b.komitee]
       : ["ausgabe", "Sonstige Ausgaben"];
     const k = `${art}|${titel}`;
-    const p = posten.get(k) || { art, titel, farbe: kat?.farbe ?? null, ein_cent: 0, aus_cent: 0, anzahl: 0, zuletzt: b.datum };
+    const farbe = art === "sonstiges" && !kat ? "grau" : kat?.farbe ?? null;
+    const p = posten.get(k) || { art, titel, farbe, ein_cent: 0, aus_cent: 0, anzahl: 0, zuletzt: b.datum };
     if (b.cent > 0) p.ein_cent += b.cent; else p.aus_cent += -b.cent;
     p.anzahl++;
     if (b.datum > p.zuletzt) p.zuletzt = b.datum;

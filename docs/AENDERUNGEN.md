@@ -40,6 +40,11 @@ aktualisiert sich still.
   Die Standard-Ansicht bekommt die Farben über `finanz_uebersicht()` – die
   Buchungen selbst sehen weiterhin nur Kassenwart, Team und Aufsichtsrat.
 - Rechte-Test: 129 Fälle (neu: Kategorie anlegen – nur mit `finanzen.manage`).
+- **Beide Finanz-Ansichten rechnen jetzt gleich** (vorher: Standard 17 %,
+  Erweitert 11 %): Einnahmen und Ausgaben sind brutto, Bankabgleiche zählen
+  als „Sonstiges“ (grau), zurückgenommene Elternbeiträge als Ausgabe. Damit
+  gilt überall Einnahmen − Ausgaben = Kontostand, und der Fortschritt ist in
+  beiden Ansichten Kontostand ÷ Ziel. „Sonstiges“ ist jetzt grau.
 
 ---
 

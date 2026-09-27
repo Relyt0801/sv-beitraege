@@ -67,23 +67,25 @@ export function FinanzenTab({ kosten }: { kosten: KostenValue }) {
     let abgleich = 0;
     for (const b of fin.buchungen) {
       stand += b.cent;
+      // Bankabgleich zählt als "Sonstiges" – so gilt: Einnahmen − Ausgaben = Kontostand
       if (b.quelle === "abgleich") {
         abgleich += b.cent;
         if (!letzterAbgleich || b.datum > letzterAbgleich) letzterAbgleich = b.datum;
-        continue;
       }
+      // Auch zurückgenommene Elternbeiträge sind eine Ausgabe
       if (b.cent < 0) {
         aus += -b.cent;
         continue;
       }
       ein += b.cent;
-      jeQuelle[b.quelle] = (jeQuelle[b.quelle] || 0) + b.cent;
+      const quelle = b.quelle === "abgleich" ? "sonstiges" : b.quelle;
+      jeQuelle[quelle] = (jeQuelle[quelle] || 0) + b.cent;
       const kat = b.kategorie_id ? fin.kategorien.find((k) => k.id === b.kategorie_id) : null;
-      const key = kat ? `k:${kat.id}` : `q:${b.quelle}`;
+      const key = kat ? `k:${kat.id}` : `q:${quelle}`;
       const g = gruppen.get(key) || {
         key,
-        label: kat ? kat.name : EINNAHME_QUELLEN.find((q) => q.key === b.quelle)?.label || QUELLE_NAME[b.quelle],
-        farbe: kat ? kat.farbe : STANDARD_FARBE[b.quelle] || "grau",
+        label: kat ? kat.name : EINNAHME_QUELLEN.find((q) => q.key === quelle)?.label || QUELLE_NAME[quelle],
+        farbe: kat ? kat.farbe : STANDARD_FARBE[quelle] || "grau",
         cent: 0,
       };
       g.cent += b.cent;
@@ -266,8 +268,12 @@ function UebersichtKarte({
   // Jede Kategorie bzw. Herkunft ein Bogen – in ihrer Farbe
   const teile = zahlen.gruppen.map((g) => ({ key: g.key, label: g.label, farbe: farbHex(g.farbe, dunkel), cent: Math.max(0, g.cent) }));
   const summe = teile.reduce((n, t) => n + t.cent, 0);
-  const ganz = ziel.ziel_cent > 0 ? Math.max(ziel.ziel_cent, summe) : summe;
-  const prozent = ziel.ziel_cent > 0 ? Math.round((summe / ziel.ziel_cent) * 100) : null;
+  // Wie in der Standard-Ansicht: Fortschritt = Kontostand / Ziel. Die Bögen
+  // teilen diesen Anteil nach Herkunft der Einnahmen auf.
+  const stand = Math.max(0, zahlen.stand);
+  const ganz =
+    ziel.ziel_cent > 0 && stand > 0 && stand < ziel.ziel_cent ? (summe * ziel.ziel_cent) / stand : summe;
+  const prozent = ziel.ziel_cent > 0 ? Math.round((stand / ziel.ziel_cent) * 100) : null;
 
   return (
     <section className="card p-5">
@@ -283,7 +289,7 @@ function UebersichtKarte({
           </div>
           <div className="mt-1.5 text-[12px] text-tinte-leise">
             {zahlen.letzterAbgleich
-              ? `Einnahmen − Ausgaben ${zahlen.abgleich >= 0 ? "+" : "−"} ${euro(Math.abs(zahlen.abgleich))} Bankabgleich · zuletzt ${new Date(zahlen.letzterAbgleich).toLocaleDateString("de-DE")}`
+              ? `Einnahmen − Ausgaben · Bankabgleich (unter Sonstiges) zuletzt ${new Date(zahlen.letzterAbgleich).toLocaleDateString("de-DE")}`
               : "noch nicht mit der Bank abgeglichen"}
           </div>
         </div>
@@ -322,11 +328,18 @@ function UebersichtKarte({
                 <span className="zahl shrink-0 font-bold">{euroKurz(t.cent)}</span>
               </li>
             ))}
-            {ziel.ziel_cent > summe && (
+            {zahlen.aus > 0 && (
               <li className="flex items-center gap-2.5 text-[13px] text-tinte-leise">
-                <span className="h-3 w-3 shrink-0 rounded-[3px] bg-papier-linie dark:bg-slate-700" />
+                <span className="h-3 w-3 shrink-0" />
+                <span className="min-w-0 flex-1 truncate">abzüglich Ausgaben</span>
+                <span className="zahl shrink-0 font-bold">−{euroKurz(zahlen.aus)}</span>
+              </li>
+            )}
+            {ziel.ziel_cent > stand && (
+              <li className="flex items-center gap-2.5 text-[13px] text-tinte-leise">
+                <span className="h-3 w-3 shrink-0 rounded-full bg-papier-linie dark:bg-slate-700" />
                 <span className="min-w-0 flex-1 truncate">Fehlt noch</span>
-                <span className="zahl shrink-0 font-bold">{euroKurz(ziel.ziel_cent - summe)}</span>
+                <span className="zahl shrink-0 font-bold">{euroKurz(ziel.ziel_cent - stand)}</span>
               </li>
             )}
           </ul>

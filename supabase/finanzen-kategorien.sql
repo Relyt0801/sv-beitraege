@@ -7,6 +7,10 @@
 -- Farbe haben. Die Standard-Ansicht (finanz_uebersicht) fasst Buchungen mit
 -- Kategorie unter deren Namen zusammen und gibt die Farbe mit – so passen
 -- Balken und Farbpunkte der Liste zusammen.
+--
+-- Stand 27.09. (2): Einnahmen/Ausgaben sind jetzt „brutto“ und passen zum
+-- Kontostand: Einnahmen − Ausgaben = Kontostand. Bankabgleiche zählen als
+-- „Sonstiges“ (grau), zurückgenommene Elternbeiträge als Ausgabe.
 -- =====================================================================
 
 create table if not exists public.kasse_kategorien (
@@ -76,6 +80,8 @@ begin
   posten as (
     select
       case
+        when b.quelle = 'abgleich' then 'sonstiges'
+        when b.quelle = 'beitrag' then 'ausgabe'
         when k.id is not null then 'kategorie'
         when b.aktion_id is not null then 'aktion'
         when b.quelle = 'aktion' then 'aktion'
@@ -85,27 +91,29 @@ begin
         else 'ausgabe'
       end as art,
       case
+        when b.quelle = 'abgleich' then 'Sonstiges'
+        when b.quelle = 'beitrag' then 'Zurückgenommene Elternbeiträge'
         when k.id is not null then k.name
         when b.aktion_id is not null then coalesce(a.titel, 'Aktion')
         when b.quelle = 'aktion' then b.titel
         when b.quelle = 'spende' then 'Spenden'
-        when b.quelle = 'sonstiges' then 'Sonstige Einnahmen'
+        when b.quelle = 'sonstiges' then 'Sonstiges'
         when b.komitee is not null then b.komitee
         else 'Sonstige Ausgaben'
       end as titel,
-      k.farbe,
+      case when b.quelle in ('abgleich', 'sonstiges') and k.id is null then 'grau' else k.farbe end as farbe,
       b.cent, b.datum
     from b
     left join aktionen a on a.id = b.aktion_id
     left join kasse_kategorien k on k.id = b.kategorie_id
-    where b.quelle not in ('beitrag', 'abgleich')
+    -- Beiträge stehen eigens; nur zurückgenommene tauchen hier als Ausgabe auf
+    where b.quelle <> 'beitrag' or b.cent < 0
   )
   select jsonb_build_object(
     'erweitert', erweitert,
     'stand_cent', (select coalesce(sum(cent), 0) from b),
-    'einnahmen_cent', (select coalesce(sum(cent) filter (where cent > 0 and quelle not in ('beitrag', 'abgleich')), 0)
-                            + coalesce(sum(cent) filter (where quelle = 'beitrag'), 0) from b),
-    'ausgaben_cent', (select coalesce(-sum(cent), 0) from b where cent < 0 and quelle not in ('beitrag', 'abgleich')),
+    'einnahmen_cent', (select coalesce(sum(cent), 0) from b where cent > 0),
+    'ausgaben_cent', (select coalesce(-sum(cent), 0) from b where cent < 0),
     'abgleich_cent', (select coalesce(sum(cent), 0) from b where quelle = 'abgleich'),
     'letzte_buchung', (select max(datum) from b),
     'ziel_cent', (select ziel_cent from kasse_einstellungen where id = 1),
@@ -116,7 +124,7 @@ begin
     'beitraege', coalesce((
       select jsonb_agg(jsonb_build_object('phase', phase, 'cent', cent) order by phase)
         from (select coalesce(left(halbjahr, 2), '–') as phase, sum(cent) as cent
-                from b where quelle = 'beitrag' group by 1) x), '[]'::jsonb),
+                from b where quelle = 'beitrag' and cent > 0 group by 1) x), '[]'::jsonb),
     'posten', coalesce((
       select jsonb_agg(jsonb_build_object(
                'art', art, 'titel', titel, 'farbe', farbe,
