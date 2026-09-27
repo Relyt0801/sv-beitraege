@@ -12,6 +12,46 @@ ausführlich (auf Deutsch); hier steht der Überblick dazu.
 ---
 
 
+## 27.09.2026 (abends): Finanzen in zwei Bereichen, Posten mit Gewinn
+
+SQL dazu: `supabase/finanzen-kategorien.sql`, Funktion `finanz_uebersicht()`
+(Migration `finanz_uebersicht_netto_bereiche`, eingespielt). Keine Mitteilung,
+keine neue Einführung.
+
+- **Legende der Halbjahre** passt auf dem Handy in eine Zeile (auch 320 px):
+  kleinere Kästchen, Schrift per `clamp`. „nicht dabei“ erscheint nur noch,
+  wenn die Person wirklich Halbjahre vor dem Eintritt hat (`HalbjahrLegende`).
+- **Prozent-Ring:** die Stufen-Striche schneiden jetzt quer durch den Ring
+  (dunkel mit hellem Rand – auf gefülltem und leerem Teil gut sichtbar); der
+  aktuelle Strich in der Markenfarbe steht etwas über (`Ring.tsx`).
+- **Kennzahlen:** statt drei gequetschter Kacheln zwei (Einnahmen, Ausgaben)
+  und darunter eine Zeile „Offene Elternbeiträge · fällig bis … · Schuljahr“
+  (`Kennzahlen` in `FinanzBereiche.tsx`, Standard und Erweitert).
+- **Zwei Bereiche** statt „Stufenbeiträge“ + „Aktionen, Ausgaben und
+  Sonstiges“ (`PostenBereiche`):
+  1. **Aktionen, Beiträge und Sonstiges** – Elternbeiträge (blau), jede
+     Aktion bzw. jeder Posten in seiner Farbe, Spenden, Sonstiges (grau).
+  2. **Ausgaben** – was keiner Aktion gehört (Komitees, sonstige Ausgaben).
+  Jede Zeile ist antippbar (ⓘ): Einnahmen, Ausgaben, Gewinn mit Balken;
+  bei mehreren Tagen die einzelnen Termine. Elternbeiträge zeigen EF, Q1, Q2
+  und die Summe.
+- **Wieder ausgetragene Elternbeiträge** werden nicht mehr als Ausgabe
+  aufgelistet, sondern mit ihrer Phase verrechnet (netto). Die 25 € vom
+  24.09. heben sich so mit der erneuten Zahlung auf; Einnahmen − Ausgaben =
+  Kontostand stimmt weiter. In der Datenbank wurde nichts gelöscht.
+- **Bearbeiten (Kassenwart/Admin, „Kassenbuch führen“, Ansicht Erweitert):**
+  „＋ Neu“ → Name + Farbe → „Weiter“, dann im Detail Betrag + Tag →
+  „Einnahme/Ausgabe hinzufügen“. Mehrere Termine = mehrmals hinzufügen,
+  alles zusammen = einmal. Einträge per Mülleimer löschen, „Ändern“ für Name
+  und Farbe (eine Aktion bekommt dabei einen eigenen Posten mit Farbe, ihre
+  Buchungen ziehen mit). Ein Posten ist technisch eine Kategorie
+  (`kasse_kategorien`); Rechte unverändert.
+- Standard-Ansicht zeigt weiterhin keine Namen und keine Bezeichnungen
+  einzelner Buchungen – nur Summen je Posten und je Tag.
+
+---
+
+
 ## 27.09.2026: Rückmeldungen der Eltern (Kasse, Mithilfe, Finanzen)
 
 SQL dazu: `supabase/finanzen-kategorien.sql` (in der Datenbank eingespielt).
@@ -22,7 +62,7 @@ aktualisiert sich still.
   weniger Aufschlag auf das 1. Abiball-Ticket.“ Über den Kacheln steht
   „Aufschlag aufs erste Ticket“ (`StaffelKacheln` in `Staffel.tsx`, auch in
   der Schüleransicht).
-- **Prozent-Ring:** außen ein kleiner Strich an jeder Stufe, an der der
+- **Prozent-Ring:** (später geändert, siehe oben) außen ein kleiner Strich an jeder Stufe, an der der
   Aufschlag sinkt; der Strich der aktuellen Stufe in der Markenfarbe – wie
   die aktuelle Kachel (`Ring.tsx`, `StaffelRing`).
 - **Legende der Halbjahre:** statt Text-Zeichen dieselben Kästchen wie oben

@@ -10,7 +10,14 @@
 --
 -- Stand 27.09. (2): Einnahmen/Ausgaben sind jetzt „brutto“ und passen zum
 -- Kontostand: Einnahmen − Ausgaben = Kontostand. Bankabgleiche zählen als
--- „Sonstiges“ (grau), zurückgenommene Elternbeiträge als Ausgabe.
+-- „Sonstiges“ (grau).
+--
+-- Stand 27.09. (3): Zurückgenommene Elternbeiträge werden NICHT mehr als
+-- Ausgabe aufgelistet, sondern mit den Beiträgen ihrer Phase verrechnet
+-- (netto je Phase). Jeder Posten hat einen Bereich ('ein' = Aktionen,
+-- Beiträge und Sonstiges; 'aus' = reine Ausgaben) und Summen je Tag
+-- („einzelne Termine“) für die Detailansicht – nur Beträge und Tage, keine
+-- Namen, keine Bezeichnungen einzelner Buchungen.
 -- =====================================================================
 
 create table if not exists public.kasse_kategorien (
@@ -77,11 +84,16 @@ begin
     ) q;
 
   with b as (select * from kasse_buchungen),
+  -- Elternbeiträge netto je Phase: ein wieder ausgetragener Beitrag hebt
+  -- sich mit seiner Zahlung auf und taucht nirgends als Ausgabe auf
+  beitr as (
+    select coalesce(left(halbjahr, 2), '–') as phase, sum(cent) as cent
+      from b where quelle = 'beitrag' group by 1
+  ),
   posten as (
     select
       case
         when b.quelle = 'abgleich' then 'sonstiges'
-        when b.quelle = 'beitrag' then 'ausgabe'
         when k.id is not null then 'kategorie'
         when b.aktion_id is not null then 'aktion'
         when b.quelle = 'aktion' then 'aktion'
@@ -92,7 +104,6 @@ begin
       end as art,
       case
         when b.quelle = 'abgleich' then 'Sonstiges'
-        when b.quelle = 'beitrag' then 'Zurückgenommene Elternbeiträge'
         when k.id is not null then k.name
         when b.aktion_id is not null then coalesce(a.titel, 'Aktion')
         when b.quelle = 'aktion' then b.titel
@@ -101,19 +112,30 @@ begin
         when b.komitee is not null then b.komitee
         else 'Sonstige Ausgaben'
       end as titel,
-      case when b.quelle in ('abgleich', 'sonstiges') and k.id is null then 'grau' else k.farbe end as farbe,
+      case when k.id is not null then k.farbe when b.quelle in ('abgleich', 'sonstiges') then 'grau' end as farbe,
+      k.art as kart,
+      case when k.id is not null then 'k:' || k.id::text
+           when b.aktion_id is not null and b.quelle <> 'abgleich' then 'a:' || b.aktion_id::text end as gid,
       b.cent, b.datum
     from b
     left join aktionen a on a.id = b.aktion_id
-    left join kasse_kategorien k on k.id = b.kategorie_id
-    -- Beiträge stehen eigens; nur zurückgenommene tauchen hier als Ausgabe auf
-    where b.quelle <> 'beitrag' or b.cent < 0
+    left join kasse_kategorien k on k.id = b.kategorie_id and b.quelle <> 'abgleich'
+    where b.quelle <> 'beitrag'
+  ),
+  gruppiert as (
+    select art, coalesce(gid, titel) as schluessel, max(titel) as titel, max(farbe) as farbe, max(kart) as kart,
+           coalesce(sum(cent) filter (where cent > 0), 0) as ein,
+           coalesce(-sum(cent) filter (where cent < 0), 0) as aus,
+           count(*) as n, max(datum) as zuletzt
+      from posten group by art, coalesce(gid, titel)
   )
   select jsonb_build_object(
     'erweitert', erweitert,
     'stand_cent', (select coalesce(sum(cent), 0) from b),
-    'einnahmen_cent', (select coalesce(sum(cent), 0) from b where cent > 0),
-    'ausgaben_cent', (select coalesce(-sum(cent), 0) from b where cent < 0),
+    'einnahmen_cent', (select coalesce(sum(cent), 0) from b where cent > 0 and quelle <> 'beitrag')
+                      + (select coalesce(sum(greatest(cent, 0)), 0) from beitr),
+    'ausgaben_cent', (select coalesce(-sum(cent), 0) from b where cent < 0 and quelle <> 'beitrag')
+                     + (select coalesce(sum(greatest(-cent, 0)), 0) from beitr),
     'abgleich_cent', (select coalesce(sum(cent), 0) from b where quelle = 'abgleich'),
     'letzte_buchung', (select max(datum) from b),
     'ziel_cent', (select ziel_cent from kasse_einstellungen where id = 1),
@@ -123,18 +145,22 @@ begin
     'offen_personen', offen_personen,
     'beitraege', coalesce((
       select jsonb_agg(jsonb_build_object('phase', phase, 'cent', cent) order by phase)
-        from (select coalesce(left(halbjahr, 2), '–') as phase, sum(cent) as cent
-                from b where quelle = 'beitrag' and cent > 0 group by 1) x), '[]'::jsonb),
+        from beitr where cent > 0), '[]'::jsonb),
     'posten', coalesce((
       select jsonb_agg(jsonb_build_object(
-               'art', art, 'titel', titel, 'farbe', farbe,
-               'ein_cent', ein, 'aus_cent', aus, 'anzahl', n, 'zuletzt', zuletzt)
-             order by zuletzt desc)
-        from (select art, titel, max(farbe) as farbe,
-                     coalesce(sum(cent) filter (where cent > 0), 0) as ein,
-                     coalesce(-sum(cent) filter (where cent < 0), 0) as aus,
-                     count(*) as n, max(datum) as zuletzt
-                from posten group by art, titel) y), '[]'::jsonb)
+               'art', g.art, 'titel', g.titel, 'farbe', g.farbe,
+               'bereich', case when g.art in ('komitee', 'ausgabe') or g.kart = 'aus' then 'aus' else 'ein' end,
+               'ein_cent', g.ein, 'aus_cent', g.aus, 'anzahl', g.n, 'zuletzt', g.zuletzt,
+               'termine', (
+                 select jsonb_agg(jsonb_build_object('datum', t.datum, 'ein_cent', t.ein, 'aus_cent', t.aus) order by t.datum)
+                   from (select p.datum,
+                                coalesce(sum(p.cent) filter (where p.cent > 0), 0) as ein,
+                                coalesce(-sum(p.cent) filter (where p.cent < 0), 0) as aus
+                           from posten p
+                          where p.art = g.art and coalesce(p.gid, p.titel) = g.schluessel
+                          group by p.datum) t))
+             order by g.zuletzt desc)
+        from gruppiert g), '[]'::jsonb)
   ) into ergebnis;
 
   return ergebnis;

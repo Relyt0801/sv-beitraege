@@ -1,6 +1,6 @@
 import { HY, type Settings, type Student } from "../lib/types";
 import { useStore } from "../store";
-import { basisOffen, beitragFuer, naechsteStufe, prozentVon, ticketBetrag } from "../lib/logic";
+import { basisOffen, beitragFuer, isPreJoin, naechsteStufe, prozentVon, ticketBetrag } from "../lib/logic";
 import { HalbjahrLegende, TermChip } from "./TermChip";
 import { StaffelKacheln, StaffelRing } from "./Staffel";
 import { BeitragsListe } from "./BeitragsListe";
@@ -94,7 +94,7 @@ export function MyKasse({
           ))}
         </div>
 
-        <HalbjahrLegende nichtDabei />
+        <HalbjahrLegende nichtDabei={HY.some((_, i) => isPreJoin(student, i))} />
       </section>
 
       {/* ------------------------------------------ Prozentstand */}

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { hasSupabase, supabase } from "./supabase";
 import { abonniere } from "./realtime";
-import { demoBuchungen } from "./demo";
+import { DEMO_KATEGORIEN, demoBuchungen } from "./demo";
 import { useStore } from "../store";
 
 /**
@@ -140,6 +140,8 @@ export interface FinanzenValue {
   kategorien: KassenKategorie[];
   kategorieSpeichern: (k: Partial<KassenKategorie> & { name: string; farbe: string }) => Promise<string | null>;
   kategorieLoeschen: (id: string) => Promise<string | null>;
+  /** Neuen Posten (Kategorie) anlegen – gibt die neue id zurück */
+  postenAnlegen: (name: string, farbe: string, art?: KassenKategorie["art"]) => Promise<{ id?: string; fehler?: string }>;
   /** Kategorie einer vorhandenen Buchung ändern (nicht bei automatischen). */
   buchungKategorie: (id: string, kategorieId: string | null) => Promise<string | null>;
   ziel: KassenZiel;
@@ -180,6 +182,7 @@ export function useFinanzen(aktiv: boolean): FinanzenValue {
     if (hasSupabase || demo.current || !students.length) return;
     demo.current = true;
     setBuchungen(demoBuchungen(students));
+    setKategorien(DEMO_KATEGORIEN);
     setZiel({ ziel_cent: 800000, ziel_titel: "Abiball" });
   }, [students]);
 
@@ -320,6 +323,23 @@ export function useFinanzen(aktiv: boolean): FinanzenValue {
     [laden],
   );
 
+  const postenAnlegen = useCallback<FinanzenValue["postenAnlegen"]>(
+    async (name, farbe, art = "beide") => {
+      const zeile = { name: name.trim().slice(0, 40), farbe, art, sort: 100 };
+      if (!zeile.name) return { fehler: "Bitte einen Namen eingeben." };
+      if (!hasSupabase) {
+        const id = crypto.randomUUID();
+        setKategorien((prev) => [...prev, { id, ...zeile }]);
+        return { id };
+      }
+      const { data, error } = await supabase!.from("kasse_kategorien").insert(zeile).select("id").single();
+      if (error) return { fehler: error.message };
+      await laden();
+      return { id: (data as { id: string }).id };
+    },
+    [laden],
+  );
+
   const buchungKategorie = useCallback<FinanzenValue["buchungKategorie"]>(
     async (id, kategorieId) => {
       setBuchungen((prev) => prev.map((b) => (b.id === id ? { ...b, kategorie_id: kategorieId } : b)));
@@ -337,9 +357,9 @@ export function useFinanzen(aktiv: boolean): FinanzenValue {
   return useMemo(
     () => ({
       buchungen, kategorien, ziel, bereit, fehler, buchen, loeschen, zielSetzen, neuLaden: laden,
-      kategorieSpeichern, kategorieLoeschen, buchungKategorie,
+      kategorieSpeichern, kategorieLoeschen, buchungKategorie, postenAnlegen,
     }),
-    [buchungen, kategorien, ziel, bereit, fehler, buchen, loeschen, zielSetzen, laden, kategorieSpeichern, kategorieLoeschen, buchungKategorie],
+    [buchungen, kategorien, ziel, bereit, fehler, buchen, loeschen, zielSetzen, laden, kategorieSpeichern, kategorieLoeschen, buchungKategorie, postenAnlegen],
   );
 }
 
@@ -362,7 +382,25 @@ export interface FinanzPosten {
   aus_cent: number;
   anzahl: number;
   zuletzt: string;
+  /** "ein": Aktionen, Beiträge und Sonstiges · "aus": reine Ausgaben */
+  bereich?: "ein" | "aus";
+  /** Summen je Tag – für „einzelne Termine“ in der Detailansicht */
+  termine?: { datum: string; ein_cent: number; aus_cent: number }[] | null;
+  /** Nur in der App (Kassenwart): woran neue Buchungen dieses Postens hängen */
+  ref?: PostenRef;
+  /** Nur in der App (Kassenwart): die einzelnen Buchungen */
+  buchungen?: Buchung[];
 }
+
+/** Woran eine neue Buchung eines Postens hängt. */
+export type PostenRef =
+  | { typ: "kategorie"; id: string; art: KassenKategorie["art"] }
+  | { typ: "aktion"; id: string }
+  | { typ: "aktionTitel"; titel: string }
+  | { typ: "spende" }
+  | { typ: "sonstiges" }
+  | { typ: "komitee"; komitee: string }
+  | { typ: "ausgabe" };
 
 export interface FinanzUebersicht {
   erweitert: boolean;
@@ -381,7 +419,12 @@ export interface FinanzUebersicht {
   posten: FinanzPosten[];
 }
 
-/** Dieselbe Zusammenfassung ohne Datenbank (Demo), aus erfundenen Buchungen. */
+/**
+ * Dieselbe Zusammenfassung wie finanz_uebersicht() – für die Demo und für den
+ * Kassenwart (Erweitert), dort mit Buchungen und ref zum Bearbeiten.
+ * Zurückgenommene Elternbeiträge werden mit ihrer Phase verrechnet und nicht
+ * als Ausgabe aufgelistet.
+ */
 export function uebersichtAus(
   buchungen: Buchung[],
   ziel: KassenZiel,
@@ -389,44 +432,70 @@ export function uebersichtAus(
   halbjahr: string,
   aktionName: (id: string) => string,
   kategorien: KassenKategorie[] = [],
+  mitBuchungen = false,
 ): FinanzUebersicht {
   let stand = 0, ein = 0, aus = 0, abgleich = 0;
   let letzte: string | null = null;
   const phasen: Record<string, number> = {};
   const posten = new Map<string, FinanzPosten>();
+  const tage = new Map<string, Map<string, { ein_cent: number; aus_cent: number }>>();
   for (const b of buchungen) {
     stand += b.cent;
     if (!letzte || b.datum > letzte) letzte = b.datum;
-    // Brutto wie in finanz_uebersicht(): Einnahmen − Ausgaben = Kontostand
-    if (b.cent > 0) ein += b.cent; else aus += -b.cent;
     if (b.quelle === "abgleich") abgleich += b.cent;
-    if (b.quelle === "beitrag" && b.cent > 0) {
+    if (b.quelle === "beitrag") {
       const p = b.halbjahr ? b.halbjahr.slice(0, 2) : "–";
       phasen[p] = (phasen[p] || 0) + b.cent;
       continue;
     }
-    const kat = b.kategorie_id ? kategorien.find((x) => x.id === b.kategorie_id) : null;
-    const [art, titel]: [FinanzPosten["art"], string] = b.quelle === "abgleich"
-      ? ["sonstiges", "Sonstiges"]
-      : b.quelle === "beitrag"
-      ? ["ausgabe", "Zurückgenommene Elternbeiträge"]
+    if (b.cent > 0) ein += b.cent; else aus += -b.cent;
+    const kat = b.kategorie_id && b.quelle !== "abgleich" ? kategorien.find((x) => x.id === b.kategorie_id) : null;
+    const [art, titel, schluessel, ref]: [FinanzPosten["art"], string, string, PostenRef] = b.quelle === "abgleich"
+      ? ["sonstiges", "Sonstiges", "Sonstiges", { typ: "sonstiges" }]
       : kat
-      ? ["kategorie", kat.name]
+      ? ["kategorie", kat.name, `k:${kat.id}`, { typ: "kategorie", id: kat.id, art: kat.art }]
       : b.aktion_id
-      ? ["aktion", aktionName(b.aktion_id) || "Aktion"]
-      : b.quelle === "aktion" ? ["aktion", b.titel]
-      : b.quelle === "spende" ? ["spende", "Spenden"]
-      : b.quelle === "sonstiges" ? ["sonstiges", "Sonstiges"]
-      : b.komitee ? ["komitee", b.komitee]
-      : ["ausgabe", "Sonstige Ausgaben"];
-    const k = `${art}|${titel}`;
-    const farbe = art === "sonstiges" && !kat ? "grau" : kat?.farbe ?? null;
-    const p = posten.get(k) || { art, titel, farbe, ein_cent: 0, aus_cent: 0, anzahl: 0, zuletzt: b.datum };
+      ? ["aktion", aktionName(b.aktion_id) || "Aktion", `a:${b.aktion_id}`, { typ: "aktion", id: b.aktion_id }]
+      : b.quelle === "aktion" ? ["aktion", b.titel, b.titel, { typ: "aktionTitel", titel: b.titel }]
+      : b.quelle === "spende" ? ["spende", "Spenden", "Spenden", { typ: "spende" }]
+      : b.quelle === "sonstiges" ? ["sonstiges", "Sonstiges", "Sonstiges", { typ: "sonstiges" }]
+      : b.komitee ? ["komitee", b.komitee, b.komitee, { typ: "komitee", komitee: b.komitee }]
+      : ["ausgabe", "Sonstige Ausgaben", "Sonstige Ausgaben", { typ: "ausgabe" }];
+    const k = `${art}|${schluessel}`;
+    const farbe = kat ? kat.farbe : art === "sonstiges" ? "grau" : null;
+    const bereich = art === "komitee" || art === "ausgabe" || kat?.art === "aus" ? "aus" : "ein";
+    const p = posten.get(k) || {
+      art, titel, farbe, bereich, ein_cent: 0, aus_cent: 0, anzahl: 0, zuletzt: b.datum,
+      ...(mitBuchungen ? { ref, buchungen: [] as Buchung[] } : {}),
+    };
     if (b.cent > 0) p.ein_cent += b.cent; else p.aus_cent += -b.cent;
     p.anzahl++;
     if (b.datum > p.zuletzt) p.zuletzt = b.datum;
+    p.buchungen?.push(b);
     posten.set(k, p);
+    const t = tage.get(k) || new Map();
+    const tag = t.get(b.datum) || { ein_cent: 0, aus_cent: 0 };
+    if (b.cent > 0) tag.ein_cent += b.cent; else tag.aus_cent += -b.cent;
+    t.set(b.datum, tag);
+    tage.set(k, t);
   }
+  for (const [k, p] of posten)
+    p.termine = [...(tage.get(k) || new Map()).entries()].sort(([a], [b]) => (a < b ? -1 : 1)).map(([datum, v]) => ({ datum, ...v }));
+  // Elternbeiträge netto je Phase
+  for (const c of Object.values(phasen)) {
+    if (c > 0) ein += c; else aus += -c;
+  }
+  // Leere Posten (gerade angelegt) – damit der Kassenwart sie gleich füllen kann
+  if (mitBuchungen)
+    for (const kat of kategorien) {
+      const k = `kategorie|k:${kat.id}`;
+      if (!posten.has(k))
+        posten.set(k, {
+          art: "kategorie", titel: kat.name, farbe: kat.farbe, bereich: kat.art === "aus" ? "aus" : "ein",
+          ein_cent: 0, aus_cent: 0, anzahl: 0, zuletzt: "9999", termine: [],
+          ref: { typ: "kategorie", id: kat.id, art: kat.art }, buchungen: [],
+        });
+    }
   return {
     erweitert: false,
     stand_cent: stand,
@@ -439,7 +508,7 @@ export function uebersichtAus(
     halbjahr,
     offen_cent: offen.cent,
     offen_personen: offen.personen,
-    beitraege: Object.entries(phasen).sort().map(([phase, cent]) => ({ phase, cent })),
+    beitraege: Object.entries(phasen).filter(([, c]) => c > 0).sort().map(([phase, cent]) => ({ phase, cent })),
     posten: [...posten.values()].sort((a, b) => (a.zuletzt < b.zuletzt ? 1 : -1)),
   };
 }

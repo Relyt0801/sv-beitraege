@@ -5,11 +5,12 @@ import { useTermine } from "../termine-store";
 import { useProfiles } from "../profiles-store";
 import { basisOffen } from "../lib/logic";
 import { FinanzStandard } from "./FinanzStandard";
+import { FarbWahl, Kennzahlen, PostenBereiche } from "./FinanzBereiche";
 import { useNachschub } from "../lib/liste";
 import { COMMITTEES, committeeIcon, committeeLabel } from "../lib/committees";
 import {
   EINNAHME_QUELLEN, KASSEN_FARBEN, QUELLE_NAME, STANDARD_FARBE, buchungFarbe, centAus, euro, euroKurz, farbHex,
-  schuljahrVon, useFinanzen,
+  uebersichtAus, useFinanzen,
   type Buchung, type FinanzenValue, type KassenKategorie, type Quelle,
 } from "../lib/finanzen";
 import type { KostenAnfrage, KostenValue } from "../lib/kosten";
@@ -65,14 +66,20 @@ export function FinanzenTab({ kosten }: { kosten: KostenValue }) {
     const gruppen = new Map<string, { key: string; label: string; farbe: string; cent: number }>();
     let letzterAbgleich: string | null = null;
     let abgleich = 0;
+    // Elternbeiträge netto: ein wieder ausgetragener Beitrag hebt sich mit
+    // seiner Zahlung auf und erscheint nicht als Ausgabe
+    let beitraege = 0;
     for (const b of fin.buchungen) {
       stand += b.cent;
+      if (b.quelle === "beitrag") {
+        beitraege += b.cent;
+        continue;
+      }
       // Bankabgleich zählt als "Sonstiges" – so gilt: Einnahmen − Ausgaben = Kontostand
       if (b.quelle === "abgleich") {
         abgleich += b.cent;
         if (!letzterAbgleich || b.datum > letzterAbgleich) letzterAbgleich = b.datum;
       }
-      // Auch zurückgenommene Elternbeiträge sind eine Ausgabe
       if (b.cent < 0) {
         aus += -b.cent;
         continue;
@@ -91,6 +98,11 @@ export function FinanzenTab({ kosten }: { kosten: KostenValue }) {
       g.cent += b.cent;
       gruppen.set(key, g);
     }
+    if (beitraege > 0) {
+      ein += beitraege;
+      jeQuelle.beitrag += beitraege;
+      gruppen.set("q:beitrag", { key: "q:beitrag", label: "Elternbeiträge", farbe: "blau", cent: beitraege });
+    } else aus += -beitraege;
     return { stand, ein, aus, jeQuelle, letzterAbgleich, abgleich, gruppen: [...gruppen.values()].sort((a, b) => b.cent - a.cent) };
   }, [fin.buchungen, fin.kategorien]);
 
@@ -106,6 +118,12 @@ export function FinanzenTab({ kosten }: { kosten: KostenValue }) {
     }
     return { cent, personen };
   }, [students, settings]);
+
+  // Dieselben zwei Bereiche wie in der Standard-Ansicht – hier mit Bearbeiten
+  const postenDaten = useMemo(
+    () => uebersichtAus(fin.buchungen, fin.ziel, offen, settings.aktuelles_halbjahr, aktionName, fin.kategorien, true),
+    [fin.buchungen, fin.ziel, fin.kategorien, offen, settings.aktuelles_halbjahr, aktionen], // eslint-disable-line react-hooks/exhaustive-deps
+  );
 
   // Standard-Ansicht: Summen ohne Namen (Schüler, Eltern – oder zur Kontrolle)
   if ((!darfSehen && darfStandard) || (darfSehen && ansicht === "standard")) {
@@ -187,6 +205,9 @@ export function FinanzenTab({ kosten }: { kosten: KostenValue }) {
           </div>
         )}
       </div>
+
+      {/* ================================================ Aktionen, Beiträge, Ausgaben */}
+      <PostenBereiche d={postenDaten} fin={darfBuchen ? fin : null} />
 
       {/* ================================================ Kostenanfragen */}
       {zeigeAnfragen && (
@@ -300,18 +321,7 @@ function UebersichtKarte({
         )}
       </div>
 
-      {/* Drei Zahlen in einer Zeile */}
-      <dl className={`mt-4 grid gap-2 text-center ${offen ? "grid-cols-3" : "grid-cols-2"}`}>
-        <Zahl titel="Einnahmen" wert={euroKurz(zahlen.ein)} />
-        <Zahl titel="Ausgaben" wert={euroKurz(zahlen.aus)} />
-        {offen && (
-          <Zahl
-            titel="Elternbeiträge offen"
-            wert={euroKurz(offen.cent)}
-            unter={`${offen.personen} Pers. · fällig bis ${halbjahr} (${schuljahrVon(halbjahr)})`}
-          />
-        )}
-      </dl>
+      <Kennzahlen ein={zahlen.ein} aus={zahlen.aus} offen={offen ? { ...offen, halbjahr } : null} />
 
       {/* Kreis + Legende */}
       <div className="mt-4 flex flex-col items-center gap-4 border-t border-papier-linie pt-4 dark:border-slate-800 sm:flex-row">
@@ -346,17 +356,6 @@ function UebersichtKarte({
         </div>
       </div>
     </section>
-  );
-}
-
-/** Zahlen ohne Wertung – alle in derselben Farbe. */
-function Zahl({ titel, wert, unter }: { titel: string; wert: string; unter?: string }) {
-  return (
-    <div className="min-w-0 rounded-2xl bg-papier px-2 py-2.5 dark:bg-slate-800/70">
-      <dt className="text-[12px] font-medium leading-tight text-tinte-leise">{titel}</dt>
-      <dd className="zahl mt-0.5 truncate text-[16px] font-bold leading-tight">{wert}</dd>
-      {unter && <dd className="mt-0.5 text-[11px] leading-tight text-tinte-leise">{unter}</dd>}
-    </div>
   );
 }
 
@@ -493,7 +492,7 @@ function BuchungSheet({
         </div>
       </div>
 
-      <label className="mt-3 block text-[13px] font-medium text-tinte-leise">Kategorie und Farbe (freiwillig)</label>
+      <label className="mt-3 block text-[13px] font-medium text-tinte-leise">Posten / Farbe (freiwillig)</label>
       <KategorieWahl
         kategorien={kategorien.filter((k) => k.art === "beide" || k.art === typ)}
         wert={kategorie}
@@ -594,27 +593,6 @@ function KategorieWahl({
           </div>
         </div>
       )}
-    </div>
-  );
-}
-
-function FarbWahl({ wert, setzen }: { wert: string; setzen: (f: string) => void }) {
-  const dunkel = useDunkel();
-  return (
-    <div className="mt-2 flex flex-wrap gap-1.5" role="radiogroup" aria-label="Farbe">
-      {KASSEN_FARBEN.map((f) => (
-        <button
-          type="button"
-          key={f.key}
-          role="radio"
-          aria-checked={wert === f.key}
-          aria-label={f.name}
-          title={f.name}
-          onClick={() => setzen(f.key)}
-          className={`h-8 w-8 rounded-full transition ${wert === f.key ? "ring-2 ring-brand ring-offset-2 dark:ring-offset-slate-900" : ""}`}
-          style={{ background: dunkel ? f.dunkel : f.hell }}
-        />
-      ))}
     </div>
   );
 }

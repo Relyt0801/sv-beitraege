@@ -86,6 +86,8 @@ export function TermChip({
 /**
  * Legende unter den Halbjahren – mit genau den Kästchen, die auch oben
  * stehen (Farbe, Rand und Zeichen), damit man sie sofort wiedererkennt.
+ * Die vier Einträge stehen immer in einer Zeile (auch auf 320 px);
+ * „nicht dabei“ kommt nur, wenn es das bei dieser Person gibt.
  */
 export function HalbjahrLegende({ nichtDabei = false }: { nichtDabei?: boolean }) {
   const eintraege: { cls: string; glyph: string; text: string; fett?: boolean }[] = [
@@ -94,25 +96,29 @@ export function HalbjahrLegende({ nichtDabei = false }: { nichtDabei?: boolean }
     { cls: STATUS_CLASS.erlassen, glyph: GLYPH.erlassen, text: "erlassen", fett: true },
     { cls: "bg-[rgb(118_118_128/0.1)] text-tinte-leise border-transparent", glyph: GLYPH.offen, text: "später fällig" },
   ];
-  if (nichtDabei)
-    eintraege.push({
-      cls: "border-dashed border-papier-linie text-tinte-leise dark:border-slate-600 dark:text-slate-500",
-      glyph: "–",
-      text: "nicht dabei",
-    });
+  const punkt = (e: (typeof eintraege)[number]) => (
+    <li key={e.text} className="flex min-w-0 items-center gap-1 whitespace-nowrap">
+      <span
+        aria-hidden
+        className={`flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-[5px] border text-[10px] leading-none ${e.fett ? "font-black" : "font-bold"} ${e.cls}`}
+      >
+        {e.glyph}
+      </span>
+      {e.text}
+    </li>
+  );
   return (
-    <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-[12px] text-tinte-matt dark:text-slate-300" aria-label="Legende">
-      {eintraege.map((e) => (
-        <li key={e.text} className="flex items-center gap-1.5">
-          <span
-            aria-hidden
-            className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border text-[11px] leading-none ${e.fett ? "font-black" : "font-bold"} ${e.cls}`}
-          >
-            {e.glyph}
-          </span>
-          {e.text}
-        </li>
-      ))}
-    </ul>
+    <div className="mt-3 text-[clamp(11px,3.1vw,12px)] text-tinte-matt dark:text-slate-300" aria-label="Legende">
+      <ul className="flex flex-nowrap items-center justify-between gap-x-2">{eintraege.map(punkt)}</ul>
+      {nichtDabei && (
+        <ul className="mt-1.5 flex">
+          {punkt({
+            cls: "border-dashed border-papier-linie text-tinte-leise dark:border-slate-600 dark:text-slate-500",
+            glyph: "–",
+            text: "nicht dabei (vor dem Eintritt)",
+          })}
+        </ul>
+      )}
+    </div>
   );
 }

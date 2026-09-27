@@ -1,9 +1,11 @@
 /**
  * Runder Fortschritt: die Prozentzahl groß in der Mitte.
  *
- * stufen: an diesen Prozentwerten sinkt der Aufschlag – dort sitzt außen ein
- * kleiner Strich. Der Strich der aktuellen Stufe (aktuellAb) ist in der
- * Markenfarbe, wie die aktuelle Kachel darunter.
+ * stufen: an diesen Prozentwerten sinkt der Aufschlag – dort schneidet ein
+ * Strich quer durch den Ring (dunkel mit hellem Rand, damit er auf dem
+ * gefüllten und dem leeren Teil gleich gut zu sehen ist). Der Strich der
+ * aktuellen Stufe (aktuellAb) ist in der Markenfarbe wie die aktuelle
+ * Kachel darunter und steht etwas über den Ring hinaus.
  */
 export function Ring({
   pct, klein, stufen, aktuellAb,
@@ -16,7 +18,7 @@ export function Ring({
   const mitStrichen = Boolean(stufen?.length);
   const r = klein ? 26 : 34;
   const dicke = klein ? 7 : 9;
-  const rand = mitStrichen ? 9 : 0; // Platz für die Striche außen
+  const rand = mitStrichen ? 4 : 0; // Platz für den überstehenden aktuellen Strich
   const groesse = (klein ? 68 : 88) + rand * 2;
   const mitte = groesse / 2;
   const umfang = 2 * Math.PI * r;
@@ -25,8 +27,8 @@ export function Ring({
   // 0 % und 100 % liegen am selben Punkt oben – nur einmal zeichnen
   const winkel = [...new Set((stufen || []).map((ab) => ((ab % 100) + 100) % 100))];
   const aktuellWinkel = aktuellAb == null ? null : ((aktuellAb % 100) + 100) % 100;
-  const innen = r + dicke / 2 + 1.5;
-  const aussen = innen + 6;
+  const innen = r - dicke / 2;
+  const aussen = r + dicke / 2;
 
   return (
     <div className="relative shrink-0" style={{ width: groesse, height: groesse }}>
@@ -49,17 +51,24 @@ export function Ring({
           const cos = Math.cos(rad);
           const sin = Math.sin(rad);
           const aktuell = w === aktuellWinkel;
+          const ueber = aktuell ? 3 : 0.5;
+          const pos = {
+            x1: mitte + (innen - ueber) * cos,
+            y1: mitte + (innen - ueber) * sin,
+            x2: mitte + (aussen + ueber) * cos,
+            y2: mitte + (aussen + ueber) * sin,
+          };
           return (
-            <line
-              key={w}
-              x1={mitte + innen * cos}
-              y1={mitte + innen * sin}
-              x2={mitte + aussen * cos}
-              y2={mitte + aussen * sin}
-              strokeLinecap="round"
-              strokeWidth={aktuell ? 3 : 2}
-              className={aktuell ? "stroke-brand" : "stroke-[rgb(118_118_128/0.45)]"}
-            />
+            <g key={w}>
+              {/* heller Rand in Kartenfarbe – trennt den Strich vom Ring */}
+              <line {...pos} strokeLinecap="round" strokeWidth={aktuell ? 6 : 4.5} className="stroke-white dark:stroke-slate-900" />
+              <line
+                {...pos}
+                strokeLinecap="round"
+                strokeWidth={aktuell ? 3 : 2}
+                className={aktuell ? "stroke-brand" : "stroke-tinte/70 dark:stroke-slate-300/80"}
+              />
+            </g>
           );
         })}
       </svg>

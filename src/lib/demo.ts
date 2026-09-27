@@ -1,7 +1,7 @@
 import { hasSupabase } from "./supabase";
 import type { Profile, Role } from "../auth/RoleProvider";
 import type { BankKonto, Student } from "./types";
-import type { Buchung } from "./finanzen";
+import type { Buchung, KassenKategorie } from "./finanzen";
 
 /**
  * Demo-Modus – nur ohne Datenbank (`npm run demo` oder lokaler Modus).
@@ -100,6 +100,12 @@ export const DEMO_KONTO: BankKonto = {
 };
 
 /** Ein paar erfundene Buchungen fürs Kassenbuch. */
+/** Zwei Posten mit eigener Farbe – so sieht man Einnahmen, Ausgaben und Gewinn. */
+export const DEMO_KATEGORIEN: KassenKategorie[] = [
+  { id: "demo-k1", name: "Lehrerkarten", farbe: "lila", art: "beide", sort: 1 },
+  { id: "demo-k2", name: "Waffelverkauf", farbe: "gelb", art: "beide", sort: 2 },
+];
+
 export function demoBuchungen(students: Student[]): Buchung[] {
   const heute = new Date();
   const tag = (vor: number) => {
@@ -144,5 +150,10 @@ export function demoBuchungen(students: Student[]): Buchung[] {
     b(20, -12000, "ausgabe", "Kaution Location", { anfrage_id: "demo-anfrage" }),
     b(35, 9340, "aktion", "Waffelstand Elternsprechtag"),
     b(40, 32000, "abgleich", "Abgleich mit der Bank"),
+    b(16, 40000, "aktion", "Lehrerkarten", { kategorie_id: "demo-k1" }),
+    b(28, -25000, "ausgabe", "Druck Lehrerkarten", { kategorie_id: "demo-k1" }),
+    b(6, 12040, "aktion", "Waffelverkauf", { kategorie_id: "demo-k2" }),
+    b(13, 9580, "aktion", "Waffelverkauf", { kategorie_id: "demo-k2" }),
+    b(13, -2150, "ausgabe", "Waffelteig", { kategorie_id: "demo-k2" }),
   ].sort((x, y) => (x.datum < y.datum ? 1 : -1));
 }
