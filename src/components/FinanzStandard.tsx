@@ -1,14 +1,14 @@
 import { useMemo } from "react";
-import { Icon } from "./Icon";
 import { useStore } from "../store";
 import { basisOffen } from "../lib/logic";
 import { committeeLabel } from "../lib/committees";
 import { hasSupabase } from "../lib/supabase";
 import { demoBuchungen } from "../lib/demo";
 import {
-  euro, euroKurz, uebersichtAus, useFinanzUebersicht,
+  euro, euroKurz, farbHex, postenFarbe, schuljahrVon, uebersichtAus, useFinanzUebersicht,
   type FinanzPosten, type FinanzUebersicht,
 } from "../lib/finanzen";
+import { useDunkel } from "../lib/dunkel";
 
 /**
  * Finanzen – Standard-Ansicht: was die ganze Stufe (und die Eltern) sehen.
@@ -59,10 +59,21 @@ function postenName(p: FinanzPosten): string {
 }
 
 export function FinanzStandardInhalt({ d }: { d: FinanzUebersicht }) {
+  const dunkel = useDunkel();
   const prozent = d.ziel_cent > 0 ? Math.max(0, Math.min(100, Math.round((d.stand_cent / d.ziel_cent) * 100))) : null;
   const beitraegeSumme = d.beitraege.reduce((n, b) => n + b.cent, 0);
-  const aktionen = d.posten.filter((p) => p.art === "aktion");
-  const weitere = d.posten.filter((p) => p.art !== "aktion");
+  const aktionen = d.posten.filter((p) => p.art === "aktion" || p.art === "kategorie");
+  const weitere = d.posten.filter((p) => p.art !== "aktion" && p.art !== "kategorie");
+
+  // Woher das Geld kommt – als farbige Abschnitte im Balken. Gleiche Farbe =
+  // ein Abschnitt; die Anteile richten sich nach den Einnahmen.
+  const abschnitte = (() => {
+    const m = new Map<string, number>();
+    if (beitraegeSumme > 0) m.set("blau", beitraegeSumme);
+    for (const p of d.posten) if (p.ein_cent > 0) m.set(postenFarbe(p), (m.get(postenFarbe(p)) || 0) + p.ein_cent);
+    const summe = [...m.values()].reduce((n, c) => n + c, 0);
+    return summe > 0 ? [...m.entries()].map(([farbe, cent]) => ({ farbe, anteil: cent / summe })) : [];
+  })();
 
   return (
     <div className="grid grid-cols-[minmax(0,1fr)] gap-3 pb-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-start">
@@ -92,7 +103,15 @@ export function FinanzStandardInhalt({ d }: { d: FinanzUebersicht }) {
               aria-valuenow={prozent}
               aria-label={`${prozent} Prozent vom Ziel ${d.ziel_titel}`}
             >
-              <div className="h-full rounded-full bg-brand transition-all" style={{ width: `${prozent}%` }} />
+              <div className="flex h-full overflow-hidden rounded-full transition-all" style={{ width: `${prozent}%` }}>
+                {abschnitte.length === 0 ? (
+                  <div className="h-full w-full bg-brand" />
+                ) : (
+                  abschnitte.map((a) => (
+                    <div key={a.farbe} className="h-full" style={{ width: `${a.anteil * 100}%`, background: farbHex(a.farbe, dunkel) }} />
+                  ))
+                )}
+              </div>
             </div>
             {d.ziel_cent > d.stand_cent && (
               <div className="mt-1.5 text-[12px] text-tinte-leise">Es fehlen noch {euroKurz(d.ziel_cent - d.stand_cent)}.</div>
@@ -101,9 +120,9 @@ export function FinanzStandardInhalt({ d }: { d: FinanzUebersicht }) {
         )}
 
         <dl className="mt-4 grid grid-cols-3 gap-2 text-center">
-          <Kennzahl titel="Rein" wert={euroKurz(d.einnahmen_cent)} ton="plus" />
-          <Kennzahl titel="Raus" wert={euroKurz(d.ausgaben_cent)} ton="minus" />
-          <Kennzahl titel="Beiträge offen" wert={euroKurz(d.offen_cent)} unter={`bis ${d.halbjahr}`} />
+          <Kennzahl titel="Einnahmen" wert={euroKurz(d.einnahmen_cent)} />
+          <Kennzahl titel="Ausgaben" wert={euroKurz(d.ausgaben_cent)} />
+          <Kennzahl titel="Elternbeiträge offen" wert={euroKurz(d.offen_cent)} unter={`fällig bis ${d.halbjahr} (${schuljahrVon(d.halbjahr)})`} />
         </dl>
       </section>
 
@@ -117,6 +136,7 @@ export function FinanzStandardInhalt({ d }: { d: FinanzUebersicht }) {
           <ul className="grid gap-2">
             {d.beitraege.map((b) => (
               <li key={b.phase} className="flex items-center gap-3 rounded-xl bg-papier-matt px-3 py-2.5 dark:bg-slate-800">
+                <Punkt hex={farbHex("blau", dunkel)} />
                 <span className="min-w-0 flex-1 truncate text-[14px] font-semibold">{PHASE_NAME[b.phase] ?? "Ohne Halbjahr"}</span>
                 <span className="zahl shrink-0 text-[15px] font-bold">{euro(b.cent)}</span>
               </li>
@@ -138,35 +158,34 @@ export function FinanzStandardInhalt({ d }: { d: FinanzUebersicht }) {
         ) : (
           <ul className="grid gap-2">
             {[...aktionen, ...weitere].map((p) => (
-              <PostenZeile key={`${p.art}|${p.titel}`} p={p} />
+              <PostenZeile key={`${p.art}|${p.titel}`} p={p} hex={farbHex(postenFarbe(p), dunkel)} />
             ))}
           </ul>
         )}
       </section>
 
-      <div className="flex items-start gap-2 rounded-2xl bg-[rgb(118_118_128/0.1)] px-4 py-3 text-[13px] leading-relaxed text-tinte-matt dark:text-slate-300 lg:col-span-2">
-        <span className="mt-0.5 shrink-0"><Icon name="info" size={16} /></span>
-        <span>
-          Das ist die Übersicht für alle. Einzelne Buchungen – und wer was bezahlt hat – sehen nur das Stufenteam,
-          der Kassenwart und der Aufsichtsrat.
-        </span>
-      </div>
     </div>
   );
 }
 
-function PostenZeile({ p }: { p: FinanzPosten }) {
+/** Farbpunkt – dieselbe Farbe wie der Abschnitt im Balken. */
+function Punkt({ hex }: { hex: string }) {
+  return <span aria-hidden className="h-2.5 w-2.5 shrink-0 self-center rounded-full" style={{ background: hex }} />;
+}
+
+function PostenZeile({ p, hex }: { p: FinanzPosten; hex: string }) {
   const saldo = p.ein_cent - p.aus_cent;
   return (
     <li className="rounded-xl bg-papier-matt px-3 py-2.5 dark:bg-slate-800">
       <div className="flex items-baseline gap-3">
+        <Punkt hex={hex} />
         <span className="min-w-0 flex-1 truncate text-[14px] font-semibold">{postenName(p)}</span>
         <span className={`zahl shrink-0 text-[15px] font-bold ${saldo < 0 ? "text-red-600 dark:text-red-400" : "text-bezahlt"}`}>
           {saldo < 0 ? "−" : "+"}{euro(Math.abs(saldo))}
         </span>
       </div>
       {(p.art === "aktion" || (p.ein_cent > 0 && p.aus_cent > 0)) && (
-        <div className="mt-0.5 flex flex-wrap gap-x-3 text-[12px] text-tinte-leise">
+        <div className="mt-0.5 flex flex-wrap gap-x-3 pl-[1.375rem] text-[12px] text-tinte-leise">
           <span>Einnahmen <span className="zahl font-semibold">{euroKurz(p.ein_cent)}</span></span>
           <span>Ausgaben <span className="zahl font-semibold">{euroKurz(p.aus_cent)}</span></span>
           <span>Total <span className="zahl font-semibold">{saldo < 0 ? "−" : ""}{euroKurz(Math.abs(saldo))}</span></span>
@@ -176,14 +195,13 @@ function PostenZeile({ p }: { p: FinanzPosten }) {
   );
 }
 
-function Kennzahl({ titel, wert, unter, ton }: { titel: string; wert: string; unter?: string; ton?: "plus" | "minus" }) {
+/** Zahlen ohne Wertung: Einnahmen, Ausgaben und Offenes in derselben Farbe. */
+function Kennzahl({ titel, wert, unter }: { titel: string; wert: string; unter?: string }) {
   return (
     <div className="min-w-0 rounded-xl bg-papier-matt px-2 py-2.5 dark:bg-slate-800">
-      <dt className="truncate text-[12px] font-medium text-tinte-leise">{titel}</dt>
-      <dd className={`zahl mt-0.5 truncate text-[16px] font-bold ${ton === "plus" ? "text-bezahlt" : ton === "minus" ? "text-red-600 dark:text-red-400" : ""}`}>
-        {wert}
-      </dd>
-      {unter && <dd className="truncate text-[11px] text-tinte-leise">{unter}</dd>}
+      <dt className="text-[12px] font-medium leading-tight text-tinte-leise">{titel}</dt>
+      <dd className="zahl mt-0.5 truncate text-[16px] font-bold">{wert}</dd>
+      {unter && <dd className="text-[11px] leading-tight text-tinte-leise">{unter}</dd>}
     </div>
   );
 }

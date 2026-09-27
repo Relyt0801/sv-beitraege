@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { HY } from "../lib/types";
-import { basisOffen, beitragFuer, prozentVon, punkteIndex, staffelVon, ticketBetrag } from "../lib/logic";
+import { basisOffen, beitragFuer, prozentVon, punkteIndex, ticketBetrag } from "../lib/logic";
 import { useStore } from "../store";
 import { useEltern } from "../eltern-store";
 import { useRole } from "../auth/RoleProvider";
-import { TermChip } from "./TermChip";
-import { Ring } from "./Ring";
+import { HalbjahrLegende, TermChip } from "./TermChip";
+import { StaffelKacheln, StaffelRing } from "./Staffel";
 import { BeitragsListe } from "./BeitragsListe";
 import { TicketErklaerung } from "./TicketErklaerung";
 import { Icon, type IconName } from "./Icon";
@@ -387,12 +387,7 @@ function KindKarte({
             </div>
           ))}
         </div>
-        <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[12px] text-tinte-leise">
-          <span>✓ bezahlt</span>
-          <span>€ offen</span>
-          <span>/ erlassen</span>
-          <span className="text-tinte-leise">grau = später fällig</span>
-        </div>
+        <HalbjahrLegende />
       </section>
 
       <div className="grid items-start gap-3 lg:grid-cols-2">
@@ -400,35 +395,14 @@ function KindKarte({
         <section className="card p-5" data-tour={erstes ? "kind-prozent" : undefined}>
           <div className="text-[15px] font-semibold">Mithilfe bei Aktionen</div>
           <div className="mt-3 flex items-center gap-4">
-            <Ring pct={pct} />
+            <StaffelRing pct={pct} settings={settings} />
             <div className="min-w-0 flex-1 text-[14px] leading-relaxed text-tinte-matt dark:text-slate-300">
-              Wer bei Aktionen mithilft, zahlt weniger Aufschlag auf das erste Abiball-Ticket.
+              Wenn Ihr Kind bei Aktionen mithilft, zahlt es weniger Aufschlag auf das 1. Abiball-Ticket.
             </div>
           </div>
 
           {/* Die Staffel zum Nachsehen: ab wie viel Prozent kostet das Ticket wie viel extra */}
-          <div className="mt-4 grid grid-cols-5 gap-1">
-            {staffelVon(settings).map((stufe) => {
-              const erreicht = pct >= stufe.ab;
-              const aktuell = staffelVon(settings).filter((x) => pct >= x.ab).pop()?.ab === stufe.ab;
-              return (
-                <div
-                  key={stufe.ab}
-                  className={`rounded-xl px-1 py-2 text-center transition ${
-                    aktuell
-                      ? "bg-brand text-white"
-                      : erreicht
-                        ? "bg-brand/[0.12] text-brand-dark dark:text-brand"
-                        : "bg-[rgb(118_118_128/0.1)] text-tinte-leise"
-                  }`}
-                >
-                  <div className="zahl text-[13px] font-bold leading-none">{stufe.ab} %</div>
-                  <div className="zahl mt-1 text-[11px] font-medium leading-none">+{stufe.betrag} €</div>
-                </div>
-              );
-            })}
-          </div>
-          <div className="mt-1.5 text-[12px] text-tinte-leise">Aufschlag aufs erste Ticket</div>
+          <StaffelKacheln pct={pct} settings={settings} />
         </section>
 
         <TicketErklaerung settings={settings} zusatz={ticketBetrag(pct, settings)} prozent={pct} fuerEltern />

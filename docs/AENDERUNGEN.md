@@ -1,4 +1,4 @@
-# Änderungen – Stand 25.09.2026
+# Änderungen – Stand 27.09.2026
 
 Diese Datei erklärt, was sich in den letzten Runden geändert hat, **wo** es im
 Code steht und **warum** es so gebaut ist. Die Kommentare im Code selbst sind
@@ -8,6 +8,38 @@ ausführlich (auf Deutsch); hier steht der Überblick dazu.
 > Bankdaten, der `service_role`-Schlüssel und der VAPID Private Key liegen nur
 > in der Datenbank bzw. als Supabase-Secret. `privat/` ist per `.gitignore`
 > ausgeschlossen. Bitte so beibehalten.
+
+---
+
+
+## 27.09.2026: Rückmeldungen der Eltern (Kasse, Mithilfe, Finanzen)
+
+SQL dazu: `supabase/finanzen-kategorien.sql` (in der Datenbank eingespielt).
+Es gibt dazu keine Mitteilung und keine neue Einführung – die App
+aktualisiert sich still.
+
+- **Mithilfe:** Eltern lesen „Wenn Ihr Kind bei Aktionen mithilft, zahlt es
+  weniger Aufschlag auf das 1. Abiball-Ticket.“ Über den Kacheln steht
+  „Aufschlag aufs erste Ticket“ (`StaffelKacheln` in `Staffel.tsx`, auch in
+  der Schüleransicht).
+- **Prozent-Ring:** außen ein kleiner Strich an jeder Stufe, an der der
+  Aufschlag sinkt; der Strich der aktuellen Stufe in der Markenfarbe – wie
+  die aktuelle Kachel (`Ring.tsx`, `StaffelRing`).
+- **Legende der Halbjahre:** statt Text-Zeichen dieselben Kästchen wie oben
+  (Farbe, Rand, ✓ € /), in Eltern- und Schüleransicht (`HalbjahrLegende`).
+- **Finanzen:** Hinweis „Das ist die Übersicht für alle …“ entfernt.
+  „Rein/Raus“ heißt jetzt „Einnahmen/Ausgaben“, alle Zahlen in derselben
+  Farbe. „Beiträge offen“ heißt „Elternbeiträge offen – fällig bis Q1.1
+  (2026/27)“ (`schuljahrVon()`).
+- **Kategorien mit Farbe** fürs Kassenbuch (`kasse_kategorien`,
+  `kasse_buchungen.kategorie_id`): beim Buchen wählen oder neu anlegen, später
+  im Detail ändern, im Zahnrad verwalten. Mehrere Kategorien dürfen dieselbe
+  Farbe haben. Die Farbe steht im Kreis (Erweitert), im Fortschrittsbalken
+  (Standard, Abschnitte nach Farbe) und als Punkt an jeder Zeile. Ohne
+  Kategorie gilt die Farbe der Herkunft (Beiträge blau, Aktionen orange …).
+  Die Standard-Ansicht bekommt die Farben über `finanz_uebersicht()` – die
+  Buchungen selbst sehen weiterhin nur Kassenwart, Team und Aufsichtsrat.
+- Rechte-Test: 129 Fälle (neu: Kategorie anlegen – nur mit `finanzen.manage`).
 
 ---
 

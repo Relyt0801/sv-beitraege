@@ -8,8 +8,9 @@ import { FinanzStandard } from "./FinanzStandard";
 import { useNachschub } from "../lib/liste";
 import { COMMITTEES, committeeIcon, committeeLabel } from "../lib/committees";
 import {
-  EINNAHME_QUELLEN, QUELLE_NAME, centAus, euro, euroKurz, useFinanzen,
-  type Buchung, type FinanzenValue, type Quelle,
+  EINNAHME_QUELLEN, KASSEN_FARBEN, QUELLE_NAME, STANDARD_FARBE, buchungFarbe, centAus, euro, euroKurz, farbHex,
+  schuljahrVon, useFinanzen,
+  type Buchung, type FinanzenValue, type KassenKategorie, type Quelle,
 } from "../lib/finanzen";
 import type { KostenAnfrage, KostenValue } from "../lib/kosten";
 import { Sheet, SheetKopf } from "./Sheet";
@@ -17,16 +18,7 @@ import { Avatar } from "./Avatar";
 import { Icon, type IconName } from "./Icon";
 
 import { frage, meldeFehler } from "../lib/melder";
-/** Folgt dem Hell/Dunkel-Schalter der App (Klasse "dark" am <html>). */
-function useDunkel(): boolean {
-  const [dunkel, setDunkel] = useState(() => document.documentElement.classList.contains("dark"));
-  useEffect(() => {
-    const beob = new MutationObserver(() => setDunkel(document.documentElement.classList.contains("dark")));
-    beob.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
-    return () => beob.disconnect();
-  }, []);
-  return dunkel;
-}
+import { useDunkel } from "../lib/dunkel";
 
 const heute = () => new Date().toISOString().slice(0, 10);
 const kurzTag = (d: string) =>
@@ -69,6 +61,8 @@ export function FinanzenTab({ kosten }: { kosten: KostenValue }) {
     let ein = 0;
     let aus = 0;
     const jeQuelle: Record<string, number> = { beitrag: 0, aktion: 0, spende: 0, sonstiges: 0 };
+    // Einnahmen je Kategorie (eigene Farbe) bzw. je Herkunft – für den Kreis
+    const gruppen = new Map<string, { key: string; label: string; farbe: string; cent: number }>();
     let letzterAbgleich: string | null = null;
     let abgleich = 0;
     for (const b of fin.buchungen) {
@@ -84,9 +78,19 @@ export function FinanzenTab({ kosten }: { kosten: KostenValue }) {
       }
       ein += b.cent;
       jeQuelle[b.quelle] = (jeQuelle[b.quelle] || 0) + b.cent;
+      const kat = b.kategorie_id ? fin.kategorien.find((k) => k.id === b.kategorie_id) : null;
+      const key = kat ? `k:${kat.id}` : `q:${b.quelle}`;
+      const g = gruppen.get(key) || {
+        key,
+        label: kat ? kat.name : EINNAHME_QUELLEN.find((q) => q.key === b.quelle)?.label || QUELLE_NAME[b.quelle],
+        farbe: kat ? kat.farbe : STANDARD_FARBE[b.quelle] || "grau",
+        cent: 0,
+      };
+      g.cent += b.cent;
+      gruppen.set(key, g);
     }
-    return { stand, ein, aus, jeQuelle, letzterAbgleich, abgleich };
-  }, [fin.buchungen]);
+    return { stand, ein, aus, jeQuelle, letzterAbgleich, abgleich, gruppen: [...gruppen.values()].sort((a, b) => b.cent - a.cent) };
+  }, [fin.buchungen, fin.kategorien]);
 
   const offen = useMemo(() => {
     let cent = 0;
@@ -188,7 +192,14 @@ export function FinanzenTab({ kosten }: { kosten: KostenValue }) {
       )}
 
       {/* ================================================ Verlauf */}
-      <VerlaufKarte buchungen={fin.buchungen} darf={darfBuchen} onLoeschen={fin.loeschen} aktionName={aktionName} />
+      <VerlaufKarte
+        buchungen={fin.buchungen}
+        kategorien={fin.kategorien}
+        darf={darfBuchen}
+        onLoeschen={fin.loeschen}
+        onKategorie={fin.buchungKategorie}
+        aktionName={aktionName}
+      />
 
       {darfBuchen && (
         <>
@@ -197,6 +208,8 @@ export function FinanzenTab({ kosten }: { kosten: KostenValue }) {
             onClose={() => setBuchen(null)}
             onBuchen={fin.buchen}
             aktionen={aktionen}
+            kategorien={fin.kategorien}
+            onKategorieNeu={fin.kategorieSpeichern}
           />
           <EinstellungenSheet
             open={einstellungen}
@@ -238,7 +251,10 @@ function AnsichtWahl({ ansicht, setAnsicht }: { ansicht: "standard" | "erweitert
 function UebersichtKarte({
   zahlen, offen, halbjahr, ziel, darf, onEinstellungen,
 }: {
-  zahlen: { stand: number; ein: number; aus: number; jeQuelle: Record<string, number>; letzterAbgleich: string | null; abgleich: number };
+  zahlen: {
+    stand: number; ein: number; aus: number; jeQuelle: Record<string, number>; letzterAbgleich: string | null; abgleich: number;
+    gruppen: { key: string; label: string; farbe: string; cent: number }[];
+  };
   /** null: wer nicht alle Personen sieht, bekäme hier eine falsche Summe */
   offen: { cent: number; personen: number } | null;
   halbjahr: string;
@@ -247,11 +263,8 @@ function UebersichtKarte({
   onEinstellungen: () => void;
 }) {
   const dunkel = useDunkel();
-  const teile = EINNAHME_QUELLEN.map((q) => ({
-    ...q,
-    farbe: dunkel ? q.dunkel : q.hell,
-    cent: Math.max(0, zahlen.jeQuelle[q.key] || 0),
-  }));
+  // Jede Kategorie bzw. Herkunft ein Bogen – in ihrer Farbe
+  const teile = zahlen.gruppen.map((g) => ({ key: g.key, label: g.label, farbe: farbHex(g.farbe, dunkel), cent: Math.max(0, g.cent) }));
   const summe = teile.reduce((n, t) => n + t.cent, 0);
   const ganz = ziel.ziel_cent > 0 ? Math.max(ziel.ziel_cent, summe) : summe;
   const prozent = ziel.ziel_cent > 0 ? Math.round((summe / ziel.ziel_cent) * 100) : null;
@@ -270,12 +283,12 @@ function UebersichtKarte({
           </div>
           <div className="mt-1.5 text-[12px] text-tinte-leise">
             {zahlen.letzterAbgleich
-              ? `Rein − Raus ${zahlen.abgleich >= 0 ? "+" : "−"} ${euro(Math.abs(zahlen.abgleich))} Bankabgleich · zuletzt ${new Date(zahlen.letzterAbgleich).toLocaleDateString("de-DE")}`
+              ? `Einnahmen − Ausgaben ${zahlen.abgleich >= 0 ? "+" : "−"} ${euro(Math.abs(zahlen.abgleich))} Bankabgleich · zuletzt ${new Date(zahlen.letzterAbgleich).toLocaleDateString("de-DE")}`
               : "noch nicht mit der Bank abgeglichen"}
           </div>
         </div>
         {darf && (
-          <button onClick={onEinstellungen} className="iconbtn shrink-0" aria-label="Ziel und Bankabgleich" title="Ziel und Bankabgleich">
+          <button onClick={onEinstellungen} className="iconbtn shrink-0" aria-label="Ziel, Kategorien und Bankabgleich" title="Ziel, Kategorien und Bankabgleich">
             <Icon name="regler" size={19} />
           </button>
         )}
@@ -283,9 +296,15 @@ function UebersichtKarte({
 
       {/* Drei Zahlen in einer Zeile */}
       <dl className={`mt-4 grid gap-2 text-center ${offen ? "grid-cols-3" : "grid-cols-2"}`}>
-        <Zahl titel="Rein" wert={euroKurz(zahlen.ein)} ton="plus" />
-        <Zahl titel="Raus" wert={euroKurz(zahlen.aus)} ton="minus" />
-        {offen && <Zahl titel="Noch offen" wert={euroKurz(offen.cent)} unter={`${offen.personen} Pers. · ${halbjahr}`} />}
+        <Zahl titel="Einnahmen" wert={euroKurz(zahlen.ein)} />
+        <Zahl titel="Ausgaben" wert={euroKurz(zahlen.aus)} />
+        {offen && (
+          <Zahl
+            titel="Elternbeiträge offen"
+            wert={euroKurz(offen.cent)}
+            unter={`${offen.personen} Pers. · fällig bis ${halbjahr} (${schuljahrVon(halbjahr)})`}
+          />
+        )}
       </dl>
 
       {/* Kreis + Legende */}
@@ -298,7 +317,7 @@ function UebersichtKarte({
           <ul className="grid grid-cols-[minmax(0,1fr)] gap-1.5">
             {teile.map((t) => (
               <li key={t.key} className="flex items-center gap-2.5 text-[13px]">
-                <span className="h-3 w-3 shrink-0 rounded-[3px]" style={{ background: t.farbe }} />
+                <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: t.farbe }} />
                 <span className="min-w-0 flex-1 truncate font-semibold">{t.label}</span>
                 <span className="zahl shrink-0 font-bold">{euroKurz(t.cent)}</span>
               </li>
@@ -317,18 +336,13 @@ function UebersichtKarte({
   );
 }
 
-function Zahl({ titel, wert, unter, ton }: { titel: string; wert: string; unter?: string; ton?: "plus" | "minus" }) {
+/** Zahlen ohne Wertung – alle in derselben Farbe. */
+function Zahl({ titel, wert, unter }: { titel: string; wert: string; unter?: string }) {
   return (
     <div className="min-w-0 rounded-2xl bg-papier px-2 py-2.5 dark:bg-slate-800/70">
-      <dt className="text-[12px] font-medium text-tinte-leise">{titel}</dt>
-      <dd
-        className={`zahl mt-0.5 truncate text-[16px] font-bold leading-tight ${
-          ton === "plus" ? "text-bezahlt dark:text-emerald-400" : ton === "minus" ? "text-red-600 dark:text-red-400" : ""
-        }`}
-      >
-        {wert}
-      </dd>
-      {unter && <dd className="mt-0.5 truncate text-[11px] text-tinte-leise">{unter}</dd>}
+      <dt className="text-[12px] font-medium leading-tight text-tinte-leise">{titel}</dt>
+      <dd className="zahl mt-0.5 truncate text-[16px] font-bold leading-tight">{wert}</dd>
+      {unter && <dd className="mt-0.5 text-[11px] leading-tight text-tinte-leise">{unter}</dd>}
     </div>
   );
 }
@@ -340,13 +354,16 @@ function Zahl({ titel, wert, unter, ton }: { titel: string; wert: string; unter?
  * Die Beschreibung ist freiwillig – ohne steht dort die Zuordnung.
  */
 function BuchungSheet({
-  art, onClose, onBuchen, aktionen,
+  art, onClose, onBuchen, aktionen, kategorien, onKategorieNeu,
 }: {
   art: "ein" | "aus" | null;
   onClose: () => void;
   onBuchen: FinanzenValue["buchen"];
   aktionen: { id: string; titel: string; icon: string }[];
+  kategorien: KassenKategorie[];
+  onKategorieNeu: FinanzenValue["kategorieSpeichern"];
 }) {
+  const [kategorie, setKategorie] = useState<string | null>(null);
   const [typ, setTyp] = useState<"ein" | "aus">("ein");
   const [betrag, setBetrag] = useState("");
   const [datum, setDatum] = useState(heute());
@@ -363,6 +380,7 @@ function BuchungSheet({
     setZu("");
     setTitel("");
     setFehler("");
+    setKategorie(null);
   }, [art]);
 
   // Zuordnung als "aktion:<id>", "komitee:<slug>" oder eine Quelle
@@ -393,6 +411,7 @@ function BuchungSheet({
       titel: titel.trim() || z.name,
       aktion_id: z.aktion_id,
       komitee: z.komitee,
+      kategorie_id: kategorie,
     });
     setBusy(false);
     if (f) return setFehler("Hat nicht geklappt: " + f);
@@ -461,6 +480,14 @@ function BuchungSheet({
         </div>
       </div>
 
+      <label className="mt-3 block text-[13px] font-medium text-tinte-leise">Kategorie und Farbe (freiwillig)</label>
+      <KategorieWahl
+        kategorien={kategorien.filter((k) => k.art === "beide" || k.art === typ)}
+        wert={kategorie}
+        setzen={setKategorie}
+        onNeu={(name, farbe) => onKategorieNeu({ name, farbe, art: typ })}
+      />
+
       <label className="mt-3 block text-[13px] font-medium text-tinte-leise">Bezeichnung (freiwillig)</label>
       <input
         className="field mt-1"
@@ -478,6 +505,104 @@ function BuchungSheet({
         Stufenbeiträge buchen sich von selbst, sobald sie auf „bezahlt“ stehen.
       </p>
     </Sheet>
+  );
+}
+
+/**
+ * Kategorie wählen – oder gleich eine neue mit Farbe anlegen. Mehrere
+ * Kategorien dürfen dieselbe Farbe haben (z. B. „Deko“ und „Druck“ beide lila).
+ */
+function KategorieWahl({
+  kategorien, wert, setzen, onNeu,
+}: {
+  kategorien: KassenKategorie[];
+  wert: string | null;
+  setzen: (id: string | null) => void;
+  onNeu?: (name: string, farbe: string) => Promise<string | null>;
+}) {
+  const dunkel = useDunkel();
+  const [neu, setNeu] = useState(false);
+  const [name, setName] = useState("");
+  const [farbe, setFarbe] = useState("blau");
+  const [fehler, setFehler] = useState("");
+  return (
+    <div className="mt-1">
+      <div className="flex flex-wrap gap-1.5">
+        <button
+          type="button"
+          onClick={() => setzen(null)}
+          className={`rounded-full border px-3 py-1.5 text-[13px] font-semibold ${
+            wert === null ? "border-brand text-brand" : "border-papier-linie text-tinte-leise dark:border-slate-700"
+          }`}
+        >
+          keine
+        </button>
+        {kategorien.map((k) => (
+          <button
+            type="button"
+            key={k.id}
+            onClick={() => setzen(k.id)}
+            className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[13px] font-semibold ${
+              wert === k.id ? "border-brand bg-brand/10" : "border-papier-linie dark:border-slate-700"
+            }`}
+          >
+            <span className="h-2.5 w-2.5 rounded-full" style={{ background: farbHex(k.farbe, dunkel) }} />
+            {k.name}
+          </button>
+        ))}
+        {onNeu && !neu && (
+          <button type="button" onClick={() => setNeu(true)} className="rounded-full px-3 py-1.5 text-[13px] font-bold text-brand">
+            ＋ neue Kategorie
+          </button>
+        )}
+      </div>
+      {neu && onNeu && (
+        <div className="mt-2 rounded-2xl border border-papier-linie p-2.5 dark:border-slate-700">
+          <input className="field" placeholder="z. B. Deko, Druck, Getränke" maxLength={40} value={name} onChange={(e) => setName(e.target.value)} />
+          <FarbWahl wert={farbe} setzen={setFarbe} />
+          {fehler && <p className="mt-1 text-[12px] font-semibold text-amber-600">{fehler}</p>}
+          <div className="mt-2 flex gap-2">
+            <button
+              type="button"
+              onClick={async () => {
+                const f = await onNeu(name, farbe);
+                if (f) return setFehler(f);
+                setNeu(false);
+                setName("");
+                setFehler("");
+              }}
+              className="flex-1 rounded-xl bg-brand py-2 text-[14px] font-bold text-white"
+            >
+              Anlegen
+            </button>
+            <button type="button" onClick={() => setNeu(false)} className="rounded-xl px-3 text-[14px] font-semibold text-tinte-leise">
+              Abbrechen
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function FarbWahl({ wert, setzen }: { wert: string; setzen: (f: string) => void }) {
+  const dunkel = useDunkel();
+  return (
+    <div className="mt-2 flex flex-wrap gap-1.5" role="radiogroup" aria-label="Farbe">
+      {KASSEN_FARBEN.map((f) => (
+        <button
+          type="button"
+          key={f.key}
+          role="radio"
+          aria-checked={wert === f.key}
+          aria-label={f.name}
+          title={f.name}
+          onClick={() => setzen(f.key)}
+          className={`h-8 w-8 rounded-full transition ${wert === f.key ? "ring-2 ring-brand ring-offset-2 dark:ring-offset-slate-900" : ""}`}
+          style={{ background: dunkel ? f.dunkel : f.hell }}
+        />
+      ))}
+    </div>
   );
 }
 
@@ -509,7 +634,7 @@ function EinstellungenSheet({
 
   return (
     <Sheet open={open} onClose={onClose}>
-      <SheetKopf titel="Ziel & Bank" onClose={onClose} />
+      <SheetKopf titel="Ziel, Kategorien & Bank" onClose={onClose} />
 
       <h3 className="text-[15px] font-semibold">Sparziel</h3>
       <div className="mt-1.5 grid grid-cols-[minmax(0,1fr)_8rem] gap-2">
@@ -563,7 +688,98 @@ function EinstellungenSheet({
           {diff === 0 ? "Stimmt genau mit dem Kassenbuch überein." : `Unterschied: ${diff > 0 ? "+" : "−"} ${euro(Math.abs(diff))}`}
         </p>
       )}
+
+      <h3 className="mt-6 text-[15px] font-semibold">Kategorien</h3>
+      <p className="text-[12px] text-tinte-leise">
+        Die Farbe steht im Kreis, im Balken der Übersicht und als Punkt an jeder Zeile. Mehrere Kategorien dürfen
+        dieselbe Farbe haben.
+      </p>
+      <KategorienVerwalten fin={fin} />
     </Sheet>
+  );
+}
+
+function KategorienVerwalten({ fin }: { fin: FinanzenValue }) {
+  const dunkel = useDunkel();
+  const [offen, setOffen] = useState<string | null>(null);
+  const [name, setName] = useState("");
+  const [farbe, setFarbe] = useState("blau");
+  const [artWahl, setArtWahl] = useState<KassenKategorie["art"]>("beide");
+
+  function bearbeiten(k: KassenKategorie | null) {
+    setOffen(k ? k.id : "neu");
+    setName(k?.name ?? "");
+    setFarbe(k?.farbe ?? "blau");
+    setArtWahl(k?.art ?? "beide");
+  }
+
+  async function speichern() {
+    const f = await fin.kategorieSpeichern({ id: offen === "neu" ? undefined : offen ?? undefined, name, farbe, art: artWahl });
+    if (f) meldeFehler("Hat nicht geklappt: " + f);
+    else setOffen(null);
+  }
+
+  const formular = (
+    <div className="mt-1.5 rounded-2xl border border-papier-linie p-2.5 dark:border-slate-700">
+      <input className="field" placeholder="Name der Kategorie" maxLength={40} value={name} onChange={(e) => setName(e.target.value)} />
+      <FarbWahl wert={farbe} setzen={setFarbe} />
+      <div className="seg mt-2" role="radiogroup" aria-label="Für welche Buchungen">
+        {([["beide", "Beides"], ["ein", "Einnahmen"], ["aus", "Ausgaben"]] as const).map(([k, l]) => (
+          <button key={k} type="button" role="radio" aria-checked={artWahl === k} onClick={() => setArtWahl(k)} className={`seg-item !py-1.5 !text-[13px] ${artWahl === k ? "seg-aktiv" : ""}`}>
+            {l}
+          </button>
+        ))}
+      </div>
+      <div className="mt-2 flex gap-2">
+        <button type="button" onClick={() => void speichern()} className="flex-1 rounded-xl bg-brand py-2 text-[14px] font-bold text-white">
+          Speichern
+        </button>
+        <button type="button" onClick={() => setOffen(null)} className="rounded-xl px-3 text-[14px] font-semibold text-tinte-leise">
+          Abbrechen
+        </button>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="mt-1.5">
+      <ul className="grid gap-1.5">
+        {fin.kategorien.map((k) => (
+          <li key={k.id}>
+            <div className="flex items-center gap-2.5 rounded-xl bg-papier px-3 py-2 dark:bg-slate-800/70">
+              <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: farbHex(k.farbe, dunkel) }} />
+              <span className="min-w-0 flex-1 truncate text-[14px] font-semibold">{k.name}</span>
+              <span className="shrink-0 text-[11px] text-tinte-leise">
+                {k.art === "ein" ? "Einnahmen" : k.art === "aus" ? "Ausgaben" : "beides"}
+              </span>
+              <button type="button" onClick={() => bearbeiten(k)} className="shrink-0 text-[13px] font-bold text-brand">
+                ändern
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  if (!(await frage(`Kategorie „${k.name}“ löschen? Die Buchungen bleiben, sie verlieren nur die Farbe.`, "Löschen", true))) return;
+                  const f = await fin.kategorieLoeschen(k.id);
+                  if (f) meldeFehler("Löschen hat nicht geklappt: " + f);
+                }}
+                className="shrink-0 text-[13px] font-bold text-red-500"
+                aria-label={`${k.name} löschen`}
+              >
+                ✕
+              </button>
+            </div>
+            {offen === k.id && formular}
+          </li>
+        ))}
+      </ul>
+      {offen === "neu" ? (
+        formular
+      ) : (
+        <button type="button" onClick={() => bearbeiten(null)} className="mt-2 text-[14px] font-bold text-brand">
+          ＋ Kategorie anlegen
+        </button>
+      )}
+    </div>
   );
 }
 
@@ -889,24 +1105,26 @@ function AnfrageDetailSheet({
 
 type Filter = "alle" | "ein" | "aus";
 
-/** Wie eine Buchungsart aussieht: Farbe der Kachel und Zeichen darin. */
-function art(b: Buchung): { farbe: string; icon: IconName; name: string } {
+/** Wie eine Buchungsart aussieht: Farbe der Kachel (Kategorie vor Herkunft) und Zeichen darin. */
+function art(b: Buchung, kategorien: KassenKategorie[] = []): { farbe: string; icon: IconName; name: string } {
   if (b.quelle === "abgleich") return { farbe: "#8E8E93", icon: "bank", name: "Abgleich mit der Bank" };
-  if (b.cent < 0) return { farbe: "#E5484D", icon: "pfeil-raus", name: b.quelle === "beitrag" ? "Beitrag zurückgenommen" : "Ausgabe" };
-  const q = EINNAHME_QUELLEN.find((x) => x.key === b.quelle);
+  const hex = farbHex(buchungFarbe(b, kategorien));
+  if (b.cent < 0) return { farbe: hex, icon: "pfeil-raus", name: b.quelle === "beitrag" ? "Beitrag zurückgenommen" : "Ausgabe" };
   const icon: IconName = b.quelle === "beitrag" ? "kasse" : b.quelle === "aktion" ? "events" : b.quelle === "spende" ? "herz" : "pfeil-rein";
-  return { farbe: q?.hell ?? "#8E8E93", icon, name: QUELLE_NAME[b.quelle] };
+  return { farbe: hex, icon, name: QUELLE_NAME[b.quelle] };
 }
 
 const monatName = (m: string) =>
   new Date(m + "-01T12:00:00").toLocaleDateString("de-DE", { month: "long", year: "numeric" });
 
 function VerlaufKarte({
-  buchungen, darf, onLoeschen, aktionName,
+  buchungen, kategorien, darf, onLoeschen, onKategorie, aktionName,
 }: {
   buchungen: Buchung[];
+  kategorien: KassenKategorie[];
   darf: boolean;
   onLoeschen: (id: string) => Promise<string | null>;
+  onKategorie: FinanzenValue["buchungKategorie"];
   aktionName: (id: string) => string;
 }) {
   const [filter, setFilter] = useState<Filter>("alle");
@@ -985,7 +1203,7 @@ function VerlaufKarte({
                 </div>
                 <ul className="liste border border-black/[0.04] dark:border-white/[0.06]">
                   {zeilen.map((b) => (
-                    <Zeile key={b.id} b={b} aktionName={aktionName} onOeffnen={() => setAuswahl(b)} />
+                    <Zeile key={b.id} b={b} kategorien={kategorien} aktionName={aktionName} onOeffnen={() => setAuswahl(b)} />
                   ))}
                 </ul>
               </div>
@@ -996,10 +1214,12 @@ function VerlaufKarte({
       )}
 
       <BuchungDetail
-        buchung={auswahl}
+        buchung={auswahl ? buchungen.find((x) => x.id === auswahl.id) ?? auswahl : null}
+        kategorien={kategorien}
         onClose={() => setAuswahl(null)}
         darf={darf}
         onLoeschen={onLoeschen}
+        onKategorie={onKategorie}
         aktionName={aktionName}
       />
     </section>
@@ -1007,8 +1227,8 @@ function VerlaufKarte({
 }
 
 /** Farbige Kachel mit Zeichen – wie in der Wallet-App. */
-function Kachel({ b, gross }: { b: Buchung; gross?: boolean }) {
-  const a = art(b);
+function Kachel({ b, gross, kategorien }: { b: Buchung; gross?: boolean; kategorien: KassenKategorie[] }) {
+  const a = art(b, kategorien);
   return (
     <span
       className={`flex shrink-0 items-center justify-center text-white ${gross ? "h-14 w-14 rounded-[1rem]" : "h-9 w-9 rounded-[0.65rem]"}`}
@@ -1033,20 +1253,22 @@ function Betrag({ b, gross }: { b: Buchung; gross?: boolean }) {
 }
 
 function Zeile({
-  b, aktionName, onOeffnen,
+  b, kategorien, aktionName, onOeffnen,
 }: {
   b: Buchung;
+  kategorien: KassenKategorie[];
   aktionName: (id: string) => string;
   onOeffnen: () => void;
 }) {
-  const zu = zuweisungText(b, aktionName);
+  const kat = b.kategorie_id ? kategorien.find((k) => k.id === b.kategorie_id) : null;
+  const zu = kat ? kat.name : zuweisungText(b, aktionName);
   return (
     <li>
       <button
         onClick={onOeffnen}
         className="flex w-full items-center gap-3 px-4 py-2.5 text-left transition hover:bg-black/[0.02] active:bg-black/[0.05] dark:hover:bg-white/[0.03] dark:active:bg-white/[0.07]"
       >
-        <Kachel b={b} />
+        <Kachel b={b} kategorien={kategorien} />
         <span className="min-w-0 flex-1">
           <span className="block truncate text-[15px] font-medium">{b.titel || zu}</span>
           <span className="block truncate text-[13px] text-tinte-leise">
@@ -1065,12 +1287,14 @@ function Zeile({
  * Titel, darunter eine Liste mit je einer Angabe pro Zeile.
  */
 function BuchungDetail({
-  buchung, onClose, darf, onLoeschen, aktionName,
+  buchung, kategorien, onClose, darf, onLoeschen, onKategorie, aktionName,
 }: {
   buchung: Buchung | null;
+  kategorien: KassenKategorie[];
   onClose: () => void;
   darf: boolean;
   onLoeschen: (id: string) => Promise<string | null>;
+  onKategorie: FinanzenValue["buchungKategorie"];
   aktionName: (id: string) => string;
 }) {
   const { profile } = useProfiles();
@@ -1078,7 +1302,8 @@ function BuchungDetail({
   const [busy, setBusy] = useState(false);
   if (!buchung) return null;
   const b = buchung;
-  const a = art(b);
+  const a = art(b, kategorien);
+  const kat = b.kategorie_id ? kategorien.find((k) => k.id === b.kategorie_id) : null;
   const person = b.student_id ? students.find((x) => x.id === b.student_id) : null;
   const wer = b.created_by ? profile[b.created_by]?.anzeigename : null;
   const erfasst = new Date(b.created_at);
@@ -1090,7 +1315,8 @@ function BuchungDetail({
     ["Status", b.automatisch ? "Automatisch gebucht" : "Gebucht"],
     ["Art", artName],
   ];
-  if (kategorie !== artName) zeilen.push(["Kategorie", kategorie]);
+  if (kat) zeilen.push(["Kategorie", kat.name]);
+  else if (kategorie !== artName) zeilen.push(["Herkunft", kategorie]);
   if (b.aktion_id && aktionName(b.aktion_id)) zeilen.push(["Aktion", aktionName(b.aktion_id)]);
   if (b.komitee) zeilen.push(["Komitee", committeeLabel(b.komitee)]);
   if (person) zeilen.push(["Person", `${person.vorname} ${person.nachname}`]);
@@ -1120,7 +1346,7 @@ function BuchungDetail({
 
       {/* Kopf: Kachel, Betrag, Titel, Datum */}
       <div className="flex flex-col items-center px-2 pb-5 pt-1 text-center">
-        <Kachel b={b} gross />
+        <Kachel b={b} gross kategorien={kategorien} />
         <div className="mt-4">
           <Betrag b={b} gross />
         </div>
@@ -1138,6 +1364,19 @@ function BuchungDetail({
           </div>
         ))}
       </dl>
+
+      {darf && !b.automatisch && b.quelle !== "abgleich" && (
+        <div className="mt-3 px-1">
+          <div className="text-[13px] font-medium text-tinte-leise">Kategorie und Farbe</div>
+          <KategorieWahl
+            kategorien={kategorien.filter((k) => k.art === "beide" || k.art === (b.cent < 0 ? "aus" : "ein"))}
+            wert={b.kategorie_id ?? null}
+            setzen={(id) => {
+              void onKategorie(b.id, id).then((f) => { if (f) meldeFehler("Ändern hat nicht geklappt: " + f); });
+            }}
+          />
+        </div>
+      )}
 
       {b.automatisch && (
         <p className="mt-3 px-4 text-[13px] leading-relaxed text-tinte-leise">

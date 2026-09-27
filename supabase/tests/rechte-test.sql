@@ -1,7 +1,7 @@
 -- ============================================================
--- Rechte-Test: Wer darf was? (Stand 25.09.2026)
+-- Rechte-Test: Wer darf was? (Stand 27.09.2026)
 --
--- Spielt 127 Angriffe und erlaubte Aktionen mit echten Konten JEDER Rolle
+-- Spielt 131 Angriffe und erlaubte Aktionen mit echten Konten JEDER Rolle
 -- durch – direkt in der Datenbank, genau so, wie es ein Angreifer über die
 -- Schnittstelle versuchen würde (Rolle "authenticated" bzw. "anon" mit der
 -- Kennung der Person, Zugriffsregeln greifen wie in der App).
@@ -179,7 +179,11 @@ insert into faelle values
   ('s_komitee', 'Fremde Nachricht umschreiben', 'update topic_items set body=''x'' where topic_id=''{CHAT_EIGEN}'' and created_by is distinct from auth.uid() and type <> ''todo''', 'V'),
   -- Mithilfe: der Urheber steht fest (mithilfe-nachvollziehen.sql). "erlaubt" hieße: gefälschter Name bleibt stehen.
   ('stufenteam', 'Mithilfe unter fremdem Namen eintragen', 'with x as (insert into contributions(student_id,titel,punkte,created_by) values (''{S_FREMD}'',''x'',5,''{UID_ADMIN}'') returning created_by) select 1 from x where created_by = ''{UID_ADMIN}''', 'V'),
-  ('stufenteam', 'Punkte für laufende Schicht vergeben', 'select schicht_abschliessen(''{SCHICHT_OFFEN}''::uuid, true)', 'V');
+  ('stufenteam', 'Punkte für laufende Schicht vergeben', 'select schicht_abschliessen(''{SCHICHT_OFFEN}''::uuid, true)', 'V'),
+  ('schueler', 'Kassen-Kategorie anlegen', 'insert into kasse_kategorien(name,farbe) values (''x'',''rot'')', 'V'),
+  ('eltern', 'Kassen-Kategorie anlegen', 'insert into kasse_kategorien(name,farbe) values (''x'',''rot'')', 'V'),
+  ('anon', 'Kassen-Kategorie anlegen', 'insert into kasse_kategorien(name,farbe) values (''x'',''rot'')', 'V'),
+  ('kassenwart', 'Kassen-Kategorie anlegen', 'insert into kasse_kategorien(name,farbe) values (''x'',''rot'')', 'E');
 
 create temp table erg (rolle text, fall text, erwartet text, ergebnis text, detail text) on commit drop;
 grant insert, select on erg to authenticated, anon;

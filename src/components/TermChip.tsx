@@ -82,3 +82,37 @@ export function TermChip({
     </button>
   );
 }
+
+/**
+ * Legende unter den Halbjahren – mit genau den Kästchen, die auch oben
+ * stehen (Farbe, Rand und Zeichen), damit man sie sofort wiedererkennt.
+ */
+export function HalbjahrLegende({ nichtDabei = false }: { nichtDabei?: boolean }) {
+  const eintraege: { cls: string; glyph: string; text: string; fett?: boolean }[] = [
+    { cls: STATUS_CLASS.bezahlt, glyph: GLYPH.bezahlt, text: "bezahlt" },
+    { cls: STATUS_CLASS.offen, glyph: GLYPH.offen, text: "offen" },
+    { cls: STATUS_CLASS.erlassen, glyph: GLYPH.erlassen, text: "erlassen", fett: true },
+    { cls: "bg-[rgb(118_118_128/0.1)] text-tinte-leise border-transparent", glyph: GLYPH.offen, text: "später fällig" },
+  ];
+  if (nichtDabei)
+    eintraege.push({
+      cls: "border-dashed border-papier-linie text-tinte-leise dark:border-slate-600 dark:text-slate-500",
+      glyph: "–",
+      text: "nicht dabei",
+    });
+  return (
+    <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-[12px] text-tinte-matt dark:text-slate-300" aria-label="Legende">
+      {eintraege.map((e) => (
+        <li key={e.text} className="flex items-center gap-1.5">
+          <span
+            aria-hidden
+            className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border text-[11px] leading-none ${e.fett ? "font-black" : "font-bold"} ${e.cls}`}
+          >
+            {e.glyph}
+          </span>
+          {e.text}
+        </li>
+      ))}
+    </ul>
+  );
+}

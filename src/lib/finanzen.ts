@@ -31,6 +31,52 @@ export interface Buchung {
   automatisch: boolean;
   created_by: string | null;
   created_at: string;
+  /** Selbst gewählte Kategorie mit Farbe (null = nach Quelle) */
+  kategorie_id?: string | null;
+}
+
+/** Eine Kategorie fürs Kassenbuch: Name + Farbe. Mehrere dürfen dieselbe Farbe haben. */
+export interface KassenKategorie {
+  id: string;
+  name: string;
+  farbe: string;
+  art: "ein" | "aus" | "beide";
+  sort: number;
+}
+
+/**
+ * Farben fürs Kassenbuch – hell und dunkel getrennt gewählt, damit Kreis,
+ * Balken und Farbpunkte in beiden Modi gut unterscheidbar bleiben.
+ */
+export const KASSEN_FARBEN: { key: string; name: string; hell: string; dunkel: string }[] = [
+  { key: "blau", name: "Blau", hell: "#2a78d6", dunkel: "#3987e5" },
+  { key: "orange", name: "Orange", hell: "#eb6834", dunkel: "#d95926" },
+  { key: "gruen", name: "Grün", hell: "#1baf7a", dunkel: "#199e70" },
+  { key: "gelb", name: "Gelb", hell: "#eda100", dunkel: "#c98500" },
+  { key: "lila", name: "Lila", hell: "#8b5cf6", dunkel: "#a78bfa" },
+  { key: "pink", name: "Pink", hell: "#db2777", dunkel: "#ec4899" },
+  { key: "tuerkis", name: "Türkis", hell: "#0891b2", dunkel: "#06b6d4" },
+  { key: "rot", name: "Rot", hell: "#dc2626", dunkel: "#ef4444" },
+  { key: "grau", name: "Grau", hell: "#8e8e93", dunkel: "#98989f" },
+];
+
+/** Farbe ohne eigene Kategorie – nach Herkunft. */
+export const STANDARD_FARBE: Record<string, string> = {
+  beitrag: "blau", aktion: "orange", spende: "gruen", sonstiges: "gelb",
+  komitee: "lila", ausgabe: "grau", abgleich: "grau", kategorie: "blau",
+};
+
+export function farbHex(key: string | null | undefined, dunkel = false): string {
+  const f = KASSEN_FARBEN.find((x) => x.key === key) ?? KASSEN_FARBEN.find((x) => x.key === "grau")!;
+  return dunkel ? f.dunkel : f.hell;
+}
+
+/** Farbe einer Buchung: Kategorie vor Herkunft. */
+export function buchungFarbe(b: Buchung, kategorien: KassenKategorie[]): string {
+  const k = b.kategorie_id ? kategorien.find((x) => x.id === b.kategorie_id) : null;
+  if (k) return k.farbe;
+  if (b.cent < 0) return b.komitee ? "lila" : "grau";
+  return STANDARD_FARBE[b.quelle] ?? "grau";
 }
 
 export interface KassenZiel {
@@ -90,6 +136,11 @@ export function centAus(text: string): number | null {
 
 export interface FinanzenValue {
   buchungen: Buchung[];
+  kategorien: KassenKategorie[];
+  kategorieSpeichern: (k: Partial<KassenKategorie> & { name: string; farbe: string }) => Promise<string | null>;
+  kategorieLoeschen: (id: string) => Promise<string | null>;
+  /** Kategorie einer vorhandenen Buchung ändern (nicht bei automatischen). */
+  buchungKategorie: (id: string, kategorieId: string | null) => Promise<string | null>;
   ziel: KassenZiel;
   bereit: boolean;
   fehler: string;
@@ -100,6 +151,7 @@ export interface FinanzenValue {
     titel: string;
     aktion_id?: string | null;
     komitee?: string | null;
+    kategorie_id?: string | null;
   }) => Promise<string | null>;
   loeschen: (id: string) => Promise<string | null>;
   zielSetzen: (z: KassenZiel) => Promise<string | null>;
@@ -115,6 +167,7 @@ export interface FinanzenValue {
 export function useFinanzen(aktiv: boolean): FinanzenValue {
   const { students } = useStore();
   const [buchungen, setBuchungen] = useState<Buchung[]>([]);
+  const [kategorien, setKategorien] = useState<KassenKategorie[]>([]);
   const [ziel, setZiel] = useState<KassenZiel>({ ziel_cent: 0, ziel_titel: "Abiball" });
   const [bereit, setBereit] = useState(!hasSupabase);
   const [fehler, setFehler] = useState("");
@@ -131,10 +184,12 @@ export function useFinanzen(aktiv: boolean): FinanzenValue {
 
   const laden = useCallback(async () => {
     if (!hasSupabase) return;
-    const [b, z] = await Promise.all([
+    const [b, z, k] = await Promise.all([
       supabase!.from("kasse_buchungen").select("*").order("datum", { ascending: false }).order("created_at", { ascending: false }),
       supabase!.from("kasse_einstellungen").select("ziel_cent, ziel_titel").eq("id", 1).maybeSingle(),
+      supabase!.from("kasse_kategorien").select("*").order("sort").order("name"),
     ]);
+    if (!k.error) setKategorien((k.data as KassenKategorie[]) || []);
     if (b.error) setFehler(b.error.message);
     else setFehler("");
     setBuchungen((b.data as Buchung[]) || []);
@@ -156,7 +211,8 @@ export function useFinanzen(aktiv: boolean): FinanzenValue {
       aufbauen: (kanal) =>
         kanal
           .on("postgres_changes", { event: "*", schema: "public", table: "kasse_buchungen" }, nach)
-          .on("postgres_changes", { event: "*", schema: "public", table: "kasse_einstellungen" }, nach),
+          .on("postgres_changes", { event: "*", schema: "public", table: "kasse_einstellungen" }, nach)
+          .on("postgres_changes", { event: "*", schema: "public", table: "kasse_kategorien" }, nach),
     });
     return () => {
       if (timer.current) clearTimeout(timer.current);
@@ -175,6 +231,7 @@ export function useFinanzen(aktiv: boolean): FinanzenValue {
           titel: b.titel.trim(),
           aktion_id: b.aktion_id ?? null,
           komitee: b.komitee ?? null,
+          kategorie_id: b.kategorie_id ?? null,
           student_id: null,
           halbjahr: null,
           anfrage_id: null,
@@ -193,6 +250,7 @@ export function useFinanzen(aktiv: boolean): FinanzenValue {
         titel: b.titel.trim(),
         aktion_id: b.aktion_id ?? null,
         komitee: b.komitee ?? null,
+        kategorie_id: b.kategorie_id ?? null,
         created_by: s.session?.user.id ?? null,
       });
       if (error) return error.message;
@@ -226,9 +284,61 @@ export function useFinanzen(aktiv: boolean): FinanzenValue {
     [],
   );
 
+  const kategorieSpeichern = useCallback<FinanzenValue["kategorieSpeichern"]>(
+    async (k) => {
+      const zeile = { name: k.name.trim().slice(0, 40), farbe: k.farbe, art: k.art ?? "beide", sort: k.sort ?? 100 };
+      if (!zeile.name) return "Bitte einen Namen eingeben.";
+      if (!hasSupabase) {
+        setKategorien((prev) =>
+          k.id ? prev.map((x) => (x.id === k.id ? { ...x, ...zeile } : x)) : [...prev, { id: crypto.randomUUID(), ...zeile }],
+        );
+        return null;
+      }
+      const { error } = k.id
+        ? await supabase!.from("kasse_kategorien").update(zeile).eq("id", k.id)
+        : await supabase!.from("kasse_kategorien").insert(zeile);
+      if (error) return error.message;
+      await laden();
+      return null;
+    },
+    [laden],
+  );
+
+  const kategorieLoeschen = useCallback<FinanzenValue["kategorieLoeschen"]>(
+    async (id) => {
+      setKategorien((prev) => prev.filter((x) => x.id !== id));
+      setBuchungen((prev) => prev.map((b) => (b.kategorie_id === id ? { ...b, kategorie_id: null } : b)));
+      if (!hasSupabase) return null;
+      const { error } = await supabase!.from("kasse_kategorien").delete().eq("id", id);
+      if (error) {
+        void laden();
+        return error.message;
+      }
+      return null;
+    },
+    [laden],
+  );
+
+  const buchungKategorie = useCallback<FinanzenValue["buchungKategorie"]>(
+    async (id, kategorieId) => {
+      setBuchungen((prev) => prev.map((b) => (b.id === id ? { ...b, kategorie_id: kategorieId } : b)));
+      if (!hasSupabase) return null;
+      const { error } = await supabase!.from("kasse_buchungen").update({ kategorie_id: kategorieId }).eq("id", id);
+      if (error) {
+        void laden();
+        return error.message;
+      }
+      return null;
+    },
+    [laden],
+  );
+
   return useMemo(
-    () => ({ buchungen, ziel, bereit, fehler, buchen, loeschen, zielSetzen, neuLaden: laden }),
-    [buchungen, ziel, bereit, fehler, buchen, loeschen, zielSetzen, laden],
+    () => ({
+      buchungen, kategorien, ziel, bereit, fehler, buchen, loeschen, zielSetzen, neuLaden: laden,
+      kategorieSpeichern, kategorieLoeschen, buchungKategorie,
+    }),
+    [buchungen, kategorien, ziel, bereit, fehler, buchen, loeschen, zielSetzen, laden, kategorieSpeichern, kategorieLoeschen, buchungKategorie],
   );
 }
 
@@ -241,8 +351,10 @@ export function useFinanzen(aktiv: boolean): FinanzenValue {
  * die Buchungen selbst kommen gar nicht erst aufs Gerät.
  */
 export interface FinanzPosten {
-  /** aktion | spende | sonstiges | komitee (Ausgaben eines Komitees) | ausgabe */
-  art: "aktion" | "spende" | "sonstiges" | "komitee" | "ausgabe";
+  /** kategorie (selbst gewählt) | aktion | spende | sonstiges | komitee (Ausgaben eines Komitees) | ausgabe */
+  art: "kategorie" | "aktion" | "spende" | "sonstiges" | "komitee" | "ausgabe";
+  /** Farbe der Kategorie (nur bei art "kategorie") */
+  farbe?: string | null;
   /** Name der Aktion – bei art "komitee" der Komitee-Schlüssel */
   titel: string;
   ein_cent: number;
@@ -275,6 +387,7 @@ export function uebersichtAus(
   offen: { cent: number; personen: number },
   halbjahr: string,
   aktionName: (id: string) => string,
+  kategorien: KassenKategorie[] = [],
 ): FinanzUebersicht {
   let stand = 0, ein = 0, aus = 0, abgleich = 0;
   let letzte: string | null = null;
@@ -291,7 +404,10 @@ export function uebersichtAus(
       continue;
     }
     if (b.cent > 0) ein += b.cent; else aus += -b.cent;
-    const [art, titel]: [FinanzPosten["art"], string] = b.aktion_id
+    const kat = b.kategorie_id ? kategorien.find((x) => x.id === b.kategorie_id) : null;
+    const [art, titel]: [FinanzPosten["art"], string] = kat
+      ? ["kategorie", kat.name]
+      : b.aktion_id
       ? ["aktion", aktionName(b.aktion_id) || "Aktion"]
       : b.quelle === "aktion" ? ["aktion", b.titel]
       : b.quelle === "spende" ? ["spende", "Spenden"]
@@ -299,7 +415,7 @@ export function uebersichtAus(
       : b.komitee ? ["komitee", b.komitee]
       : ["ausgabe", "Sonstige Ausgaben"];
     const k = `${art}|${titel}`;
-    const p = posten.get(k) || { art, titel, ein_cent: 0, aus_cent: 0, anzahl: 0, zuletzt: b.datum };
+    const p = posten.get(k) || { art, titel, farbe: kat?.farbe ?? null, ein_cent: 0, aus_cent: 0, anzahl: 0, zuletzt: b.datum };
     if (b.cent > 0) p.ein_cent += b.cent; else p.aus_cent += -b.cent;
     p.anzahl++;
     if (b.datum > p.zuletzt) p.zuletzt = b.datum;
@@ -360,4 +476,20 @@ export function useFinanzUebersicht(aktiv: boolean): {
   }, [aktiv, laden]);
 
   return { daten, fehler, neuLaden: laden };
+}
+
+/** Farbschlüssel eines Postens der Standard-Ansicht. */
+export function postenFarbe(p: FinanzPosten): string {
+  if (p.farbe) return p.farbe;
+  if (p.art === "komitee") return "lila";
+  if (p.art === "ausgabe") return "grau";
+  return STANDARD_FARBE[p.art] ?? "grau";
+}
+
+/** Abi-Jahrgang: Q2 endet im Sommer 2028 – daraus das Schuljahr eines Halbjahrs. */
+const ABI_JAHR = 2028;
+export function schuljahrVon(halbjahr: string): string {
+  const phase = halbjahr.slice(0, 2);
+  const ende = ABI_JAHR - (phase === "Q2" ? 0 : phase === "Q1" ? 1 : 2);
+  return `${ende - 1}/${String(ende).slice(2)}`;
 }

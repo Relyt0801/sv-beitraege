@@ -1,8 +1,8 @@
 import { HY, type Settings, type Student } from "../lib/types";
 import { useStore } from "../store";
-import { basisOffen, beitragFuer, naechsteStufe, prozentVon, staffelVon, ticketBetrag } from "../lib/logic";
-import { TermChip } from "./TermChip";
-import { Ring } from "./Ring";
+import { basisOffen, beitragFuer, naechsteStufe, prozentVon, ticketBetrag } from "../lib/logic";
+import { HalbjahrLegende, TermChip } from "./TermChip";
+import { StaffelKacheln, StaffelRing } from "./Staffel";
 import { BeitragsListe } from "./BeitragsListe";
 import { TicketErklaerung } from "./TicketErklaerung";
 
@@ -94,12 +94,7 @@ export function MyKasse({
           ))}
         </div>
 
-        <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[12px] text-tinte-leise">
-          <Legende farbe="bg-bezahlt" text="bezahlt" />
-          <Legende farbe="bg-offen" text="noch offen" />
-          <Legende farbe="bg-erlassen" text="erlassen" />
-          <Legende farbe="bg-slate-300 dark:bg-slate-600" text="später fällig / nicht dabei" />
-        </div>
+        <HalbjahrLegende nichtDabei />
       </section>
 
       {/* ------------------------------------------ Prozentstand */}
@@ -107,7 +102,7 @@ export function MyKasse({
         <h2 className="text-[15px] font-semibold">Mithilfe bei Aktionen</h2>
 
         <div className="mt-3 flex items-center gap-4">
-          <Ring pct={pct} />
+          <StaffelRing pct={pct} settings={settings} />
           <div className="min-w-0 flex-1">
             <div className="text-[14px] font-semibold leading-snug">
               {pct >= 100
@@ -123,27 +118,7 @@ export function MyKasse({
           </div>
         </div>
 
-        <div className="mt-4 grid grid-cols-5 gap-1">
-          {staffelVon(settings).map((stufe) => {
-            const erreicht = pct >= stufe.ab;
-            const aktuell = staffelVon(settings).filter((x) => pct >= x.ab).pop()?.ab === stufe.ab;
-            return (
-              <div
-                key={stufe.ab}
-                className={`rounded-xl px-1 py-2 text-center transition ${
-                  aktuell
-                    ? "bg-brand text-white"
-                    : erreicht
-                      ? "bg-brand/[0.12] text-brand-dark dark:text-brand"
-                      : "bg-[rgb(118_118_128/0.1)] text-tinte-leise"
-                }`}
-              >
-                <div className="zahl text-[13px] font-bold leading-none">{stufe.ab} %</div>
-                <div className="zahl mt-1 text-[11px] font-medium leading-none">+{stufe.betrag} €</div>
-              </div>
-            );
-          })}
-        </div>
+        <StaffelKacheln pct={pct} settings={settings} />
       </section>
 
       {/* ------------------------------------------ Abiballticket */}
@@ -164,14 +139,5 @@ export function MyKasse({
         />
       </section>
     </div>
-  );
-}
-
-function Legende({ farbe, text }: { farbe: string; text: string }) {
-  return (
-    <span className="flex items-center gap-1.5">
-      <span className={`h-2.5 w-2.5 rounded-[3px] ${farbe}`} />
-      {text}
-    </span>
   );
 }
