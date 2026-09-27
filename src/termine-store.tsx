@@ -562,7 +562,6 @@ export function TermineProvider({ children }: { children: ReactNode }) {
       const weg = await supabase!.from("komitee_vorsitz").delete().eq("tag", tag);
       if (weg.error) return weg.error.message;
       if (zwei.length) {
-        const vorher = vorsitzRef.current[tag] || [];
         const { error } = await supabase!
           .from("komitee_vorsitz")
           .insert(zwei.map((user_id) => ({ tag, user_id, gesetzt_von: uidRef.current })));
@@ -570,14 +569,8 @@ export function TermineProvider({ children }: { children: ReactNode }) {
           await laden();
           return error.message;
         }
-        const neu = zwei.filter((u) => !vorher.includes(u));
-        if (neu.length)
-          void pushToUsers(
-            neu,
-            `${committeeIcon(tag)} Vorsitz ${committeeLabel(tag)}`,
-            "Du hast jetzt den Vorsitz. Termine kannst du im Reiter Events anfragen.",
-            "./#events",
-          );
+        // Keine Mitteilung mehr beim neuen Vorsitz (Wunsch 28.09.) – er steht
+        // auf der Komiteeseite.
       }
       await laden();
       return null;

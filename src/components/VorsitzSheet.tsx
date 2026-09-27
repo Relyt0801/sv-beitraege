@@ -5,6 +5,35 @@ import { useProfiles } from "../profiles-store";
 import { useRole } from "../auth/RoleProvider";
 import { committeeIcon, committeeLabel } from "../lib/committees";
 import { Avatar } from "./Avatar";
+import { useStore } from "../store";
+import { lesbarerName } from "../lib/profil";
+
+/**
+ * Name einer Person – auch wenn sie sich noch nie angemeldet hat. Dann gibt es
+ * noch kein öffentliches Profil; das Team kennt den Namen aber aus der
+ * Schülerliste (Konto → Schülereintrag). Sonst: "noch nicht angemeldet".
+ */
+const OHNE_NAME = "Noch nicht angemeldet";
+const fuerKreis = (n: string) => (n === OHNE_NAME ? undefined : n);
+
+function useNameVon(): (uid: string) => string {
+  const { profile } = useProfiles();
+  const { profiles } = useRole();
+  const { students } = useStore();
+  return useMemo(() => {
+    const konto = new Map(profiles.map((p) => [p.user_id, p]));
+    const schueler = new Map(students.map((s) => [s.id, s]));
+    return (uid: string) => {
+      const n = profile[uid]?.anzeigename;
+      if (n) return n;
+      const k = konto.get(uid);
+      const st = k?.student_id ? schueler.get(k.student_id) : null;
+      if (st) return `${st.vorname} ${st.nachname}`.trim();
+      if (k?.username) return lesbarerName(k.username);
+      return OHNE_NAME;
+    };
+  }, [profile, profiles, students]);
+}
 import { Sheet } from "./Sheet";
 
 /**
@@ -28,7 +57,7 @@ export function VorsitzSheet({
 }) {
   const { vorsitz, vorsitzSetzen } = useTermine();
   const { tagMembers } = useTopics();
-  const { profile } = useProfiles();
+  const nameVon = useNameVon();
   const [wahl, setWahl] = useState<string[]>([]);
   const [fehler, setFehler] = useState("");
   const [busy, setBusy] = useState(false);
@@ -44,10 +73,8 @@ export function VorsitzSheet({
 
   const mitglieder = useMemo(() => {
     const ids = [...new Set([...(tagMembers[tag] || []), ...jetzt])];
-    return ids.sort((a, b) =>
-      (profile[a]?.anzeigename || "").localeCompare(profile[b]?.anzeigename || ""),
-    );
-  }, [tagMembers, tag, jetzt, profile]);
+    return ids.sort((a, b) => nameVon(a).localeCompare(nameVon(b)));
+  }, [tagMembers, tag, jetzt, nameVon]);
 
   function umschalten(uid: string) {
     setFehler("");
@@ -107,9 +134,9 @@ export function VorsitzSheet({
                 >
                   {an ? "✓" : ""}
                 </span>
-                <Avatar userId={uid} size={30} />
+                <Avatar userId={uid} name={fuerKreis(nameVon(uid))} size={30} />
                 <span className={`min-w-0 flex-1 truncate text-[14px] ${an ? "font-bold text-brand" : "font-semibold"}`}>
-                  {profile[uid]?.anzeigename || "Unbekannt"}
+                  {nameVon(uid)}
                 </span>
               </button>
             );
@@ -136,13 +163,13 @@ export function VorsitzSheet({
  */
 export function VorsitzZeile({ tag }: { tag: string }) {
   const { vorsitz } = useTermine();
-  const { profile } = useProfiles();
+  const nameVon = useNameVon();
   const { isStaff, can } = useRole();
   const [offen, setOffen] = useState(false);
   const darf = isStaff || can("komitees.assign");
 
   const ids = vorsitz[tag] || [];
-  const namen = ids.map((u) => profile[u]?.anzeigename || "Unbekannt");
+  const namen = ids.map(nameVon);
 
   return (
     <>
@@ -156,7 +183,7 @@ export function VorsitzZeile({ tag }: { tag: string }) {
             ) : (
               ids.map((u, i) => (
                 <span key={u} className="flex min-w-0 items-center gap-1.5">
-                  <Avatar userId={u} size={22} />
+                  <Avatar userId={u} name={fuerKreis(namen[i])} size={22} />
                   <span className="min-w-0 truncate text-[13px] font-semibold">{namen[i]}</span>
                 </span>
               ))

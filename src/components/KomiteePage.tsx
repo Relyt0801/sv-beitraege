@@ -5,8 +5,7 @@ import { useStore } from "../store";
 import { committeeIcon, committeeLabel } from "../lib/committees";
 import { WerHatGestimmt } from "./WerHatGestimmt";
 import { Avatar, PersonName } from "./Avatar";
-import { MuteKnopf } from "./MuteKnopf";
-import { SystemZeile } from "./ChatBlasen";
+import { ChatBlase, SystemZeile } from "./ChatBlasen";
 import { BannHinweis } from "./BannHinweis";
 import { Sheet } from "./Sheet";
 import { useChatEnde } from "../lib/gescrollt";
@@ -363,42 +362,7 @@ function ChatBereich({
         {liste.length === 0 && <p className="py-12 text-center text-sm text-tinte-leise">Noch keine Nachricht.</p>}
         {liste.map((m) => {
           if (m.type === "system") return <SystemZeile key={m.id} m={m} darfLoeschen={darfLoeschen} onDelete={(id) => void deleteItem(id)} />;
-          const meins = m.created_by === uid;
-          return (
-            <div key={m.id} className={`flex items-end gap-2 ${meins ? "justify-end" : "justify-start"}`}>
-              {!meins && <Avatar userId={m.created_by} name={m.author} size={28} />}
-              <div className={`max-w-[80%] rounded-2xl px-3.5 py-2 sm:max-w-[65%] lg:max-w-[50%] ${meins ? "bg-brand text-white" : "bg-white shadow-card dark:bg-slate-900 dark:shadow-cardDark"}`}>
-                <PersonName
-                  userId={m.created_by}
-                  name={m.author}
-                  role={m.author_role}
-                  koms={m.author_koms}
-                  className={`mb-0.5 block text-[12px] font-bold leading-tight ${meins ? "text-right" : ""}`}
-                  aufFarbig={meins}
-                />
-                <div className="whitespace-pre-wrap break-words text-[15px] leading-snug">{m.body}</div>
-                {m.nicht_gesendet && (
-                  <div
-                    className={`mt-1 rounded-lg px-2 py-1 text-[11px] font-semibold ${
-                      meins ? "bg-white/20 text-white" : "bg-red-50 text-red-600 dark:bg-red-500/15 dark:text-red-400"
-                    }`}
-                    title={m.nicht_gesendet}
-                  >
-                    ⚠ Nicht gesendet – bitte noch einmal schreiben
-                  </div>
-                )}
-                <div className={`mt-1 text-right text-[10px] ${meins ? "text-white/90" : "text-tinte-leise"}`}>
-                  {new Date(m.created_at).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })}
-                  {(meins || darfLoeschen) && (
-                    <button onClick={() => void frage("Nachricht löschen?", "Löschen", true).then((ok) => { if (ok) void deleteItem(m.id); })} className="ml-2 underline">
-                      löschen
-                    </button>
-                  )}
-                  {!meins && <MuteKnopf userId={m.created_by} name={m.author} topicId={m.topic_id} />}
-                </div>
-              </div>
-            </div>
-          );
+          return <ChatBlase key={m.id} m={m} meins={m.created_by === uid} darfLoeschen={darfLoeschen} onDelete={(id) => void deleteItem(id)} />;
         })}
         {/* Platz für Eingabezeile und Tab-Leiste, Scroll-Marke dahinter */}
         <div aria-hidden className="h-[calc(var(--leiste)+5rem)] lg:h-24" />

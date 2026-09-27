@@ -12,6 +12,27 @@ ausführlich (auf Deutsch); hier steht der Überblick dazu.
 ---
 
 
+## 28.09.2026 (spät): Chat-Kreise, Vorsitz
+
+Kein SQL. Keine Mitteilung, keine neue Einführung.
+
+- **Kreis mit Initialen oben – in allen Chats:** Die Komitee-Chats hatten
+  eine eigene Kopie der Nachrichtenblase, darum griff die letzte Änderung dort
+  nicht. Jetzt gibt es eine Blase für alle (`ChatBlase` in `ChatBlasen.tsx`,
+  genutzt von `KomiteePage.tsx` und den übrigen Chats). Der Kreis steht oben
+  auf Höhe des Namens, bei eigenen Nachrichten rechts. Das gilt für alte und
+  neue Nachrichten – die Darstellung kommt aus der App.
+- **Vorsitz: „Unbekannt“ behoben** (`VorsitzSheet.tsx`): Wer sich noch nie
+  angemeldet hat, hat noch kein öffentliches Profil. Das Stufenteam sieht
+  jetzt den Namen aus der Schülerliste (Konto → Schülereintrag), sonst steht
+  dort „Noch nicht angemeldet“. Bewusst **nicht** vorab öffentliche Profile
+  angelegt: sonst stünden die Namen aller nie angemeldeten Schüler für alle
+  (auch Eltern) lesbar in der Datenbank.
+- **Keine Mitteilung mehr beim neuen Vorsitz** (`termine-store.tsx`).
+
+---
+
+
 ## 28.09.2026 (abends): Live-Verbindung, Chats, Kalender
 
 SQL dazu: `supabase/chat-eintraege-loeschen.sql` (Migration

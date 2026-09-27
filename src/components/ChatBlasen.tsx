@@ -8,6 +8,70 @@ import { frage } from "../lib/melder";
  * Nachrichtenliste im WhatsApp-Stil: fremde Nachrichten links mit Kreis (oben, auf Höhe des Namens) und
  * farbigem Namen in der Blase, eigene rechts ohne Namen.
  */
+/**
+ * Eine Nachricht. Der Kreis mit den Initialen steht oben auf Höhe des Namens –
+ * bei fremden Nachrichten links, bei eigenen rechts. Gilt für alle
+ * Nachrichten, alte wie neue (die Darstellung kommt aus der App, nicht aus der
+ * Nachricht).
+ */
+export function ChatBlase({
+  m, meins, darfLoeschen, onDelete,
+}: {
+  m: TopicItem;
+  meins: boolean;
+  darfLoeschen: boolean;
+  onDelete: (id: string) => void;
+}) {
+  const kreis = (
+    <span className="mt-0.5 shrink-0">
+      <Avatar userId={m.created_by} name={m.author} size={28} />
+    </span>
+  );
+  return (
+    <div className={`flex items-start gap-2 ${meins ? "justify-end" : "justify-start"}`}>
+      {!meins && kreis}
+      <div
+        className={`max-w-[78%] rounded-2xl px-3.5 py-2 sm:max-w-[65%] lg:max-w-[50%] ${
+          meins ? "bg-brand text-white" : "bg-white shadow-card dark:bg-slate-900 dark:shadow-cardDark"
+        }`}
+      >
+        <PersonName
+          userId={m.created_by}
+          name={m.author}
+          role={m.author_role}
+          koms={m.author_koms}
+          className={`mb-0.5 block text-[12px] font-bold leading-tight ${meins ? "text-right" : ""}`}
+          aufFarbig={meins}
+        />
+        <div className="whitespace-pre-wrap break-words text-[15px] leading-snug">{m.body}</div>
+        {m.nicht_gesendet && (
+          <div
+            className={`mt-1 rounded-lg px-2 py-1 text-[11px] font-semibold ${
+              meins ? "bg-white/20 text-white" : "bg-red-50 text-red-600 dark:bg-red-500/15 dark:text-red-400"
+            }`}
+            title={m.nicht_gesendet}
+          >
+            ⚠ Nicht gesendet – bitte noch einmal schreiben
+          </div>
+        )}
+        <div className={`mt-0.5 text-right text-[10px] ${meins ? "text-white/90" : "text-tinte-leise"}`}>
+          {new Date(m.created_at).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })}
+          {(meins || darfLoeschen) && (
+            <button
+              onClick={() => void frage("Nachricht löschen?", "Löschen", true).then((ok) => { if (ok) void onDelete(m.id); })}
+              className="ml-2 underline"
+            >
+              löschen
+            </button>
+          )}
+          {!meins && <MuteKnopf userId={m.created_by} name={m.author} topicId={m.topic_id} />}
+        </div>
+      </div>
+      {meins && kreis}
+    </div>
+  );
+}
+
 export function ChatBlasen({
   liste,
   uid,
@@ -28,50 +92,7 @@ export function ChatBlasen({
       {liste.length === 0 && <p className="py-12 text-center text-sm text-tinte-leise">{leerText}</p>}
       {liste.map((m) => {
         if (m.type === "system") return <SystemZeile key={m.id} m={m} darfLoeschen={darfLoeschen} onDelete={onDelete} />;
-        const meins = m.created_by === uid;
-        return (
-          <div key={m.id} className={`flex items-start gap-2 ${meins ? "justify-end" : "justify-start"}`}>
-            {/* Kreis oben neben dem Namen – dort, wo man zuerst hinschaut */}
-            {!meins && <span className="mt-0.5 shrink-0"><Avatar userId={m.created_by} name={m.author} size={28} /></span>}
-            <div
-              className={`max-w-[80%] rounded-2xl px-3.5 py-2 sm:max-w-[65%] lg:max-w-[50%] ${
-                meins ? "bg-brand text-white" : "bg-white shadow-card dark:bg-slate-900 dark:shadow-cardDark"
-              }`}
-            >
-              <PersonName
-                userId={m.created_by}
-                name={m.author}
-                role={m.author_role}
-                koms={m.author_koms}
-                className={`mb-0.5 block text-[12px] font-bold leading-tight ${meins ? "text-right" : ""}`}
-                aufFarbig={meins}
-              />
-              <div className="whitespace-pre-wrap break-words text-[15px] leading-snug">{m.body}</div>
-              {m.nicht_gesendet && (
-                <div
-                  className={`mt-1 rounded-lg px-2 py-1 text-[11px] font-semibold ${
-                    meins ? "bg-white/20 text-white" : "bg-red-50 text-red-600 dark:bg-red-500/15 dark:text-red-400"
-                  }`}
-                  title={m.nicht_gesendet}
-                >
-                  ⚠ Nicht gesendet – bitte noch einmal schreiben
-                </div>
-              )}
-              <div className={`mt-0.5 text-right text-[10px] ${meins ? "text-white/90" : "text-tinte-leise"}`}>
-                {new Date(m.created_at).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })}
-                {(meins || darfLoeschen) && (
-                  <button
-                    onClick={() => void frage("Nachricht löschen?", "Löschen", true).then((ok) => { if (ok) void onDelete(m.id); })}
-                    className="ml-2 underline"
-                  >
-                    löschen
-                  </button>
-                )}
-                {!meins && <MuteKnopf userId={m.created_by} name={m.author} topicId={m.topic_id} />}
-              </div>
-            </div>
-          </div>
-        );
+        return <ChatBlase key={m.id} m={m} meins={m.created_by === uid} darfLoeschen={darfLoeschen} onDelete={onDelete} />;
       })}
       {/* Platz für Eingabezeile und Tab-Leiste. Die Marke fürs Scrollen steht
           dahinter – so landet die letzte Nachricht über der Eingabe statt
