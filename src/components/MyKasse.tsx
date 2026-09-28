@@ -4,6 +4,10 @@ import { basisOffen, beitragFuer, isPreJoin, naechsteStufe, prozentVon, ticketBe
 import { HalbjahrLegende, TermChip } from "./TermChip";
 import { StaffelKacheln, StaffelRing } from "./Staffel";
 import { BeitragsListe } from "./BeitragsListe";
+import { KontoTab } from "./KontoTab";
+import { Sheet, SheetKopf } from "./Sheet";
+import { Icon } from "./Icon";
+import { useState } from "react";
 import { TicketErklaerung } from "./TicketErklaerung";
 
 /**
@@ -26,6 +30,7 @@ export function MyKasse({
   ready: boolean;
 }) {
   const { contributions } = useStore();
+  const [ueberweisen, setUeberweisen] = useState(false);
 
   if (!ready)
     return (
@@ -70,7 +75,19 @@ export function MyKasse({
         <div className="mt-2 text-[12px] text-white/50">
           {student.vorname} {student.nachname} · {gesamt} € über alle sechs Halbjahre
         </div>
+        {/* Überweisen – falls Schüler selbst zahlen (sonst die Eltern) */}
+        <button
+          onClick={() => setUeberweisen(true)}
+          className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3.5 py-2 text-[13px] font-semibold text-white transition active:scale-95"
+        >
+          <Icon name="bank" size={15} />
+          Überweisen – Kontodaten
+        </button>
       </section>
+      <Sheet open={ueberweisen} onClose={() => setUeberweisen(false)}>
+        <SheetKopf titel="Überweisen" onClose={() => setUeberweisen(false)} />
+        <KontoTab personen={[student]} du />
+      </Sheet>
 
       {/* ------------------------------------------ Halbjahre mit Preis */}
       <section className="card p-4 sm:p-5 lg:col-span-2">

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useEltern } from "../eltern-store";
 import { useRole } from "../auth/RoleProvider";
 import { useStore } from "../store";
+import type { Student } from "../lib/types";
 
 /**
  * IBAN in Viererblöcken, so wie man sie auf Papier schreibt.
@@ -24,18 +25,19 @@ export function jahrgangKurz(halbjahr: string): string {
  * Die Daten kommen aus der Datenbank und stehen an keiner Stelle im Quellcode.
  * Lesen darf sie jedes angemeldete Konto, ändern nur Admin und Kassenwart.
  */
-export function KontoTab() {
+export function KontoTab({ personen, du = false }: { personen?: Student[]; du?: boolean } = {}) {
   const { konto, kontoSpeichern, kinder: meineKinder } = useEltern();
   const { role } = useRole();
   // Eltern sehen hier nur die eigenen Kinder – dafür sorgt die Datenbank,
   // und zur Sicherheit filtert die App noch einmal nach der Zuordnung.
+  // Schüler (personen) sehen nur sich selbst.
   const { students, settings } = useStore();
   // Gleiche Reihenfolge wie in der Übersicht: nach Vorname
-  const kinder = (role === "eltern" ? students.filter((s) => meineKinder.includes(s.id)) : students)
+  const kinder = (personen ?? (role === "eltern" ? students.filter((s) => meineKinder.includes(s.id)) : students))
     .slice()
     .sort((a, b) => a.vorname.localeCompare(b.vorname, "de"));
   const [kopiert, setKopiert] = useState<string | null>(null);
-  const darfAendern = role === "admin" || role === "kassenwart";
+  const darfAendern = !personen && (role === "admin" || role === "kassenwart");
 
   if (!konto)
     return (
@@ -66,11 +68,12 @@ export function KontoTab() {
   // Seite breiter als den Bildschirm.
   return (
     <div className="grid grid-cols-1 gap-3">
-      <section className="card p-5">
-        <h2 className="text-[1.25rem] font-bold tracking-[-0.01em]">So überweisen Sie</h2>
+      <section className={personen ? "" : "card p-5"}>
+        <h2 className="text-[1.25rem] font-bold tracking-[-0.01em]">{du ? "So überweist du" : "So überweisen Sie"}</h2>
         <p className="mt-0.5 text-[13px] leading-relaxed text-tinte-matt dark:text-slate-400">
-          Bitte immer den Verwendungszweck angeben – sonst können wir das Geld nicht zuordnen. Bei
-          mehreren Kindern bitte für jedes Kind einzeln überweisen.
+          {du
+            ? "Meistens zahlen das deine Eltern. Falls du selbst überweist: bitte immer den Verwendungszweck angeben – sonst können wir das Geld nicht zuordnen."
+            : "Bitte immer den Verwendungszweck angeben – sonst können wir das Geld nicht zuordnen. Bei mehreren Kindern bitte für jedes Kind einzeln überweisen."}
         </p>
 
         <div className="mt-4 grid grid-cols-1 gap-2" data-tour="konto-daten">
@@ -107,7 +110,8 @@ export function KontoTab() {
           })}
         </ul>
 
-        {konto.hinweis && (
+        {/* Der Hinweis ist für Eltern geschrieben („bei mehreren Kindern …“) */}
+        {konto.hinweis && !du && (
           <p className="mt-3 rounded-2xl bg-[rgb(118_118_128/0.1)] p-3.5 text-[13px] leading-relaxed text-tinte-matt dark:text-slate-300">
             {konto.hinweis}
           </p>

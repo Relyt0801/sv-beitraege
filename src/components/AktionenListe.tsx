@@ -10,6 +10,7 @@ import { abHeute, tagLang, uhr, zeitText, type Aktion, type Termin } from "../li
 
 import { frage, meldeFehler } from "../lib/melder";
 import { ProzentWahl } from "./AktionSheet";
+import { MeldeBestaetigung } from "./MeldeBestaetigung";
 /**
  * Die ausgeschriebenen Aktionen im Events-Reiter.
  *
@@ -22,6 +23,15 @@ export function AktionenListe() {
   const { isStaff, can } = useRole();
   const darfVerteilen = isStaff || can("termine.manage");
   const [schicht, setSchicht] = useState<Termin | null>(null);
+  // „eintragen“: Bestätigung wie beim Bezahlen, mit Hinweis aufs Einteilen
+  const [meldung, setMeldung] = useState<{ auftrag: Promise<unknown>; titel: string; unter: string } | null>(null);
+  const eintragen = (id: string, an: boolean) => {
+    const auftrag = bewerben(id, an);
+    if (!an) return;
+    const t = termine.find((x) => x.id === id);
+    const a = t?.aktion_id ? aktionen.find((x) => x.id === t.aktion_id) : null;
+    setMeldung({ auftrag, titel: a?.titel || t?.titel || "Schicht", unter: t ? tagLang(t.datum) : "" });
+  };
 
   const nachAktion = useMemo(() => {
     const m = new Map<string, Termin[]>();
@@ -57,12 +67,19 @@ export function AktionenListe() {
               meineUid={meineUid}
               meineStudentIds={meineStudentIds}
               darfVerteilen={darfVerteilen}
-              onEintragen={bewerben}
+              onEintragen={eintragen}
               onOeffnen={setSchicht}
             />
           ))}
         </div>
       </section>
+
+      <MeldeBestaetigung
+        auftrag={meldung?.auftrag ?? null}
+        titel={meldung?.titel ?? ""}
+        unter={meldung?.unter}
+        onFertig={() => setMeldung(null)}
+      />
 
       {aktuelleSchicht && (
         <SchichtSheet
@@ -188,7 +205,7 @@ function AktionKarte({
                         : "bg-brand text-white"
                   }`}
                 >
-                  {ich ? "eingetragen ✓" : darfVerteilen ? "mich eintragen" : "eintragen"}
+                  {ich ? "gemeldet ✓" : darfVerteilen ? "mich eintragen" : "eintragen"}
                 </button>
               )}
 

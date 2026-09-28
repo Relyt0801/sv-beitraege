@@ -12,6 +12,27 @@ ausführlich (auf Deutsch); hier steht der Überblick dazu.
 ---
 
 
+## 28.09.2026 (spät): Überweisen für Schüler, Bestätigung beim Eintragen
+
+Kein SQL (Schüler durften die Kontodaten schon lesen, `bank_konto`: „konto
+lesen“). Keine Mitteilung.
+
+- **Überweisen für Schüler:** In „Deine Stufenkasse“ gibt es den Knopf
+  „Überweisen – Kontodaten“. Er öffnet dieselben Daten wie bei den Eltern
+  (Empfänger, IBAN, BIC, Bank, Verwendungszweck „Nachname, Vorname Q1“, alles
+  zum Kopieren), in Du-Form und nur mit der eigenen Person. Der Eltern-Hinweis
+  („bei mehreren Kindern …“) wird dort nicht gezeigt.
+- **Eintragen bei einer Schicht:** Nach „eintragen“ erscheint ein Fenster wie
+  beim Bezahlen (Apple Pay): drehender Ring → grüner Kreis mit Haken. Darunter:
+  „Noch keine feste Schicht. Das Stufenteam teilt ein – wer bisher wenig
+  Mithilfe hat, kommt zuerst dran. Bist du eingeteilt, steht die Schicht als
+  ‚für dich‘ in deinem Kalender.“ Der Knopf heißt danach „gemeldet ✓“ statt
+  „eingetragen ✓“ (`MeldeBestaetigung.tsx`). Bei „Bewegung reduzieren“ ohne
+  Animation.
+
+---
+
+
 ## 28.09.2026 (abends): iPhone-Befunde, Kalender-Test, Update erzwingen
 
 Kein SQL. Function `kalender` neu eingespielt (v3, JWT-Prüfung wie bisher aus,

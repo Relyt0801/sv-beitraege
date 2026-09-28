@@ -234,3 +234,19 @@ button:not(:disabled) {
   --tw-bg-opacity: 1;
   background-color: rgb(var(--brand-fuell) / var(--tw-bg-opacity));
 }
+
+/* Bestätigung nach „eintragen“ (MeldeBestaetigung.tsx) – wie ein Bezahl-Fenster */
+@keyframes melde-dreh { to { transform: rotate(360deg); } }
+@keyframes melde-kreis { from { transform: scale(0.5); opacity: 0; } 70% { transform: scale(1.06); opacity: 1; } to { transform: scale(1); } }
+@keyframes melde-haken { from { stroke-dashoffset: 48; } to { stroke-dashoffset: 0; } }
+@keyframes melde-hoch { from { transform: translateY(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes melde-hinein { from { opacity: 0; } to { opacity: 1; } }
+.melde-dreh { transform-origin: 38px 38px; animation: melde-dreh 0.9s linear infinite; }
+.melde-kreis { transform-origin: 38px 38px; animation: melde-kreis 0.45s cubic-bezier(.32,.72,0,1) both; }
+.melde-haken { stroke-dasharray: 48; stroke-dashoffset: 48; animation: melde-haken 0.35s 0.25s ease-out forwards; }
+.melde-hoch { animation: melde-hoch 0.35s cubic-bezier(.32,.72,0,1) both; }
+.melde-hinein { animation: melde-hinein 0.2s ease-out both; }
+@media (prefers-reduced-motion: reduce) {
+  .melde-dreh, .melde-kreis, .melde-hoch, .melde-hinein { animation-duration: 0.01s; }
+  .melde-haken { animation: none; stroke-dashoffset: 0; }
+}
