@@ -12,6 +12,29 @@ ausführlich (auf Deutsch); hier steht der Überblick dazu.
 ---
 
 
+## 28.09.2026: Mithilfe-Werte an die Vorlagen angeglichen
+
+SQL dazu: `supabase/aktion-prozent.sql` (Migration `aktion_prozent_und_angleichen`,
+eingespielt). Keine Mitteilungen – die Werte wurden direkt in der Datenbank
+geändert, Mitteilungen schickt nur die App.
+
+- **Eingetragene Mithilfe** an die Möglichkeiten im Beiträge-Reiter
+  angeglichen (gleicher Titel, auch mit „ EF“ am Ende): „Waffel-/Kuchenverkauf
+  außerhalb der Schulzeit“ 10 → 15 % (19 Einträge). Alle anderen passten schon.
+- **Aktionen (Mitmachen)** angeglichen: Waffeleisen 20 %, Puderzucker,
+  Besteck und Tischdecke je 5 %, „Waffelverkauf 1. große Pause“ 8 % (Vorlage
+  „Waffelverkauf in der Pause“). Kuchen backen / Waffelteig blieben bei 5 %.
+- Tippfehler in der Vorlage behoben: „Lehrerkarten Unterstützung“.
+- **Prozent nachträglich ändern:** Team bzw. „Termine verwalten“ tippt an der
+  Aktion im Events-Reiter auf „ändern“ neben „zählt als +x %“ und wählt eine
+  Möglichkeit aus dem Beiträge-Reiter. Neue Funktion
+  `aktion_prozent_setzen()`: setzt den Wert und passt schon vergebene Mithilfe
+  der abgeschlossenen Schichten dieser Aktion mit an. Auch „anpassen“ im
+  Aktions-Fenster nutzt sie jetzt.
+
+---
+
+
 ## 28.09.2026: Alte App-Stände auf iPhone/iPad
 
 Kein SQL. Keine Mitteilung.

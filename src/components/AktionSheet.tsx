@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useTermine } from "../termine-store";
 import { useStore } from "../store";
-import { frage } from "../lib/melder";
+import { frage, meldeFehler } from "../lib/melder";
 import { Sheet } from "./Sheet";
 import {
   WOCHENTAG_WAHL, heuteKey, plusTage, tagLang, uhr, wiederholungsTage,
@@ -24,7 +24,7 @@ const ICONS = ["🧇", "🍰", "🥣", "☕", "🍪", "🎪", "🧹", "📦", "�
  * ohne dass die ganze Reihe auseinanderfällt.
  */
 export function AktionSheet({ offen, onSchliessen }: { offen: boolean; onSchliessen: () => void }) {
-  const { aktionen, termine: alleTermine, aktionAnlegen, aktionAendern, aktionLoeschen, anlegenViele } = useTermine();
+  const { aktionen, termine: alleTermine, aktionAnlegen, aktionAendern, aktionProzent, aktionLoeschen, anlegenViele } = useTermine();
   // Wie viel eine Schicht zählt, kommt aus dem Beiträge-Reiter – so passen
   // Aktionen und eingetragene Mithilfe immer zusammen.
   const { templates } = useStore();
@@ -179,7 +179,7 @@ export function AktionSheet({ offen, onSchliessen }: { offen: boolean; onSchlies
           vorlagen={vorlagen}
           schichtenAb={alleTermine.filter((t) => t.aktion_id === gewaehlt.id && t.datum >= heuteKey()).length}
           schichtenGesamt={alleTermine.filter((t) => t.aktion_id === gewaehlt.id).length}
-          onProzent={(p) => void aktionAendern(gewaehlt.id, { prozent: p })}
+          onProzent={(p) => void aktionProzent(gewaehlt.id, p).then((f) => f && meldeFehler("Ändern hat nicht geklappt: " + f))}
           onEntfernen={async () => {
             const alle = alleTermine.filter((t) => t.aktion_id === gewaehlt.id).length;
             if (alle === 0) {
@@ -402,10 +402,10 @@ export function AktionSheet({ offen, onSchliessen }: { offen: boolean; onSchlies
 
 export type { Aktion };
 
-type Vorlage = { id: string; titel: string; punkte: number };
+export type Vorlage = { id: string; titel: string; punkte: number };
 
 /** Prozent aus den Beitrags-Vorlagen wählen – keine freie Zahl mehr. */
-function ProzentWahl({ vorlagen, wert, setzen }: { vorlagen: Vorlage[]; wert: number; setzen: (p: number) => void }) {
+export function ProzentWahl({ vorlagen, wert, setzen }: { vorlagen: Vorlage[]; wert: number; setzen: (p: number) => void }) {
   if (!vorlagen.length) {
     return <p className="text-[12px] text-tinte-leise">Im Beiträge-Reiter sind noch keine Möglichkeiten angelegt.</p>;
   }

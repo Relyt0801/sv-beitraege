@@ -8,7 +8,8 @@ import { Sheet } from "./Sheet";
 import { Avatar } from "./Avatar";
 import { abHeute, tagLang, uhr, zeitText, type Aktion, type Termin } from "../lib/termine";
 
-import { frage } from "../lib/melder";
+import { frage, meldeFehler } from "../lib/melder";
+import { ProzentWahl } from "./AktionSheet";
 /**
  * Die ausgeschriebenen Aktionen im Events-Reiter.
  *
@@ -74,6 +75,39 @@ export function AktionenListe() {
   );
 }
 
+/**
+ * Prozent einer Aktion nachträglich ändern (Team / Termine verwalten). Zur
+ * Wahl stehen die Möglichkeiten aus dem Beiträge-Reiter; schon vergebene
+ * Mithilfe dieser Aktion zieht mit. Keine Mitteilung.
+ */
+function ProzentAendern({ aktion }: { aktion: Aktion }) {
+  const { aktionProzent } = useTermine();
+  const { templates } = useStore();
+  const [offen, setOffen] = useState(false);
+  const vorlagen = useMemo(() => [...templates].sort((a, b) => a.sort - b.sort || a.punkte - b.punkte), [templates]);
+  return (
+    <>
+      <button onClick={() => setOffen(!offen)} className="ml-1.5 font-bold text-brand underline-offset-2 hover:underline">
+        {offen ? "fertig" : "ändern"}
+      </button>
+      {offen && (
+        <div className="mt-2">
+          <ProzentWahl
+            vorlagen={vorlagen}
+            wert={aktion.prozent}
+            setzen={(p) => {
+              void aktionProzent(aktion.id, p).then((f) => {
+                if (f) meldeFehler("Ändern hat nicht geklappt: " + f);
+                else setOffen(false);
+              });
+            }}
+          />
+        </div>
+      )}
+    </>
+  );
+}
+
 function AktionKarte({
   aktion, schichten, gesamt, bewerbungen, meineUid, meineStudentIds, darfVerteilen, onEintragen, onOeffnen,
 }: {
@@ -98,6 +132,7 @@ function AktionKarte({
           <div className="mt-0.5 text-[12px] text-tinte-leise">
             zählt als <span className="font-semibold text-brand">+{aktion.prozent} %</span> Mithilfe
             {gesamt > 4 && ` · ${gesamt} Termine`}
+            {darfVerteilen && <ProzentAendern aktion={aktion} />}
           </div>
         </div>
       </div>

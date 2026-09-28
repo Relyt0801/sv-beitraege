@@ -31,6 +31,8 @@ interface TermineValue {
   loeschen: (id: string) => Promise<void>;
   aktionAnlegen: (a: Omit<Aktion, "id" | "created_at"> & { id?: string }) => Promise<string | null>;
   aktionAendern: (id: string, patch: Partial<Aktion>) => Promise<void>;
+  /** Prozent einer Aktion ändern – schon vergebene Mithilfe zieht mit (ohne Mitteilung). */
+  aktionProzent: (id: string, prozent: number) => Promise<string | null>;
   aktionLoeschen: (id: string) => Promise<void>;
   /** Sich selbst fuer eine Schicht ein- oder austragen. */
   bewerben: (terminId: string, an: boolean) => Promise<void>;
@@ -374,6 +376,20 @@ export function TermineProvider({ children }: { children: ReactNode }) {
       await supabase!.from("aktionen").update(patch).eq("id", id);
     },
     [],
+  );
+
+  const aktionProzent = useCallback<TermineValue["aktionProzent"]>(
+    async (id, prozent) => {
+      setAktionen((prev) => prev.map((a) => (a.id === id ? { ...a, prozent } : a)));
+      if (!hasSupabase) return null;
+      const { error } = await supabase!.rpc("aktion_prozent_setzen", { aid: id, neu: prozent });
+      if (error) {
+        void laden();
+        return error.message;
+      }
+      return null;
+    },
+    [laden],
   );
 
   const aktionLoeschen = useCallback<TermineValue["aktionLoeschen"]>(
@@ -723,6 +739,7 @@ export function TermineProvider({ children }: { children: ReactNode }) {
         loeschen,
         aktionAnlegen,
         aktionAendern,
+        aktionProzent,
         aktionLoeschen,
         bewerben,
         zuteilen,
