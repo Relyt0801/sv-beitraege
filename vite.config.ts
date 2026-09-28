@@ -26,19 +26,31 @@ async function bauStand(): Promise<string> {
   return "unbekannt";
 }
 
-export default defineConfig(async () => ({
+export default defineConfig(async () => {
+  // Ein Stand für beides: im Code (__BAU_ZEIT__) und in /version.json. Die App
+  // vergleicht die beiden und lädt neu, wenn online ein neuerer Stand liegt.
+  const commit = await bauStand();
+  const zeit = new Date().toISOString();
+  return {
   // Sourcemaps: im Fehlerfall steht die echte Datei/Zeile in der Meldung
   // statt minifiziertem Kauderwelsch wie "n is not a function".
   build: { sourcemap: true },
   define: {
-    __BAU_COMMIT__: JSON.stringify(await bauStand()),
-    __BAU_ZEIT__: JSON.stringify(new Date().toISOString()),
+    __BAU_COMMIT__: JSON.stringify(commit),
+    __BAU_ZEIT__: JSON.stringify(zeit),
   },
   // base = "/" für Vercel/eigene Domain; für GitHub Pages "/sv-beitraege/"
   // (wird im Deploy-Workflow via BASE_PATH gesetzt).
   base: process.env.BASE_PATH || "/",
   plugins: [
     react(),
+    {
+      name: "version-json",
+      apply: "build" as const,
+      generateBundle() {
+        this.emitFile({ type: "asset", fileName: "version.json", source: JSON.stringify({ commit, zeit }) });
+      },
+    },
     VitePWA({
       strategies: "injectManifest",
       srcDir: "src",
@@ -64,4 +76,5 @@ export default defineConfig(async () => ({
       },
     }),
   ],
-}));
+};
+});

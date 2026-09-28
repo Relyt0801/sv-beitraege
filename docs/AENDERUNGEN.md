@@ -12,6 +12,31 @@ ausführlich (auf Deutsch); hier steht der Überblick dazu.
 ---
 
 
+## 28.09.2026: Alte App-Stände auf iPhone/iPad
+
+Kein SQL. Keine Mitteilung.
+
+- **Befund (Beispiel eines Schülerkontos):** Rechte und Datenbank stimmen –
+  „Finanzen ansehen – Standard“ ist an, `finanz_uebersicht()` liefert Daten.
+  Das Apple-Gerät hat sich am 25.09. um 07:02 (UTC) angemeldet; den
+  Finanzen-Reiter für alle gibt es erst seit 25.09. 12:29 (UTC). Das Gerät
+  läuft sehr wahrscheinlich noch mit dem alten App-Stand, weil iOS die
+  Web-App im Speicher hält und den Service Worker nur selten nach Updates
+  fragt.
+- **Sicherheitsnetz** (`vite.config.ts`, `main.tsx`): Jeder Build legt
+  `/version.json` mit dem Bau-Zeitpunkt ab. Die App fragt sie beim Start, alle
+  5 Minuten und beim Zurückholen in den Vordergrund ab (ohne Zwischenspeicher).
+  Ist online ein neuerer Stand, wird erst das normale Update versucht; kommt es
+  nicht binnen 15 s, werden Service Worker und Zwischenspeicher gelöscht und
+  die Seite neu geladen – nie beim Tippen, pro Stand höchstens einmal (getestet:
+  lädt einmal neu, keine Schleife).
+- Geräte, die noch einen Stand **vor** dieser Änderung haben, brauchen einmal
+  einen echten Neustart der App (ganz schließen, neu öffnen) – danach
+  aktualisieren sie sich selbst.
+
+---
+
+
 ## 28.09.2026 (spät): Chat-Kreise, Vorsitz
 
 Kein SQL. Keine Mitteilung, keine neue Einführung.
