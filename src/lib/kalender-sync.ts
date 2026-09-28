@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { hasSupabase, supabase } from "./supabase";
 import { demoRolle } from "./demo";
+import { useRole } from "../auth/RoleProvider";
 import { kalenderIcs, leseIcs, type FremderTermin } from "../../supabase/functions/kalender/ics";
 import { heuteKey, plusTage, type Termin } from "./termine";
 
@@ -17,8 +18,8 @@ import { heuteKey, plusTage, type Termin } from "./termine";
  *                Function "kalender" und zeigt die Termine grau – nur dieser
  *                Person, nur auf diesem Gerät (der Link bleibt im Browser).
  *
- * Vorerst nur für die Testkonten (siehe DEMO_KONTEN, auch in der Function)
- * und im Demo-Modus.
+ * Vorerst nur für die Testkonten (siehe DEMO_KONTEN, auch in der Function),
+ * für alle mit dem Recht „Kalender-Verbindung (Testphase)“ und im Demo-Modus.
  */
 
 export const DEMO_KONTEN = ["admin.test", "test.admin"];
@@ -36,6 +37,10 @@ async function nutzername(): Promise<string | null> {
 
 /** Darf diese Person die Kalender-Verbindung (Testphase) sehen? */
 export function useKalenderDemo(): boolean {
+  // Freigabe über den Rechte-Reiter („Kalender-Verbindung (Testphase)“) –
+  // Namen stehen so nicht im Code. Die Function prüft dasselbe.
+  const { can } = useRole();
+  const perm = can("kalender.test");
   const [ja, setJa] = useState(() => !hasSupabase && demoRolle() !== null);
   useEffect(() => {
     if (!hasSupabase) return;
@@ -50,7 +55,7 @@ export function useKalenderDemo(): boolean {
       sub.subscription.unsubscribe();
     };
   }, []);
-  return ja;
+  return ja || perm;
 }
 
 // ---------------------------------------------------------------- App → Handy

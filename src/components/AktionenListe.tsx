@@ -167,18 +167,13 @@ function AktionKarte({
                 {voll ? `voll · ${belegt}/${plaetze}` : `${belegt}/${plaetze}`}
               </span>
 
-              {darfVerteilen ? (
-                <button
-                  onClick={() => onOeffnen(t)}
-                  className="shrink-0 rounded-lg bg-brand px-2.5 py-1.5 text-[12px] font-bold text-white transition active:scale-95"
-                >
-                  {gemeldet.length > 0 ? `${gemeldet.length} gemeldet` : "verteilen"}
-                </button>
-              ) : t.personen.some((sid) => meineStudentIds.includes(sid)) ? (
+              {/* Selbst eintragen – auch fürs Team (vorher sah das Team hier nur
+                  „x gemeldet“ und konnte sich nicht selbst melden). */}
+              {t.personen.some((sid) => meineStudentIds.includes(sid)) ? (
                 <span className="shrink-0 rounded-lg bg-bezahlt-grund px-2.5 py-1.5 text-[12px] font-bold text-bezahlt dark:bg-emerald-500/20 dark:text-emerald-300">
-                  du bist eingeteilt ✓
+                  {darfVerteilen ? "du ✓" : "du bist eingeteilt ✓"}
                 </span>
-              ) : voll && !ich ? (
+              ) : !meineStudentIds.length ? null : voll && !ich && !darfVerteilen ? (
                 <span className="shrink-0 rounded-lg px-2.5 py-1.5 text-[12px] font-bold text-tinte-leise">
                   voll belegt
                 </span>
@@ -188,10 +183,21 @@ function AktionKarte({
                   className={`shrink-0 rounded-lg px-2.5 py-1.5 text-[12px] font-bold transition active:scale-95 ${
                     ich
                       ? "border border-brand text-brand"
-                      : "bg-brand text-white"
+                      : darfVerteilen
+                        ? "border border-brand/40 text-brand"
+                        : "bg-brand text-white"
                   }`}
                 >
-                  {ich ? "eingetragen ✓" : "eintragen"}
+                  {ich ? "eingetragen ✓" : darfVerteilen ? "mich eintragen" : "eintragen"}
+                </button>
+              )}
+
+              {darfVerteilen && (
+                <button
+                  onClick={() => onOeffnen(t)}
+                  className="shrink-0 rounded-lg bg-brand px-2.5 py-1.5 text-[12px] font-bold text-white transition active:scale-95"
+                >
+                  {gemeldet.length > 0 ? `${gemeldet.length} gemeldet` : "verteilen"}
                 </button>
               )}
             </li>

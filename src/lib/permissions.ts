@@ -12,6 +12,7 @@ export type PermKey =
   | "hilfen.edit"
   | "beitraege.manage"
   | "termine.manage"
+  | "kalender.test"
   | "finanzen.basis"
   | "finanzen.view"
   | "finanzen.manage"
@@ -64,6 +65,7 @@ export const PERM_CATEGORIES: PermCategory[] = [
   {
     label: "Termine", icon: "📅", perms: [
       { key: "termine.manage", label: "Termine verwalten", desc: "Termine anlegen, ändern, löschen und festlegen, wer sie sehen darf." },
+      { key: "kalender.test", label: "Kalender-Verbindung (Testphase)", desc: "Stufen-Termine als Abo ins Handy holen und den eigenen Handy-Kalender in der App anzeigen. Noch im Test – nur einzelnen Personen geben." },
     ],
   },
   {

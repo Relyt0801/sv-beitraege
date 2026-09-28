@@ -12,6 +12,40 @@ ausführlich (auf Deutsch); hier steht der Überblick dazu.
 ---
 
 
+## 28.09.2026 (abends): iPhone-Befunde, Kalender-Test, Update erzwingen
+
+Kein SQL. Function `kalender` neu eingespielt (v3, JWT-Prüfung wie bisher aus,
+weil Kalender-Apps sich nicht anmelden; die Function prüft selbst).
+
+- **„lädt weitere …“ blieb stehen (Kasse, Rollen, Rechte, Buchungen):** Die
+  Liste lädt in 40er-Schritten nach, sobald die Marke unten in Sicht kommt.
+  Der Beobachter startete aber nur, wenn die Marke schon beim Laden der Daten
+  im Bild war. Wurde die App auf einem anderen Reiter geöffnet (z. B. durch
+  Tippen auf eine Mitteilung → Chats) und erst dann die Kasse angesehen, fehlte
+  er – die Liste blieb bei 40 Personen stehen. Jetzt startet er, sobald die
+  Marke erscheint (`useNachschub`, `App.tsx`); zusätzlich ist die Marke
+  antippbar („jetzt anzeigen“). Nicht iPhone-spezifisch, fiel dort nur auf.
+- **Selbst eintragen fürs Team:** Wer Schichten verteilen darf, sah an jeder
+  Schicht nur „x gemeldet“ und konnte sich nicht selbst melden. Jetzt steht
+  daneben „mich eintragen“ (bzw. „eingetragen ✓“ / „du ✓“) – auch bei vollen
+  Schichten, weil das Team ohnehin selbst einteilt.
+- **Kalender-Verbindung (Testphase):** neues Recht „Kalender-Verbindung
+  (Testphase)“ (`kalender.test`, Rechte-Reiter → Termine). Admins haben es
+  automatisch; einzelnen Personen gibt man es dort. Keine Namen mehr im Code
+  (App und Function prüfen das Recht).
+- **Update erzwingen** (`sw.ts`): Übernimmt ein neuer Stand, werden Fenster im
+  Hintergrund sofort neu geladen und alte Zwischenspeicher gelöscht – auch
+  bei alten App-Ständen ohne eigene Update-Prüfung. Das Fenster im Vordergrund
+  lädt wie bisher neu (nicht mitten im Tippen). Zusammen mit `/version.json`
+  kommt damit jedes Update an.
+- **Reiter-Leiste im Safari-Browser (iPhone):** Safari legt seine eigene Leiste
+  unten über die Seite; die Reiter-Leiste der App steht deshalb darüber und
+  man sieht darunter Inhalt durchscheinen. Das ist Safari; in der App vom
+  Home-Bildschirm („Zum Home-Bildschirm“) sitzt sie richtig.
+
+---
+
+
 ## 28.09.2026: Mithilfe-Werte an die Vorlagen angeglichen
 
 SQL dazu: `supabase/aktion-prozent.sql` (Migration `aktion_prozent_und_angleichen`,

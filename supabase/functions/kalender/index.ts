@@ -20,8 +20,10 @@
 //
 // Dazu POST { aktion: "link" } mit Anmeldung: gibt den persönlichen Abo-Link.
 //
-// DEMO: Vorerst nur für die Testkonten in DEMO_KONTEN. Alle anderen bekommen
-// weder Link noch Abo noch Import.
+// DEMO: Vorerst nur für die Testkonten in DEMO_KONTEN und für alle, denen im
+// Rechte-Reiter „Kalender-Verbindung (Testphase)“ (kalender.test) gegeben
+// wurde – so stehen keine Namen im Code. Alle anderen bekommen weder Link noch
+// Abo noch Import.
 //
 // Deploy: supabase functions deploy kalender --no-verify-jwt
 // (ohne JWT-Prüfung, weil Kalender-Apps keinen Login schicken – die Function
@@ -70,7 +72,19 @@ async function profilVon(uid: string) {
   return data as { user_id: string; username: string | null; role: string; student_id: string | null } | null;
 }
 
-const istDemo = (p: { username: string | null } | null) => Boolean(p?.username && DEMO_KONTEN.includes(p.username));
+/** Wie has_perm('kalender.test') – aber für eine bestimmte Person (das Abo kommt ohne Anmeldung). */
+async function istDemo(p: { user_id: string; username: string | null; role: string } | null): Promise<boolean> {
+  if (!p) return false;
+  if (p.username && DEMO_KONTEN.includes(p.username)) return true;
+  if (p.role === "admin") return true;
+  const { data: eigen } = await admin
+    .from("user_permissions").select("allowed").eq("user_id", p.user_id).eq("perm", "kalender.test").maybeSingle();
+  if (eigen) return Boolean((eigen as { allowed: boolean }).allowed);
+  const rolle = p.role === "stv_sprecher" ? "sprecher" : p.role;
+  const { data: r } = await admin
+    .from("role_permissions").select("allowed").eq("role", rolle).eq("perm", "kalender.test").maybeSingle();
+  return Boolean((r as { allowed: boolean } | null)?.allowed);
+}
 
 // ------------------------------------------------------------ Sichtbarkeit
 // Dieselbe Regel wie kann_termin_sehen() in supabase/termine.sql – hier für eine
@@ -164,7 +178,7 @@ Deno.serve(async (req) => {
       return new Response("Link ungültig.", { status: 403, headers: cors });
     }
     const p = await profilVon(uid);
-    if (!p || !istDemo(p)) return new Response("Kalender-Abo ist für dieses Konto nicht freigeschaltet.", { status: 403, headers: cors });
+    if (!p || !(await istDemo(p))) return new Response("Kalender-Abo ist für dieses Konto nicht freigeschaltet.", { status: 403, headers: cors });
     const termine = await sichtbareTermine(p);
     // Gekennzeichnet: eigener Kalendername, Kategorie "Stufe" und ein Satz in
     // jeder Beschreibung – so sieht man im Handy sofort, woher ein Termin kommt.
@@ -189,7 +203,7 @@ Deno.serve(async (req) => {
   const { data: wer } = await admin.auth.getUser(jwt);
   if (!wer?.user) return json({ error: "Bitte anmelden." }, 401);
   const p = await profilVon(wer.user.id);
-  if (!istDemo(p)) return json({ error: "Die Kalender-Verbindung ist noch in der Testphase." }, 403);
+  if (!(await istDemo(p))) return json({ error: "Die Kalender-Verbindung ist noch in der Testphase." }, 403);
   const k = (await req.json().catch(() => ({}))) as { aktion?: string; url?: string };
 
   if (k.aktion === "link") {

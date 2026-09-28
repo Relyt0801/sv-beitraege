@@ -220,7 +220,10 @@ function Main() {
   // Wie viele Zeilen gerade im Dokument haengen. Beim Filtern faengt es
   // wieder von vorn an, sonst waeren nach einer langen Sitzung doch alle da.
   const [sichtbar, setSichtbar] = useState(SCHRITT_LISTE);
-  const nachschub = useRef<HTMLDivElement | null>(null);
+  // Marke als Zustand (Callback-Ref): erscheint sie erst später (anderer Reiter
+  // war offen, Daten kamen nach), startet der Beobachter trotzdem – sonst stand
+  // „lädt weitere …“ für immer da (iPhone, 28.09.).
+  const [nachschub, setNachschub] = useState<HTMLElement | null>(null);
 
   useEffect(() => {
     setSichtbar(SCHRITT_LISTE);
@@ -258,7 +261,7 @@ function Main() {
   );
 
   useEffect(() => {
-    const ziel = nachschub.current;
+    const ziel = nachschub;
     if (!ziel) return;
     const beobachter = new IntersectionObserver(
       (eintraege) => {
@@ -268,7 +271,7 @@ function Main() {
     );
     beobachter.observe(ziel);
     return () => beobachter.disconnect();
-  }, [sichtbar, filtered.length]);
+  }, [nachschub, sichtbar, filtered.length]);
 
   const openStudent = students.find((s) => s.id === openId) ?? null;
   // Laeuft ueber alle Personen – nicht bei jedem Tastendruck neu.
@@ -671,10 +674,15 @@ function Main() {
           {/* Nachschubmarke: sobald sie in Sicht kommt, kommen weitere Zeilen.
               So haengen nie 300 Zeilen gleichzeitig im Dokument. */}
           {filtered.length > sichtbar && (
-            <div ref={nachschub} className="py-6 text-center text-[12px] text-tinte-leise">
+            <button
+              ref={setNachschub}
+              type="button"
+              onClick={() => setSichtbar((v) => v + SCHRITT_LISTE)}
+              className="w-full py-6 text-center text-[12px] text-tinte-leise"
+            >
               lädt weitere {Math.min(SCHRITT_LISTE, filtered.length - sichtbar)} von{" "}
-              {filtered.length - sichtbar} …
-            </div>
+              {filtered.length - sichtbar} … <span className="font-semibold text-brand">jetzt anzeigen</span>
+            </button>
           )}
           {mode === "local" && ready && (
             <p className="col-span-full pt-2 text-center text-[11px] text-tinte-leise">

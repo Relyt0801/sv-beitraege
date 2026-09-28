@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
 /** Wie viele Zeilen auf einmal dazukommen. */
 export const SCHRITT = 40;
@@ -17,7 +17,11 @@ export const SCHRITT = 40;
  */
 export function useNachschub(anzahl: number, zuruecksetzenBei: unknown[]) {
   const [sichtbar, setSichtbar] = useState(SCHRITT);
-  const marke = useRef<HTMLDivElement | null>(null);
+  // Die Marke als Zustand (Callback-Ref), nicht als useRef: Erscheint sie erst
+  // später (Liste war beim Laden unsichtbar, anderer Reiter offen), muss der
+  // Beobachter neu starten. Mit useRef merkte das niemand – dann stand
+  // „lädt weitere …“ für immer da (so gesehen auf iPhones, 28.09.).
+  const [marke, setMarke] = useState<HTMLDivElement | null>(null);
 
   // Neue Suche, neuer Filter: wieder oben anfangen.
   useEffect(() => {
@@ -26,17 +30,17 @@ export function useNachschub(anzahl: number, zuruecksetzenBei: unknown[]) {
   }, zuruecksetzenBei);
 
   useEffect(() => {
-    const ziel = marke.current;
-    if (!ziel) return;
+    if (!marke) return;
     const beobachter = new IntersectionObserver(
       (eintraege) => {
         if (eintraege.some((e) => e.isIntersecting)) setSichtbar((v) => v + SCHRITT);
       },
       { rootMargin: "600px" },
     );
-    beobachter.observe(ziel);
+    beobachter.observe(marke);
     return () => beobachter.disconnect();
-  }, [sichtbar, anzahl]);
+  }, [marke, sichtbar, anzahl]);
 
-  return { sichtbar, marke, rest: Math.max(0, anzahl - sichtbar) };
+  const mehr = () => setSichtbar((v) => v + SCHRITT);
+  return { sichtbar, marke: setMarke, rest: Math.max(0, anzahl - sichtbar), mehr };
 }

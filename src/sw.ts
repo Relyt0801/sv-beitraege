@@ -1,12 +1,28 @@
 /// <reference lib="webworker" />
-import { precacheAndRoute } from "workbox-precaching";
+import { cleanupOutdatedCaches, precacheAndRoute } from "workbox-precaching";
 
 declare const self: ServiceWorkerGlobalScope & { __WB_MANIFEST: unknown[] };
 
 // Offline-Precache (wie bisher)
 precacheAndRoute(self.__WB_MANIFEST);
+// Alte Zwischenspeicher früherer Stände wegräumen
+cleanupOutdatedCaches();
 self.addEventListener("install", () => self.skipWaiting());
-self.addEventListener("activate", (e) => e.waitUntil(self.clients.claim()));
+// Neuer Stand übernimmt sofort. Fenster im Hintergrund (nicht im Fokus) werden
+// direkt neu geladen – so kommt jedes Update auch bei alten App-Ständen an, die
+// selbst noch keine Update-Prüfung haben. Das Fenster im Vordergrund lädt über
+// "controllerchange" in main.tsx neu (dort mit Rücksicht aufs Tippen).
+self.addEventListener("activate", (e) =>
+  e.waitUntil(
+    (async () => {
+      await self.clients.claim();
+      const fenster = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+      await Promise.all(
+        fenster.filter((c) => !c.focused).map((c) => c.navigate(c.url).catch(() => undefined)),
+      );
+    })(),
+  ),
+);
 
 // Pfad relativ zum Scope aufloesen (funktioniert auch unter /sv-beitraege/ auf GitHub Pages).
 const asset = (file: string) => new URL(file, self.registration.scope).href;
