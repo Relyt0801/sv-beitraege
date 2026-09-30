@@ -12,6 +12,26 @@ ausführlich (auf Deutsch); hier steht der Überblick dazu.
 ---
 
 
+## 30.09.2026: Rollen-Menü statt nativem Auswahlfeld
+
+Kein SQL, keine Mitteilung.
+
+- **Problem:** Unter Windows (helles System) mit der App im Dunkelmodus war
+  die Rollenliste hellgrau mit fast weißer Schrift – kaum lesbar. Ursache:
+  `color-scheme: light dark` folgte dem Betriebssystem, die App aber ihrem
+  eigenen Schalter.
+- **Rollen-Reiter:** Die Rolle wählt man jetzt in einem eigenen Menü
+  (`RollenMenue` in `RolesTab.tsx`) im selben Stil wie „Komitees“: aktuelle
+  Rolle mit Häkchen, je Rolle ein Satz Erklärung, vergebene Rollen mit 🔒 und
+  Grund, Trennlinien zwischen Schüler / Team / Eltern. Rückfrage bei
+  heiklen Wechseln (Eltern, Admin) wie bisher. Escape schließt.
+- **Alle anderen Auswahlfelder:** `color-scheme` folgt jetzt der App
+  (`html.dark`), Optionen haben Karten-Hintergrund und Textfarbe der App
+  (`src/index.css`).
+
+---
+
+
 ## 30.09.2026: Schicht bekommen / nicht bekommen – auf einen Blick
 
 Kein SQL, keine Mitteilung. Nur Anzeige – wer eingeteilt ist, entscheidet

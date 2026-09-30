@@ -58,6 +58,21 @@
   --glas: 30 30 32;
 }
 
+/*
+ * Native Auswahlfelder (<select>) folgen der App, nicht dem Betriebssystem.
+ * Vorher stand hier nur „light dark“: Windows im hellen Modus + App im
+ * dunklen Modus ergab eine hellgraue Liste mit fast weißer Schrift.
+ */
+html:not(.dark) { color-scheme: light; }
+html.dark { color-scheme: dark; }
+select option {
+  background-color: rgb(var(--karte));
+  color: rgb(var(--tinte));
+}
+select option:disabled {
+  color: rgb(var(--tinte-leise));
+}
+
 html, body, #root {
   height: 100%;
 }

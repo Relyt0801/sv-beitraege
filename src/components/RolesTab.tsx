@@ -49,6 +49,7 @@ export function RolesTab() {
   const { committeesOf, setUserCommittee } = useTopics();
   const [q, setQ] = useState("");
   const [openKom, setOpenKom] = useState<string | null>(null);
+  const [openRolle, setOpenRolle] = useState<string | null>(null);
   const [openBan, setOpenBan] = useState<string | null>(null);
   // Elternzugang, dessen Kinder gerade bearbeitet werden
   const [kinderFuer, setKinderFuer] = useState<Profile | null>(null);
@@ -162,38 +163,30 @@ export function RolesTab() {
 
               {/* Zeile 2: Rolle + Komitees (bei Eltern: Kinder) + Chat-Sperre */}
               <div className="mt-3 flex min-w-0 flex-wrap items-stretch gap-2">
-                <select
-                  disabled={rolleGesperrt}
-                  aria-label="Rolle"
-                  title={
+                <RollenMenue
+                  profil={p}
+                  gesperrt={rolleGesperrt}
+                  gesperrtGrund={
                     geschuetzt
                       ? "Diese Rolle kann nicht geändert werden"
                       : rolleGesperrt
                         ? "Diese Rolle darf nur der Admin ändern"
                         : undefined
                   }
-                  className={`${feld} w-0 min-w-[8.5rem] flex-1 px-3 disabled:opacity-50`}
-                  value={p.role}
-                  onChange={async (e) => {
-                    const neu = e.target.value as Role;
+                  offen={openRolle === p.user_id}
+                  setOffen={(an) => setOpenRolle(an ? p.user_id : null)}
+                  auswahl={ROLLEN_AUSWAHL.filter((r) => isAdmin || !NUR_ADMIN.includes(r) || p.role === r)}
+                  vergeben={(r) => NUR_EINMAL.includes(r) && profiles.some((x) => x.role === r && x.user_id !== p.user_id)}
+                  feld={feld}
+                  onWahl={async (neu) => {
+                    setOpenRolle(null);
+                    if (neu === p.role) return;
                     // Eltern zu Stufenteam oder umgekehrt ist fast immer ein Versehen
                     const heikel = p.role === "eltern" || neu === "eltern" || neu === "admin";
                     if (heikel && !(await frage(`${p.username ?? "Dieses Konto"} wirklich zu „${rolleName(neu)}“ machen?`, "Ändern"))) return;
                     void setRole(p.user_id, neu);
                   }}
-                >
-                  {ROLLEN_AUSWAHL
-                    .filter((r) => isAdmin || !NUR_ADMIN.includes(r) || p.role === r)
-                    .map((r) => {
-                      const vergeben = NUR_EINMAL.includes(r) && profiles.some((x) => x.role === r && x.user_id !== p.user_id);
-                      return (
-                        <option key={r} value={r} disabled={vergeben}>
-                          {rolleName(r)}
-                          {vergeben ? " (schon vergeben)" : ""}
-                        </option>
-                      );
-                    })}
-                </select>
+                />
 
                 {/* Eltern haben keine Komitees – dort waehlt man stattdessen die Kinder. */}
                 {istEltern ? (
@@ -319,6 +312,111 @@ export function RolesTab() {
 
       {kinderFuer && (
         <KinderSheet profil={kinderFuer} darf={darfKinder} onClose={() => setKinderFuer(null)} />
+      )}
+    </div>
+  );
+}
+
+/** Kurzer Satz unter jeder Rolle im Menü – was sie bedeutet. */
+const ROLLE_HINWEIS: Partial<Record<Role, string>> = {
+  schueler: "Normales Mitglied der Stufe",
+  sprecher: "Gibt es nur einmal",
+  stv_sprecher: "Stellvertretung – gibt es nur einmal",
+  stufenteam: "Organisation – Rechte im Rechte-Reiter",
+  kassenwart: "Kassenbuch – Rechte im Rechte-Reiter",
+  admin: "Alle Rechte",
+  eltern: "Sieht nur die eigenen Kinder",
+};
+
+/**
+ * Rolle wählen – als eigenes Menü statt nativem <select>. Das native Feld sah
+ * je nach Betriebssystem anders aus (unter Windows im Dunkelmodus: hellgraue
+ * Liste mit fast weißer Schrift) und konnte nicht erklären, warum eine Rolle
+ * gesperrt ist. Hier: Häkchen an der aktuellen Rolle, ein Satz Erklärung,
+ * gesperrte Rollen mit Grund. Team und Eltern sind durch Linien getrennt.
+ */
+function RollenMenue({
+  profil, gesperrt, gesperrtGrund, offen, setOffen, auswahl, vergeben, feld, onWahl,
+}: {
+  profil: Profile;
+  gesperrt: boolean;
+  gesperrtGrund?: string;
+  offen: boolean;
+  setOffen: (an: boolean) => void;
+  auswahl: Role[];
+  vergeben: (r: Role) => boolean;
+  feld: string;
+  onWahl: (r: Role) => void;
+}) {
+  const trennerVor = (r: Role, i: number) => i > 0 && (r === "sprecher" || r === "eltern");
+  return (
+    <div className="relative w-0 min-w-[8.5rem] flex-1">
+      <button
+        type="button"
+        disabled={gesperrt}
+        aria-label={`Rolle: ${rolleName(profil.role)}`}
+        aria-haspopup="listbox"
+        aria-expanded={offen}
+        title={gesperrtGrund}
+        onClick={() => setOffen(!offen)}
+        onKeyDown={(e) => e.key === "Escape" && setOffen(false)}
+        className={`${feld} flex w-full items-center gap-1.5 px-3 text-left active:scale-[.98] disabled:opacity-50 disabled:active:scale-100`}
+      >
+        <span className="min-w-0 flex-1 truncate">{rolleName(profil.role)}</span>
+        <span className={`shrink-0 text-tinte-leise transition ${offen ? "rotate-180" : ""}`} aria-hidden>
+          ▾
+        </span>
+      </button>
+      {offen && (
+        <>
+          <button className="fixed inset-0 z-20 cursor-default" onClick={() => setOffen(false)} aria-label="Schließen" />
+          <div
+            role="listbox"
+            aria-label="Rolle wählen"
+            onKeyDown={(e) => e.key === "Escape" && setOffen(false)}
+            className="absolute left-0 z-30 mt-1.5 max-h-[22rem] w-[max(100%,16rem)] animate-popIn overflow-y-auto rounded-2xl border border-black/[0.06] bg-white/95 p-1.5 shadow-glas backdrop-blur-xl dark:border-white/10 dark:bg-slate-800/95"
+          >
+            {auswahl.map((r, i) => {
+              const aktiv = r === profil.role;
+              const belegt = vergeben(r);
+              return (
+                <div key={r}>
+                  {trennerVor(r, i) && <div className="mx-2.5 my-1 h-px bg-black/[0.07] dark:bg-white/10" aria-hidden />}
+                  <button
+                    type="button"
+                    role="option"
+                    aria-selected={aktiv}
+                    disabled={belegt}
+                    autoFocus={aktiv}
+                    onClick={() => onWahl(r)}
+                    className={`flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left transition focus:outline-none focus-visible:bg-black/[0.06] enabled:hover:bg-black/[0.04] disabled:cursor-not-allowed dark:focus-visible:bg-white/[0.1] dark:enabled:hover:bg-white/[0.06] ${
+                      aktiv ? "bg-brand/[0.08] dark:bg-brand/[0.15]" : ""
+                    }`}
+                  >
+                    <span className="min-w-0 flex-1">
+                      <span className={`block truncate text-[15px] font-semibold ${belegt ? "text-tinte-leise" : aktiv ? "text-brand" : ""}`}>
+                        {rolleName(r)}
+                      </span>
+                      <span className="block text-[12px] leading-snug text-tinte-leise">
+                        {belegt ? "Schon vergeben – erst der anderen Person wegnehmen" : ROLLE_HINWEIS[r]}
+                      </span>
+                    </span>
+                    {aktiv && (
+                      <span className="shrink-0 text-brand">
+                        <Icon name="haken" size={18} strich={2.5} />
+                      </span>
+                    )}
+                    {belegt && (
+                      <span className="shrink-0 text-tinte-leise" aria-hidden>
+                        🔒
+                      </span>
+                    )}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </>
       )}
     </div>
   );
