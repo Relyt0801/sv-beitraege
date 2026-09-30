@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
-import { useTermine } from "../termine-store";
+import { useSchichtStatus, useTermine } from "../termine-store";
 import { useRole } from "../auth/RoleProvider";
 import { committeeIcon, committeeLabel } from "../lib/committees";
 import {
   MONATE, WOCHENTAGE, anTag, ausKey, betrifftMich, farbeVon, freiAn, heuteKey, istKlausur, laeuftAn, monatLang,
-  montagVon, plusTage, tagKey, tagLang, uhr, umfangText, zeitText, type Termin,
+  montagVon, plusTage, tagKey, tagLang, uhr, umfangText, zeitText, type SchichtStatus, type Termin,
 } from "../lib/termine";
-import { KuerzelLeiste, Zeichen, chipKlasse } from "./TerminZeichen";
+import { KuerzelLeiste, SchichtLegende, SchichtSchild, Zeichen, chipKlasse, schichtRahmen, schichtVorzeichen } from "./TerminZeichen";
 import { Icon } from "./Icon";
 import { TerminZeile } from "./Wochenstreifen";
 
@@ -60,6 +60,9 @@ export function Kalender({
   const [anker, setAnker] = useState(startTag || heute);
 
   const meins = (t: Termin) => betrifftMich(t, meineKomitees, meineStudentIds);
+  // Schichten: bekommen / gemeldet / nicht bekommen – eigene Optik im Kalender
+  const st = useSchichtStatus();
+  const hatSchichten = useMemo(() => stufenTermine.some((t) => st(t) !== null), [stufenTermine, st]);
 
   // ---------------------------------------------------------- blättern
   function weiter(richtung: number) {
@@ -175,12 +178,14 @@ export function Kalender({
               <span className="shrink-0 rounded-full bg-brand/10 px-2 py-0.5 text-[10px] font-bold">Test</span>
             </button>
           )}
+          {hatSchichten && <SchichtLegende />}
           {ansicht === "monat" && (
             <MonatsAnsicht
               anker={anker}
               termine={termine}
               heute={heute}
               meins={meins}
+              st={st}
               onTag={(k) => {
                 setAnker(k);
                 setAnsicht("tag");
@@ -193,6 +198,7 @@ export function Kalender({
               termine={termine}
               heute={heute}
               meins={meins}
+              st={st}
               onOeffnen={onOeffnen}
               onTag={(k) => {
                 setAnker(k);
@@ -201,7 +207,7 @@ export function Kalender({
             />
           )}
           {ansicht === "tag" && (
-            <TagesAnsicht anker={anker} termine={termine} meins={meins} onOeffnen={onOeffnen} />
+            <TagesAnsicht anker={anker} termine={termine} meins={meins} st={st} onOeffnen={onOeffnen} />
           )}
         </div>
       </div>
@@ -213,12 +219,13 @@ export function Kalender({
 // ================================================================ Monat
 
 function MonatsAnsicht({
-  anker, termine, heute, meins, onTag,
+  anker, termine, heute, meins, st, onTag,
 }: {
   anker: string;
   termine: Termin[];
   heute: string;
   meins: (t: Termin) => boolean;
+  st: (t: Termin) => SchichtStatus;
   onTag: (k: string) => void;
 }) {
   const d = ausKey(anker);
@@ -293,8 +300,9 @@ function MonatsAnsicht({
                     {liste.slice(0, klausuren.length ? 1 : 2).map((t) => (
                       <span
                         key={t.id}
-                        className={`block min-w-0 overflow-hidden whitespace-nowrap rounded-[4px] px-[3px] py-[2px] text-[9px] font-semibold leading-[1.1] ${chipKlasse(t, meins(t))}`}
+                        className={`block min-w-0 overflow-hidden whitespace-nowrap rounded-[4px] px-[3px] py-[2px] text-[9px] font-semibold leading-[1.1] ${chipKlasse(t, meins(t), st(t))}`}
                       >
+                        {st(t) === "eingeteilt" && <span className="mr-[1px] font-extrabold">✓</span>}
                         {t.icon && <span className="mr-[1px]">{t.icon}</span>}
                         {t.titel}
                       </span>
@@ -316,8 +324,9 @@ function MonatsAnsicht({
                     {liste.slice(0, platz).map((t) => (
                       <span
                         key={t.id}
-                        className={`truncate rounded px-1 py-0.5 text-[10px] font-semibold leading-tight ${chipKlasse(t, meins(t))}`}
+                        className={`truncate rounded px-1 py-0.5 text-[10px] font-semibold leading-tight ${chipKlasse(t, meins(t), st(t))}`}
                       >
+                        {schichtVorzeichen(st(t))}
                         {t.icon ? `${t.icon} ` : t.von ? `${uhr(t.von)} ` : ""}
                         {t.titel}
                       </span>
@@ -359,12 +368,13 @@ function MiniKuerzel({ liste }: { liste: Termin[] }) {
 // ================================================================ Woche
 
 function WochenAnsicht({
-  anker, termine, heute, meins, onTag, onOeffnen,
+  anker, termine, heute, meins, st, onTag, onOeffnen,
 }: {
   anker: string;
   termine: Termin[];
   heute: string;
   meins: (t: Termin) => boolean;
+  st: (t: Termin) => SchichtStatus;
   onTag: (k: string) => void;
   onOeffnen: (t: Termin) => void;
 }) {
@@ -426,18 +436,23 @@ function WochenAnsicht({
                   <button
                     key={t.id}
                     onClick={() => onOeffnen(t)}
-                    className={`min-w-0 rounded-lg px-1.5 py-1 text-left transition active:scale-[.98] ${chipKlasse(t, meins(t))}`}
+                    className={`min-w-0 rounded-lg px-1.5 py-1 text-left transition active:scale-[.98] ${chipKlasse(t, meins(t), st(t))}`}
                   >
                     <span className="block truncate text-[11px] font-bold leading-tight">
-                      {t.privat ? "📱 " : <Zeichen icon={t.icon} auf={meins(t)} klein />}
+                      {schichtVorzeichen(st(t))}
+                      {t.privat ? "📱 " : <Zeichen icon={t.icon} auf={meins(t) || st(t) === "eingeteilt"} klein />}
                       {t.titel}
                     </span>
                     <span
                       className={`block truncate text-[10px] ${
-                        meins(t) ? "text-white/90" : "opacity-75"
+                        (meins(t) && st(t) !== "nicht") || st(t) === "eingeteilt" ? "text-white/90" : "opacity-75"
                       }`}
                     >
-                      {[t.von ? zeitText(t) : "ganztägig", t.ort].filter(Boolean).join(" · ")}
+                      {[
+                        t.von ? zeitText(t) : "ganztägig",
+                        t.ort,
+                        st(t) === "eingeteilt" ? "deine Schicht" : st(t) === "nicht" ? "nicht bekommen" : "",
+                      ].filter(Boolean).join(" · ")}
                     </span>
                   </button>
                 ))}
@@ -453,11 +468,12 @@ function WochenAnsicht({
 // ================================================================ Tag
 
 function TagesAnsicht({
-  anker, termine, meins, onOeffnen,
+  anker, termine, meins, st, onOeffnen,
 }: {
   anker: string;
   termine: Termin[];
   meins: (t: Termin) => boolean;
+  st: (t: Termin) => SchichtStatus;
   onOeffnen: (t: Termin) => void;
 }) {
   const liste = anTag(termine, anker);
@@ -481,13 +497,27 @@ function TagesAnsicht({
               <button
                 onClick={() => onOeffnen(t)}
                 className={`card relative flex w-full items-start gap-3 overflow-hidden p-4 text-left transition active:scale-[.99] ${
-                  t.privat ? "!border-dashed !border-tinte-leise/40 !bg-transparent !shadow-none" : meins(t) ? "!border-brand/40 bg-brand/5 dark:bg-brand/10" : ""
+                  t.privat
+                    ? "!border-dashed !border-tinte-leise/40 !bg-transparent !shadow-none"
+                    : st(t)
+                      ? schichtRahmen(st(t))
+                      : meins(t)
+                        ? "!border-brand/40 bg-brand/5 dark:bg-brand/10"
+                        : ""
                 }`}
               >
-                {farbeVon(t) && !t.privat && (
-                  <span aria-hidden className={`absolute inset-y-0 left-0 w-1.5 ${farbeVon(t)!.punkt}`} />
+                {st(t) === "eingeteilt" ? (
+                  <span aria-hidden className="absolute inset-y-0 left-0 w-1.5 bg-emerald-500" />
+                ) : (
+                  farbeVon(t) && !t.privat && st(t) !== "nicht" && (
+                    <span aria-hidden className={`absolute inset-y-0 left-0 w-1.5 ${farbeVon(t)!.punkt}`} />
+                  )
                 )}
-                <span className="zahl w-[4.6rem] shrink-0 pt-0.5 text-[13px] font-bold text-brand">
+                <span
+                  className={`zahl w-[4.6rem] shrink-0 pt-0.5 text-[13px] font-bold ${
+                    st(t) === "eingeteilt" ? "text-emerald-700 dark:text-emerald-300" : "text-brand"
+                  }`}
+                >
                   {t.von ? uhr(t.von) : "ganztägig"}
                   {t.von && t.bis && (
                     <span className="block text-[11px] font-semibold text-tinte-leise">bis {uhr(t.bis)}</span>
@@ -518,13 +548,20 @@ function TagesAnsicht({
                       .filter(Boolean)
                       .join(" · ")}
                   </span>
+                  {/* Schicht-Stand unter dem Titel – rechts daneben bricht sonst
+                      ein langer Titel mitten im Wort um. */}
+                  {st(t) && (
+                    <span className="mt-1.5 block">
+                      <SchichtSchild status={st(t)} klein />
+                    </span>
+                  )}
                   {t.beschreibung && (
                     <span className="mt-1 block line-clamp-2 text-[12px] leading-relaxed text-tinte-leise">
                       {t.beschreibung}
                     </span>
                   )}
                 </span>
-                {meins(t) && (
+                {!st(t) && meins(t) && (
                   <span className="shrink-0 rounded-full bg-brand/10 px-2 py-0.5 text-[10px] font-bold text-brand dark:bg-brand/20">
                     für dich
                   </span>

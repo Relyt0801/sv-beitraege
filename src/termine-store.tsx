@@ -3,7 +3,7 @@ import {
 } from "react";
 import { hasSupabase, supabase } from "./lib/supabase";
 import { abonniere } from "./lib/realtime";
-import { kurzDatum, uhr, type Aktion, type NeueAnfrage, type NeuerTermin, type Termin, type TerminAnfrage } from "./lib/termine";
+import { kurzDatum, schichtStatus, uhr, type Aktion, type SchichtStatus, type NeueAnfrage, type NeuerTermin, type Termin, type TerminAnfrage } from "./lib/termine";
 import { pushAnTeam, pushToUsers, pushZuTermin } from "./lib/push";
 import { committeeIcon, committeeLabel } from "./lib/committees";
 
@@ -86,6 +86,15 @@ export const useTermine = () => {
   if (!v) throw new Error("useTermine ausserhalb des Providers");
   return v;
 };
+
+/** Mein Stand zu einer Schicht: eingeteilt, gemeldet, nicht bekommen – oder null. */
+export function useSchichtStatus(): (t: Termin) => SchichtStatus {
+  const { meineUid, meineStudentIds, bewerbungen } = useTermine();
+  return useCallback(
+    (t: Termin) => schichtStatus(t, meineUid, meineStudentIds, bewerbungen),
+    [meineUid, meineStudentIds, bewerbungen],
+  );
+}
 
 const uuid = () => (crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random()));
 

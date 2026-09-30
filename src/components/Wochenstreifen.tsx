@@ -1,11 +1,11 @@
 import { useMemo, useState } from "react";
-import { useTermine } from "../termine-store";
+import { useSchichtStatus, useTermine } from "../termine-store";
 import { committeeIcon, committeeLabel } from "../lib/committees";
 import {
   WOCHENTAGE, anTag, ausKey, betrifftMich, farbeVon, freiAn, heuteKey, montagVon, plusTage, tagKey,
-  tagLang, umfangText, zeitText, type Termin,
+  tagLang, umfangText, zeitText, type SchichtStatus, type Termin,
 } from "../lib/termine";
-import { Zeichen, punktKlasse } from "./TerminZeichen";
+import { SchichtSchild, Zeichen, punktKlasse, schichtRahmen } from "./TerminZeichen";
 import { Icon } from "./Icon";
 import { usePrivatTermine, useKalenderDemo } from "../lib/kalender-sync";
 import { KalenderSyncSheet } from "./KalenderSyncSheet";
@@ -50,6 +50,7 @@ export function Wochenstreifen({
   const desTages = anTag(termine, gewaehlt);
 
   const meins = (t: Termin) => betrifftMich(t, meineKomitees, meineStudentIds);
+  const st = useSchichtStatus();
 
   function woche(richtung: number) {
     const neu = plusTage(woStart, richtung * 7);
@@ -176,7 +177,7 @@ export function Wochenstreifen({
                   <span
                     key={t.id}
                     className={`h-1.5 w-1.5 rounded-full ${
-                      neueTermine.has(t.id) ? "bg-red-500" : aktiv ? "bg-white/80" : punktKlasse(t, meins(t))
+                      neueTermine.has(t.id) ? "bg-red-500" : aktiv ? "bg-white/80" : punktKlasse(t, meins(t), st(t))
                     }`}
                   />
                 ))}
@@ -213,7 +214,7 @@ export function Wochenstreifen({
         ) : (
           <ul className="grid gap-1.5">
             {desTages.map((t) => (
-              <TerminZeile key={t.id} t={t} meins={meins(t)} onClick={onOeffnen ? () => onOeffnen(t) : undefined} />
+              <TerminZeile key={t.id} t={t} meins={meins(t)} status={st(t)} onClick={onOeffnen ? () => onOeffnen(t) : undefined} />
             ))}
           </ul>
         )}
@@ -223,11 +224,21 @@ export function Wochenstreifen({
 }
 
 /** Eine Zeile: Uhrzeit, Bezeichnung, Ort. Mehr braucht der schnelle Blick nicht. */
-export function TerminZeile({ t, meins, onClick }: { t: Termin; meins: boolean; onClick?: () => void }) {
+export function TerminZeile({
+  t, meins, status = null, onClick,
+}: {
+  t: Termin;
+  meins: boolean;
+  /** Schicht: bekommen / gemeldet / nicht bekommen */
+  status?: SchichtStatus;
+  onClick?: () => void;
+}) {
   const inhalt = (
     <>
       <span
-        className={`zahl w-[4.2rem] shrink-0 text-[12px] font-bold ${meins ? "text-brand" : "text-tinte-matt"}`}
+        className={`zahl w-[4.2rem] shrink-0 text-[12px] font-bold ${
+          status === "eingeteilt" ? "text-emerald-700 dark:text-emerald-300" : meins && status !== "nicht" ? "text-brand" : "text-tinte-matt"
+        }`}
       >
         {t.von ? zeitText(t).replace(" – ", "–") : "ganztägig"}
       </span>
@@ -257,21 +268,29 @@ export function TerminZeile({ t, meins, onClick }: { t: Termin; meins: boolean; 
             .join(" · ")}
         </span>
       </span>
-      {meins && (
-        <span className="shrink-0 rounded-full bg-brand/10 px-2 py-0.5 text-[10px] font-bold text-brand dark:bg-brand/20">
-          für dich
-        </span>
+      {status ? (
+        <SchichtSchild status={status} klein />
+      ) : (
+        meins && (
+          <span className="shrink-0 rounded-full bg-brand/10 px-2 py-0.5 text-[10px] font-bold text-brand dark:bg-brand/20">
+            für dich
+          </span>
+        )
       )}
     </>
   );
 
-  const f = t.privat ? null : farbeVon(t);
+  const f = t.privat || status ? null : farbeVon(t);
   const klasse = `flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left ${f ? "border-l-4 " + f.rand : ""} ${
+    status === "eingeteilt" ? "border-l-4 border-emerald-500 " : ""
+  }${
     t.privat
       ? "border border-dashed border-tinte-leise/40"
-      : meins
-        ? "bg-brand/5 dark:bg-brand/10"
-        : "bg-papier-matt dark:bg-slate-800/60"
+      : status === "eingeteilt" || status === "nicht"
+        ? schichtRahmen(status)
+        : meins
+          ? "bg-brand/5 dark:bg-brand/10"
+          : "bg-papier-matt dark:bg-slate-800/60"
   }`;
 
   return (

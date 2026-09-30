@@ -101,7 +101,7 @@ export function MeldeBestaetigung({
           }`}
         >
           <b>Noch keine feste Schicht.</b> Das Stufenteam teilt ein – wer bisher wenig Mithilfe hat, kommt
-          zuerst dran. Bist du eingeteilt, steht die Schicht als „für dich“ in deinem Kalender.
+          zuerst dran. Bekommst du sie, wird sie grün mit Haken – oben unter „Deine Schichten“ und im Kalender.
         </div>
 
         <button

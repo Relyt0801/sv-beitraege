@@ -1,4 +1,4 @@
-# Änderungen – Stand 27.09.2026
+# Änderungen – Stand 30.09.2026
 
 Diese Datei erklärt, was sich in den letzten Runden geändert hat, **wo** es im
 Code steht und **warum** es so gebaut ist. Die Kommentare im Code selbst sind
@@ -8,6 +8,43 @@ ausführlich (auf Deutsch); hier steht der Überblick dazu.
 > Bankdaten, der `service_role`-Schlüssel und der VAPID Private Key liegen nur
 > in der Datenbank bzw. als Supabase-Secret. `privat/` ist per `.gitignore`
 > ausgeschlossen. Bitte so beibehalten.
+
+---
+
+
+## 30.09.2026: Schicht bekommen / nicht bekommen – auf einen Blick
+
+Kein SQL, keine Mitteilung. Nur Anzeige – wer eingeteilt ist, entscheidet
+weiter das Stufenteam.
+
+Jede Schicht hat für mich jetzt einen von drei Ständen
+(`schichtStatus()` in `src/lib/termine.ts`, Hook `useSchichtStatus()` in
+`src/termine-store.tsx`):
+
+| Stand | Wann | Aussehen |
+|---|---|---|
+| **bekommen** | ich (oder mein Kind) bin eingeteilt | sattes Grün, Haken, „deine Schicht“ |
+| **gemeldet** | gemeldet, Plätze noch frei, nicht abgeschlossen | normale Farbe mit feinem blauem Rand, ⏳ |
+| **nicht bekommen** | gemeldet, aber Plätze ohne mich voll, Schicht abgeschlossen oder vorbei | verblasst, gestrichelter Rand, „nicht bekommen“ |
+
+- **Events → „Deine Schichten“:** Bekommene, kommende Schichten stehen oben
+  als grüne „Tickets“: links der Abriss mit Monat/Tag/Wochentag, gepunktete
+  Perforation, rechts Aktion, Zeit, Ort und „Du bist eingeteilt“
+  (`SchichtTicket` in `AktionenListe.tsx`).
+- **Mitmachen-Liste:** bekommene Zeile grün umrandet mit grünem Balken links;
+  nicht bekommene Zeile verblasst und gestrichelt mit „Die Plätze sind ohne
+  dich vergeben – danke fürs Melden!“; gemeldete Zeile „⏳ gemeldet“
+  (antippen = austragen, wie bisher).
+- **Kalender (Monat/Woche/Tag) und Wochenstreifen:** dieselben drei Looks.
+  Bekommene Schichten grün mit „✓“, der Punkt im Wochenstreifen grün mit
+  Ring, nicht bekommene gestrichelt und blass. Oben im Kalender steht eine
+  kleine Legende – nur, wenn man überhaupt mit einer Schicht zu tun hat.
+  In der Tagesansicht steht das Schildchen unter dem Titel (daneben brach ein
+  langer Titel mitten im Wort um).
+- Die Bestätigung nach „eintragen“ erklärt jetzt: „Bekommst du sie, wird sie
+  grün mit Haken – oben unter ‚Deine Schichten‘ und im Kalender.“
+- Styles zentral in `TerminZeichen.tsx`: `chipKlasse`/`punktKlasse` mit
+  Schicht-Stand, `SchichtSchild`, `schichtRahmen`, `SchichtLegende`.
 
 ---
 

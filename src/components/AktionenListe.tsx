@@ -1,12 +1,13 @@
 import { useMemo, useState } from "react";
-import { useTermine } from "../termine-store";
+import { useSchichtStatus, useTermine } from "../termine-store";
 import { useRole } from "../auth/RoleProvider";
 import { useStore } from "../store";
 import { useProfiles } from "../profiles-store";
 import { prozentVon } from "../lib/logic";
 import { Sheet } from "./Sheet";
 import { Avatar } from "./Avatar";
-import { abHeute, tagLang, uhr, zeitText, type Aktion, type Termin } from "../lib/termine";
+import { MONATE, WOCHENTAGE, abHeute, ausKey, tagLang, uhr, zeitText, type Aktion, type SchichtStatus, type Termin } from "../lib/termine";
+import { SchichtSchild, schichtRahmen } from "./TerminZeichen";
 
 import { frage, meldeFehler } from "../lib/melder";
 import { ProzentWahl } from "./AktionSheet";
@@ -20,6 +21,7 @@ import { MeldeBestaetigung } from "./MeldeBestaetigung";
  */
 export function AktionenListe() {
   const { termine, aktionen, bewerbungen, bewerben, meineUid, meineStudentIds } = useTermine();
+  const st = useSchichtStatus();
   const { isStaff, can } = useRole();
   const darfVerteilen = isStaff || can("termine.manage");
   const [schicht, setSchicht] = useState<Termin | null>(null);
@@ -45,7 +47,10 @@ export function AktionenListe() {
   }, [termine]);
 
   const laufende = aktionen.filter((a) => (nachAktion.get(a.id) || []).length > 0);
-  if (laufende.length === 0) return null;
+  // Meine kommenden Schichten – oben als „Tickets“, damit man sofort sieht,
+  // was man bekommen hat.
+  const meineSchichten = abHeute(termine).filter((t) => st(t) === "eingeteilt");
+  if (laufende.length === 0 && meineSchichten.length === 0) return null;
 
   // Damit das aufgeklappte Blatt immer die frischen Bewerbungen zeigt
   const aktuelleSchicht = schicht ? termine.find((t) => t.id === schicht.id) ?? schicht : null;
@@ -53,9 +58,27 @@ export function AktionenListe() {
   return (
     <>
       <section className="mb-3">
+        {meineSchichten.length > 0 && (
+          <>
+            <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-tinte-leise">
+              Deine Schichten
+            </h3>
+            <div className="mb-3.5 grid gap-2 sm:grid-cols-2">
+              {meineSchichten.map((t) => (
+                <SchichtTicket
+                  key={t.id}
+                  schicht={t}
+                  aktion={aktionen.find((a) => a.id === t.aktion_id) || null}
+                />
+              ))}
+            </div>
+          </>
+        )}
+        {laufende.length > 0 && (
         <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-tinte-leise">
           Mitmachen
         </h3>
+        )}
         <div className="grid items-start gap-2.5 lg:grid-cols-2">
           {laufende.map((a) => (
             <AktionKarte
@@ -67,6 +90,7 @@ export function AktionenListe() {
               meineUid={meineUid}
               meineStudentIds={meineStudentIds}
               darfVerteilen={darfVerteilen}
+              st={st}
               onEintragen={eintragen}
               onOeffnen={setSchicht}
             />
@@ -126,8 +150,9 @@ function ProzentAendern({ aktion }: { aktion: Aktion }) {
 }
 
 function AktionKarte({
-  aktion, schichten, gesamt, bewerbungen, meineUid, meineStudentIds, darfVerteilen, onEintragen, onOeffnen,
+  aktion, schichten, gesamt, bewerbungen, meineUid, meineStudentIds, darfVerteilen, st, onEintragen, onOeffnen,
 }: {
+  st: (t: Termin) => SchichtStatus;
   meineStudentIds: string[];
   aktion: Aktion;
   schichten: Termin[];
@@ -161,11 +186,15 @@ function AktionKarte({
           const belegt = t.personen.length;
           const plaetze = t.plaetze ?? 1;
           const voll = belegt >= plaetze;
+          const status = st(t);
           return (
             <li
               key={t.id}
-              className="flex flex-wrap items-center gap-x-2 gap-y-1.5 rounded-xl bg-papier-matt px-3 py-2 dark:bg-slate-800/60"
+              className={`relative flex flex-wrap items-center gap-x-2 gap-y-1.5 overflow-hidden rounded-xl bg-papier-matt px-3 py-2 transition dark:bg-slate-800/60 ${schichtRahmen(status)}`}
             >
+              {status === "eingeteilt" && (
+                <span aria-hidden className="absolute inset-y-0 left-0 w-1 bg-emerald-500" />
+              )}
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-[13px] font-semibold">{tagLang(t.datum)}</span>
                 <span className="block truncate text-[11px] text-tinte-leise">
@@ -173,6 +202,7 @@ function AktionKarte({
                 </span>
               </span>
 
+              {status !== "nicht" && (
               <span
                 className={`zahl shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold ${
                   voll
@@ -183,13 +213,14 @@ function AktionKarte({
               >
                 {voll ? `voll · ${belegt}/${plaetze}` : `${belegt}/${plaetze}`}
               </span>
+              )}
 
               {/* Selbst eintragen – auch fürs Team (vorher sah das Team hier nur
                   „x gemeldet“ und konnte sich nicht selbst melden). */}
-              {t.personen.some((sid) => meineStudentIds.includes(sid)) ? (
-                <span className="shrink-0 rounded-lg bg-bezahlt-grund px-2.5 py-1.5 text-[12px] font-bold text-bezahlt dark:bg-emerald-500/20 dark:text-emerald-300">
-                  {darfVerteilen ? "du ✓" : "du bist eingeteilt ✓"}
-                </span>
+              {status === "eingeteilt" ? (
+                <SchichtSchild status="eingeteilt" />
+              ) : status === "nicht" ? (
+                <SchichtSchild status="nicht" />
               ) : !meineStudentIds.length ? null : voll && !ich && !darfVerteilen ? (
                 <span className="shrink-0 rounded-lg px-2.5 py-1.5 text-[12px] font-bold text-tinte-leise">
                   voll belegt
@@ -197,6 +228,7 @@ function AktionKarte({
               ) : (
                 <button
                   onClick={() => onEintragen(t.id, !ich)}
+                  title={ich ? "Gemeldet – das Team teilt noch ein. Antippen zum Austragen." : undefined}
                   className={`shrink-0 rounded-lg px-2.5 py-1.5 text-[12px] font-bold transition active:scale-95 ${
                     ich
                       ? "border border-brand text-brand"
@@ -205,8 +237,14 @@ function AktionKarte({
                         : "bg-brand text-white"
                   }`}
                 >
-                  {ich ? "gemeldet ✓" : darfVerteilen ? "mich eintragen" : "eintragen"}
+                  {ich ? "⏳ gemeldet" : darfVerteilen ? "mich eintragen" : "eintragen"}
                 </button>
+              )}
+
+              {status === "nicht" && (
+                <span className="basis-full text-[11px] leading-snug text-tinte-leise">
+                  {t.abschluss || voll ? "Die Plätze sind ohne dich vergeben – danke fürs Melden!" : "Schicht ist vorbei."}
+                </span>
               )}
 
               {darfVerteilen && (
@@ -229,6 +267,47 @@ function AktionKarte({
           {alle ? "weniger anzeigen" : `alle ${schichten.length} Termine anzeigen`}
         </button>
       )}
+    </div>
+  );
+}
+
+/**
+ * Eine bekommene Schicht als „Ticket“: links der Abriss mit dem Tag, rechts
+ * was, wann, wo. Sattes Grün mit gepunkteter Perforation – das Gegenstück zu
+ * den verblassten, gestrichelten Schichten, die man nicht bekommen hat.
+ */
+function SchichtTicket({ schicht: t, aktion }: { schicht: Termin; aktion: Aktion | null }) {
+  const d = ausKey(t.datum);
+  const icon = t.icon || aktion?.icon;
+  return (
+    <div className="relative flex min-w-0 overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-700 text-white shadow-[0_6px_18px_-8px_rgb(31_127_56/0.7)] dark:from-emerald-600 dark:to-emerald-800">
+      <div className="flex w-[4.25rem] shrink-0 flex-col items-center justify-center py-2.5">
+        <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-white/85">
+          {MONATE[d.getMonth()].slice(0, 3)}
+        </span>
+        <span className="zahl text-[1.7rem] font-extrabold leading-none">{d.getDate()}</span>
+        <span className="text-[10px] font-semibold text-white/85">{WOCHENTAGE[(d.getDay() + 6) % 7]}</span>
+      </div>
+      {/* Perforation mit zwei Kerben oben und unten */}
+      <div aria-hidden className="relative my-2 w-0 border-l-2 border-dotted border-white/50">
+        <span className="absolute -left-[9px] -top-[17px] h-4 w-4 rounded-full bg-papier" />
+        <span className="absolute -bottom-[17px] -left-[9px] h-4 w-4 rounded-full bg-papier" />
+      </div>
+      <div className="min-w-0 flex-1 px-3 py-2.5">
+        <div className="truncate text-[14px] font-bold leading-tight">
+          {icon && <span className="mr-1">{icon}</span>}
+          {aktion?.titel || t.titel}
+        </div>
+        <div className="mt-0.5 truncate text-[12px] text-white/90">
+          {[t.von ? zeitText(t) : "ganztägig", t.ort].filter(Boolean).join(" · ")}
+        </div>
+        <div className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-white/20 px-2 py-0.5 text-[10.5px] font-bold">
+          <svg viewBox="0 0 12 12" className="h-2.5 w-2.5" aria-hidden>
+            <path d="M2.2 6.4 4.8 9 9.8 3.4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          Du bist eingeteilt
+        </div>
+      </div>
     </div>
   );
 }
@@ -459,7 +538,7 @@ function SchichtSheet({
       )}
 
       <p className="mt-3 text-[11px] leading-relaxed text-tinte-leise">
-        Wer eingeteilt ist, sieht die Schicht als „für dich" im eigenen Kalender.
+        Wer eingeteilt ist, sieht die Schicht grün mit Haken („deine Schicht") – im Kalender und oben unter „Deine Schichten“. Wer sich gemeldet und sie nicht bekommen hat, sieht sie verblasst und gestrichelt.
       </p>
 
       <button className="btn-primary mt-4" onClick={onSchliessen}>

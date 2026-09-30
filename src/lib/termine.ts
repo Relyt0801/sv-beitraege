@@ -260,6 +260,31 @@ export function istSchicht(t: Termin): boolean {
   return Boolean(t.aktion_id);
 }
 
+/**
+ * Wie stehe ich zu dieser Schicht?
+ *  - "eingeteilt": ich (oder mein Kind) habe die Schicht bekommen
+ *  - "gemeldet":   ich habe mich gemeldet, das Team hat noch nicht entschieden
+ *  - "nicht":      gemeldet, aber nicht bekommen – die Plätze sind ohne mich
+ *                  voll, die Schicht ist abgeschlossen oder schon vorbei
+ *  - null:         nichts mit mir zu tun (oder gar keine Schicht)
+ */
+export type SchichtStatus = "eingeteilt" | "gemeldet" | "nicht" | null;
+
+export function schichtStatus(
+  t: Termin,
+  meineUid: string | null,
+  meineStudentIds: string[],
+  bewerbungen: Record<string, string[]>,
+  heute: string = heuteKey(),
+): SchichtStatus {
+  if (!t.aktion_id || t.privat) return null;
+  if (t.personen.some((id) => meineStudentIds.includes(id))) return "eingeteilt";
+  if (!meineUid || !(bewerbungen[t.id] || []).includes(meineUid)) return null;
+  const voll = t.personen.length >= (t.plaetze ?? 1);
+  if (voll || t.abschluss || (t.bis_datum || t.datum) < heute) return "nicht";
+  return "gemeldet";
+}
+
 /** Das Zeichen, das im Kalender vor dem Titel steht. */
 export function terminIcon(t: Termin, aktionIcon?: string): string {
   return t.icon || aktionIcon || "";
