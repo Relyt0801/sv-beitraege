@@ -261,6 +261,23 @@ export function istSchicht(t: Termin): boolean {
 }
 
 /**
+ * Wann ist eine Schicht vorbei? Mit Endzeit: dann. Nur mit Beginn: 45 Minuten
+ * später. Ganztägig: 14:00 (Ende des Schultags). Gleiche Regel wie
+ * termin_ende() in der Datenbank (supabase/schicht-ende-ganztags.sql).
+ */
+export function schichtEnde(t: Termin): Date {
+  const [j, m, d] = (t.bis_datum || t.datum).split("-").map(Number);
+  const plus45 = (hhmm: string) => {
+    const [h, mi] = hhmm.split(":").map(Number);
+    const x = h * 60 + mi + 45;
+    return `${String(Math.floor(x / 60)).padStart(2, "0")}:${String(x % 60).padStart(2, "0")}`;
+  };
+  const zeit = uhr(t.bis) || (t.von ? plus45(uhr(t.von)) : "14:00");
+  const [h, min] = zeit.split(":").map(Number);
+  return new Date(j, m - 1, d, h, min);
+}
+
+/**
  * Wie stehe ich zu dieser Schicht?
  *  - "eingeteilt": ich (oder mein Kind) habe die Schicht bekommen
  *  - "gemeldet":   ich habe mich gemeldet, das Team hat noch nicht entschieden

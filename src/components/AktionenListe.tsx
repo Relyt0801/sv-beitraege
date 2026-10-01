@@ -6,8 +6,9 @@ import { useProfiles } from "../profiles-store";
 import { prozentVon } from "../lib/logic";
 import { Sheet } from "./Sheet";
 import { Avatar } from "./Avatar";
-import { MONATE, WOCHENTAGE, abHeute, ausKey, tagLang, uhr, zeitText, type Aktion, type SchichtStatus, type Termin } from "../lib/termine";
+import { MONATE, WOCHENTAGE, abHeute, ausKey, schichtEnde, tagLang, uhr, zeitText, type Aktion, type SchichtStatus, type Termin } from "../lib/termine";
 import { SchichtSchild, schichtRahmen } from "./TerminZeichen";
+import { abschlussOeffnen } from "./SchichtAbschluss";
 
 import { frage, meldeFehler } from "../lib/melder";
 import { ProzentWahl } from "./AktionSheet";
@@ -35,21 +36,30 @@ export function AktionenListe() {
     setMeldung({ auftrag, titel: a?.titel || t?.titel || "Schicht", unter: t ? tagLang(t.datum) : "" });
   };
 
+  // Übersichtlich halten: bestätigte Schichten („Punkte vergeben“ / „ohne“)
+  // verschwinden für alle. Vorbei, aber noch nicht bestätigt, sieht nur das
+  // Team – dort trägt man vor dem Bestätigen aus, wer nicht da war.
+  const jetzt = Date.now();
   const nachAktion = useMemo(() => {
     const m = new Map<string, Termin[]>();
     for (const t of abHeute(termine)) {
-      if (!t.aktion_id) continue;
+      if (!t.aktion_id || t.abschluss) continue;
+      if (!darfVerteilen && schichtEnde(t).getTime() < jetzt) continue;
       const l = m.get(t.aktion_id) || [];
       l.push(t);
       m.set(t.aktion_id, l);
     }
     return m;
-  }, [termine]);
+    // jetzt: bei jedem Neuzeichnen frisch, absichtlich nicht als Abhängigkeit
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [termine, darfVerteilen]);
 
   const laufende = aktionen.filter((a) => (nachAktion.get(a.id) || []).length > 0);
   // Meine kommenden Schichten – oben als „Tickets“, damit man sofort sieht,
   // was man bekommen hat.
-  const meineSchichten = abHeute(termine).filter((t) => st(t) === "eingeteilt");
+  const meineSchichten = abHeute(termine).filter(
+    (t) => st(t) === "eingeteilt" && !t.abschluss && schichtEnde(t).getTime() >= jetzt,
+  );
   if (laufende.length === 0 && meineSchichten.length === 0) return null;
 
   // Damit das aufgeklappte Blatt immer die frischen Bewerbungen zeigt
@@ -187,6 +197,8 @@ function AktionKarte({
           const plaetze = t.plaetze ?? 1;
           const voll = belegt >= plaetze;
           const status = st(t);
+          // Nur das Team sieht vorbei-aber-offene Schichten (zum Austragen vor dem Bestätigen)
+          const vorbei = schichtEnde(t).getTime() < Date.now();
           return (
             <li
               key={t.id}
@@ -217,7 +229,15 @@ function AktionKarte({
 
               {/* Selbst eintragen – auch fürs Team (vorher sah das Team hier nur
                   „x gemeldet“ und konnte sich nicht selbst melden). */}
-              {status === "eingeteilt" ? (
+              {vorbei ? (
+                <button
+                  onClick={abschlussOeffnen}
+                  title="Schicht ist vorbei – Mithilfe bestätigen"
+                  className="shrink-0 rounded-lg border border-dashed border-amber-600/60 px-2.5 py-1.5 text-[12px] font-bold text-amber-800 transition active:scale-95 dark:text-amber-200"
+                >
+                  vorbei · bestätigen
+                </button>
+              ) : status === "eingeteilt" ? (
                 <SchichtSchild status="eingeteilt" />
               ) : status === "nicht" ? (
                 <SchichtSchild status="nicht" />

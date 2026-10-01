@@ -4,25 +4,8 @@ import { useRole } from "../auth/RoleProvider";
 import { useStore } from "../store";
 import { pushAnPersonen } from "../lib/push";
 import { hasSupabase } from "../lib/supabase";
-import { heuteKey, tagLang, terminIcon, uhr, type Termin } from "../lib/termine";
+import { heuteKey, schichtEnde as endeVon, tagLang, terminIcon, uhr, type Termin } from "../lib/termine";
 import { Sheet } from "./Sheet";
-
-/**
- * Wann ist ein Termin vorbei? Ganztägig: 14:00 (Ende des Schultags – vorher
- * 23:59, da kam die Erinnerung mitten in der Nacht); ohne Ende: 45 Minuten.
- * Gleiche Regel wie termin_ende() in der Datenbank.
- */
-function endeVon(t: Termin): Date {
-  const [j, m, d] = (t.bis_datum || t.datum).split("-").map(Number);
-  const zeit = uhr(t.bis) || (t.von ? plus45(uhr(t.von)) : "14:00");
-  const [h, min] = zeit.split(":").map(Number);
-  return new Date(j, m - 1, d, h, min);
-}
-function plus45(hhmm: string): string {
-  const [h, m] = hhmm.split(":").map(Number);
-  const x = h * 60 + m + 45;
-  return `${String(Math.floor(x / 60)).padStart(2, "0")}:${String(x % 60).padStart(2, "0")}`;
-}
 
 /** Ereignis, mit dem der Hinweis im Events-Reiter das Fenster wieder öffnet. */
 const OEFFNEN = "sv:schicht-abschluss";

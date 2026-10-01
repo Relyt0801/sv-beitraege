@@ -26,6 +26,12 @@ ausführlich (auf Deutsch); hier steht der Überblick dazu.
   Erinnerung ans Team kam sonst mitten in der Nacht, und bis dahin ließ sich
   nichts bestätigen. SQL: `supabase/schicht-ende-ganztags.sql` (eingespielt),
   App: `endeVon()` in `SchichtAbschluss.tsx`.
+- **Mitmachen-Liste aufgeräumt:** Bestätigte Schichten („Punkte vergeben“
+  oder „ohne“) verschwinden für alle. Vorbei, aber noch nicht bestätigt,
+  sieht nur das Team – mit „vorbei · bestätigen“ (öffnet das Fenster) und
+  „verteilen“, um vorher auszutragen, wer nicht da war. Schüler sehen vorbei
+  Schichten nicht mehr; „Deine Schichten“ zeigt nur Kommendes. Im Kalender
+  bleiben alle Termine als Verlauf stehen. Gelöscht wird nichts.
 - Die Erinnerung (Push) geht wie bisher genau einmal je Schicht ans Team
   (Stufenteam, Kassenwart, Admin, Sprecher, OP) – das sind genau die Rollen
   mit `hilfen.edit`.
