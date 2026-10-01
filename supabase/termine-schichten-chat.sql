@@ -24,7 +24,7 @@ exception when duplicate_object then null; end $$;
 create or replace function public.termin_ende(t public.termine)
 returns timestamptz language sql stable set search_path = public as $$
   select ((coalesce(t.bis_datum, t.datum)
-           + coalesce(t.bis, t.von + interval '45 minutes', time '23:59'))::timestamp)
+           + coalesce(t.bis, t.von + interval '45 minutes', time '14:00'))::timestamp)  -- ganztägig: 14:00, siehe schicht-ende-ganztags.sql
          at time zone 'Europe/Berlin'
 $$;
 

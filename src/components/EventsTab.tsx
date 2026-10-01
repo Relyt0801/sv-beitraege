@@ -10,6 +10,7 @@ import { Kalender } from "./Kalender";
 import { TerminSheet, TerminAnsehen } from "./TerminSheet";
 import { anfrageAlsEntwurf, heuteKey, type NeuerTermin, type Termin, type TerminAnfrage } from "../lib/termine";
 import { AktionenListe } from "./AktionenListe";
+import { AbschlussHinweis } from "./SchichtAbschluss";
 import { AnfragenFuerTeam, MeineAnfragen } from "./TerminAnfragen";
 import { useTermine } from "../termine-store";
 import { PrivatTerminSheet } from "./KalenderSyncSheet";
@@ -73,6 +74,9 @@ export function EventsTab() {
 
       <MeineAnfragen />
       <AnfragenFuerTeam onUebernehmen={anfrageUebernehmen} />
+
+      {/* Offene Schichten zum Bestätigen – bleibt, auch wenn das Pop-up weggewischt wurde */}
+      <AbschlussHinweis />
 
       <AktionenListe />
 

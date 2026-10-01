@@ -1,4 +1,4 @@
-# Änderungen – Stand 30.09.2026
+# Änderungen – Stand 01.10.2026
 
 Diese Datei erklärt, was sich in den letzten Runden geändert hat, **wo** es im
 Code steht und **warum** es so gebaut ist. Die Kommentare im Code selbst sind
@@ -8,6 +8,27 @@ ausführlich (auf Deutsch); hier steht der Überblick dazu.
 > Bankdaten, der `service_role`-Schlüssel und der VAPID Private Key liegen nur
 > in der Datenbank bzw. als Supabase-Secret. `privat/` ist per `.gitignore`
 > ausgeschlossen. Bitte so beibehalten.
+
+---
+
+
+## 01.10.2026: Mithilfe für vergangene Schichten bestätigen – wiederfindbar
+
+- **Hinweis im Events-Reiter:** Wer Schichten bestätigen darf (Team oder
+  „Mithilfe eintragen“, `hilfen.edit`), sieht oben einen orangen Hinweis
+  „N Schichten sind vorbei – Mithilfe bestätigen“, solange etwas offen ist.
+  Antippen öffnet wieder das Fenster mit „Punkte vergeben / ohne“ – auch für
+  ältere Schichten (das Fenster geht von selbst nur für die letzten 14 Tage
+  auf). Vorher war nach dem Wegwischen bis zum nächsten App-Start nichts mehr
+  zu sehen (`AbschlussHinweis`, `useOffeneAbschluesse` in `SchichtAbschluss.tsx`).
+- **Ganztägige Schichten** („Waffelteig mitbringen“, „Waffeleisen
+  bereitstellen“ …) gelten jetzt um **14:00** als vorbei statt um 23:59. Die
+  Erinnerung ans Team kam sonst mitten in der Nacht, und bis dahin ließ sich
+  nichts bestätigen. SQL: `supabase/schicht-ende-ganztags.sql` (eingespielt),
+  App: `endeVon()` in `SchichtAbschluss.tsx`.
+- Die Erinnerung (Push) geht wie bisher genau einmal je Schicht ans Team
+  (Stufenteam, Kassenwart, Admin, Sprecher, OP) – das sind genau die Rollen
+  mit `hilfen.edit`.
 
 ---
 
