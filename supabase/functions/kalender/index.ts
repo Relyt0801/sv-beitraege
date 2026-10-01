@@ -30,7 +30,7 @@
 //  prüft selbst: Schlüssel im Link bzw. Anmeldung bei POST).
 
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { kalenderIcs, leseIcs } from "./ics.ts";
+import { kalenderIcs, leseIcs, passtZuThemen } from "./ics.ts";
 
 const DEMO_KONTEN = ["admin.test", "test.admin"];
 
@@ -94,7 +94,7 @@ async function sichtbareTermine(p: { user_id: string; role: string; student_id: 
   const von = new Date(Date.now() - 60 * 86400000).toISOString().slice(0, 10);
   const { data: termine } = await admin
     .from("termine")
-    .select("id, titel, beschreibung, ort, datum, bis_datum, von, bis, sichtbar, fuer_eltern, icon, created_at")
+    .select("id, titel, beschreibung, ort, datum, bis_datum, von, bis, sichtbar, fuer_eltern, icon, created_at, aktion_id, frei")
     .or(`datum.gte.${von},bis_datum.gte.${von}`)
     .order("datum")
     .limit(2000);
@@ -131,6 +131,25 @@ async function sichtbareTermine(p: { user_id: string; role: string; student_id: 
     if (t.sichtbar === "personen") return (personVon.get(t.id) || []).some((s) => personen.has(s));
     return false;
   });
+}
+
+// ------------------------------------------------------------ Themen
+// Gewählte Themen (Tabelle kalender_themen, update-abi28.sql). Fehlt die
+// Tabelle oder ist nichts gewählt, kommt alles – wie vorher.
+async function nachThemen(p: { user_id: string; role: string; student_id: string | null }, liste: Record<string, any>[]) {
+  const { data: th, error } = await admin.from("kalender_themen").select("themen").eq("user_id", p.user_id).maybeSingle();
+  const themen = error ? null : ((th as { themen: string[] } | null)?.themen ?? null);
+  if (!themen || themen.length === 0) return liste;
+  // „Meine Schichten“: eigene Person und – bei Eltern – die Kinder
+  const { data: kinder } = await admin.from("parent_children").select("student_id").eq("user_id", p.user_id);
+  const personen = [...(p.student_id ? [p.student_id] : []), ...((kinder as { student_id: string }[]) || []).map((k) => k.student_id)];
+  const schichtIds = liste.filter((t) => t.aktion_id).map((t) => t.id);
+  const meine = new Set<string>();
+  if (personen.length && schichtIds.length) {
+    const { data: tp } = await admin.from("termin_personen").select("termin_id").in("termin_id", schichtIds).in("student_id", personen);
+    for (const r of (tp as { termin_id: string }[]) || []) meine.add(r.termin_id);
+  }
+  return liste.filter((t) => passtZuThemen(t, meine.has(t.id), themen));
 }
 
 // ------------------------------------------------------------ Fremder Kalender
@@ -179,7 +198,7 @@ Deno.serve(async (req) => {
     }
     const p = await profilVon(uid);
     if (!p || !(await istDemo(p))) return new Response("Kalender-Abo ist für dieses Konto nicht freigeschaltet.", { status: 403, headers: cors });
-    const termine = await sichtbareTermine(p);
+    const termine = await nachThemen(p, await sichtbareTermine(p));
     // Gekennzeichnet: eigener Kalendername, Kategorie "Stufe" und ein Satz in
     // jeder Beschreibung – so sieht man im Handy sofort, woher ein Termin kommt.
     const ics = kalenderIcs(

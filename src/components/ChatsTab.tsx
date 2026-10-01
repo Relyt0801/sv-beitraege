@@ -13,6 +13,8 @@ import { useProfiles } from "../profiles-store";
 import { useStore } from "../store";
 import { Sheet } from "./Sheet";
 import { normalize } from "../lib/logic";
+import { useKiOptional } from "../ki-store";
+import { aufChatZiel, chatZielNehmen } from "../lib/ziel";
 
 import { frage } from "../lib/melder";
 const TEAM_CHAT_TITLE = "Stufenteam";
@@ -37,6 +39,19 @@ export function ChatsTab() {
   const [teamOffen, setTeamOffen] = useState(false);
   const [ticketListe, setTicketListe] = useState(false);
   const angelegt = useRef(false);
+
+  // Von der Startseite: direkt in einen Chat oder zu den Gesprächen springen.
+  useEffect(() => {
+    const abholen = () => {
+      const z = chatZielNehmen();
+      if (!z) return;
+      if ("topicId" in z) setOpenId(z.topicId);
+      else if (isStaff) setTicketListe(true);
+      else setTeamOffen(true);
+    };
+    abholen();
+    return aufChatZiel(abholen);
+  }, [isStaff]);
 
   const chats = topics.filter((t) => t.kind === "chat");
   const teamChat = chats.find((t) => !t.tag) ?? null;
@@ -261,6 +276,7 @@ function TicketCard({
 function TeamChatSchueler({ tickets, onBack }: { tickets: Topic[]; onBack: () => void }) {
   const { items, postItem, deleteItem, markRead, createTopic, committeesOf, uid } = useTopics();
   const { role, banned } = useRole();
+  const ki = useKiOptional();
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -280,8 +296,11 @@ function TeamChatSchueler({ tickets, onBack }: { tickets: Topic[]; onBack: () =>
     setText("");
     const meta = { role, koms: committeesOf(uid) };
     const offenes = tickets.find((t) => t.status !== "erledigt");
+    // Mit Freischaltung (Testphase) und Einwilligung schaut der Assistent
+    // auf die Nachricht – sonst antwortet das Team wie bisher.
     if (offenes) {
-      await postItem(offenes, "nachricht", nachricht, undefined, "", meta);
+      const id = await postItem(offenes, "nachricht", nachricht, undefined, "", meta);
+      if (id) ki?.assistentAnstossen(id);
     } else {
       const titel = nachricht.trim().slice(0, 60);
       const id = await createTopic({
@@ -293,7 +312,7 @@ function TeamChatSchueler({ tickets, onBack }: { tickets: Topic[]; onBack: () =>
         kind: "ticket",
       });
       if (id) {
-        await postItem(
+        const itemId = await postItem(
           { id, title: titel, tag: "", kind: "ticket", status: "offen", pinned: false, admin_only: false, visibility: "stufenteam", parent_id: null, created_by: uid, created_at: new Date().toISOString() },
           "nachricht",
           nachricht,
@@ -301,6 +320,7 @@ function TeamChatSchueler({ tickets, onBack }: { tickets: Topic[]; onBack: () =>
           "",
           meta,
         );
+        if (itemId) ki?.assistentAnstossen(itemId);
       }
     }
     setBusy(false);
@@ -399,12 +419,54 @@ function TicketChat({ topic, onBack }: { topic: Topic; onBack: () => void }) {
         )}
       </div>
 
+      {isStaff && <AssistentVorschlaege topicId={topic.id} />}
       <ChatBlasen liste={liste} uid={uid} darfLoeschen={can("chats.delete_messages")} onDelete={deleteItem} />
       {!banned && <ChatEingabe wert={text} setWert={setText} onSenden={senden} platzhalter="Antworten…" />}
     </div>
   );
 }
 
+
+/**
+ * Was der Assistent zu diesem Gespräch vorschlägt (Update Abi28). Nur fürs
+ * Team, ohne Score. Den SQL-Vorschlag sieht nur der Admin – er wird nie von
+ * selbst ausgeführt, sondern nur angezeigt (zum Prüfen und selbst Ausführen).
+ */
+function AssistentVorschlaege({ topicId }: { topicId: string }) {
+  const ki = useKiOptional();
+  const { role } = useRole();
+  const offen = (ki?.vorschlaege || []).filter(
+    (v) => v.topic_id === topicId && v.status === "offen" && v.ergebnis !== "laeuft" && v.ergebnis !== "auto" && (v.vorschlag || v.sql_vorschlag),
+  );
+  if (!ki || !offen.length) return null;
+  return (
+    <div className="mt-3 grid gap-2">
+      {offen.map((v) => (
+        <div key={v.id} className="rounded-2xl border border-brand/30 bg-brand/[0.05] p-3">
+          <div className="text-[12px] font-bold text-brand-dark dark:text-brand">
+            🤖 Assistent{" "}
+            {v.ergebnis === "rueckfrage" ? "· hat nachgefragt" : v.ergebnis === "fehler" ? "· konnte nicht helfen" : "· Vorschlag"}
+          </div>
+          {v.vorschlag && <p className="mt-1 text-[13px] leading-relaxed">{v.vorschlag}</p>}
+          {role === "admin" && v.sql_vorschlag && (
+            <details className="mt-1.5">
+              <summary className="cursor-pointer text-[12px] font-semibold text-tinte-leise">SQL-Vorschlag (nur prüfen, nicht blind ausführen)</summary>
+              <pre className="mt-1 overflow-x-auto rounded-lg bg-papier-matt p-2 text-[11px] dark:bg-slate-800">{v.sql_vorschlag}</pre>
+            </details>
+          )}
+          <div className="mt-2 flex gap-2">
+            <button onClick={() => void ki.vorschlagErledigen(v.id, "erledigt")} className="rounded-lg bg-brand px-2.5 py-1 text-[12px] font-bold text-white">
+              erledigt
+            </button>
+            <button onClick={() => void ki.vorschlagErledigen(v.id, "verworfen")} className="rounded-lg border border-papier-linie px-2.5 py-1 text-[12px] font-bold text-tinte-matt dark:border-slate-700">
+              verwerfen
+            </button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 /** Karte "Gespräche mit Schülern" – steht direkt über den Gesprächen mit Eltern. */
 function TicketUebersichtKarte({

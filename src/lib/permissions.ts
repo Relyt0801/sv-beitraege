@@ -13,6 +13,7 @@ export type PermKey =
   | "beitraege.manage"
   | "termine.manage"
   | "kalender.test"
+  | "ki.test"
   | "finanzen.basis"
   | "finanzen.view"
   | "finanzen.manage"
@@ -65,7 +66,12 @@ export const PERM_CATEGORIES: PermCategory[] = [
   {
     label: "Termine", icon: "📅", perms: [
       { key: "termine.manage", label: "Termine verwalten", desc: "Termine anlegen, ändern, löschen und festlegen, wer sie sehen darf." },
-      { key: "kalender.test", label: "Kalender-Verbindung (Testphase)", desc: "Stufen-Termine als Abo ins Handy holen und den eigenen Handy-Kalender in der App anzeigen. Noch im Test – nur einzelnen Personen geben." },
+      { key: "kalender.test", label: "Kalender-Verbindung (Testphase)", desc: "Stufen-Termine als Abo ins Handy holen (mit Themenauswahl) und den eigenen Handy-Kalender in der App anzeigen. Noch im Test – das Stufenteam hat es, sonst nur einzelnen Personen geben." },
+    ],
+  },
+  {
+    label: "KI (Testphase)", icon: "🤖", perms: [
+      { key: "ki.test", label: "Vertrauens-Check (Testphase)", desc: "Bekommt die Einwilligungsfrage zum Vertrauens-Check. Mit Einwilligung kann „war da“ automatisch eingetragen werden, und der Assistent antwortet auf Nachträge im Chat. Den Score sieht nur der Admin. Noch im Test – Admins und Testkonten haben es; wer es bekommt, sieht danach einmal die Einwilligungsfrage." },
     ],
   },
   {
@@ -134,7 +140,7 @@ export function rollenDerZeile(key: string): string[] {
 }
 
 // Standard-Rechte je Rolle (Fallback im Client, Seeds in permissions.sql identisch)
-const TEAM_STANDARD: PermKey[] = ["chats.view_all", "chats.delete_messages", "chats.delete_items", "chats.manage", "komitees.assign", "data.edit", "hilfen.edit", "termine.manage", "mod.timeout", "finanzen.basis", "finanzen.view"];
+const TEAM_STANDARD: PermKey[] = ["chats.view_all", "chats.delete_messages", "chats.delete_items", "chats.manage", "komitees.assign", "data.edit", "hilfen.edit", "termine.manage", "kalender.test", "mod.timeout", "finanzen.basis", "finanzen.view"];
 
 export const ROLE_DEFAULTS: Record<string, PermKey[]> = {
   schueler: ["finanzen.basis"],

@@ -34,7 +34,7 @@ export function FinanzStandard({ aktionName }: { aktionName?: (id: string) => st
   return <FinanzStandardInhalt d={d} />;
 }
 
-function useDemoUebersicht(aktiv: boolean, aktionName?: (id: string) => string): FinanzUebersicht | null {
+export function useDemoUebersicht(aktiv: boolean, aktionName?: (id: string) => string): FinanzUebersicht | null {
   const { students, settings } = useStore();
   return useMemo(() => {
     if (!aktiv || !students.length) return null;

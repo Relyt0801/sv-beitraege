@@ -1,3 +1,71 @@
+# Update Abi28 einspielen (01.10.2026)
+
+Startseite, „Was ist neu“, „Warst du da?“, Vertrauens-Check (Testphase),
+Assistent für Nachträge, Kalender-Themen. Was sich geändert hat:
+`docs/AENDERUNGEN.md`. Datenschutz-Arbeitsliste: `docs/DATENSCHUTZ.md`.
+
+## Reihenfolge
+
+> **Wichtig:** Die Vercel-Vorschau (`…vercel.app`) benutzt **dieselbe
+> Datenbank** wie die echte App. Deshalb ist das SQL rein additiv – die alte
+> App läuft damit unverändert weiter. Ohne das SQL blendet die neue App die
+> neuen Teile einfach aus.
+
+1. **Vorschau ansehen.** Nach dem Push baut Vercel automatisch eine Vorschau
+   für den Branch `claude/intelligent-gauss-34fzgf` (Link im Pull Request bzw.
+   Vercel → Deployments). Zum Durchklicken ohne Datenbank lokal:
+   `npm run demo` und z. B. `http://localhost:5173/?rolle=stufenteam`,
+   `?rolle=admin`, `?rolle=schueler&ki=1` (Schüler in der Testphase).
+2. **SQL einspielen:** Supabase → SQL Editor → ganze Datei
+   `supabase/update-abi28.sql` (auf GitHub „Copy raw file“) → **Run**. Am Ende
+   steht eine Prüftabelle; bei 1–7 muss ✅ stehen, 8 nennt die Zahl der
+   freigeschalteten Konten (Admins + `admin.test`/`test.admin`), 9 sagt
+   „Assistent aus“ – das ist richtig so.
+3. **Rechte-Test** (`supabase/tests/rechte-test.sql`) einmal laufen lassen.
+   Erwartet: `157 ok / 0 Abweichungen …`.
+4. **Functions deployen** (Supabase CLI, im Projektordner):
+   ```bash
+   supabase functions deploy send-push       # fragt nach Schichtende „Warst du da?“
+   supabase functions deploy kalender --no-verify-jwt   # Themenfilter
+   supabase functions deploy assistent       # neu
+   ```
+5. **Schlüssel für den Assistenten** (nur wenn ihr ihn testen wollt):
+   ```bash
+   supabase secrets set ANTHROPIC_API_KEY=sk-ant-...
+   supabase secrets set TYPESAFE_API_KEY=...      # oder: OPENROUTER_API_KEY=...
+   ```
+   Ohne Jev-Schlüssel trägt der Assistent nie selbst ein (dann bekommt nur das
+   Team einen Vorschlag). Ohne Anthropic-Schlüssel schreibt er keine
+   Rückfragen. Die Schlüssel gehören **nur** in die Supabase-Secrets – nie in
+   `.env`, nie in Vercel, nie ins Repo.
+6. **Assistent einschalten:** In der App als Admin → Profil → „Vertrauen & KI“
+   → „Assistent im Chat“. Dort auch Schwelle und euren Schreibstil.
+7. **Produktion:** Pull Request nach `main` mergen – Vercel deployt dann auf
+   die echte Domain.
+
+## Testphase
+
+Vertrauens-Check, Einwilligungsfrage und Assistent gibt es vorerst **nur für
+Admins und die Testkonten** (`admin.test`, `test.admin`). Weitere Personen:
+Rechte-Reiter → „KI (Testphase)“ → „Vertrauens-Check (Testphase)“. Wer das
+Recht bekommt, sieht beim nächsten Öffnen einmal die Einwilligungsfrage.
+Alle anderen: „war da“ geht wie bisher ans Team, ohne Score.
+
+Das Kalender-Abo mit Themenauswahl bekommt das **ganze Stufenteam**
+(`kalender.test`, setzt das SQL).
+
+## Nachträge im Terminal (optional)
+
+`nachtraege.bat` doppelklicken (Windows) bzw. `npm run nachtraege`. Dafür
+braucht es Claude Code auf dem Rechner und `privat/.env` mit
+`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` und `NACHTRAEGE_ALS=<euer
+Benutzername>`. Claude sieht keine Namen (nur Kürzel), schlägt je Fall etwas
+vor und fragt vor jeder Aktion. Am besten mit einem Team-/API-Konto oder
+einem Konto, bei dem in den Datenschutz-Einstellungen die Nutzung der Chats
+fürs Training ausgeschaltet ist – es geht trotz Kürzeln um Schülerdaten.
+
+---
+
 # Einspielen – Protokoll, tägliche Sicherung, App-Installation, Impressum
 
 ## Was dieses Paket enthält

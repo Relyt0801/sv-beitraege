@@ -1,6 +1,6 @@
 # Datenschutz, Impressum – was fertig ist und was du noch tun musst
 
-Stand: 23.09.2026. Diese Datei ist eine Arbeitsliste, keine Rechtsberatung.
+Stand: 01.10.2026 (Update Abi28). Diese Datei ist eine Arbeitsliste, keine Rechtsberatung.
 Bei einer App, in der **Daten von Minderjährigen** stehen, lohnt sich ein Blick
 der Schule oder des Datenschutzbeauftragten, bevor sie unter einer eigenen
 Domain öffentlich erreichbar ist.
@@ -119,3 +119,54 @@ damit erfüllt, denn sie verlangt Information, nicht Zustimmung. Wenn ihr
 zusätzlich eine **dokumentierte Kenntnisnahme** wollt (praktisch, wenn jemand
 später fragt), wäre der nächste Schritt, `terms_accepted_at` wieder zu setzen –
 diesmal aber als reine Bestätigung, ohne die Datenbank zu blockieren.
+
+
+## 7. Update Abi28: Vertrauens-Check und Assistent (01.10.2026)
+
+Was gebaut ist und warum so – und was **ihr** noch tun müsst, bevor die
+Testphase über Admins/Testkonten hinausgeht.
+
+**So gebaut (bewusst):**
+
+* **Einwilligung freiwillig** (Art. 6 Abs. 1 lit. a, Art. 7 DSGVO). Eine
+  Pflicht-Zustimmung wäre wegen des Kopplungsverbots (Art. 7 Abs. 4) kaum
+  wirksam: Der Score ist für Beiträge und Chats nicht nötig. Ohne Zustimmung
+  läuft alles wie bisher.
+* **Kein Nachteil durch die Automatik** (Art. 22 DSGVO): Automatisch wird nur
+  zugunsten der Person entschieden (sofort eintragen). Niedriger Score =
+  Mensch prüft, nie Ablehnung.
+* **Kein Social Scoring** (KI-Verordnung Art. 5 Abs. 1 lit. c): Der Score
+  wird nur für genau diesen Zweck benutzt (Mithilfe-Angaben), nicht für
+  Schichtvergabe, Sperren oder sonst etwas. **Bitte so lassen.**
+* **KI-Kennzeichnung** (KI-Verordnung Art. 50, gilt seit 02.08.2026):
+  Antworten des Assistenten stehen als „automatische Antwort (KI)“ im Chat.
+* **Datenminimierung:** an Jev/Claude nur Nachrichten an das Stufenteam, ohne
+  Namen; keine Gruppenchats; nichts von Eltern. Eltern können gar nicht
+  einwilligen (Datenbank-Regel).
+* **Score nur Admin** (Datenbank-Regel), Widerruf löscht den Score sofort.
+
+**Noch zu tun:**
+
+- [ ] **Auftragsverarbeitung** (Art. 28) mit **Anthropic** (in den Commercial
+      Terms der API enthalten, mit EU-Standardvertragsklauseln) und **TypeSafe**
+      (DPA mit Standardvertragsklauseln) – bzw. **OpenRouter**, wenn ihr den
+      Weg nehmt. Bei OpenRouter läuft es über zwei Dienstleister; der direkte
+      TypeSafe-Weg ist datensparsamer.
+- [ ] **Speicherfristen der Anbieter** in der Datenschutzerklärung eintragen
+      (gelb markiert). TypeSafe nennt öffentlich keine feste Frist („solange
+      nötig“), Zero-Data-Retention nur für Enterprise.
+- [ ] **Datenschutz-Folgenabschätzung** (Art. 35): Profiling mit KI bei teils
+      Minderjährigen – vor dem Ausrollen an alle Schüler eine kurze DSFA
+      schreiben (Zweck, Risiken, Maßnahmen oben). Für die Testphase mit
+      Admins/Testkonten weniger dringend.
+- [ ] **Unter 16:** Wer jünger ist, kann nach Art. 8 DSGVO / Deutschland
+      nicht selbst einwilligen – vor dem Ausrollen an alle prüfen, ob das in
+      der Q1 jemanden betrifft, und den dann nicht freischalten.
+- [ ] **Verarbeitungsverzeichnis** um „Vertrauens-Check / Assistent“ ergänzen.
+- [ ] **Terminal-Befehl:** Claude Code auf euren Rechnern nur mit einem Konto,
+      bei dem die Chats nicht fürs Training genutzt werden (Team/API oder
+      Einstellung aus). Das Skript zeigt zwar keine Namen, aber Nachrichten.
+- [ ] **Jev ist neu** (seit 15.09.2026 auf dem Markt). Die Herstellerangaben
+      zu Genauigkeit und Kalibrierung sind nicht unabhängig geprüft. Darum
+      senkt Jev den Score nur und hebt ihn nie. Nach ein paar Wochen
+      ansehen: Wie oft lag „Zweifel“ daneben?

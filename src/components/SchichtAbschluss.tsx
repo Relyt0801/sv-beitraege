@@ -6,6 +6,8 @@ import { pushAnPersonen } from "../lib/push";
 import { hasSupabase } from "../lib/supabase";
 import { heuteKey, schichtEnde as endeVon, tagLang, terminIcon, uhr, type Termin } from "../lib/termine";
 import { Sheet } from "./Sheet";
+import { useKiOptional } from "../ki-store";
+import { anwesenheitOeffnen } from "./AnwesenheitSheet";
 
 /** Ereignis, mit dem der Hinweis im Events-Reiter das Fenster wieder öffnet. */
 const OEFFNEN = "sv:schicht-abschluss";
@@ -54,7 +56,28 @@ export function abschlussOeffnen() {
  */
 export function AbschlussHinweis() {
   const offen = useOffeneAbschluesse();
-  if (!offen.length) return null;
+  const ki = useKiOptional();
+  const { isStaff, can } = useRole();
+  const angaben = isStaff || can("hilfen.edit") ? (ki?.offeneAngaben.length ?? 0) : 0;
+  if (!offen.length && !angaben) return null;
+  if (!offen.length)
+    return (
+      <button
+        onClick={anwesenheitOeffnen}
+        className="mb-3 flex w-full items-center gap-3 rounded-2xl border border-amber-500/40 bg-amber-50 px-4 py-3 text-left transition active:scale-[.99] dark:border-amber-400/30 dark:bg-amber-500/10"
+      >
+        <span className="text-xl leading-none" aria-hidden>
+          🙋
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-[14px] font-bold text-amber-800 dark:text-amber-200">
+            {angaben === 1 ? "1 Angabe „war da“" : `${angaben} Angaben „war da“`}
+          </span>
+          <span className="block text-[12px] text-amber-800/80 dark:text-amber-200/80">Wer war da? Kurz bestätigen</span>
+        </span>
+        <span className="shrink-0 rounded-lg bg-amber-700 px-2.5 py-1.5 text-[12px] font-bold text-white">prüfen</span>
+      </button>
+    );
   return (
     <button
       onClick={abschlussOeffnen}
@@ -87,6 +110,7 @@ export function AbschlussHinweis() {
 export function SchichtAbschluss() {
   const { aktionen, abschliessen } = useTermine();
   const { students } = useStore();
+  const ki = useKiOptional();
   const [spaeter, setSpaeter] = useState<Set<string>>(() => new Set());
   // Vom Hinweis im Events-Reiter geöffnet: alle offenen zeigen, auch ältere
   const [vonHand, setVonHand] = useState(false);
@@ -121,11 +145,25 @@ export function SchichtAbschluss() {
   }
   const namen = new Map(students.map((s) => [s.id, `${s.vorname} ${s.nachname}`]));
   const vornamen = new Map(students.map((s) => [s.id, s.vorname]));
+  // Was die Eingeteilten selbst gesagt haben („Warst du da?“, Update Abi28)
+  const angabe = (tid: string, sid: string) => ki?.anwesenheit.find((w) => w.termin_id === tid && w.student_id === sid) ?? null;
+  // Wer bei „Punkte vergeben“ wirklich etwas bekommt: nicht wer „nicht da“ sagt
+  // oder als „stimmt nicht“ markiert ist, und nicht doppelt (die Datenbank prüft dasselbe).
+  const bekommen = (t: Termin) =>
+    t.personen.filter((sid) => {
+      const w = angabe(t.id, sid);
+      return !w || !(w.angabe === "nicht_da" || w.status === "falsch" || w.status === "auto" || w.status === "bestaetigt");
+    }).length;
 
   async function erledigen(t: Termin, vergeben: boolean) {
     setBusy(t.id);
     setFehler("");
     const a = t.aktion_id ? aktionVon.get(t.aktion_id) : null;
+    // Vorher merken, wer wirklich etwas bekommt – danach ändern sich die Angaben.
+    const empfaenger = t.personen.filter((sid) => {
+      const w = angabe(t.id, sid);
+      return !w || !(w.angabe === "nicht_da" || w.status === "falsch" || w.status === "auto" || w.status === "bestaetigt");
+    });
     const r = await abschliessen(t.id, vergeben);
     setBusy(null);
     if (typeof r === "string") {
@@ -135,7 +173,7 @@ export function SchichtAbschluss() {
     // Die Eingeteilten (und ihre Eltern) bekommen Bescheid – nur wenn wirklich eingetragen.
     if (vergeben && r > 0 && a && hasSupabase) {
       void pushAnPersonen(
-        t.personen.map((sid) => ({
+        empfaenger.map((sid) => ({
           student_id: sid,
           title: `🙌 Mithilfe eingetragen (+${a.prozent} %)`,
           body: `${a.titel} am ${tagLang(t.datum)}${vornamen.get(sid) ? ` – ${vornamen.get(sid)}` : ""}. Danke fürs Mithelfen!`,
@@ -176,19 +214,36 @@ export function SchichtAbschluss() {
                 </span>
               </div>
               <div className="mt-2 flex flex-wrap gap-1">
-                {t.personen.map((sid) => (
-                  <span key={sid} className="rounded-full bg-papier-matt px-2 py-0.5 text-[12px] font-semibold dark:bg-slate-800">
-                    {namen.get(sid) || "Unbekannt"}
-                  </span>
-                ))}
+                {t.personen.map((sid) => {
+                  const w = angabe(t.id, sid);
+                  const zeichen = !w ? "" : w.angabe === "nicht_da" || w.status === "falsch" ? "✗ " : w.status === "offen" ? "⏳ " : "✓ ";
+                  const weg = w && (w.angabe === "nicht_da" || w.status === "falsch");
+                  return (
+                    <span
+                      key={sid}
+                      className={`rounded-full px-2 py-0.5 text-[12px] font-semibold ${
+                        weg ? "bg-red-500/10 text-red-700 line-through dark:text-red-300" : "bg-papier-matt dark:bg-slate-800"
+                      }`}
+                      title={!w ? "keine Antwort" : weg ? "sagt: nicht da" : w.status === "offen" ? "sagt: war da" : "schon eingetragen"}
+                    >
+                      {zeichen}
+                      {namen.get(sid) || "Unbekannt"}
+                    </span>
+                  );
+                })}
               </div>
+              {ki?.verfuegbar && (
+                <button onClick={anwesenheitOeffnen} className="mt-1.5 text-[12px] font-semibold text-brand">
+                  Wer war da? ›
+                </button>
+              )}
               <div className="mt-2.5 flex gap-2">
                 <button
                   disabled={busy === t.id}
                   onClick={() => void erledigen(t, true)}
                   className="btn-primary min-w-0 flex-1 !py-2.5 !text-[14px] disabled:opacity-50"
                 >
-                  {busy === t.id ? "…" : `Punkte vergeben (${t.personen.length})`}
+                  {busy === t.id ? "…" : `Punkte vergeben (${bekommen(t)})`}
                 </button>
                 <button
                   disabled={busy === t.id}

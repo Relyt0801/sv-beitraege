@@ -104,8 +104,37 @@ Deno.serve(async (req) => {
           if (code === 403 || code === 404 || code === 410) await supabase.from("push_subscriptions").delete().eq("endpoint", s.endpoint);
         }
       }));
-      console.log("Schicht-Ende gemeldet:", liste.length, "| gesendet:", sent);
-      return json({ sent, schichten: liste.length });
+      // Die Eingeteilten selbst fragen: „Warst du da?“ (Update Abi28). Nur die
+      // Person, nicht die Eltern; wer schon geantwortet hat, bekommt nichts.
+      // Fehlt die Funktion (SQL noch nicht eingespielt), bleibt es beim Team.
+      let gefragt = 0;
+      const { data: empf, error: empfFehler } = await supabase.rpc("schicht_abfrage_empfaenger", { tids: liste.map((x) => x.id) });
+      if (!empfFehler && Array.isArray(empf) && empf.length) {
+        const nachTermin = new Map(liste.map((x) => [x.id, x]));
+        const personIds = [...new Set((empf as { user_id: string }[]).map((e) => e.user_id))];
+        const { data: psubs } = await supabase.from("push_subscriptions").select("*").in("user_id", personIds);
+        await Promise.all((empf as { termin_id: string; user_id: string }[]).map(async (e) => {
+          const t = nachTermin.get(e.termin_id);
+          if (!t) return;
+          const frage = JSON.stringify({
+            title: `${t.icon ? t.icon + " " : ""}Warst du da? ${t.titel}`.slice(0, 80),
+            body: "Kurz Ja oder Nein tippen – dann wird deine Mithilfe eingetragen.",
+            url: "./#start",
+            tag: `abfrage-${e.termin_id}`,
+          });
+          for (const s of (psubs || []).filter((x: { user_id: string }) => x.user_id === e.user_id)) {
+            try {
+              await webpush.sendNotification(s.subscription as webpush.PushSubscription, frage, { TTL: 86400 });
+              gefragt++;
+            } catch (err) {
+              const code = (err as { statusCode?: number })?.statusCode;
+              if (code === 403 || code === 404 || code === 410) await supabase.from("push_subscriptions").delete().eq("endpoint", s.endpoint);
+            }
+          }
+        }));
+      }
+      console.log("Schicht-Ende gemeldet:", liste.length, "| gesendet:", sent, "| gefragt:", gefragt);
+      return json({ sent, gefragt, schichten: liste.length });
     }
 
     // Nur angemeldete Personen dürfen Benachrichtigungen auslösen. Vorher

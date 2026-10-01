@@ -274,6 +274,12 @@ export function schuelerSchritte(staffel: Staffel): TourStep[] {
       title: "Willkommen in der Stufenkasse",
       text: "In einer Minute weißt du, wo du was findest. Du kannst jederzeit überspringen.",
     },
+    {
+      tab: "start",
+      anchor: "start",
+      title: "Deine Startseite",
+      text: "Was du zahlen musst, dein Abiball-Ticket, der Kontostand der Stufe, Abstimmungen und Antworten. Antippen führt weiter – nach einer Schicht fragt sie auch „Warst du da?“.",
+    },
     { tab: "kasse", anchor: "meine-karte", title: "Was du noch zahlst", text: "Oben steht dein offener Betrag. Steht dort 0 €, ist alles erledigt." },
     {
       tab: "kasse",
@@ -289,7 +295,7 @@ export function schuelerSchritte(staffel: Staffel): TourStep[] {
     },
     { tab: "events", anchor: "tab-events", title: "Events", text: "Termine, Aktionen und Abstimmungen vom Stufenteam. Für Aktionen trägst du dich hier ein." },
     { tab: "themen", anchor: "tab-themen", title: "Chats", text: "Hier chattest du mit deinem Komitee und stellst dem Stufenteam Fragen." },
-    { tab: "kasse", anchor: "profil", title: "Dein Profil", text: "Bild, Namensfarbe, Passwort und Mitteilungen. Dort startest du diese Einführung auch neu." },
+    { tab: "start", anchor: "profil", title: "Dein Profil", text: "Bild, Namensfarbe, Passwort und Mitteilungen. Dort startest du diese Einführung auch neu." },
   ];
 }
 
@@ -307,6 +313,12 @@ export function teamSchritte(o: {
       zeichen: "👋",
       title: "Willkommen im Stufenteam",
       text: "Ein kurzer Rundgang durch alle Reiter – nur das Wichtigste. Du kannst jederzeit überspringen.",
+    },
+    {
+      tab: "start",
+      anchor: "start",
+      title: "Startseite",
+      text: "Was gerade ansteht: offene Beiträge, Kontostand, „war da“-Angaben zum Prüfen, Abstimmungen und neue Nachrichten. Antippen führt hin.",
     },
     { tab: "kasse", anchor: "kassenkopf", title: "Die Lage auf einen Blick", text: "Wie viel in der Stufe noch offen ist und wie viele noch zahlen müssen." },
     {
@@ -332,7 +344,9 @@ export function teamSchritte(o: {
     s.push({ tab: "rollen", anchor: "tab-rollen", title: "Rollen", text: "Wer welche Rolle hat. Mit dem Schalter „Elternzugänge anzeigen“ holst du die Eltern dazu und legst fest, welche Kinder sie sehen." });
   if (o.rechte)
     s.push({ tab: "rechte", anchor: "tab-rechte", title: "Rechte", text: "Feineinstellung, wer was darf. Nur nötig, wenn ihr vom Standard abweichen wollt." });
-  s.push({ tab: "kasse", anchor: "profil", title: "Dein Profil", text: "Bild, Passwort und Mitteilungen. Dort startest du diese Einführung jederzeit neu." });
+  if ([o.beitraege, o.finanzen, o.rollen, o.rechte].filter(Boolean).length > 1)
+    s.push({ anchor: "tab-mehr", title: "Mehr", text: "Am Handy stecken Finanzen, Beiträge, Rollen und Rechte unter „Mehr“ – so bleibt die Leiste übersichtlich." });
+  s.push({ tab: "start", anchor: "profil", title: "Dein Profil", text: "Bild, Passwort und Mitteilungen. Dort startest du diese Einführung jederzeit neu." });
   return s;
 }
 

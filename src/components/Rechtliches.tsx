@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { Sheet } from "./Sheet";
+import { DATENSCHUTZ_VERSION } from "../lib/ki";
 
 /**
  * Impressum und Datenschutzerklärung.
@@ -122,6 +123,10 @@ function Datenschutz() {
         Aktionen, Anträge und Kostenanfragen, das Kassenbuch der Stufe.
       </P>
       <P>
+        <b>Nach Schichten:</b> deine Antwort auf „Warst du da?“ (war da / nicht da), ob du für die Schicht
+        eingeteilt warst und ob das Stufenteam die Angabe bestätigt oder als „stimmt nicht“ markiert hat.
+      </P>
+      <P>
         <b>Für Benachrichtigungen:</b> eine technische Kennung des Geräts (Push-Abo) – nur, wenn du
         Benachrichtigungen ausdrücklich erlaubst.
       </P>
@@ -151,6 +156,49 @@ function Datenschutz() {
         dafür beim Stufenteam.
       </P>
 
+      <H>3a. Vertrauens-Check und Assistent (freiwillig, Testphase)</H>
+      <P>
+        <b>Nur mit deiner ausdrücklichen Einwilligung</b> und derzeit nur für einzelne Konten (Admins und Testkonten).
+        Für Elternzugänge gibt es den Vertrauens-Check nicht.
+      </P>
+      <P>
+        <b>Was passiert:</b> Sagst du nach einer Schicht „war da“, kann das sofort eingetragen werden – wenn du für
+        die Schicht eingeteilt warst und dein Vertrauenswert hoch genug ist. Der Wert ergibt sich aus deiner Bilanz:
+        wie oft deine Angaben vom Stufenteam bestätigt und wie oft als falsch markiert wurden. Zusätzlich schätzt ein
+        KI-Modell (Jev von TypeSafe AI) ein, ob die Angaben in deinen Nachrichten an das Stufenteam zusammenpassen; es
+        kann den Wert nur senken, nie heben. Ein Assistent (Claude von Anthropic) beantwortet Nachfragen zu
+        Nachträgen im Chat mit dem Stufenteam. Seine Antworten sind immer als automatische Antwort (KI) gekennzeichnet.
+      </P>
+      <P>
+        <b>Was an die KI-Dienste geht:</b> der Text deiner Nachrichten an das Stufenteam (höchstens der letzten 60
+        Tage), wobei dein Name durch „Person“ ersetzt wird; die Zahl bestätigter und als falsch markierter Angaben;
+        Titel und Datum der Schichten, die gemeint sein könnten. Nicht: Gruppen- und Komitee-Chats, Namen, Kennungen,
+        Beitragsdaten, irgendetwas von Eltern.
+      </P>
+      <P>
+        <b>Automatisierte Entscheidung (Art. 22 DSGVO):</b> Automatisch wird nur zu deinen Gunsten entschieden
+        (sofort eintragen). Ein niedriger Wert lehnt nie etwas ab – dann prüft ein Mensch aus dem Stufenteam, wie
+        ohne Vertrauens-Check auch. Du kannst jederzeit verlangen, dass ein Mensch entscheidet, und deinen Standpunkt
+        darlegen. Den Wert sieht nur der Admin; er wird für nichts anderes verwendet (nicht für Schichtvergabe, nicht
+        für Chat-Sperren).
+      </P>
+      <P>
+        <b>Rechtsgrundlage:</b> Einwilligung, Art. 6 Abs. 1 lit. a DSGVO. Freiwillig: Ohne Zustimmung funktioniert
+        alles wie bisher. <b>Widerruf</b> jederzeit im Profil („Vertrauens-Check“) – dein Wert wird dann sofort
+        gelöscht.
+      </P>
+      <P>
+        <b>Empfänger:</b> TypeSafe AI (Sitz USA) – direkt oder über OpenRouter (Sitz USA) – und Anthropic (Sitz USA). Die
+        Übermittlung in die USA stützt sich auf die EU-Standardvertragsklauseln (Art. 46 Abs. 2 lit. c DSGVO) in den
+        Auftragsverarbeitungsverträgen der Anbieter. Wie lange die Anbieter Anfragen speichern, richtet sich nach deren
+        Bedingungen: <Lueck>Speicherfristen von TypeSafe/OpenRouter und Anthropic prüfen und eintragen</Lueck>.
+      </P>
+      <P>
+        <b>Speicherdauer bei uns:</b> Wert und Bilanz bis zum Widerruf, längstens solange die Stufe besteht. Die
+        Einschätzungen des Assistenten (was gefragt war, was er vorgeschlagen hat) ebenso; das Stufenteam kann sie
+        erledigen oder verwerfen.
+      </P>
+
       <H>4. Wer bekommt die Daten zu sehen?</H>
       <P>
         Innerhalb der App: das Stufenteam und der Kassenwart sehen die Personen- und Beitragsliste; Schülerinnen
@@ -170,6 +218,7 @@ function Datenschutz() {
         Schriften werden von dieser Seite selbst geladen, nicht von Google oder anderen Schrift-Diensten.
         <br />• <b>Apple, Google und Mozilla</b> – nur wenn Benachrichtigungen an sind: der Push-Dienst des
         jeweiligen Browserherstellers stellt die Nachricht zu. Der Inhalt ist dabei verschlüsselt.
+        <br />• <b>TypeSafe AI / OpenRouter und Anthropic</b> – nur mit Einwilligung zum Vertrauens-Check (siehe 3a).
       </P>
       <P>
         Mit Supabase und Vercel gilt jeweils deren Auftragsverarbeitungsvertrag (Data Processing Addendum),
@@ -187,8 +236,8 @@ function Datenschutz() {
 
       <H>6. Was auf deinem Gerät bleibt</H>
       <P>
-        Die App speichert im Browser: deine Anmeldung, ob du die Einführung schon gesehen hast, deine Auswahl
-        für hell/dunkel und den Programmcode selbst (damit sie offline startet). Das ist technisch nötig und
+        Die App speichert im Browser: deine Anmeldung, ob du die Einführung und „Was ist neu“ schon gesehen hast,
+        deine Auswahl für hell/dunkel und den Programmcode selbst (damit sie offline startet). Das ist technisch nötig und
         deshalb nach § 25 Abs. 2 Nr. 2 TDDDG ohne Einwilligung erlaubt. Alles davon verschwindet, wenn du dich
         abmeldest oder die Websitedaten löschst.
       </P>
@@ -215,7 +264,7 @@ function Datenschutz() {
       </P>
 
       <p className="mt-4 text-[12px] text-tinte-leise">
-        Stand: {new Date().toLocaleDateString("de-DE")}
+        Stand: {DATENSCHUTZ_VERSION.split("-").reverse().join(".")}
       </p>
     </>
   );

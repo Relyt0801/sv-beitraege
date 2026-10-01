@@ -1,4 +1,4 @@
-# Änderungen – Stand 01.10.2026
+# Änderungen – Stand 01.10.2026 (Update Abi28)
 
 Diese Datei erklärt, was sich in den letzten Runden geändert hat, **wo** es im
 Code steht und **warum** es so gebaut ist. Die Kommentare im Code selbst sind
@@ -8,6 +8,55 @@ ausführlich (auf Deutsch); hier steht der Überblick dazu.
 > Bankdaten, der `service_role`-Schlüssel und der VAPID Private Key liegen nur
 > in der Datenbank bzw. als Supabase-Secret. `privat/` ist per `.gitignore`
 > ausgeschlossen. Bitte so beibehalten.
+
+---
+
+
+## 01.10.2026 (abends): Update Abi28
+
+SQL: `supabase/update-abi28.sql` (**muss eingespielt werden**). Functions:
+`send-push`, `kalender` neu deployen, `assistent` neu. Anleitung: `EINSPIELEN.md`.
+
+- **Startseite** (`StartTab.tsx`): erster Reiter. Oben „Warst du da?“ (falls
+  offen), dann die eine Zahl (Schüler: was ich zahlen muss; Team: offen in der
+  Stufe), zwei Kacheln (Abiball-Ticket bzw. Ziel, Kontostand), darunter nur,
+  was wirklich ansteht: Antworten des Teams, offene Abstimmungen, ungelesene
+  Chats, „war da“-Angaben zum Prüfen, nächste eigene Schicht. Antippen führt
+  hin (Chats über `src/lib/ziel.ts`).
+- **Schlichtere Leiste:** Schüler unten nur Start · Events · Chats (Kasse und
+  Finanzen über die Startseite, oben links ‹ zurück). Team: Start · Kasse ·
+  Events · Chats, Zusatz-Reiter am Handy unter „Mehr“ (erst ab zwei, sonst
+  direkt in der Leiste). Am Rechner wie bisher alle oben.
+- **Was ist neu** (`src/lib/neues.ts`, `WasIstNeu.tsx`): je Update einmal,
+  nur die Punkte für die eigene Rolle/Rechte. Eltern bekommen diesmal nichts.
+- **„Warst du da?“** (`ki-store.tsx`, Tabelle `anwesenheit`): Nach Schichtende
+  fragt die App die Eingeteilten (auch per Push, `send-push`). „Nein“ schließt
+  die Person von „Punkte vergeben“ aus. „Ja“ wird sofort eingetragen, wenn sie
+  eingeteilt war, in der Testphase ist, eingewilligt hat und ihr Score ≥
+  Schwelle ist – sonst prüft das Team. Push ans Team nur, wenn das Team nicht
+  ohnehin beim Abschließen draufschaut (nicht eingeteilt / schon abgeschlossen).
+- **Wer war da?** (`AnwesenheitSheet.tsx`): Übersicht je Schicht (30 Tage),
+  ✓ / ⏳ / ✗ / –, „stimmt“ / „stimmt nicht“. Im Schicht-Abschluss stehen die
+  Antworten an den Namen; „Punkte vergeben (n)“ zählt nur, wer bekommt.
+- **Vertrauens-Check (Testphase: Admins + Testkonten, Recht `ki.test`):**
+  Score = Bilanz `(b+1)/(b+1+3f+1)`; Jev kann ihn nur senken. Nur der Admin
+  sieht ihn (Profil → „Vertrauen & KI“, `VertrauenSheet.tsx`). Einwilligung
+  getrennt von `profiles` (`ki_einwilligung`), freiwillig, Widerruf im Profil
+  löscht den Score.
+- **Assistent** (`supabase/functions/assistent/`): Jev (TypeSafe/OpenRouter)
+  entscheidet Absicht, Schicht (aus fester Liste) und Stimmigkeit; Regeln in
+  `regeln.ts` (Tests: `npm run test:regeln`); Claude schreibt nur Text
+  (Rückfrage im Teamstil, Vorschlag fürs Team, SQL-Vorschlag nur als Text für
+  den Admin). Antworten im Chat sind als KI gekennzeichnet.
+- **Datenschutzerklärung** (`Rechtliches.tsx`): Abschnitt 3a, Empfänger,
+  Anwesenheit. **Einwilligungsfrage** (`DatenschutzUpdate.tsx`) nur für
+  Freigeschaltete, zwei gleichwertige Knöpfe.
+- **Kalender-Abo mit Themen** (`KalenderSyncSheet.tsx`, `kalender_themen`,
+  `passtZuThemen()` in `ics.ts`): Stufe, Klausuren, Meine Schichten, Alle
+  Schichten, Ferien, Komitee. Testphase jetzt fürs ganze Stufenteam.
+- **Terminal:** `.claude/commands/nachtraege.md`, `scripts/nachtraege.mjs`,
+  `nachtraege.bat`, `npm run nachtraege` – ohne Namen, mit Rückfrage vor jeder
+  Aktion, kein freies SQL.
 
 ---
 
