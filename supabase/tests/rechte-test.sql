@@ -1,7 +1,7 @@
 -- ============================================================
--- Rechte-Test: Wer darf was? (Stand 28.09.2026)
+-- Rechte-Test: Wer darf was? (Stand 01.10.2026, mit Update Abi28)
 --
--- Spielt 137 Angriffe und erlaubte Aktionen mit echten Konten JEDER Rolle
+-- Spielt 158 Angriffe und erlaubte Aktionen mit echten Konten JEDER Rolle
 -- durch – direkt in der Datenbank, genau so, wie es ein Angreifer über die
 -- Schnittstelle versuchen würde (Rolle "authenticated" bzw. "anon" mit der
 -- Kennung der Person, Zugriffsregeln greifen wie in der App).
@@ -191,7 +191,30 @@ insert into faelle values
   ('stufenteam', 'Geplante Aktion ändern', 'update kasse_geplant set titel=''x'' where true', 'V'),
   ('kassenwart', 'Geplante Aktion eintragen', 'insert into kasse_geplant(titel) values (''x'')', 'E'),
   -- To-dos/Abstimmungen anderer löschen: nur mit chats.delete_items (chat-eintraege-loeschen.sql)
-  ('s_komitee', 'Fremdes To-do löschen', 'delete from topic_items where type in (''todo'',''umfrage'') and created_by is distinct from auth.uid()', 'V');
+  ('s_komitee', 'Fremdes To-do löschen', 'delete from topic_items where type in (''todo'',''umfrage'') and created_by is distinct from auth.uid()', 'V'),
+  -- Update Abi28 (update-abi28.sql): Score nur für den Admin, Anwesenheit nur über die Funktionen,
+  -- Eltern ganz außen vor, Server-Funktionen der KI für die App gesperrt.
+  ('schueler', 'Vertrauens-Score lesen', 'select 1 from vertrauen_liste() limit 1', 'V'),
+  ('stufenteam', 'Vertrauens-Score lesen', 'select 1 from vertrauen_liste() limit 1', 'V'),
+  ('kassenwart', 'Vertrauens-Score lesen', 'select 1 from vertrauen_liste() limit 1', 'V'),
+  ('admin', 'Vertrauens-Score lesen', 'select 1 from vertrauen_liste() limit 1', 'E'),
+  ('schueler', 'Score direkt schreiben', 'insert into vertrauen(user_id,bestaetigt) values (auth.uid(),99)', 'V'),
+  ('stufenteam', 'Score direkt schreiben', 'insert into vertrauen(user_id,bestaetigt) values (auth.uid(),99)', 'V'),
+  ('schueler', 'Score über Server-Funktion setzen', 'select vertrauen_jev_setzen(auth.uid(), 1, 1)', 'V'),
+  ('schueler', 'Sich über Server-Funktion eintragen', 'select anwesenheit_melden_fuer(''00000000-0000-4000-8000-000000000000''::uuid, auth.uid())', 'V'),
+  ('schueler', 'Anwesenheit direkt als auto eintragen', 'insert into anwesenheit(termin_id,student_id,angabe,status) select id, ''{S_EIGEN}'', ''da'', ''auto'' from termine limit 1', 'V'),
+  ('schueler', 'Eigene Angabe selbst bestätigen', 'select anwesenheit_pruefen(''00000000-0000-4000-8000-000000000000''::uuid, true)', 'V'),
+  ('eltern', 'Anwesenheit melden', 'select anwesenheit_melden(''00000000-0000-4000-8000-000000000000''::uuid, true)', 'V'),
+  ('eltern', 'Vertrauens-Check einwilligen', 'select ki_einwilligung_setzen(true, ''2026-10-01'')', 'V'),
+  ('schueler', 'Vertrauens-Check zustimmen (Testphase: nur Admin/Testkonten)', 'select ki_einwilligung_setzen(true, ''2026-10-01'')', 'V'),
+  ('anon', 'Anwesenheit melden', 'select anwesenheit_melden(''00000000-0000-4000-8000-000000000000''::uuid, true)', 'V'),
+  ('schueler', 'Fremde Einwilligung ändern', 'update ki_einwilligung set ja=true where user_id is distinct from auth.uid()', 'V'),
+  ('schueler', 'KI-Einstellungen ändern', 'select ki_einstellungen_setzen(0.5, true, null)', 'V'),
+  ('stufenteam', 'KI-Einstellungen ändern', 'select ki_einstellungen_setzen(0.5, true, null)', 'V'),
+  ('stufenteam', 'KI-Einstellungen lesen (Schreibstil, Schwelle)', 'select 1 from ki_einstellungen', 'V'),
+  ('admin', 'KI-Einstellungen lesen (Schreibstil, Schwelle)', 'select 1 from ki_einstellungen', 'E'),
+  ('schueler', 'Assistent-Vorschläge lesen', 'select 1 from assistent_vorschlaege limit 1', 'V'),
+  ('eltern', 'Fremde Anwesenheit lesen', 'select 1 from anwesenheit limit 1', 'V');
 
 create temp table erg (rolle text, fall text, erwartet text, ergebnis text, detail text) on commit drop;
 grant insert, select on erg to authenticated, anon;

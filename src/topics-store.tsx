@@ -94,7 +94,8 @@ interface TopicsValue {
   setUserCommittee: (userId: string, slug: string, on: boolean) => Promise<void>;
   selfAssignCommittee: (slug: string) => Promise<boolean>;
   committeesOf: (userId: string) => string[];
-  postItem: (topic: Topic, type: TopicItemType, body: string, options?: string[], title?: string, meta?: { role?: string | null; koms?: string[]; pinned?: boolean; poll?: { multi?: boolean; anon?: boolean; deadline?: string | null } }) => Promise<void>;
+  /** Gibt die Kennung der gespeicherten Nachricht zurück (null, wenn sie nicht rausging). */
+  postItem: (topic: Topic, type: TopicItemType, body: string, options?: string[], title?: string, meta?: { role?: string | null; koms?: string[]; pinned?: boolean; poll?: { multi?: boolean; anon?: boolean; deadline?: string | null } }) => Promise<string | null>;
   updateItem: (id: string, patch: Partial<Pick<TopicItem, "done" | "pinned">>) => Promise<void>;
   deleteItem: (id: string) => Promise<void>;
   vote: (itemId: string, optionId: string, multi?: boolean) => Promise<void>;
@@ -437,7 +438,7 @@ export function TopicsProvider({ children }: { children: ReactNode }) {
     };
     // Sofort anzeigen – die Nachricht steht da, bevor der Server geantwortet hat.
     setItems((p) => [...p, item]);
-    if (!hasSupabase) return;
+    if (!hasSupabase) return item.id;
     const { error } = await supabase!.from("topic_items").insert({
       id: item.id, topic_id: item.topic_id, type: item.type, title: item.title, body: item.body,
       options: item.options, pinned: item.pinned, author: item.author,
@@ -449,12 +450,13 @@ export function TopicsProvider({ children }: { children: ReactNode }) {
       // geschrieben wurde und dass es nicht angekommen ist.
       setItems((p) => p.map((i) => (i.id === item.id ? { ...i, nicht_gesendet: error.message } : i)));
       meldeFehler("Die Nachricht ging nicht raus: " + error.message);
-      return;
+      return null;
     }
     // Empfänger rechnet der Server aus (send-push, chat_item_id). Im Browser
     // sieht ein Schüler nur seine eigene Komitee-Zeile – vorher landeten
     // Chat-Pop-ups deshalb nur bei den Nachrichten des Teams.
     void chatPush(item.id);
+    return item.id;
   }, []);
 
   const updateItem: TopicsValue["updateItem"] = useCallback(async (id, patch) => {

@@ -41,6 +41,12 @@ import { Icon, type IconName } from "./components/Icon";
 import { InstallKarte, InstallOverlay } from "./components/InstallHinweis";
 import { useGescrollt, useHoeheAlsVariable, useReiter } from "./lib/gescrollt";
 import { Schalter } from "./components/Schalter";
+import { StartTab } from "./components/StartTab";
+import { KiProvider, useKi } from "./ki-store";
+import { WasIstNeu } from "./components/WasIstNeu";
+import { DatenschutzUpdate } from "./components/DatenschutzUpdate";
+import { AnwesenheitSheet, AUF_ANWESENHEIT } from "./components/AnwesenheitSheet";
+import type { PermKey } from "./lib/permissions";
 
 import { frage, melde, meldeFehler } from "./lib/melder";
 export default function App() {
@@ -86,7 +92,9 @@ function NachRolle() {
         <TermineProvider>
           <TopicsProvider>
             <ElternProvider>
-              <Main />
+              <KiProvider>
+                <Main />
+              </KiProvider>
             </ElternProvider>
           </TopicsProvider>
         </TermineProvider>
@@ -95,13 +103,14 @@ function NachRolle() {
   );
 }
 
-type Tab = "kasse" | "events" | "themen" | "beitraege" | "finanzen" | "rollen" | "rechte";
+type Tab = "start" | "kasse" | "events" | "themen" | "beitraege" | "finanzen" | "rollen" | "rechte";
 
 /** "#events" -> Events, "#chats" -> Chats. Danach wird die Marke entfernt,
  *  damit ein Neuladen nicht wieder dorthin springt. */
 function tabAusAdresse(entfernen = true): Tab | null {
   const h = window.location.hash.replace("#", "");
-  const t: Tab | null = h === "events" ? "events" : h === "chats" ? "themen" : h === "kasse" ? "kasse" : h === "finanzen" ? "finanzen" : null;
+  const t: Tab | null =
+    h === "events" ? "events" : h === "chats" ? "themen" : h === "kasse" ? "kasse" : h === "finanzen" ? "finanzen" : h === "start" ? "start" : null;
   if (t && entfernen) history.replaceState(null, "", window.location.pathname + window.location.search);
   return t;
 }
@@ -111,6 +120,7 @@ const SCHRITT_LISTE = 40;
 
 /** Was oben im Kopf steht – je Reiter eine kurze Überschrift. */
 const REITER_TITEL: Record<Tab, string> = {
+  start: "Start",
   kasse: "Stufenkasse",
   events: "Events",
   themen: "Chats",
@@ -129,6 +139,7 @@ function Main() {
   // liegt sie in einer Referenz und ist beim ersten Zeichnen noch leer.
   const { uid } = useProfiles();
   const { theme, toggle } = useTheme();
+  const ki = useKi();
 
   const showTopicsTab = true;
   const topicsUnreadChats = topics.reduce((s, t) => s + unreadCount(t.id), 0);
@@ -176,7 +187,7 @@ function Main() {
   // Nur lesen – React ruft den Startwert im Entwicklungsmodus zweimal auf.
   // useReiter springt vor dem Wechsel nach oben – sonst federt auf iOS die
   // Tab-Leiste, wenn der neue Reiter kürzer ist als die alte Scrollposition.
-  const [tab, setTab] = useReiter<Tab>(() => tabAusAdresse(false) || "kasse");
+  const [tab, setTab] = useReiter<Tab>(() => tabAusAdresse(false) || "start");
   useEffect(() => {
     tabAusAdresse(true);
   }, []);
@@ -202,6 +213,14 @@ function Main() {
   const [showAdd, setShowAdd] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showTour, setShowTour] = useState(false);
+  const [showAnwesenheit, setShowAnwesenheit] = useState(false);
+  const [showMehr, setShowMehr] = useState(false);
+  // „Wer war da?“ lässt sich von überall öffnen (Hinweis im Events-Reiter, Schicht-Abschluss).
+  useEffect(() => {
+    const auf = () => setShowAnwesenheit(true);
+    window.addEventListener(AUF_ANWESENHEIT, auf);
+    return () => window.removeEventListener(AUF_ANWESENHEIT, auf);
+  }, []);
   const gescrollt = useGescrollt(4);
   // Kopf und Tab-Leiste messen: danach richten sich Chat-Eingabe,
   // Komitee-Leiste und die Zwischenüberschriften (siehe index.css).
@@ -322,21 +341,40 @@ function Main() {
   const klein =
     "rounded-full bg-[rgb(118_118_128/0.12)] px-3.5 py-1.5 text-[14px] font-semibold text-brand-dark transition active:scale-95 dark:bg-[rgb(118_118_128/0.24)] dark:text-brand";
 
-  const navItems: { key: Tab; icon: IconName; label: string; badge?: number; show: boolean }[] = [
-    { key: "kasse", icon: "kasse", label: "Kasse", show: true },
-    { key: "events", icon: "events", label: "Events", badge: unread, show: true },
-    { key: "themen", icon: "chats", label: "Chats", badge: topicsUnread, show: showTopicsTab },
-    { key: "beitraege", icon: "beitraege", label: "Beiträge", show: can("beitraege.manage") },
-    { key: "finanzen", icon: "finanzen", label: "Finanzen", badge: offeneKosten, show: showFinanzen },
-    { key: "rollen", icon: "rollen", label: "Rollen", show: canManageRoles },
-    { key: "rechte", icon: "rechte", label: "Rechte", show: can("perms.manage") },
+  // Schlicht (Update Abi28): Schüler haben unten nur Start, Events, Chats –
+  // Kasse und Finanzen erreichen sie über die Karten der Startseite.
+  // Das Team hat am Handy Start, Kasse, Events, Chats und „Mehr“.
+  // show = darf hin, leiste = steht unten bzw. oben in der Leiste.
+  const startBadge = (teamView ? ki.offeneAngaben.length : 0) + ki.meineAbfragen.length;
+  const navItems: { key: Tab; icon: IconName; label: string; badge?: number; show: boolean; leiste: boolean }[] = [
+    { key: "start", icon: "haus", label: "Start", badge: startBadge, show: true, leiste: true },
+    { key: "kasse", icon: "kasse", label: "Kasse", show: true, leiste: teamView },
+    { key: "events", icon: "events", label: "Events", badge: unread, show: true, leiste: true },
+    { key: "themen", icon: "chats", label: "Chats", badge: topicsUnread, show: showTopicsTab, leiste: true },
+    { key: "beitraege", icon: "beitraege", label: "Beiträge", show: can("beitraege.manage"), leiste: false },
+    { key: "finanzen", icon: "finanzen", label: "Finanzen", badge: offeneKosten, show: showFinanzen, leiste: false },
+    { key: "rollen", icon: "rollen", label: "Rollen", show: canManageRoles, leiste: false },
+    { key: "rechte", icon: "rechte", label: "Rechte", show: can("perms.manage"), leiste: false },
   ];
+  // Zusatz-Reiter fürs Team: am Rechner oben mit in der Leiste, am Handy unter
+  // „Mehr“ – aber nur, wenn es mindestens zwei sind (ein Menü für einen
+  // einzigen Eintrag wäre nur ein Tipp mehr).
+  const zusatz = teamView ? navItems.filter((n) => n.show && !n.leiste) : [];
+  const mehrItems = zusatz.length > 1 ? zusatz : [];
+  const leisteItems = navItems.filter((n) => n.show && (n.leiste || (zusatz.length === 1 && zusatz.includes(n))));
+  const mehrBadge = mehrItems.reduce((n, m) => n + (m.badge ?? 0), 0);
+  // Ein Reiter, der nirgends in der Leiste steht (z. B. Kasse für Schüler):
+  // oben links ein Pfeil zurück zur Startseite.
+  const ohneLeiste = !leisteItems.some((n) => n.key === tab) && !mehrItems.some((m) => m.key === tab);
+  // Testphase: nur Freigeschaltete (Admins, Testkonten) werden gefragt.
+  const datenschutzFrage = ki.freigeschaltet && ki.verfuegbar && ki.einwilligung === null && roleReady;
+  const istAktiv = (k: Tab | "mehr") => tab === k || (k === "mehr" && mehrItems.some((m) => m.key === tab));
 
   // Über eine Adresse wie #finanzen darf niemand in einen Reiter, der für ihn
   // nicht vorgesehen ist – dann zurück zur Kasse.
   const reiterErlaubt = navItems.find((n) => n.key === tab)?.show ?? true;
   useEffect(() => {
-    if (roleReady && !reiterErlaubt) setTab("kasse");
+    if (roleReady && !reiterErlaubt) setTab("start");
   }, [roleReady, reiterErlaubt, setTab]);
 
   // Im Auswahl-Modus ist die Leiste unten höher (Namen der Ausgewählten) –
@@ -353,6 +391,11 @@ function Main() {
         }`}
       >
         <div className="mx-auto flex max-w-5xl items-center gap-2.5">
+          {ohneLeiste && (
+            <button className="iconbtn" onClick={() => setTab("start")} aria-label="Zurück zur Startseite" title="Start">
+              ‹
+            </button>
+          )}
           <div
             aria-hidden={!titelWeg}
             className={`min-w-0 flex-1 truncate text-[17px] font-semibold tracking-[-0.01em] transition duration-300 ease-ios ${
@@ -409,7 +452,7 @@ function Main() {
         {/* Am Rechner und iPad quer: schwebende Reiterleiste oben in der Mitte
             (wie iPadOS). Auf dem Handy steht sie unten. */}
         <nav className="mx-auto mt-3 hidden w-fit max-w-full items-center gap-0.5 overflow-x-auto rounded-full border border-black/[0.06] p-1 shadow-glas glas no-scrollbar dark:border-white/10 lg:flex">
-          {navItems.filter((n) => n.show).map((n) => (
+          {navItems.filter((n) => n.show && (n.leiste || zusatz.includes(n))).map((n) => (
             <button
               key={n.key}
               data-tour={`tab-${n.key}`}
@@ -464,7 +507,7 @@ function Main() {
         {/* Zum Home-Bildschirm hinzufügen. Verschwindet von selbst, sobald die
             App installiert ist – und auf iPhone/iPad, sobald jemand bestätigt,
             dass er es gemacht hat (mehr dazu in src/lib/install.ts). */}
-        {tab === "kasse" && (
+        {tab === "start" && (
           <div className="mx-auto max-w-5xl">
             <InstallKarte />
           </div>
@@ -562,7 +605,16 @@ function Main() {
         <PushHinweis />
       </div>
 
-      {tab === "rollen" ? (
+      {tab === "start" ? (
+        <main key={tab} className="animate-fadeIn mt-3">
+          <StartTab
+            student={meinEintrag}
+            punkte={punkte[meinEintrag?.id ?? ""] || 0}
+            onTab={(t) => setTab(t)}
+            onAnwesenheit={() => setShowAnwesenheit(true)}
+          />
+        </main>
+      ) : tab === "rollen" ? (
         <main key={tab} className="animate-fadeIn mt-3">
           <RolesTab />
         </main>
@@ -727,19 +779,24 @@ function Main() {
       {!massMode && (
         <nav ref={leisteRef} className="pointer-events-none fixed inset-x-0 bottom-0 z-40 px-3 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] lg:hidden">
           <div className="glas pointer-events-auto mx-auto flex max-w-xl items-stretch rounded-[1.9rem] border border-black/[0.06] p-1 shadow-glas dark:border-white/10">
-            {navItems.filter((n) => n.show).map((n) => (
+            {[
+              ...leisteItems,
+              ...(mehrItems.length
+                ? [{ key: "mehr" as const, icon: "regler" as IconName, label: "Mehr", badge: mehrBadge, show: true, leiste: true }]
+                : []),
+            ].map((n) => (
               <button
                 key={n.key}
                 data-tour={`tab-${n.key}`}
-                onClick={() => setTab(n.key)}
-                aria-current={tab === n.key ? "page" : undefined}
+                onClick={() => (n.key === "mehr" ? setShowMehr(true) : setTab(n.key))}
+                aria-current={istAktiv(n.key) ? "page" : undefined}
                 className={`relative flex min-w-0 flex-1 flex-col items-center gap-0.5 rounded-[1.5rem] px-0.5 pb-1.5 pt-2 text-[10px] font-semibold tracking-[-0.01em] transition duration-300 ease-ios active:scale-90 ${
-                  tab === n.key ? "bg-black/[0.06] text-brand dark:bg-white/[0.12] dark:text-brand-dark" : "text-tinte dark:text-slate-100"
+                  istAktiv(n.key) ? "bg-black/[0.06] text-brand dark:bg-white/[0.12] dark:text-brand-dark" : "text-tinte dark:text-slate-100"
                 }`}
                 aria-label={n.label}
               >
                 <span className="relative flex h-[22px] items-center leading-none">
-                  <Icon name={n.icon} size={22} strich={tab === n.key ? 2.2 : 1.8} />
+                  <Icon name={n.icon} size={22} strich={istAktiv(n.key) ? 2.2 : 1.8} />
                   {(n.badge ?? 0) > 0 && (
                     <span className="absolute -right-3 -top-1.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#FF3B30] px-1 text-[11px] font-semibold text-white ring-2 ring-white dark:ring-slate-900">
                       {n.badge! > 9 ? "9+" : n.badge}
@@ -772,11 +829,43 @@ function Main() {
           setShowTour(true);
         }}
       />
-      {/* Nicht zwei Begrüßungen übereinander: erst die Einführung, danach der
-          Hinweis zum Home-Bildschirm. */}
-      {!showTour && <InstallOverlay />}
+      {/* Nicht mehrere Begrüßungen übereinander. Reihenfolge: Einführung →
+          Datenschutz-Frage (Testphase Vertrauens-Check) → Was ist neu →
+          Home-Bildschirm-Hinweis und Schicht-Abschluss. */}
+      {!showTour && datenschutzFrage && <DatenschutzUpdate onAntwort={ki.einwilligen} />}
+      <WasIstNeu
+        uid={uid}
+        frei={!showTour && !datenschutzFrage}
+        kontext={{ isAdmin: role === "admin", isStaff, isEltern: false, can: (p) => can(p as PermKey), kiTest: ki.freigeschaltet }}
+      />
+      {!showTour && !datenschutzFrage && <InstallOverlay />}
       {/* Schicht vorbei: Stufenteam vergibt die Beitragspunkte mit einem Tipp */}
-      {!showTour && <SchichtAbschluss />}
+      {!showTour && !datenschutzFrage && <SchichtAbschluss />}
+      <AnwesenheitSheet open={showAnwesenheit} onClose={() => setShowAnwesenheit(false)} />
+      <Sheet open={showMehr} onClose={() => setShowMehr(false)}>
+        <div className="mb-3 text-xl font-bold">Mehr</div>
+        <div className="grid gap-2">
+          {mehrItems.map((m) => (
+            <button
+              key={m.key}
+              onClick={() => {
+                setShowMehr(false);
+                setTab(m.key);
+              }}
+              className="card flex items-center gap-3 px-4 py-3.5 text-left text-[16px] font-semibold transition active:scale-[.98]"
+            >
+              <Icon name={m.icon} size={20} />
+              <span className="flex-1">{m.label}</span>
+              {(m.badge ?? 0) > 0 && (
+                <span className="flex h-[20px] min-w-[20px] items-center justify-center rounded-full bg-[#FF3B30] px-1 text-[12px] font-semibold text-white">
+                  {m.badge}
+                </span>
+              )}
+              <Icon name="chevron" size={16} />
+            </button>
+          ))}
+        </div>
+      </Sheet>
       <Tour
         open={showTour}
         steps={
@@ -798,7 +887,7 @@ function Main() {
         }}
         onClose={() => {
           setShowTour(false);
-          setTab("kasse");
+          setTab("start");
           // Zeitpunkt merken, damit ein späteres Zurücksetzen erkannt wird
           localStorage.setItem(`sv:tour:v3:${isStaff ? "team" : "schueler"}`, new Date().toISOString());
         }}

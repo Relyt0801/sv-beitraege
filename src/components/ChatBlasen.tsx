@@ -22,7 +22,15 @@ export function ChatBlase({
   darfLoeschen: boolean;
   onDelete: (id: string) => void;
 }) {
-  const kreis = (
+  // Antworten des Assistenten (Update Abi28) sind immer klar als KI
+  // gekennzeichnet – KI-Verordnung Art. 50: Man muss wissen, dass man mit
+  // einer KI schreibt.
+  const assistent = m.author_role === "assistent";
+  const kreis = assistent ? (
+    <span aria-hidden className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand/15 text-[15px]">
+      🤖
+    </span>
+  ) : (
     <span className="mt-0.5 shrink-0">
       <Avatar userId={m.created_by} name={m.author} size={28} />
     </span>
@@ -35,15 +43,20 @@ export function ChatBlase({
           meins ? "bg-brand text-white" : "bg-white shadow-card dark:bg-slate-900 dark:shadow-cardDark"
         }`}
       >
-        <PersonName
-          userId={m.created_by}
-          name={m.author}
-          role={m.author_role}
-          koms={m.author_koms}
-          className={`mb-0.5 block text-[12px] font-bold leading-tight ${meins ? "text-right" : ""}`}
-          aufFarbig={meins}
-        />
+        {assistent ? (
+          <span className="mb-0.5 block text-[12px] font-bold leading-tight text-brand-dark dark:text-brand">Assistent · automatische Antwort (KI)</span>
+        ) : (
+          <PersonName
+            userId={m.created_by}
+            name={m.author}
+            role={m.author_role}
+            koms={m.author_koms}
+            className={`mb-0.5 block text-[12px] font-bold leading-tight ${meins ? "text-right" : ""}`}
+            aufFarbig={meins}
+          />
+        )}
         <div className="whitespace-pre-wrap break-words text-[15px] leading-snug">{m.body}</div>
+        {assistent && <div className="mt-1 text-[11px] text-tinte-leise">Das Stufenteam liest mit und meldet sich, wenn nötig.</div>}
         {m.nicht_gesendet && (
           <div
             className={`mt-1 rounded-lg px-2 py-1 text-[11px] font-semibold ${

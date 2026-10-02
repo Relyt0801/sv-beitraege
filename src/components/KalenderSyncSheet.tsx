@@ -3,9 +3,11 @@ import { Sheet, SheetKopf } from "./Sheet";
 import { aboLink, fremdLink, fremdLinkSetzen, fremdeNeuLaden, usePrivatTermine, type AboLink } from "../lib/kalender-sync";
 import { melde, meldeFehler } from "../lib/melder";
 import { tagLang, zeitText, type Termin } from "../lib/termine";
+import { KALENDER_THEMEN } from "../../supabase/functions/kalender/ics";
+import { hasSupabase, supabase } from "../lib/supabase";
 
 /**
- * "Mit deinem Kalender verbinden" – TESTPHASE, nur für die Testkonten.
+ * "Mit deinem Kalender verbinden" – TESTPHASE: Stufenteam (Recht kalender.test) und Testkonten.
  *
  * Oben: die Termine der Stufe als Abo im eigenen Kalender.
  * Unten: den eigenen Kalender (iCloud/Google/Outlook) grau in der App zeigen.
@@ -51,7 +53,7 @@ export function KalenderSyncSheet({ open, onClose }: { open: boolean; onClose: (
 
   return (
     <Sheet open={open} onClose={onClose}>
-      <SheetKopf titel="Mit deinem Kalender verbinden" unter="Testphase – nur für dieses Konto sichtbar" onClose={onClose} />
+      <SheetKopf titel="Mit deinem Kalender verbinden" unter="Testphase – vorerst fürs Stufenteam" onClose={onClose} />
 
       {/* ---------------------------------------------- App → Handy */}
       <section className="rounded-2xl bg-papier-matt p-4 dark:bg-slate-800/70">
@@ -67,6 +69,7 @@ export function KalenderSyncSheet({ open, onClose }: { open: boolean; onClose: (
           <b>„Stufen-Termine (Stufenkasse)“</b> in deinem Handy. Neue und geänderte Termine kommen von selbst nach.
           Deine eigenen Termine gehen dabei nicht in die App.
         </p>
+        <ThemenWahl offen={open} />
         {linkFehler ? (
           <p className="mt-3 text-[13px] font-semibold text-offen">{linkFehler}</p>
         ) : (
@@ -194,6 +197,98 @@ export function KalenderSyncSheet({ open, onClose }: { open: boolean; onClose: (
         Fertig
       </button>
     </Sheet>
+  );
+}
+
+const LS_THEMEN = "sv:kalender-themen";
+
+/**
+ * Welche Termine ins Handy sollen (Update Abi28). Gespeichert in der
+ * Datenbank (kalender_themen) – die Kalender-Function liest es bei jedem
+ * Abgleich, man muss also nicht neu abonnieren. Nichts gewählt = alles.
+ */
+function ThemenWahl({ offen }: { offen: boolean }) {
+  const [themen, setThemen] = useState<string[] | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [nichtDa, setNichtDa] = useState(false);
+
+  useEffect(() => {
+    if (!offen) return;
+    if (!hasSupabase) {
+      try {
+        setThemen(JSON.parse(localStorage.getItem(LS_THEMEN) || "[]"));
+      } catch {
+        setThemen([]);
+      }
+      return;
+    }
+    void (async () => {
+      const { data: s } = await supabase!.auth.getSession();
+      const uid = s.session?.user.id;
+      if (!uid) return;
+      const { data, error } = await supabase!.from("kalender_themen").select("themen").eq("user_id", uid).maybeSingle();
+      if (error) {
+        setNichtDa(true); // update-abi28.sql fehlt noch – dann einfach alles
+        return;
+      }
+      setThemen(((data as { themen: string[] } | null)?.themen) ?? []);
+    })();
+  }, [offen]);
+
+  if (nichtDa || themen === null) return null;
+  // Leer heißt „alles“ – so sind am Anfang alle Häkchen gesetzt.
+  const aktiv = themen.length ? themen : KALENDER_THEMEN.map((t) => t.key);
+
+  async function umschalten(key: string) {
+    const neu = aktiv.includes(key) ? aktiv.filter((k) => k !== key) : [...aktiv, key];
+    if (!neu.length) return meldeFehler("Mindestens ein Thema muss drin bleiben.");
+    const speichern = neu.length === KALENDER_THEMEN.length ? [] : neu;
+    setThemen(speichern);
+    if (!hasSupabase) {
+      try {
+        localStorage.setItem(LS_THEMEN, JSON.stringify(speichern));
+      } catch {
+        /* egal */
+      }
+      return;
+    }
+    setBusy(true);
+    const { data: s } = await supabase!.auth.getSession();
+    const uid = s.session?.user.id;
+    const { error } = uid
+      ? await supabase!.from("kalender_themen").upsert({ user_id: uid, themen: speichern, at: new Date().toISOString() })
+      : { error: { message: "nicht angemeldet" } };
+    setBusy(false);
+    if (error) meldeFehler("Speichern ging nicht: " + error.message);
+  }
+
+  return (
+    <div className="mt-3">
+      <div className="text-[13px] font-bold">Was soll ins Handy?</div>
+      <div className="mt-1.5 flex flex-wrap gap-1.5">
+        {KALENDER_THEMEN.map((t) => {
+          const an = aktiv.includes(t.key);
+          return (
+            <button
+              key={t.key}
+              disabled={busy}
+              onClick={() => void umschalten(t.key)}
+              aria-pressed={an}
+              title={t.unter}
+              className={`rounded-full px-3 py-1.5 text-[13px] font-semibold transition active:scale-95 ${
+                an ? "bg-brand text-white" : "bg-white text-tinte-matt shadow-card dark:bg-slate-900 dark:text-slate-300"
+              }`}
+            >
+              {an ? "✓ " : ""}
+              {t.zeichen} {t.label}
+            </button>
+          );
+        })}
+      </div>
+      <p className="mt-1.5 text-[11px] leading-relaxed text-tinte-leise">
+        Gilt auch für ein schon eingerichtetes Abo – das iPhone holt die Auswahl beim nächsten Abgleich.
+      </p>
+    </div>
   );
 }
 

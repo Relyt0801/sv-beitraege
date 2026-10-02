@@ -26,6 +26,39 @@ export interface IcsTermin {
   created_at?: string | null;
 }
 
+// ------------------------------------------------------------------ Themen
+// Welche Termine ins Kalender-Abo kommen. App (Häkchen) und Function (Filter)
+// benutzen dieselbe Liste und dieselbe Zuordnung.
+
+export const KALENDER_THEMEN = [
+  { key: "stufe", zeichen: "📅", label: "Stufen-Termine", unter: "Alles Allgemeine für die Stufe" },
+  { key: "klausuren", zeichen: "✏️", label: "Klausuren", unter: "Termine mit Fach-Kürzel (M, EK …)" },
+  { key: "meine_schichten", zeichen: "✅", label: "Meine Schichten", unter: "Nur wo du eingeteilt bist" },
+  { key: "schichten", zeichen: "🧇", label: "Alle Schichten", unter: "Waffelverkauf & Co., auch fremde" },
+  { key: "ferien", zeichen: "🏖️", label: "Ferien & frei", unter: "Ferien, Studientage" },
+  { key: "komitee", zeichen: "🏷️", label: "Komitee-Termine", unter: "Aus deinen Komitees" },
+] as const;
+export type KalenderThema = (typeof KALENDER_THEMEN)[number]["key"];
+
+/**
+ * Gehört ein Termin zu den gewählten Themen? Nichts gewählt = alles (wie vor
+ * der Themenauswahl). Jeder Termin hat genau ein Thema, in dieser Reihenfolge:
+ * frei → Schicht → Klausur → Komitee → Stufe.
+ */
+export function passtZuThemen(
+  t: { icon?: string | null; frei?: boolean | null; aktion_id?: string | null; sichtbar?: string | null },
+  meineSchicht: boolean,
+  themen: readonly string[] | null | undefined,
+): boolean {
+  if (!themen || themen.length === 0) return true;
+  const gewaehlt = new Set(themen);
+  if (t.frei) return gewaehlt.has("ferien");
+  if (t.aktion_id) return gewaehlt.has("schichten") || (meineSchicht && gewaehlt.has("meine_schichten"));
+  if (/^[A-Za-z][A-Za-z0-9]{0,3}$/.test(t.icon || "")) return gewaehlt.has("klausuren");
+  if (t.sichtbar === "komitee") return gewaehlt.has("komitee");
+  return gewaehlt.has("stufe");
+}
+
 /** Ein Termin aus einem fremden Kalender, so weit die App ihn braucht. */
 export interface FremderTermin {
   uid: string;

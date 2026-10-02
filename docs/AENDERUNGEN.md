@@ -1,4 +1,4 @@
-# Änderungen – Stand 01.10.2026
+# Änderungen – Stand 02.10.2026 (Update Abi28)
 
 Diese Datei erklärt, was sich in den letzten Runden geändert hat, **wo** es im
 Code steht und **warum** es so gebaut ist. Die Kommentare im Code selbst sind
@@ -8,6 +8,92 @@ ausführlich (auf Deutsch); hier steht der Überblick dazu.
 > Bankdaten, der `service_role`-Schlüssel und der VAPID Private Key liegen nur
 > in der Datenbank bzw. als Supabase-Secret. `privat/` ist per `.gitignore`
 > ausgeschlossen. Bitte so beibehalten.
+
+---
+
+
+## 02.10.2026: Assistent ohne TypeSafe-Schlüssel, Datenschutz-Unterlagen
+
+**Assistent läuft nur mit Claude** (`supabase/functions/assistent/`). Ohne
+TypeSafe-/OpenRouter-Schlüssel ordnet Claude ein, worum es geht und welche
+Schicht gemeint ist – per strukturierter Ausgabe aus einer festen Liste
+(`ordneEin` in `claude.ts`). Statt einer Wahrscheinlichkeit sagt Claude
+„eindeutig / wahrscheinlich / unklar“; nur „eindeutig“ reicht für einen
+Eintrags-Versuch (`KLARHEIT`, `ausClaude` in `regeln.ts`). Die Regeln und die
+Datenbank-Sperren sind dieselben wie mit Jev.
+
+Bewusst **nicht** nachgebaut: Claude bewertet nicht, wie stimmig jemand ist.
+Ohne Jev kommt der Wert nur aus der Bilanz. Das ist datensparsamer (an
+Anthropic geht nur die aktuelle Nachricht, kein Verlauf, keine Bilanz) und der
+heikelste Teil – eine KI schätzt die Glaubwürdigkeit Minderjähriger ein –
+entfällt, bis ihr euch mit DSFA und neuer Einwilligung bewusst dafür
+entscheidet. Fällt Jev später einmal aus, springt Claude ein.
+
+Außerdem:
+- **Namen anderer** aus der Stufe werden vor dem Senden ersetzt („ich war mit
+  Lena da“ → „[Name]“), nicht nur der eigene. Monate/Wochentage und Namen
+  unter drei Buchstaben bleiben, damit Daten lesbar bleiben.
+- **Rechenort USA** (`inference_geo: "us"`): Ohne die Angabe darf Anthropic
+  weltweit rechnen. So stimmt „USA“ in der Datenschutzerklärung. Aufpreis 10 %.
+- Ohne jeden KI-Schlüssel legt der Assistent keinen Eintrag mehr an (vorher:
+  ein leerer „Fehler“-Vorschlag pro Nachricht).
+- **Datenschutzerklärung 3a**, Einwilligungsbildschirm und Admin-Hinweis auf
+  „nur Claude“ umgestellt; Speicherfrist bei Anthropic eingetragen (statt
+  gelbem Platzhalter); Hinweis auf Gesundheitsangaben (Art. 9) und auf das
+  Auskunftsrecht zum eigenen Wert. `DATENSCHUTZ_VERSION` → `2026-10-02`
+  (noch hat niemand eingewilligt – das SQL ist nicht eingespielt).
+- Tests: 11 statt 9 (`npm run test:regeln`).
+
+Die Unterlagen zum Gegenlesen (DSFA, Verzeichnis, AVV-Übersicht,
+Einwilligungstext, Checkliste, Quellen) liegen als Claude-Dokument vor;
+die offenen Punkte stehen auch in `docs/DATENSCHUTZ.md`, Abschnitt 7.
+
+## 01.10.2026 (abends): Update Abi28
+
+SQL: `supabase/update-abi28.sql` (**muss eingespielt werden**). Functions:
+`send-push`, `kalender` neu deployen, `assistent` neu. Anleitung: `EINSPIELEN.md`.
+
+- **Startseite** (`StartTab.tsx`): erster Reiter. Oben „Warst du da?“ (falls
+  offen), dann die eine Zahl (Schüler: was ich zahlen muss; Team: offen in der
+  Stufe), zwei Kacheln (Abiball-Ticket bzw. Ziel, Kontostand), darunter nur,
+  was wirklich ansteht: Antworten des Teams, offene Abstimmungen, ungelesene
+  Chats, „war da“-Angaben zum Prüfen, nächste eigene Schicht. Antippen führt
+  hin (Chats über `src/lib/ziel.ts`).
+- **Schlichtere Leiste:** Schüler unten nur Start · Events · Chats (Kasse und
+  Finanzen über die Startseite, oben links ‹ zurück). Team: Start · Kasse ·
+  Events · Chats, Zusatz-Reiter am Handy unter „Mehr“ (erst ab zwei, sonst
+  direkt in der Leiste). Am Rechner wie bisher alle oben.
+- **Was ist neu** (`src/lib/neues.ts`, `WasIstNeu.tsx`): je Update einmal,
+  nur die Punkte für die eigene Rolle/Rechte. Eltern bekommen nur „Für Sie
+  ändert sich nichts“ (Datenschutzerklärung ergänzt, kein Vertrauens-Check).
+- **„Warst du da?“** (`ki-store.tsx`, Tabelle `anwesenheit`): Nach Schichtende
+  fragt die App die Eingeteilten (auch per Push, `send-push`). „Nein“ schließt
+  die Person von „Punkte vergeben“ aus. „Ja“ wird sofort eingetragen, wenn sie
+  eingeteilt war, in der Testphase ist, eingewilligt hat und ihr Score ≥
+  Schwelle ist – sonst prüft das Team. Push ans Team nur, wenn das Team nicht
+  ohnehin beim Abschließen draufschaut (nicht eingeteilt / schon abgeschlossen).
+- **Wer war da?** (`AnwesenheitSheet.tsx`): Übersicht je Schicht (30 Tage),
+  ✓ / ⏳ / ✗ / –, „stimmt“ / „stimmt nicht“. Im Schicht-Abschluss stehen die
+  Antworten an den Namen; „Punkte vergeben (n)“ zählt nur, wer bekommt.
+- **Vertrauens-Check (Testphase: Admins + Testkonten, Recht `ki.test`):**
+  Score = Bilanz `(b+1)/(b+1+3f+1)`; Jev kann ihn nur senken. Nur der Admin
+  sieht ihn (Profil → „Vertrauen & KI“, `VertrauenSheet.tsx`). Einwilligung
+  getrennt von `profiles` (`ki_einwilligung`), freiwillig, Widerruf im Profil
+  löscht den Score.
+- **Assistent** (`supabase/functions/assistent/`): Jev (TypeSafe/OpenRouter)
+  entscheidet Absicht, Schicht (aus fester Liste) und Stimmigkeit; Regeln in
+  `regeln.ts` (Tests: `npm run test:regeln`); Claude schreibt nur Text
+  (Rückfrage im Teamstil, Vorschlag fürs Team, SQL-Vorschlag nur als Text für
+  den Admin). Antworten im Chat sind als KI gekennzeichnet.
+- **Datenschutzerklärung** (`Rechtliches.tsx`): Abschnitt 3a, Empfänger,
+  Anwesenheit. **Einwilligungsfrage** (`DatenschutzUpdate.tsx`) nur für
+  Freigeschaltete, zwei gleichwertige Knöpfe.
+- **Kalender-Abo mit Themen** (`KalenderSyncSheet.tsx`, `kalender_themen`,
+  `passtZuThemen()` in `ics.ts`): Stufe, Klausuren, Meine Schichten, Alle
+  Schichten, Ferien, Komitee. Testphase jetzt fürs ganze Stufenteam.
+- **Terminal:** `.claude/commands/nachtraege.md`, `scripts/nachtraege.mjs`,
+  `nachtraege.bat`, `npm run nachtraege` – ohne Namen, mit Rückfrage vor jeder
+  Aktion, kein freies SQL.
 
 ---
 

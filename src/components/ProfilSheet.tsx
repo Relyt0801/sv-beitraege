@@ -13,7 +13,9 @@ import { ladeKomiteeAntraege, stelleKomiteeAntrag } from "../lib/komitee-antrag"
 import { useTheme } from "../lib/theme";
 import { abmelden, enablePush, pushConfigured, pushDiagnose, pushPermission } from "../lib/push";
 import { ProtokollSheet } from "./ProtokollSheet";
+import { VertrauenSheet } from "./VertrauenSheet";
 import { RechtLinks } from "./Rechtliches";
+import { useKiOptional } from "../ki-store";
 
 import { frage, meldeFehler } from "../lib/melder";
 /** Das eigene Profil: Bild, Namensfarbe, Passwort, Komitee-Wechsel, Hilfe. */
@@ -50,6 +52,10 @@ export function ProfilSheet({
   // Protokoll und Sicherung. Den ganzen Bereich gibt es NUR hier im eigenen
   // Profil – und nur beim Admin (Kassenwart: nur die Sicherheitskopie).
   const [protokollOffen, setProtokollOffen] = useState(false);
+  // Vertrauens-Check (Update Abi28): Widerruf für alle Freigeschalteten,
+  // die Übersicht mit dem Score nur für den Admin.
+  const ki = useKiOptional();
+  const [vertrauenOffen, setVertrauenOffen] = useState(false);
 
   const meine = committeesOf(uid);
   const istAdmin = role === "admin";
@@ -354,6 +360,30 @@ export function ProfilSheet({
             <span>🗂️</span> Protokoll &amp; Sicherung
           </button>
         )}
+        {istAdmin && ki?.verfuegbar && (
+          <button className={row} onClick={() => setVertrauenOffen(true)}>
+            <span>📊</span> Vertrauen &amp; KI
+          </button>
+        )}
+        {ki?.freigeschaltet && ki.verfuegbar && ki.einwilligung !== null && (
+          <button
+            className={row}
+            onClick={async () => {
+              const neu = !ki.einwilligung;
+              const ok = await frage(
+                neu
+                  ? "Dem Vertrauens-Check zustimmen? „War da“ kann dann sofort eingetragen werden, und der Assistent antwortet im Chat."
+                  : "Zustimmung zum Vertrauens-Check widerrufen? Dein Wert wird gelöscht, das Stufenteam prüft dann wieder alles selbst.",
+                neu ? "Zustimmen" : "Widerrufen",
+              );
+              if (!ok) return;
+              const f = await ki.einwilligen(neu);
+              if (f) meldeFehler("Das hat nicht geklappt: " + f);
+            }}
+          >
+            <span>🤖</span> Vertrauens-Check: {ki.einwilligung ? "an" : "aus"}
+          </button>
+        )}
         {/* Der Kassenwart darf sich die Sicherheitskopie holen – aber kein Protokoll. */}
         {hasSupabase && istKassenwart && (
           <button className={row} onClick={() => setProtokollOffen(true)}>
@@ -384,6 +414,7 @@ export function ProfilSheet({
         Fertig
       </button>
 
+      {istAdmin && <VertrauenSheet open={vertrauenOffen} onClose={() => setVertrauenOffen(false)} />}
       {(istAdmin || istKassenwart) && (
         <ProtokollSheet
           open={protokollOffen}
