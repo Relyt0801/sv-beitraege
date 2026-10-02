@@ -82,6 +82,12 @@ export const UPDATES: Update[] = [
         fuer: (k) => !k.isEltern && !k.kiTest,
       },
       {
+        zeichen: "🔒",
+        titel: "Für Sie ändert sich nichts",
+        text: "Die Datenschutzerklärung wurde ergänzt: Nach Schichten fragt die App die Schülerinnen und Schüler, ob sie da waren, und für einzelne Schülerkonten gibt es testweise einen freiwilligen Vertrauens-Check. Elternzugänge betrifft beides nicht – Ihre Nachrichten werden nicht ausgewertet.",
+        fuer: (k) => k.isEltern,
+      },
+      {
         zeichen: "🤖",
         titel: "Vertrauens-Check (Testphase)",
         text: "Wer zustimmt, bei dem kann „war da“ sofort eingetragen werden, wenn die Angaben bisher gestimmt haben. Ein Assistent beantwortet Nachträge im Chat. Freiwillig, jederzeit im Profil widerrufbar.",

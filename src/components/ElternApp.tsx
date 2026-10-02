@@ -14,6 +14,7 @@ import { FinanzStandard } from "./FinanzStandard";
 import { KontoTab } from "./KontoTab";
 import { ProfilSheet } from "./ProfilSheet";
 import { Tour, elternSchritte } from "./Tour";
+import { WasIstNeu } from "./WasIstNeu";
 import { useTheme } from "../lib/theme";
 import { useGescrollt, useReiter } from "../lib/gescrollt";
 import { hasSupabase } from "../lib/supabase";
@@ -56,7 +57,7 @@ export function ElternApp() {
     () => (zuordnungFehlt ? students.map((s) => s.id) : zugeordnet),
     [zuordnungFehlt, students, zugeordnet],
   );
-  const { tourResetAt, can } = useRole();
+  const { tourResetAt, can, uid } = useRole();
   usePushAuffrischen();
 
   // Nur die zugeordneten Kinder – auch wenn die Datenbank mehr liefern sollte.
@@ -335,6 +336,12 @@ export function ElternApp() {
             /* privates Fenster */
           }
         }}
+      />
+      {/* „Was ist neu“ – für Eltern nur, was sie betrifft (src/lib/neues.ts) */}
+      <WasIstNeu
+        uid={uid}
+        frei={!tour && !laedt}
+        kontext={{ isAdmin: false, isStaff: false, isEltern: true, can: () => false, kiTest: false }}
       />
     </div>
   );

@@ -28,7 +28,8 @@ SQL: `supabase/update-abi28.sql` (**muss eingespielt werden**). Functions:
   Events · Chats, Zusatz-Reiter am Handy unter „Mehr“ (erst ab zwei, sonst
   direkt in der Leiste). Am Rechner wie bisher alle oben.
 - **Was ist neu** (`src/lib/neues.ts`, `WasIstNeu.tsx`): je Update einmal,
-  nur die Punkte für die eigene Rolle/Rechte. Eltern bekommen diesmal nichts.
+  nur die Punkte für die eigene Rolle/Rechte. Eltern bekommen nur „Für Sie
+  ändert sich nichts“ (Datenschutzerklärung ergänzt, kein Vertrauens-Check).
 - **„Warst du da?“** (`ki-store.tsx`, Tabelle `anwesenheit`): Nach Schichtende
   fragt die App die Eingeteilten (auch per Push, `send-push`). „Nein“ schließt
   die Person von „Punkte vergeben“ aus. „Ja“ wird sofort eingetragen, wenn sie
