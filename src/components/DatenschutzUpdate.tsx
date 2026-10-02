@@ -34,29 +34,31 @@ export function DatenschutzUpdate({ onAntwort }: { onAntwort: (ja: boolean) => P
             <span aria-hidden>🙋</span>
             <span>
               Sagst du nach einer Schicht <b>„war da“</b>, kann das <b>sofort</b> eingetragen werden – wenn du eingeteilt
-              warst und deine Angaben bisher gestimmt haben.
+              warst und deine Angaben bisher gestimmt haben. Dafür zählt die App, wie oft das Stufenteam deine Angaben
+              bestätigt oder als „stimmt nicht“ markiert hat.
             </span>
           </li>
           <li className="flex gap-2.5">
             <span aria-hidden>🤖</span>
             <span>
-              Dafür werden deine Nachrichten <b>an das Stufenteam</b> (nicht die Gruppenchats) ohne deinen Namen von einer
-              KI (Jev von TypeSafe, Claude von Anthropic, Server in den USA) eingeschätzt, und ein Assistent beantwortet
-              Nachträge. Antworten des Assistenten sind als solche markiert.
+              Schreibst du <b>dem Stufenteam</b> (nicht in Gruppenchats), liest ein KI-Assistent die Nachricht –{" "}
+              <b>Claude von Anthropic, Server in den USA</b>. Dein Name und die Namen anderer werden vorher entfernt. Der
+              Assistent erkennt, ob es um eine Schicht geht, und fragt sonst nach. Seine Antworten sind markiert. Er liest
+              alles, was in der Nachricht steht – auch Persönliches wie „war krank“.
             </span>
           </li>
           <li className="flex gap-2.5">
             <span aria-hidden>👤</span>
             <span>
-              Den Wert sieht <b>nur der Admin</b>. Ein niedriger Wert lehnt nie etwas ab – dann schaut einfach das
-              Stufenteam drauf, wie bisher.
+              Den Wert sieht <b>nur der Admin</b> – und du, wenn du fragst. Ein niedriger Wert lehnt nie etwas ab; dann
+              schaut das Stufenteam drauf, wie bisher.
             </span>
           </li>
           <li className="flex gap-2.5">
             <span aria-hidden>↩️</span>
             <span>
-              Freiwillig. <b>Ohne Zustimmung</b> funktioniert alles wie bisher. Widerrufen geht jederzeit im Profil –
-              dann wird der Wert gelöscht.
+              <b>Freiwillig</b>, ab 16. Ohne Zustimmung funktioniert alles wie bisher. <b>Widerruf</b> jederzeit im
+              Profil – dann wird dein Wert gelöscht. Was bis dahin passiert ist, bleibt gültig.
             </span>
           </li>
         </ul>

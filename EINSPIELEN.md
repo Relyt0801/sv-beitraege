@@ -32,12 +32,20 @@ Assistent für Nachträge, Kalender-Themen. Was sich geändert hat:
 5. **Schlüssel für den Assistenten** (nur wenn ihr ihn testen wollt):
    ```bash
    supabase secrets set ANTHROPIC_API_KEY=sk-ant-...
-   supabase secrets set TYPESAFE_API_KEY=...      # oder: OPENROUTER_API_KEY=...
    ```
-   Ohne Jev-Schlüssel trägt der Assistent nie selbst ein (dann bekommt nur das
-   Team einen Vorschlag). Ohne Anthropic-Schlüssel schreibt er keine
-   Rückfragen. Die Schlüssel gehören **nur** in die Supabase-Secrets – nie in
-   `.env`, nie in Vercel, nie ins Repo.
+   **Das reicht.** Ohne TypeSafe-Schlüssel ordnet Claude die Nachricht ein
+   (welches Anliegen, welche Schicht) – der Vertrauenswert kommt dann nur aus
+   der Bilanz, keine KI bewertet die Glaubwürdigkeit. Eingetragen wird wie
+   immer nur, wenn die Datenbank es erlaubt (eingeteilt + Wert ≥ Schwelle).
+   Ohne jeden Schlüssel tut der Assistent nichts; das Team antwortet wie
+   bisher. Der Schlüssel gehört **nur** in die Supabase-Secrets – nie in
+   `.env`, nie in Vercel, nie ins Repo. API-Konto bei Anthropic als
+   **Organisation** anlegen (dann gelten Commercial Terms + AVV).
+
+   *Später, optional:* `TYPESAFE_API_KEY` (oder `OPENROUTER_API_KEY`) für Jev.
+   **Vorher** AVV mit TypeSafe, Datenschutzerklärung und Einwilligung
+   ergänzen und `DATENSCHUTZ_VERSION` in `src/lib/ki.ts` hochzählen – sonst
+   bewertet eine KI Leute, die dem so nicht zugestimmt haben.
 6. **Assistent einschalten:** In der App als Admin → Profil → „Vertrauen & KI“
    → „Assistent im Chat“. Dort auch Schwelle und euren Schreibstil.
 7. **Produktion:** Pull Request nach `main` mergen – Vercel deployt dann auf
@@ -60,9 +68,10 @@ Das Kalender-Abo mit Themenauswahl bekommt das **ganze Stufenteam**
 braucht es Claude Code auf dem Rechner und `privat/.env` mit
 `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` und `NACHTRAEGE_ALS=<euer
 Benutzername>`. Claude sieht keine Namen (nur Kürzel), schlägt je Fall etwas
-vor und fragt vor jeder Aktion. Am besten mit einem Team-/API-Konto oder
-einem Konto, bei dem in den Datenschutz-Einstellungen die Nutzung der Chats
-fürs Training ausgeschaltet ist – es geht trotz Kürzeln um Schülerdaten.
+vor und fragt vor jeder Aktion. **Nur mit einem API-Schlüssel der
+Stufen-Organisation bei Anthropic** (dann gelten Commercial Terms und AVV) –
+nicht mit einem privaten Claude-Abo (Free/Pro/Max: Verbraucher-Bedingungen,
+kein AVV). Es geht trotz Kürzeln um Schülerdaten.
 
 ---
 

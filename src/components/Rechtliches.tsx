@@ -163,35 +163,37 @@ function Datenschutz() {
       </P>
       <P>
         <b>Was passiert:</b> Sagst du nach einer Schicht „war da“, kann das sofort eingetragen werden – wenn du für
-        die Schicht eingeteilt warst und dein Vertrauenswert hoch genug ist. Der Wert ergibt sich aus deiner Bilanz:
-        wie oft deine Angaben vom Stufenteam bestätigt und wie oft als falsch markiert wurden. Zusätzlich schätzt ein
-        KI-Modell (Jev von TypeSafe AI) ein, ob die Angaben in deinen Nachrichten an das Stufenteam zusammenpassen; es
-        kann den Wert nur senken, nie heben. Ein Assistent (Claude von Anthropic) beantwortet Nachfragen zu
-        Nachträgen im Chat mit dem Stufenteam. Seine Antworten sind immer als automatische Antwort (KI) gekennzeichnet.
+        die Schicht eingeteilt warst und dein Vertrauenswert hoch genug ist. Der Wert ergibt sich <b>nur aus deiner
+        Bilanz</b>: wie oft das Stufenteam deine Angaben bestätigt und wie oft es sie als „stimmt nicht“ markiert hat.
+        Eine KI bewertet nicht, ob du glaubwürdig bist. Ein Assistent (Claude von Anthropic) liest deine Nachrichten
+        an das Stufenteam, erkennt, ob du Mithilfe nachtragen möchtest und welche Schicht du meinst, und fragt sonst
+        nach. Seine Antworten sind immer als automatische Antwort (KI) gekennzeichnet.
       </P>
       <P>
-        <b>Was an die KI-Dienste geht:</b> der Text deiner Nachrichten an das Stufenteam (höchstens der letzten 60
-        Tage), wobei dein Name durch „Person“ ersetzt wird; die Zahl bestätigter und als falsch markierter Angaben;
-        Titel und Datum der Schichten, die gemeint sein könnten. Nicht: Gruppen- und Komitee-Chats, Namen, Kennungen,
-        Beitragsdaten, irgendetwas von Eltern.
+        <b>Was an Anthropic geht:</b> der Text der jeweiligen Nachricht, wobei Namen aus der Stufe ersetzt werden;
+        Titel, Datum und Uhrzeit der Schichten, die gemeint sein könnten. Nicht: deine Bilanz, dein Wert, frühere
+        Nachrichten, Gruppen- und Komitee-Chats, Kennungen, Beitragsdaten, irgendetwas von Eltern. Was du selbst
+        Persönliches schreibst (z. B. dass du krank warst), liest der Assistent mit.
       </P>
       <P>
         <b>Automatisierte Entscheidung (Art. 22 DSGVO):</b> Automatisch wird nur zu deinen Gunsten entschieden
         (sofort eintragen). Ein niedriger Wert lehnt nie etwas ab – dann prüft ein Mensch aus dem Stufenteam, wie
         ohne Vertrauens-Check auch. Du kannst jederzeit verlangen, dass ein Mensch entscheidet, und deinen Standpunkt
-        darlegen. Den Wert sieht nur der Admin; er wird für nichts anderes verwendet (nicht für Schichtvergabe, nicht
-        für Chat-Sperren).
+        darlegen. Den Wert sieht nur der Admin; auf Nachfrage bekommst du ihn mitgeteilt (Art. 15 DSGVO). Er wird für
+        nichts anderes verwendet (nicht für Schichtvergabe, nicht für Chat-Sperren).
       </P>
       <P>
-        <b>Rechtsgrundlage:</b> Einwilligung, Art. 6 Abs. 1 lit. a DSGVO. Freiwillig: Ohne Zustimmung funktioniert
-        alles wie bisher. <b>Widerruf</b> jederzeit im Profil („Vertrauens-Check“) – dein Wert wird dann sofort
-        gelöscht.
+        <b>Rechtsgrundlage:</b> Einwilligung, Art. 6 Abs. 1 lit. a DSGVO, für Gesundheitsangaben in deinen Nachrichten
+        Art. 9 Abs. 2 lit. a DSGVO. Freiwillig: Ohne Zustimmung funktioniert alles wie bisher. <b>Widerruf</b>{" "}
+        jederzeit im Profil („Vertrauens-Check“) – dein Wert wird dann sofort gelöscht. Was bis zum Widerruf passiert
+        ist, bleibt rechtmäßig.
       </P>
       <P>
-        <b>Empfänger:</b> TypeSafe AI (Sitz USA) – direkt oder über OpenRouter (Sitz USA) – und Anthropic (Sitz USA). Die
-        Übermittlung in die USA stützt sich auf die EU-Standardvertragsklauseln (Art. 46 Abs. 2 lit. c DSGVO) in den
-        Auftragsverarbeitungsverträgen der Anbieter. Wie lange die Anbieter Anfragen speichern, richtet sich nach deren
-        Bedingungen: <Lueck>Speicherfristen von TypeSafe/OpenRouter und Anthropic prüfen und eintragen</Lueck>.
+        <b>Empfänger:</b> Anthropic PBC (USA) als Auftragsverarbeiter. Die Verarbeitung läuft in den USA; die
+        Übermittlung stützt sich auf die EU-Standardvertragsklauseln (Art. 46 Abs. 2 lit. c DSGVO) im
+        Auftragsverarbeitungsvertrag. Anthropic nutzt die Daten nicht zum Training. Eingaben und Antworten speichert
+        Anthropic nach eigenen Angaben nur kurz (in der Regel höchstens 30 Tage); Inhalte, die wegen eines Verstoßes
+        gegen die Nutzungsrichtlinien markiert werden, bis zu zwei Jahre.
       </P>
       <P>
         <b>Speicherdauer bei uns:</b> Wert und Bilanz bis zum Widerruf, längstens solange die Stufe besteht. Die
@@ -218,7 +220,7 @@ function Datenschutz() {
         Schriften werden von dieser Seite selbst geladen, nicht von Google oder anderen Schrift-Diensten.
         <br />• <b>Apple, Google und Mozilla</b> – nur wenn Benachrichtigungen an sind: der Push-Dienst des
         jeweiligen Browserherstellers stellt die Nachricht zu. Der Inhalt ist dabei verschlüsselt.
-        <br />• <b>TypeSafe AI / OpenRouter und Anthropic</b> – nur mit Einwilligung zum Vertrauens-Check (siehe 3a).
+        <br />• <b>Anthropic</b> – nur mit Einwilligung zum Vertrauens-Check (siehe 3a).
       </P>
       <P>
         Mit Supabase und Vercel gilt jeweils deren Auftragsverarbeitungsvertrag (Data Processing Addendum),

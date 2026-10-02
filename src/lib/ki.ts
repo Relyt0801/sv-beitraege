@@ -13,7 +13,7 @@
  */
 
 /** Stand der Datenschutzerklärung mit dem Abschnitt zum Vertrauens-Check. */
-export const DATENSCHUTZ_VERSION = "2026-10-01";
+export const DATENSCHUTZ_VERSION = "2026-10-02";
 
 export type AnwesenheitStatus = "offen" | "auto" | "bestaetigt" | "falsch" | "erledigt";
 

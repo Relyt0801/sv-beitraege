@@ -1,20 +1,38 @@
-// Spielregeln des Assistenten mit erfundenen Jev-Antworten (kein Netz, keine Datenbank).
+// Spielregeln des Assistenten mit erfundenen Jev-/Claude-Antworten (kein Netz, keine Datenbank).
 // Ausführen im Projektordner:  node --experimental-strip-types --test tests/assistent-regeln.test.ts
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  antwortNachMelden, aufEins, entscheide, istZweifel, pseudonymisiere, schichtText, type JevErgebnis,
+  antwortNachMelden, aufEins, ausClaude, entscheide, istZweifel, pseudonymisiere, schichtText, type Einschaetzung,
 } from "../supabase/functions/assistent/regeln.ts";
 
-const jev = (x: Partial<JevErgebnis>): JevErgebnis => ({
+const jev = (x: Partial<Einschaetzung>): Einschaetzung => ({
   absicht: { wahl: "mithilfe_nachtrag", sicherheit: 0.95 },
   schicht: { wahl: "s1", sicherheit: 0.95 },
   stimmig: { wert: 0.8, sicherheit: 0.8 },
   ...x,
 });
 
-test("Jev fällt aus → Team, nichts automatisch", () => {
-  assert.deepEqual(entscheide(null), { art: "team", grund: "jev_fehler" });
+test("KI fällt aus → Team, nichts automatisch", () => {
+  assert.deepEqual(entscheide(null), { art: "team", grund: "ki_fehler" });
+});
+
+test("ohne Jev: Claude – nur „eindeutig“ reicht zum Melden", () => {
+  const c = (a: "eindeutig" | "wahrscheinlich" | "unklar", s: "eindeutig" | "wahrscheinlich" | "unklar", schicht = "s1") =>
+    ausClaude({ absicht: "mithilfe_nachtrag", absicht_klarheit: a, schicht, schicht_klarheit: s }, true);
+  assert.deepEqual(entscheide(c("eindeutig", "eindeutig")), { art: "melden", terminKey: "s1" });
+  assert.equal(entscheide(c("eindeutig", "wahrscheinlich")).art, "rueckfrage");
+  assert.equal(entscheide(c("eindeutig", "eindeutig", "keine_passt")).art, "rueckfrage");
+  assert.deepEqual(entscheide(c("wahrscheinlich", "eindeutig")), { art: "team", grund: "absicht_unklar" });
+  // Claude bewertet nicht, wie stimmig jemand ist – also nie „Zweifel“
+  assert.equal(c("eindeutig", "eindeutig").stimmig, null);
+  assert.equal(antwortNachMelden("offen", c("eindeutig", "eindeutig").stimmig, "X").art, "fest");
+  // keine Schichten zur Auswahl → Rückfrage statt Raten
+  const ohne = ausClaude({ absicht: "mithilfe_nachtrag", absicht_klarheit: "eindeutig", schicht: "s1", schicht_klarheit: "eindeutig" }, false);
+  assert.equal(entscheide(ohne).art, "rueckfrage");
+  // anderes Anliegen → Team
+  const zahl = ausClaude({ absicht: "zahlung", absicht_klarheit: "eindeutig", schicht: "keine_passt", schicht_klarheit: "eindeutig" }, true);
+  assert.deepEqual(entscheide(zahl), { art: "team", grund: "andere_absicht" });
 });
 
 test("andere Absicht → Team", () => {
@@ -64,6 +82,15 @@ test("Namen werden ersetzt, ganze Wörter", () => {
   assert.equal(pseudonymisiere("Hi, hier ist Ben Müller", ["Ben", "Müller"]), "Hi, hier ist Person Person");
   assert.equal(pseudonymisiere("Benjamin war auch da", ["Ben"]), "Benjamin war auch da");
   assert.equal(pseudonymisiere("ich bin ben.mueller", ["ben.mueller"]), "ich bin Person");
+});
+
+test("Namen anderer aus der Stufe werden auch ersetzt", () => {
+  const andere = ["Lena", "Schmidt", "Ben", "Mai", "Al"];
+  assert.equal(pseudonymisiere("Ich war mit Lena Schmidt da", ["Ben"], andere), "Ich war mit [Name] [Name] da");
+  // eigener Name bleibt „Person“, auch wenn er in der Liste der anderen steht
+  assert.equal(pseudonymisiere("Ben hier", ["Ben"], andere), "Person hier");
+  // Monate und sehr kurze Namen bleiben – sonst wäre das Datum weg
+  assert.equal(pseudonymisiere("Waffeln am 3. Mai, Al war da", [], andere), "Waffeln am 3. Mai, Al war da");
 });
 
 test("Schicht als Text", () => {

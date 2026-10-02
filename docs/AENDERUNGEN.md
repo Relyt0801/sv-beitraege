@@ -1,4 +1,4 @@
-# Änderungen – Stand 01.10.2026 (Update Abi28)
+# Änderungen – Stand 02.10.2026 (Update Abi28)
 
 Diese Datei erklärt, was sich in den letzten Runden geändert hat, **wo** es im
 Code steht und **warum** es so gebaut ist. Die Kommentare im Code selbst sind
@@ -11,6 +11,42 @@ ausführlich (auf Deutsch); hier steht der Überblick dazu.
 
 ---
 
+
+## 02.10.2026: Assistent ohne TypeSafe-Schlüssel, Datenschutz-Unterlagen
+
+**Assistent läuft nur mit Claude** (`supabase/functions/assistent/`). Ohne
+TypeSafe-/OpenRouter-Schlüssel ordnet Claude ein, worum es geht und welche
+Schicht gemeint ist – per strukturierter Ausgabe aus einer festen Liste
+(`ordneEin` in `claude.ts`). Statt einer Wahrscheinlichkeit sagt Claude
+„eindeutig / wahrscheinlich / unklar“; nur „eindeutig“ reicht für einen
+Eintrags-Versuch (`KLARHEIT`, `ausClaude` in `regeln.ts`). Die Regeln und die
+Datenbank-Sperren sind dieselben wie mit Jev.
+
+Bewusst **nicht** nachgebaut: Claude bewertet nicht, wie stimmig jemand ist.
+Ohne Jev kommt der Wert nur aus der Bilanz. Das ist datensparsamer (an
+Anthropic geht nur die aktuelle Nachricht, kein Verlauf, keine Bilanz) und der
+heikelste Teil – eine KI schätzt die Glaubwürdigkeit Minderjähriger ein –
+entfällt, bis ihr euch mit DSFA und neuer Einwilligung bewusst dafür
+entscheidet. Fällt Jev später einmal aus, springt Claude ein.
+
+Außerdem:
+- **Namen anderer** aus der Stufe werden vor dem Senden ersetzt („ich war mit
+  Lena da“ → „[Name]“), nicht nur der eigene. Monate/Wochentage und Namen
+  unter drei Buchstaben bleiben, damit Daten lesbar bleiben.
+- **Rechenort USA** (`inference_geo: "us"`): Ohne die Angabe darf Anthropic
+  weltweit rechnen. So stimmt „USA“ in der Datenschutzerklärung. Aufpreis 10 %.
+- Ohne jeden KI-Schlüssel legt der Assistent keinen Eintrag mehr an (vorher:
+  ein leerer „Fehler“-Vorschlag pro Nachricht).
+- **Datenschutzerklärung 3a**, Einwilligungsbildschirm und Admin-Hinweis auf
+  „nur Claude“ umgestellt; Speicherfrist bei Anthropic eingetragen (statt
+  gelbem Platzhalter); Hinweis auf Gesundheitsangaben (Art. 9) und auf das
+  Auskunftsrecht zum eigenen Wert. `DATENSCHUTZ_VERSION` → `2026-10-02`
+  (noch hat niemand eingewilligt – das SQL ist nicht eingespielt).
+- Tests: 11 statt 9 (`npm run test:regeln`).
+
+Die Unterlagen zum Gegenlesen (DSFA, Verzeichnis, AVV-Übersicht,
+Einwilligungstext, Checkliste, Quellen) liegen als Claude-Dokument vor;
+die offenen Punkte stehen auch in `docs/DATENSCHUTZ.md`, Abschnitt 7.
 
 ## 01.10.2026 (abends): Update Abi28
 

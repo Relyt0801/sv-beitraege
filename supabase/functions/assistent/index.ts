@@ -7,28 +7,34 @@
 //   1. Prüfen: Ticket, eigene Nachricht, keine Eltern, Testphase freigeschaltet
 //      (ki_freigeschaltet), Einwilligung, Assistent im Admin-Bereich an.
 //      Fehlt etwas → nichts tun, das Team antwortet wie bisher.
-//   2. Jev entscheidet über begrenzte Fragen: Absicht, gemeinte Schicht (aus
-//      einer festen Liste aus der Datenbank), wie stimmig die Angaben sind.
+//   2. Einschätzen über begrenzte Fragen: Absicht, gemeinte Schicht (aus
+//      einer festen Liste aus der Datenbank). Mit Jev-Schlüssel macht das Jev
+//      und schätzt zusätzlich ein, wie stimmig die Angaben sind (kann den Wert
+//      nur senken). Ohne Jev-Schlüssel ordnet Claude ein – ohne „stimmig“,
+//      der Wert kommt dann nur aus der Bilanz.
 //   3. Bei „Mithilfe nachtragen“ + sicherer Schicht: anwesenheit_melden_fuer
 //      in der Datenbank. Die trägt NUR automatisch ein, wenn die Person
 //      eingeteilt war und ihr Score über der Schwelle liegt – sonst offen.
 //   4. Antwort: feste Bestätigung, oder Claude formuliert eine Rückfrage im
 //      Stil des Stufenteams, oder nur ein Vorschlag fürs Team.
 //
-// Was an Jev/Claude geht: der Text der Nachricht und frühere eigene Nachrichten
-// an das Stufenteam (Namen ersetzt durch „Person“), die Bilanz als zwei Zahlen,
-// Titel und Datum möglicher Schichten. Keine Namen, keine Kennungen, nichts aus
-// Gruppenchats, nichts von Eltern.
+// Was an Claude geht: der Text der Nachricht (eigene Namen → „Person“, Namen
+// anderer aus der Stufe → „[Name]“), Titel/Datum/Uhrzeit möglicher Schichten.
+// Nur mit Jev zusätzlich an Jev: frühere eigene Nachrichten an das Stufenteam
+// (60 Tage, ebenso ohne Namen) und die Bilanz als zwei Zahlen. Keine
+// Kennungen, nichts aus Gruppenchats, nichts von Eltern.
 //
 // Deploy: supabase functions deploy assistent   (JWT-Prüfung bleibt an)
-// Secrets: ANTHROPIC_API_KEY und TYPESAFE_API_KEY oder OPENROUTER_API_KEY
+// Secrets: ANTHROPIC_API_KEY (reicht). Optional später TYPESAFE_API_KEY oder
+// OPENROUTER_API_KEY für Jev – vorher Datenschutzerklärung + Einwilligung
+// anpassen (neue Version), siehe docs/DATENSCHUTZ.md.
 
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { jevFragen, jevWeg, leseScore, leseWahl, type Frage } from "./jev.ts";
-import { frageClaude, type ClaudeAusgabe } from "./claude.ts";
+import { frageClaude, ordneEin, type ClaudeAusgabe } from "./claude.ts";
 import {
-  antwortNachMelden, aufEins, entscheide, pseudonymisiere, schichtText,
-  type Antwort, type DbErgebnis, type JevErgebnis,
+  antwortNachMelden, aufEins, ausClaude, entscheide, pseudonymisiere, schichtText,
+  type Antwort, type DbErgebnis, type Einschaetzung,
 } from "./regeln.ts";
 
 const cors = {
@@ -92,6 +98,7 @@ Deno.serve(async (req) => {
   if (!frei) return json({ ok: true, still: "Testphase – nicht freigeschaltet" });
   if (!einw?.ja) return json({ ok: true, still: "keine Einwilligung" });
   if (!einst?.assistent_an) return json({ ok: true, still: "Assistent aus" });
+  if (!Deno.env.get("ANTHROPIC_API_KEY") && !jevWeg()) return json({ ok: true, still: "kein KI-Schlüssel" });
 
   // Jede Nachricht genau einmal (zwei Aufrufe gleichzeitig: einer gewinnt).
   const { error: doppelt } = await admin.from("assistent_vorschlaege").insert({
@@ -150,30 +157,42 @@ async function bearbeite(l: Lage): Promise<Ergebnis> {
   }
   const { data: pp } = await admin.from("public_profiles").select("anzeigename").eq("user_id", l.uid).maybeSingle();
   if (pp?.anzeigename) namen.push(pp.anzeigename, ...String(pp.anzeigename).split(/\s+/));
-  const nachricht = pseudonymisiere(l.text, namen).slice(0, 2000);
+  // Namen aller anderen aus der Stufe („ich war mit Lena da“) – die gehen auch nicht raus.
+  const [{ data: alle }, { data: anzeige }] = await Promise.all([
+    admin.from("students").select("vorname, nachname"),
+    admin.from("public_profiles").select("anzeigename"),
+  ]);
+  const andere: string[] = [];
+  for (const s of (alle || []) as { vorname: string | null; nachname: string | null }[]) {
+    for (const n of [s.vorname, s.nachname]) if (n) andere.push(n, ...String(n).split(/[\s-]+/));
+  }
+  for (const a of (anzeige || []) as { anzeigename: string | null }[]) {
+    if (a.anzeigename) andere.push(a.anzeigename, ...String(a.anzeigename).split(/\s+/));
+  }
+  const ohneNamen = (t: string) => pseudonymisiere(t, namen, andere);
+  const nachricht = ohneNamen(l.text).slice(0, 2000);
 
-  // ---- Stand für Jev --------------------------------------------------------
-  // Frühere eigene Nachrichten an das Stufenteam (nur Tickets, nur eigene, 60 Tage).
-  const { data: tickets } = await admin.from("topics").select("id").eq("kind", "ticket").eq("created_by", l.uid);
-  const ticketIds = (tickets || []).map((t: { id: string }) => t.id);
-  const { data: frueher } = ticketIds.length
-    ? await admin.from("topic_items").select("body, created_at")
-      .in("topic_id", ticketIds).eq("created_by", l.uid).eq("type", "nachricht").neq("id", l.itemId)
-      .gte("created_at", new Date(Date.now() - 60 * 86400000).toISOString())
-      .order("created_at", { ascending: false }).limit(20)
-    : { data: [] };
-  const { data: v } = await admin.from("vertrauen").select("bestaetigt, falsch").eq("user_id", l.uid).maybeSingle();
   const { data: kand } = await admin.rpc("assistent_kandidaten", { uid: l.uid });
   const kandidaten = ((kand || []) as Kandidat[]).slice(0, 40);
   const schluessel = new Map(kandidaten.map((k, i) => [`s${i + 1}`, k]));
   const texte = new Map([...schluessel].map(([key, k]) => [key, schichtText(k)]));
 
-  // ---- Jev --------------------------------------------------------------------
-  let jev: JevErgebnis | null = null;
+  // ---- Jev (nur mit Schlüssel) --------------------------------------------------
+  let jev: Einschaetzung | null = null;
   if (jevWeg()) {
+    // Frühere eigene Nachrichten an das Stufenteam (nur Tickets, nur eigene, 60 Tage).
+    const { data: tickets } = await admin.from("topics").select("id").eq("kind", "ticket").eq("created_by", l.uid);
+    const ticketIds = (tickets || []).map((t: { id: string }) => t.id);
+    const { data: frueher } = ticketIds.length
+      ? await admin.from("topic_items").select("body, created_at")
+        .in("topic_id", ticketIds).eq("created_by", l.uid).eq("type", "nachricht").neq("id", l.itemId)
+        .gte("created_at", new Date(Date.now() - 60 * 86400000).toISOString())
+        .order("created_at", { ascending: false }).limit(20)
+      : { data: [] };
+    const { data: v } = await admin.from("vertrauen").select("bestaetigt, falsch").eq("user_id", l.uid).maybeSingle();
     const state = JSON.stringify({
       neue_nachricht: nachricht,
-      fruehere_nachrichten_ans_stufenteam: (frueher || []).map((m: { body: string }) => pseudonymisiere(String(m.body), namen).slice(0, 500)),
+      fruehere_nachrichten_ans_stufenteam: (frueher || []).map((m: { body: string }) => ohneNamen(String(m.body)).slice(0, 500)),
       bilanz_frueherer_angaben: { vom_team_bestaetigt: v?.bestaetigt ?? 0, vom_team_als_falsch_markiert: v?.falsch ?? 0 },
       moegliche_schichten: [...schluessel].map(([key, k]) => ({ key, schicht: texte.get(key), eingeteilt: k.eingeteilt })),
     });
@@ -217,9 +236,14 @@ async function bearbeite(l: Lage): Promise<Ergebnis> {
         };
       }
     } catch (e) {
-      console.log("Jev-Fehler (→ Team):", (e as Error)?.message);
+      console.log("Jev-Fehler (→ Claude):", (e as Error)?.message);
     }
   }
+
+  // ---- Ohne Jev (oder Jev ausgefallen): Claude ordnet ein ------------------------
+  // Nur Anliegen und Schicht – kein „stimmig“, der Wert bleibt reine Bilanz.
+  const einschaetzung: Einschaetzung | null = jev ?? await ordneEin(nachricht, texte)
+    .then((c) => (c ? ausClaude(c, schluessel.size > 0) : null));
 
   // Jev-Einschätzung speichern, BEVOR eingetragen wird: ein deutlicher Zweifel
   // soll den Auto-Eintrag dieser Nachricht schon verhindern (vertrauen_wert).
@@ -228,15 +252,15 @@ async function bearbeite(l: Lage): Promise<Ergebnis> {
   }
 
   // ---- Regeln -------------------------------------------------------------------
-  const schritt = entscheide(jev);
-  const absicht = jev?.absicht.wahl ?? "sonstiges";
+  const schritt = entscheide(einschaetzung);
+  const absicht = einschaetzung?.absicht.wahl ?? "sonstiges";
 
   if (schritt.art === "team") {
     const c = await frageClaude(l.stil, nachricht, {
       art: "nur_team",
       absicht: { zahlung: "Beiträge/Bezahlen", termin: "Termine/Schichten", mithilfe_nachtrag: "Mithilfe nachtragen", sonstiges: "etwas anderes" }[absicht] || "etwas anderes",
     });
-    return { ergebnis: schritt.grund === "jev_fehler" ? "fehler" : "team", absicht, termin_id: null, antwort: null, vorschlag: c?.vorschlag_fuers_team ?? null, sql: mitIds(c, l, null) };
+    return { ergebnis: schritt.grund === "ki_fehler" ? "fehler" : "team", absicht, termin_id: null, antwort: null, vorschlag: c?.vorschlag_fuers_team ?? null, sql: mitIds(c, l, null) };
   }
 
   if (schritt.art === "rueckfrage") {
@@ -254,7 +278,7 @@ async function bearbeite(l: Lage): Promise<Ergebnis> {
     return { ergebnis: "fehler", absicht, termin_id: k.termin_id, antwort: null, vorschlag: `Konnte nicht eintragen: ${error.message}`, sql: null };
   }
   const schicht = texte.get(schritt.terminKey) || k.titel;
-  const antwort: Antwort = antwortNachMelden(db as DbErgebnis, jev?.stimmig ?? null, schicht);
+  const antwort: Antwort = antwortNachMelden(db as DbErgebnis, einschaetzung?.stimmig ?? null, schicht);
   let text: string | null = null;
   let vorschlag: string | null = null;
   if (antwort.art === "fest") text = antwort.text;

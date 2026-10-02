@@ -149,7 +149,7 @@ export function VertrauenSheet({ open, onClose }: { open: boolean; onClose: () =
                       ? "noch nicht gefragt"
                       : !z.einwilligung
                         ? "nicht zugestimmt – Team prüft alles"
-                        : `${z.bestaetigt} bestätigt · ${z.falsch} falsch · Jev ${prozentText(z.jev_wert)}${z.offene_angaben ? ` · ${z.offene_angaben} offen` : ""}`}
+                        : `${z.bestaetigt} bestätigt · ${z.falsch} falsch${z.jev_wert != null ? ` · Jev ${prozentText(z.jev_wert)}` : ""}${z.offene_angaben ? ` · ${z.offene_angaben} offen` : ""}`}
                 </span>
               </span>
               <Wert wert={z.wert} />
@@ -158,9 +158,10 @@ export function VertrauenSheet({ open, onClose }: { open: boolean; onClose: () =
         </ul>
       )}
       <p className="mt-3 text-[12px] leading-relaxed text-tinte-leise">
-        Der Wert ist die Bilanz (bestätigt gegen falsch). Jev kann ihn nur senken, wenn es sich ziemlich sicher ist,
-        dass Angaben nicht zusammenpassen – nie heben. Der Wert entscheidet nur, ob „war da“ sofort eingetragen wird
-        oder das Team schaut; er wird für nichts anderes benutzt.
+        Der Wert ist die Bilanz (bestätigt gegen falsch). Der Assistent (Claude) ordnet nur ein, welche Schicht gemeint
+        ist – ob jemand glaubwürdig ist, bewertet er nicht. Erst wenn ihr später Jev einrichtet, kann Jev den Wert
+        senken (nie heben). Der Wert entscheidet nur, ob „war da“ sofort eingetragen wird oder das Team schaut; er wird
+        für nichts anderes benutzt. Fragt jemand nach seinem Wert, sagt ihn ihm (Auskunftsrecht, Art. 15 DSGVO).
       </p>
     </Sheet>
   );
