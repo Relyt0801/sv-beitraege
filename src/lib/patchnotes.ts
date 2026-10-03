@@ -20,67 +20,27 @@ export interface PatchVersion {
 }
 
 export const PATCH: PatchVersion = {
-  version: "1.1",
+  version: "1.2",
   datum: "3. Oktober 2026",
   bereiche: [
     {
-      bereich: "Chats",
-      icon: "💬",
+      bereich: "Abiball-Ticket",
+      icon: "🎟️",
       eintraege: [
-        { text: "Es wurde ein Fehler behoben, dass am Reiter Chats dauerhaft „9+“ stand: Erledigte Gespräche zählen nicht mehr mit." },
-        { text: "Nachricht gedrückt halten: mit 👍 👎 🔥 😢 😂 ❓ reagieren oder den Text kopieren." },
-        { text: "Komitee-Chats öffnen jetzt direkt im Chat. Die Übersicht (Angepinntes, Abstimmungen, To-dos) liegt oben rechts – beide mit eigenem roten Punkt." },
-        { text: "Neu: „Mithilfe nachtragen“ – vergessene Mithilfe mit Datum beantragen, das Stufenteam bestätigt." },
-        { text: "Neue Bereiche: Chats mit Schülern, Chats mit Eltern und Anfragen (Nachträge, Komitee-Wechsel, Entsperrungen).", nur: "team" },
-        { text: "Mit 🔔 / 🔕 legst du je Bereich und je Komitee fest, ob du Mitteilungen bekommst. Fremde Komitees zählen nur noch, wenn du sie einschaltest.", nur: "team" },
+        { text: "Dein Abiball-Ticket mit deinem Namen: Der volle Preis steht durchgestrichen darauf, darunter, was es dich bei deinem Stand wirklich kostet. Daneben das Ticket für jedes weitere (Eltern und Gäste)." },
+        { text: "Ticket antippen: Die Ticket-Ansicht zeigt Zeile für Zeile, wie sich der Preis zusammensetzt." },
+        { text: "Sobald der Verkauf startet, bestellst du rechts neben dem Ticket und überweist mit eigenem Verwendungszweck. Vorher läuft dort ein Countdown." },
+        { text: "Wenn das Stufenteam es einschaltet, zählt Mithilfe auch über 100 %: Der Ring wird golden, und dein erstes Ticket wird noch günstiger." },
       ],
     },
     {
-      bereich: "Mitteilungen",
-      icon: "🔔",
-      eintraege: [
-        { text: "Wenn du gerade in der App bist, kommen keine Pop-ups mehr – die roten Punkte zeigen dir alles." },
-        { text: "Mehrere Nachrichten aus einem Chat kommen als eine Mitteilung („3 neue Nachrichten“) statt einzeln." },
-      ],
-    },
-    {
-      bereich: "Events",
-      icon: "📅",
-      eintraege: [
-        { text: "Deine Schichten stehen oben als grüne „Tickets“. Bekommene Schichten sind grün mit Haken, nicht bekommene blass und gestrichelt – auch im Kalender." },
-        { text: "Vergangene und bestätigte Schichten verschwinden aus „Mitmachen“, damit es übersichtlich bleibt." },
-        { text: "Offene Schichten zum Bestätigen stehen als Hinweis oben im Reiter – auch nachdem man das Fenster weggewischt hat.", nur: "team" },
-      ],
-    },
-    {
-      bereich: "Allgemein",
-      icon: "✨",
-      eintraege: [
-        { text: "Statt „Keine Live-Verbindung“ verbindet sich die App still neu. Beim Laden siehst du graue Platzhalter statt eines Kreisels." },
-        { text: "Im Profil stehen keine Version und Uhrzeit mehr." },
-        { text: "Der Datenschutz wurde ergänzt (Reaktionen, Nachträge, automatisches Löschen)." },
-      ],
-    },
-    {
-      bereich: "Profil",
-      icon: "👤",
-      eintraege: [
-        { text: "Neuer Reiter „Profil“: deine eigene Ansicht wie bei allen Schülern. Die App startet dort.", nur: "team" },
-      ],
-    },
-    {
-      bereich: "Kasse",
+      bereich: "Beiträge",
       icon: "💶",
       eintraege: [
-        { text: "Mithilfe für mehrere Personen: dieselbe Ansicht wie für eine Person – mit Vorlagen und Datum.", nur: "team" },
-      ],
-    },
-    {
-      bereich: "Rollen & Rechte",
-      icon: "🛡️",
-      eintraege: [
-        { text: "Rollen und Rechte sind jetzt ein Reiter. Person antippen öffnet ihre einzelnen Rechte; die Rechte-Bereiche sind zugeklappt.", nur: "team" },
-        { text: "Profil → Automatisch löschen: Fristen für alte Chat-Nachrichten und bearbeitete Anträge (nur Admin bzw. „Rechte verwalten“).", nur: "team" },
+        { text: "Beiträge → Ticket: Bonus über 100 % mit zwei Reglern (bis wie viel Prozent, wie viel Rabatt). Standardmäßig aus.", nur: "team" },
+        { text: "Ort und Datum des Abiballs eintragen. Beides erscheint erst dann auf den Tickets.", nur: "team" },
+        { text: "Ticketverkauf starten: Startzeit, höchstens Tickets je Person und Tickets insgesamt.", nur: "team" },
+        { text: "Bestellungen als bezahlt markieren oder stornieren. Oben siehst du, wie viel eingegangen und wie viel noch offen ist.", nur: "team" },
       ],
     },
   ],

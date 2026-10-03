@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { HY, type Halbjahr, type Status, type Student } from "../lib/types";
-import { basisOffen, beitragFuer, isDead, isPreJoin, prozentVon, ticketBetrag } from "../lib/logic";
+import { basisOffen, beitragFuer, isDead, isPreJoin, prozentVon, ticketPreise } from "../lib/logic";
 import { useStore } from "../store";
 import { useRole } from "../auth/RoleProvider";
 import { Sheet } from "./Sheet";
@@ -54,7 +54,7 @@ export function StudentSheet({
 
   const offen = basisOffen(student, settings.aktuelles_halbjahr, settings);
   const pct = prozentVon(punkte, settings);
-  const ticket = (settings.ticket_preis || 0) + ticketBetrag(pct, settings);
+  const ticket = ticketPreise(pct, settings);
   const initialen = (student.vorname[0] || "") + (student.nachname[0] || "");
 
   return (
@@ -96,7 +96,9 @@ export function StudentSheet({
         </button>
       </div>
       <div className="mt-2 text-[11px] text-tinte-leise">
-        1. Abiball-Ticket {ticket} € · wird getrennt bezahlt
+        {ticket.preisSteht
+          ? `1. Abiball-Ticket ${ticket.erstes} €${ticket.standard > ticket.erstes ? ` statt ${ticket.standard} €` : ""} · jedes weitere ${ticket.weiteres} €`
+          : `Helferzuschuss aufs 1. Abiball-Ticket: ${ticket.aufschlag - ticket.rabatt} €`}
       </div>
 
       {/* ------------------------------------------------- Zahlungen */}

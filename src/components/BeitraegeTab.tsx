@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useStore } from "../store";
-import { beitraegeVon, staffelVon } from "../lib/logic";
+import { abiballVon, beitraegeVon, staffelVon } from "../lib/logic";
 import { useEntwurf } from "../lib/entwurf";
+import { AbiballEinstellungen } from "./AbiballEinstellungen";
 import { HY, type ContribTemplate, type Halbjahr, type Staffel } from "../lib/types";
 
 import { frage } from "../lib/melder";
@@ -26,6 +27,7 @@ export function BeitraegeTab() {
   // wichtigsten Zahl – so sieht man alles auf einen Blick und tippt hinein.
   const [bereich, setBereich] = useState<"prozente" | "halbjahre" | "ticket">("prozente");
   const hoechsterZusatz = Math.max(0, ...staffel.map((x) => x.betrag));
+  const abiball = abiballVon(settings);
 
   function anlegen() {
     const t = titel.trim();
@@ -38,7 +40,12 @@ export function BeitraegeTab() {
   const kacheln: { key: typeof bereich; titel: string; wert: string; unter: string }[] = [
     { key: "prozente", titel: "Prozente", wert: `${sortiert.length}`, unter: sortiert.length === 1 ? "Möglichkeit" : "Möglichkeiten" },
     { key: "halbjahre", titel: "Halbjahre", wert: `${gesamt} €`, unter: "für alle sechs" },
-    { key: "ticket", titel: "Ticket", wert: grund > 0 ? `${grund} €` : "offen", unter: `+ bis ${hoechsterZusatz} € Zusatz` },
+    {
+      key: "ticket",
+      titel: "Ticket",
+      wert: grund > 0 ? `${grund} €` : "offen",
+      unter: abiball.verkaufAb ? "Verkauf freigegeben" : `+ bis ${hoechsterZusatz} € Zuschlag`,
+    },
   ];
 
   return (
@@ -149,8 +156,9 @@ export function BeitraegeTab() {
       <section className="card h-fit p-4 sm:p-5">
         <h2 className="text-lg font-bold">Abiball-Ticket</h2>
         <p className="mt-0.5 text-[13px] leading-relaxed text-tinte-matt dark:text-slate-400">
-          Der Aufschlag gilt <b>nur fürs erste Ticket</b>. Jedes weitere kostet den
+          Der Helferzuschuss gilt <b>nur fürs erste Ticket</b>. Jedes weitere kostet den
           Grundpreis. Es zählt immer die höchste erreichte Stufe, 60 % zählen also als 50 %.
+          Darunter: Bonus über 100 %, Ort und Datum und der Ticketverkauf.
         </p>
 
         <label className="mt-4 flex items-center gap-3 rounded-2xl bg-papier-matt p-3 dark:bg-slate-800/70">
@@ -168,12 +176,12 @@ export function BeitraegeTab() {
         </label>
         {grund === 0 && (
           <p className="mt-1.5 text-[12px] text-tinte-leise">
-            Steht 0 drin, ist der Preis noch offen. Dann sehen alle nur den Aufschlag.
+            Steht 0 drin, ist der Preis noch offen. Dann sehen alle nur den Helferzuschuss und niemand kann bestellen.
           </p>
         )}
 
         <div className="mt-4 text-xs font-semibold uppercase tracking-wide text-tinte-matt">
-          Aufschlag je Prozentstufe
+          Helferzuschuss je Prozentstufe
         </div>
         <ul className="mt-2 grid gap-2">
           {staffel.map((stufe, i) => (
@@ -187,6 +195,8 @@ export function BeitraegeTab() {
             />
           ))}
         </ul>
+
+        <AbiballEinstellungen />
       </section>
       )}
     </div>

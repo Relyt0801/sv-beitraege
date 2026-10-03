@@ -3,7 +3,8 @@ import type { Contribution, Settings, Student } from "../lib/types";
 import { useStore } from "../store";
 import { Sheet } from "./Sheet";
 import { PunkteBar, StaffelTabelle } from "./PunkteBar";
-import { prozentVon, ticketBetrag } from "../lib/logic";
+import { prozentVon } from "../lib/logic";
+import { AbiTicket } from "./AbiTicket";
 import { useProfiles } from "../profiles-store";
 
 import { frage } from "../lib/melder";
@@ -55,12 +56,9 @@ export function PunkteSheet({
         <div className="mt-3">
           <StaffelTabelle settings={settings} pct={pct} />
         </div>
-        <p className="mt-2.5 text-[13px] leading-relaxed text-tinte-matt dark:text-slate-300">
-          Das <b>erste</b> Abiball-Ticket kostet bei diesem Stand{" "}
-          <b>{(settings.ticket_preis || 0) + ticketBetrag(pct, settings)} €</b>
-          {settings.ticket_preis ? ` (${settings.ticket_preis} € Grundpreis + ${ticketBetrag(pct, settings)} €)` : ""}.
-          Weitere Tickets sind davon nicht betroffen.
-        </p>
+        <div className="mt-3 grid gap-2">
+          <AbiTicket art="erstes" student={student} settings={settings} prozent={pct} klein />
+        </div>
       </div>
 
       {editable && (

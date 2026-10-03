@@ -26,7 +26,22 @@ export function jahrgangKurz(halbjahr: string): string {
  * Die Daten kommen aus der Datenbank und stehen an keiner Stelle im Quellcode.
  * Lesen darf sie jedes angemeldete Konto, ändern nur Admin und Kassenwart.
  */
-export function KontoTab({ personen, du = false }: { personen?: Student[]; du?: boolean } = {}) {
+export function KontoTab({
+  personen,
+  du = false,
+  zweck: festerZweck,
+  betrag,
+  hinweis,
+}: {
+  personen?: Student[];
+  du?: boolean;
+  /** Fester Verwendungszweck (z. B. für eine Ticketbestellung) statt „Name Stufe“ */
+  zweck?: string;
+  /** Betrag, der überwiesen werden soll (wird oben mit angezeigt) */
+  betrag?: string;
+  /** Eigener Hinweistext unter der Überschrift */
+  hinweis?: string;
+} = {}) {
   const { konto, kontoSpeichern, kinder: meineKinder } = useEltern();
   const { role } = useRole();
   // Eltern sehen hier nur die eigenen Kinder – dafür sorgt die Datenbank,
@@ -74,12 +89,15 @@ export function KontoTab({ personen, du = false }: { personen?: Student[]; du?: 
       <section className={personen ? "" : "card p-5"}>
         <h2 className="text-[1.25rem] font-bold tracking-[-0.01em]">{du ? "So überweist du" : "So überweisen Sie"}</h2>
         <p className="mt-0.5 text-[13px] leading-relaxed text-tinte-matt dark:text-slate-400">
-          {du
+          {hinweis
+            ? hinweis
+            : du
             ? "Meistens zahlen das deine Eltern. Falls du selbst überweist: bitte immer den Verwendungszweck angeben – sonst können wir das Geld nicht zuordnen."
             : "Bitte immer den Verwendungszweck angeben – sonst können wir das Geld nicht zuordnen. Bei mehreren Kindern bitte für jedes Kind einzeln überweisen."}
         </p>
 
         <div className="mt-4 grid grid-cols-1 gap-2" data-tour="konto-daten">
+          {betrag && <Zeile label="Betrag" wert={betrag} onKopieren={() => kopieren(betrag.replace(/\s*€$/, ""), "betrag")} kopiert={kopiert === "betrag"} />}
           <Zeile label="Empfänger" wert={konto.inhaber} onKopieren={() => kopieren(konto.inhaber, "inhaber")} kopiert={kopiert === "inhaber"} />
           <Zeile
             label="IBAN"
@@ -94,7 +112,11 @@ export function KontoTab({ personen, du = false }: { personen?: Student[]; du?: 
 
         {/* Verwendungszweck zum Kopieren – je Kind eine Zeile */}
         <ul className="mt-2 grid grid-cols-1 gap-2">
-          {(kinder.length ? kinder : [null]).map((k) => {
+          {festerZweck ? (
+            <li>
+              <Zeile label="Verwendungszweck" gross wert={festerZweck} onKopieren={() => kopieren(festerZweck, "fest")} kopiert={kopiert === "fest"} />
+            </li>
+          ) : (kinder.length ? kinder : [null]).map((k) => {
             const jahr = jahrgangKurz(settings.aktuelles_halbjahr);
             // Kein Komma vor der Stufe: "Adams, Tyler Q2"
             const zweck = k ? `${k.nachname}, ${k.vorname} ${jahr}` : `Nachname, Vorname ${jahr}`;

@@ -134,7 +134,7 @@ function StudentCardRoh({
             style={{ width: `${Math.min(100, prozent)}%` }}
           />
         </span>
-        <span className={`zahl w-9 text-right text-[13px] font-semibold ${prozent >= 100 ? "text-bezahlt dark:text-emerald-300" : "text-tinte-matt dark:text-slate-300"}`}>
+        <span className={`zahl w-10 text-right text-[13px] font-semibold ${prozent > 100 ? "text-[#9A7410] dark:text-[#E9C460]" : prozent >= 100 ? "text-bezahlt dark:text-emerald-300" : "text-tinte-matt dark:text-slate-300"}`}>
           {prozent} %
         </span>
       </button>

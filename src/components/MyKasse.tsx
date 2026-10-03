@@ -1,7 +1,7 @@
 import { HY, type Settings, type Student } from "../lib/types";
 import { SkelettKarten } from "./Skelett";
 import { useStore } from "../store";
-import { basisOffen, beitragFuer, isPreJoin, naechsteStufe, prozentVon, ticketBetrag } from "../lib/logic";
+import { abiballVon, basisOffen, beitragFuer, isPreJoin, naechsteStufe, prozentVon, ticketPreise } from "../lib/logic";
 import { HalbjahrLegende, TermChip } from "./TermChip";
 import { StaffelKacheln, StaffelRing } from "./Staffel";
 import { BeitragsListe } from "./BeitragsListe";
@@ -9,7 +9,7 @@ import { KontoTab } from "./KontoTab";
 import { Sheet, SheetKopf } from "./Sheet";
 import { Icon } from "./Icon";
 import { useState } from "react";
-import { TicketErklaerung } from "./TicketErklaerung";
+import { TicketBereich } from "./AbiTicket";
 
 /**
  * Die eigene Ansicht für alle, die nicht im Stufenteam sind.
@@ -50,6 +50,8 @@ export function MyKasse({
   const offen = basisOffen(student, settings.aktuelles_halbjahr, settings);
   const pct = prozentVon(punkte, settings);
   const next = naechsteStufe(pct, settings);
+  const bonus = abiballVon(settings);
+  const preise = ticketPreise(pct, settings);
   const gesamt = HY.reduce((n, h) => n + beitragFuer(h, settings), 0);
   const meine = contributions
     .filter((c) => c.student_id === student.id)
@@ -112,6 +114,10 @@ export function MyKasse({
         <HalbjahrLegende nichtDabei={HY.some((_, i) => isPreJoin(student, i))} />
       </section>
 
+      {/* ------------------------------------------ Abiballticket */}
+      {/* Links die Tickets, rechts bestellen und überweisen */}
+      <TicketBereich student={student} settings={settings} prozent={pct} className="lg:col-span-2" />
+
       {/* ------------------------------------------ Prozentstand */}
       <section className="card p-4 sm:p-5" data-tour="meine-punkte">
         <h2 className="text-[15px] font-semibold">Mithilfe bei Aktionen</h2>
@@ -120,9 +126,13 @@ export function MyKasse({
           <StaffelRing pct={pct} settings={settings} />
           <div className="min-w-0 flex-1">
             <div className="text-[14px] font-semibold leading-snug">
-              {pct >= 100
-                ? "Geschafft. Auf dein erstes Abiball-Ticket kommt kein Aufschlag mehr."
-                : "Mehr Prozent = weniger Aufschlag auf dein Abiball-Ticket."}
+              {pct > 100 && bonus.ueber100
+                ? `Stark! Über 100 % gibt es Bonus: ${preise.rabatt} € weniger aufs erste Ticket.`
+                : pct >= 100
+                  ? bonus.ueber100
+                    ? `Kein Zuschlag mehr – und bis ${bonus.bonusBis} % wird dein Ticket noch günstiger.`
+                    : "Geschafft. Auf dein erstes Abiball-Ticket kommt kein Zuschlag mehr."
+                  : "Mehr Prozent = weniger Helferzuschuss auf dein Abiball-Ticket."}
             </div>
             {next && (
               <div className="mt-1.5 text-[13px] leading-relaxed text-tinte-matt">
@@ -135,15 +145,6 @@ export function MyKasse({
 
         <StaffelKacheln pct={pct} settings={settings} />
       </section>
-
-      {/* ------------------------------------------ Abiballticket */}
-      {/* Am Rechner rechts über zwei Zeilen – links stehen Prozente und Liste */}
-      <TicketErklaerung
-        settings={settings}
-        zusatz={ticketBetrag(pct, settings)}
-        prozent={pct}
-        className="lg:row-span-2"
-      />
 
       {/* ------------------------------------------ meine Beiträge */}
       <section className="card p-4 sm:p-5">

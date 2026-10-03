@@ -1,14 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { SkelettKarten } from "./Skelett";
 import { HY } from "../lib/types";
-import { basisOffen, beitragFuer, prozentVon, punkteIndex, ticketBetrag } from "../lib/logic";
+import { basisOffen, beitragFuer, prozentVon, punkteIndex } from "../lib/logic";
 import { useStore } from "../store";
 import { useEltern } from "../eltern-store";
 import { useRole } from "../auth/RoleProvider";
 import { HalbjahrLegende, TermChip } from "./TermChip";
 import { StaffelKacheln, StaffelRing } from "./Staffel";
 import { BeitragsListe } from "./BeitragsListe";
-import { TicketErklaerung } from "./TicketErklaerung";
+import { TicketBereich } from "./AbiTicket";
 import { Icon, type IconName } from "./Icon";
 import { ElternInfosTab } from "./ElternInfosTab";
 import { FinanzStandard } from "./FinanzStandard";
@@ -388,6 +388,9 @@ function KindKarte({
         <HalbjahrLegende />
       </section>
 
+      {/* Abiball-Ticket: Preis, Bestellungen des Kindes, überweisen */}
+      <TicketBereich student={kind} settings={settings} prozent={pct} fuerEltern />
+
       <div className="grid items-start gap-3 lg:grid-cols-2">
         {/* Prozentstand */}
         <section className="card p-5" data-tour={erstes ? "kind-prozent" : undefined}>
@@ -395,7 +398,7 @@ function KindKarte({
           <div className="mt-3 flex items-center gap-4">
             <StaffelRing pct={pct} settings={settings} />
             <div className="min-w-0 flex-1 text-[14px] leading-relaxed text-tinte-matt dark:text-slate-300">
-              Wenn Ihr Kind bei Aktionen mithilft, zahlt es weniger Aufschlag auf das 1. Abiball-Ticket.
+              Wenn Ihr Kind bei Aktionen mithilft, zahlt es weniger Helferzuschuss auf das 1. Abiball-Ticket.
             </div>
           </div>
 
@@ -403,13 +406,11 @@ function KindKarte({
           <StaffelKacheln pct={pct} settings={settings} />
         </section>
 
-        <TicketErklaerung settings={settings} zusatz={ticketBetrag(pct, settings)} prozent={pct} fuerEltern />
+        <section className="card p-5">
+          <div className="text-[15px] font-semibold">Wobei {kind.vorname} geholfen hat</div>
+          <BeitragsListe eintraege={eintraege} leerText="Noch nichts eingetragen." />
+        </section>
       </div>
-
-      <section className="card p-5">
-        <div className="text-[15px] font-semibold">Wobei {kind.vorname} geholfen hat</div>
-        <BeitragsListe eintraege={eintraege} leerText="Noch nichts eingetragen." />
-      </section>
     </div>
   );
 }

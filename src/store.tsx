@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
-import { HY, type ContribTemplate, type Contribution, type Halbjahr, type Settings, type Status, type Student, type Beitraege, newStudent, STAFFEL_STANDARD, BEITRAEGE_STANDARD } from "./lib/types";
+import { HY, type ContribTemplate, type Contribution, type Halbjahr, type Settings, type Status, type Student, type Beitraege, type Abiball, newStudent, STAFFEL_STANDARD, BEITRAEGE_STANDARD, ABIBALL_STANDARD } from "./lib/types";
 import { hasSupabase, supabase } from "./lib/supabase";
 import { echoLeeren, merkeEigeneAenderung, zusammenfuehren } from "./lib/echo";
 import { abonniere } from "./lib/realtime";
@@ -27,7 +27,13 @@ const DEFAULT_SETTINGS: Settings = {
   staffel: STAFFEL_STANDARD,
   ticket_preis: 0,
   beitraege: BEITRAEGE_STANDARD,
+  abiball: ABIBALL_STANDARD,
 };
+
+/** Abiball-Einstellungen aus der Datenbank (jsonb) – Fehlendes mit Standard. */
+function abiballAus(roh: unknown): Abiball {
+  return roh && typeof roh === "object" ? { ...ABIBALL_STANDARD, ...(roh as Partial<Abiball>) } : ABIBALL_STANDARD;
+}
 
 /**
  * Beitraege aus der Datenbank pruefen. Fehlt ein Halbjahr oder steht Unsinn
@@ -134,14 +140,15 @@ async function speichereEinstellungen(next: Settings) {
     staffel: next.staffel,
     ticket_preis: next.ticket_preis,
     beitraege: next.beitraege,
+    abiball: next.abiball,
   };
   const { error } = await supabase!.from("app_settings").upsert(voll);
   if (!error) return;
-  if (!/Could not find the '(staffel|ticket_preis|beitraege)' column/.test(error.message)) {
+  if (!/Could not find the '(staffel|ticket_preis|beitraege|abiball)' column/.test(error.message)) {
     reportErr(error.message);
     return;
   }
-  const { staffel: _s, ticket_preis: _t, beitraege: _b, ...schlank } = voll;
+  const { staffel: _s, ticket_preis: _t, beitraege: _b, abiball: _a, ...schlank } = voll;
   const zweiter = await supabase!.from("app_settings").upsert(schlank);
   if (zweiter.error) reportErr(zweiter.error.message);
   else reportErr(error.message); // trotzdem sagen, dass das SQL noch fehlt
@@ -289,6 +296,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
               staffel: Array.isArray(row.staffel) && row.staffel.length ? row.staffel : STAFFEL_STANDARD,
               ticket_preis: row.ticket_preis ?? 0,
               beitraege: gueltigeBeitraege(row.beitraege),
+              abiball: abiballAus(row.abiball),
             });
         }),
       });
@@ -329,6 +337,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
               : STAFFEL_STANDARD,
           ticket_preis: (cfg as { ticket_preis?: number }).ticket_preis ?? 0,
           beitraege: gueltigeBeitraege((cfg as { beitraege?: unknown }).beitraege),
+          abiball: abiballAus((cfg as { abiball?: unknown }).abiball),
         });
       setReady(true);
       subscribeRealtime();

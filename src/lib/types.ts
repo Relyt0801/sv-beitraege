@@ -55,7 +55,42 @@ export interface Settings {
   ticket_preis: number;
   /** Was jedes Halbjahr kostet. */
   beitraege: Beitraege;
+  /** Abiball: Bonus über 100 %, Ticketverkauf, Ort/Datum (app_settings.abiball) */
+  abiball: Abiball;
 }
+
+/**
+ * Einstellungen rund um den Abiball (eine jsonb-Spalte, damit neue Felder
+ * keine neue Spalte brauchen).
+ */
+export interface Abiball {
+  /** Über 100 % sammeln erlaubt (Standard: aus) */
+  ueber100: boolean;
+  /** Bis zu dieser Prozentzahl wird gezählt, z. B. 150 */
+  bonusBis: number;
+  /** So viel € Rabatt aufs 1. Ticket gibt es bei bonusBis (dazwischen anteilig) */
+  bonusRabatt: number;
+  /** Ab wann Tickets bestellt werden können (ISO), null = Verkauf nicht freigegeben */
+  verkaufAb: string | null;
+  /** Höchstens so viele Tickets je Person */
+  maxProPerson: number;
+  /** Tickets insgesamt, 0 = unbegrenzt */
+  kontingent: number;
+  /** Ort und Datum – erscheinen erst auf dem Ticket, wenn eingetragen */
+  ort: string;
+  datum: string | null;
+}
+
+export const ABIBALL_STANDARD: Abiball = {
+  ueber100: false,
+  bonusBis: 150,
+  bonusRabatt: 10,
+  verkaufAb: null,
+  maxProPerson: 4,
+  kontingent: 0,
+  ort: "",
+  datum: null,
+};
 
 /** Kontodaten der Stufenkasse. Stehen nur in der Datenbank, nie im Quellcode. */
 export interface BankKonto {

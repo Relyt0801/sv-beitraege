@@ -1,4 +1,4 @@
-import { HY, FEE, BEITRAEGE_STANDARD, STAFFEL_STANDARD, type Beitraege, type Contribution, type Halbjahr, type Settings, type Staffel, type Student } from "./types";
+import { HY, FEE, BEITRAEGE_STANDARD, STAFFEL_STANDARD, ABIBALL_STANDARD, type Abiball, type Beitraege, type Contribution, type Halbjahr, type Settings, type Staffel, type Student } from "./types";
 
 /** Diakritika/Umlaute/Groß-Klein/Whitespace-tolerante Normalisierung für Suche. */
 export function normalize(s: string): string {
@@ -87,10 +87,68 @@ export function staffelVon(s: Settings): Staffel[] {
   return [...roh].sort((a, b) => a.ab - b.ab);
 }
 
-/** Gesammelte Prozent, gedeckelt bei 100 (mehr bringt nichts mehr). */
+/** Abiball-Einstellungen mit Standardwerten für alles, was fehlt. */
+export function abiballVon(s: Settings): Abiball {
+  const a = { ...ABIBALL_STANDARD, ...(s.abiball || {}) };
+  return {
+    ...a,
+    bonusBis: Math.max(110, Math.min(300, Math.round(Number(a.bonusBis) || 150))),
+    bonusRabatt: Math.max(0, Math.round(Number(a.bonusRabatt) || 0)),
+    maxProPerson: Math.max(1, Math.min(20, Math.round(Number(a.maxProPerson) || 1))),
+    kontingent: Math.max(0, Math.round(Number(a.kontingent) || 0)),
+  };
+}
+
+/**
+ * Gesammelte Prozent. Normal gedeckelt bei 100 (mehr bringt nichts). Ist
+ * „Über 100 %“ an, zählt es bis zur eingestellten Grenze weiter.
+ */
 export function prozentVon(punkte: number, s: Settings): number {
   const ziel = Math.max(1, s.ziel_punkte);
-  return Math.max(0, Math.min(100, Math.round((punkte / ziel) * 100)));
+  const a = abiballVon(s);
+  const deckel = a.ueber100 ? a.bonusBis : 100;
+  return Math.max(0, Math.min(deckel, Math.round((punkte / ziel) * 100)));
+}
+
+/** Wie weit im Bonus-Bereich (über 100 %)? 0 … 1 – 0, wenn der Modus aus ist. */
+export function bonusAnteil(prozent: number, s: Settings): number {
+  const a = abiballVon(s);
+  if (!a.ueber100 || prozent <= 100) return 0;
+  return Math.min(1, (prozent - 100) / (a.bonusBis - 100));
+}
+
+/**
+ * Alles, was man über die Ticketpreise wissen muss – eine Stelle für alle
+ * Ansichten:
+ *  standard  = Grundpreis + Aufschlag bei 0 % (der „Listenpreis“)
+ *  erstes    = was das eigene 1. Ticket bei diesem Stand kostet
+ *  weiteres  = jedes weitere Ticket (Grundpreis)
+ *  rabatt    = Bonus über 100 % (nur, wenn eingeschaltet)
+ */
+export function ticketPreise(prozent: number, s: Settings) {
+  const grund = s.ticket_preis || 0;
+  const aufschlag0 = ticketBetrag(0, s);
+  const aufschlag = ticketBetrag(Math.min(prozent, 100), s);
+  const a = abiballVon(s);
+  const rabatt = Math.min(grund + aufschlag, Math.round(a.bonusRabatt * bonusAnteil(prozent, s)));
+  return {
+    grund,
+    preisSteht: grund > 0,
+    aufschlag0,
+    aufschlag,
+    rabatt,
+    standard: grund + aufschlag0,
+    erstes: grund + aufschlag - rabatt,
+    weiteres: grund,
+    gespart: aufschlag0 - aufschlag + rabatt,
+  };
+}
+
+/** Was eine Bestellung von n Tickets kostet (das erste zum eigenen Preis). */
+export function bestellBetrag(anzahl: number, prozent: number, s: Settings): number {
+  if (anzahl <= 0) return 0;
+  const p = ticketPreise(prozent, s);
+  return p.erstes + (anzahl - 1) * p.weiteres;
 }
 
 /**

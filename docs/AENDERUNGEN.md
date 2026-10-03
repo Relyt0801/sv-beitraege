@@ -12,6 +12,38 @@ ausführlich (auf Deutsch); hier steht der Überblick dazu.
 ---
 
 
+## 03.10.2026: Update 1.2 – Abiball-Ticket, Bonus über 100 %, Ticketverkauf
+
+**Datenbank** (`supabase/abiball-tickets.sql`, eingespielt):
+- `app_settings.abiball` (jsonb): `ueber100`, `bonusBis`, `bonusRabatt`,
+  `verkaufAb`, `maxProPerson`, `kontingent`, `ort`, `datum`. Standard: Bonus aus,
+  Verkauf nicht freigegeben.
+- Tabelle `ticket_bestellungen` (Person, Anzahl, Betrag in Cent, Status
+  offen/bezahlt/storniert). Lesen: eigene, Eltern über `parent_children`,
+  Team/Kasse alle. Ändern (Status): nur Team, `kasse.edit`, `finanzen.manage`.
+  Kein direktes Insert – bestellt wird nur über `ticket_bestellen(n)`.
+- `ticket_bestellen()` prüft Freigabe/Startzeit, Preis > 0, Höchstzahl je Person
+  und Kontingent (mit Advisory-Lock) und rechnet den Betrag auf dem Server:
+  1. Ticket über `ticket_erstes_cent()` (nur intern aufrufbar), alle weiteren
+  zum Grundpreis. `ticket_stand()` liefert verkauft/meine.
+
+**Preislogik** (`lib/logic.ts → ticketPreise()`, eine Stelle für alle Ansichten):
+`standard` = Grundpreis + Helferzuschuss bei 0 % (durchgestrichen auf dem
+Ticket), `erstes` = Grundpreis + Zuschlag der erreichten Stufe − Bonus,
+`weiteres` = Grundpreis. Bonus = `bonusRabatt × (Prozent − 100) / (bonusBis − 100)`,
+gerundet; der Preis fällt nie unter 0 €. `prozentVon()` deckelt bei 100 % bzw. bei `bonusBis`.
+
+**Oberfläche:**
+- `AbiTicket.tsx`: personalisiertes Ticket (Name, Ort/Datum erst wenn
+  eingetragen, Preis-Abriss), Ticket für jedes weitere, Ticket-Ansicht mit
+  Rechnung, `TicketKasse` (Countdown → Bestellen → Überweisen mit Nummer im
+  Verwendungszweck). Ersetzt `TicketErklaerung.tsx` und die „1. Ticket kostet …“-Texte.
+- `Ring.tsx`/`Staffel.tsx`/`PunkteBar.tsx`: über 100 % goldene zweite Runde,
+  goldene Zahl mit „✦ Bonus“, Bonus-Kachel.
+- `AbiballEinstellungen.tsx` in Beiträge → Ticket: Schalter + Regler, Ort/Datum,
+  Verkauf freigeben (Startzeit, „Jetzt starten“), je Person/insgesamt, Bestellliste.
+- `lib/tickets.ts`: Hook, Countdown, Demo-Modus über localStorage.
+
 ## 03.10.2026: Update 1.1
 
 Patch Notes erscheinen einmal nach dem nächsten Öffnen (`src/lib/patchnotes.ts`,

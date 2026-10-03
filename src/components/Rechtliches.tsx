@@ -127,6 +127,11 @@ function Datenschutz() {
         Aktion, das Datum und einen kurzen Text. Das sieht nur das Stufenteam bzw. wer Mithilfe eintragen darf.
       </P>
       <P>
+        <b>Abiball-Tickets:</b> Wer Tickets bestellt, speichert dazu, für welche Person, wie viele, den Betrag, den
+        Zeitpunkt und ob bezahlt oder storniert wurde. Das sehen die bestellende Person, ihre zugeordneten Eltern
+        und das Stufenteam bzw. wer die Kasse führt. Bankdaten der Zahlenden werden nicht gespeichert.
+      </P>
+      <P>
         <b>Ob du gerade in der App bist:</b> Solange die App offen und sichtbar ist, meldet sie das alle 30 Sekunden
         kurz an den Server. Gespeichert wird nur ein Zeitpunkt, der nach knapp einer Minute abläuft und dann
         überschrieben wird – damit du keine Pop-ups bekommst, während du ohnehin in der App bist. Niemand sonst
@@ -194,7 +199,8 @@ function Datenschutz() {
         Personen- und Beitragsdaten bleiben, solange die Stufe besteht, und werden danach gelöscht. Der
         Speicherstand der Nacht wird 30 Tage aufbewahrt, Sicherheitskopien vor einem Zurücksetzen 90 Tage. Das
         Protokoll wird nach zwei Jahren automatisch gelöscht. Wer die Stufe verlässt, kann seinen Zugang beim
-        Stufenteam löschen lassen.
+        Stufenteam löschen lassen. Ticketbestellungen bleiben bis nach dem Abiball (für die Abrechnung) und werden
+        danach mit den übrigen Daten gelöscht.
       </P>
       <P>
         Zusätzlich kann der Admin festlegen, dass <b>Chat-Nachrichten samt Reaktionen</b>, erledigte Gespräche und
