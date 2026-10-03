@@ -328,10 +328,8 @@ export function teamSchritte(o: {
     s.push({ tab: "beitraege", anchor: "tab-beitraege", title: "Beiträge & Abiball", text: "Was jedes Halbjahr kostet, die Prozent-Staffel fürs Ticket und die Vorlagen für Mithilfe." });
   if (o.finanzen)
     s.push({ tab: "finanzen", anchor: "tab-finanzen", title: "Finanzen", text: "Das Kassenbuch: Kontostand, Einnahmen und Ausgaben. Ein Tipp auf eine Buchung zeigt alle Details." });
-  if (o.rollen)
-    s.push({ tab: "rollen", anchor: "tab-rollen", title: "Rollen", text: "Wer welche Rolle hat. Mit dem Schalter „Elternzugänge anzeigen“ holst du die Eltern dazu und legst fest, welche Kinder sie sehen." });
-  if (o.rechte)
-    s.push({ tab: "rechte", anchor: "tab-rechte", title: "Rechte", text: "Feineinstellung, wer was darf. Nur nötig, wenn ihr vom Standard abweichen wollt." });
+  if (o.rollen || o.rechte)
+    s.push({ tab: "rollen", anchor: "tab-rollen", title: "Rollen & Rechte", text: "Oben umschalten: „Rollen“ zeigt alle Personen – Person antippen für ihre einzelnen Rechte. „Rechte“ legt fest, was jede Rolle darf." });
   s.push({ tab: "kasse", anchor: "profil", title: "Dein Profil", text: "Bild, Passwort und Mitteilungen. Dort startest du diese Einführung jederzeit neu." });
   return s;
 }

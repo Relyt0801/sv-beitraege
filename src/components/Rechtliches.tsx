@@ -118,12 +118,24 @@ function Datenschutz() {
         Namensfarbe, ob eine Chat-Sperre besteht, und wann zuletzt angemeldet wurde.
       </P>
       <P>
-        <b>Beim Benutzen:</b> geschriebene Nachrichten und Abstimmungen, Terminzu- und -absagen, Anmeldungen zu
-        Aktionen, Anträge und Kostenanfragen, das Kassenbuch der Stufe.
+        <b>Beim Benutzen:</b> geschriebene Nachrichten, Reaktionen auf Nachrichten (👍 👎 🔥 😢 😂 ❓ – sichtbar
+        für alle im selben Chat) und Abstimmungen, Terminzu- und -absagen, Anmeldungen zu Aktionen, Anträge und
+        Kostenanfragen, das Kassenbuch der Stufe.
+      </P>
+      <P>
+        <b>Mithilfe nachtragen:</b> Wer eine vergangene Mithilfe beantragt, speichert dazu den eigenen Namen, die
+        Aktion, das Datum und einen kurzen Text. Das sieht nur das Stufenteam bzw. wer Mithilfe eintragen darf.
+      </P>
+      <P>
+        <b>Ob du gerade in der App bist:</b> Solange die App offen und sichtbar ist, meldet sie das alle 30 Sekunden
+        kurz an den Server. Gespeichert wird nur ein Zeitpunkt, der nach knapp einer Minute abläuft und dann
+        überschrieben wird – damit du keine Pop-ups bekommst, während du ohnehin in der App bist. Niemand sonst
+        sieht diesen Wert.
       </P>
       <P>
         <b>Für Benachrichtigungen:</b> eine technische Kennung des Geräts (Push-Abo) – nur, wenn du
-        Benachrichtigungen ausdrücklich erlaubst.
+        Benachrichtigungen ausdrücklich erlaubst – und deine Schalter dafür (z. B. Chats aus, beim Stufenteam je
+        Bereich und Komitee).
       </P>
       <P>
         <b>Elternzugänge:</b> Benutzername und die Zuordnung zum eigenen Kind. Eltern sehen ausschließlich die
@@ -184,6 +196,12 @@ function Datenschutz() {
         Protokoll wird nach zwei Jahren automatisch gelöscht. Wer die Stufe verlässt, kann seinen Zugang beim
         Stufenteam löschen lassen.
       </P>
+      <P>
+        Zusätzlich kann der Admin festlegen, dass <b>Chat-Nachrichten samt Reaktionen</b>, erledigte Gespräche und
+        <b> bearbeitete Anträge</b> (Nachträge, Komitee-Wechsel, Entsperrungen, Termin- und Kostenanfragen)
+        nach einer Frist automatisch gelöscht werden (30 Tage bis 1 Jahr). Angepinntes, Abstimmungen, To-dos,
+        offene Anträge und Buchungen im Kassenbuch bleiben davon unberührt.
+      </P>
 
       <H>6. Was auf deinem Gerät bleibt</H>
       <P>
@@ -215,7 +233,7 @@ function Datenschutz() {
       </P>
 
       <p className="mt-4 text-[12px] text-tinte-leise">
-        Stand: {new Date().toLocaleDateString("de-DE")}
+        Stand: 03.10.2026
       </p>
     </>
   );

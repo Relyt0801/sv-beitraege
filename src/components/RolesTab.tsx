@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { PersonRechteSheet } from "./PermissionsTab";
 import { useNachschub } from "../lib/liste";
 import { useVerzoegert } from "../lib/entwurf";
 import { normalize } from "../lib/logic";
@@ -53,6 +54,9 @@ export function RolesTab() {
   const [openBan, setOpenBan] = useState<string | null>(null);
   // Elternzugang, dessen Kinder gerade bearbeitet werden
   const [kinderFuer, setKinderFuer] = useState<Profile | null>(null);
+  // Person angetippt: ihre einzelnen Rechte (vorher eigene Liste im Reiter Rechte)
+  const [rechteFuer, setRechteFuer] = useState<{ p: Profile; name: string } | null>(null);
+  const darfRechte = can("perms.manage");
   // Kinder ordnet nur zu, wer auch Elternzugaenge vergeben darf: der Admin.
   const darfKinder = isAdmin || isOp;
 
@@ -146,7 +150,16 @@ export function RolesTab() {
             "h-11 rounded-xl border border-transparent bg-[rgb(118_118_128/0.12)] font-semibold transition dark:bg-[rgb(118_118_128/0.24)]";
           return (
             <div key={p.user_id} className="card min-w-0 p-4">
-              {/* Zeile 1: Person */}
+              {/* Zeile 1: Person – antippen öffnet ihre einzelnen Rechte */}
+              <button
+                type="button"
+                disabled={!darfRechte || istEltern}
+                onClick={() => {
+                  const st = p.student_id ? nachId.get(p.student_id) : null;
+                  setRechteFuer({ p, name: st ? `${st.vorname} ${st.nachname}` : p.username || "Konto" });
+                }}
+                className="-m-1 w-[calc(100%+0.5rem)] rounded-xl p-1 text-left transition enabled:active:bg-black/[0.03] disabled:cursor-default dark:enabled:active:bg-white/[0.04]"
+              >
               <KontoZeile
                 profil={p}
                 student={p.student_id ? nachId.get(p.student_id) ?? null : null}
@@ -159,7 +172,15 @@ export function RolesTab() {
                     : undefined
                 }
                 hinweisWarnt={istEltern && kinder.length === 0}
+                rechts={
+                  darfRechte && !istEltern ? (
+                    <span className="flex shrink-0 items-center gap-1 text-[12px] font-semibold text-brand">
+                      Rechte <span aria-hidden>›</span>
+                    </span>
+                  ) : undefined
+                }
               />
+              </button>
 
               {/* Zeile 2: Rolle + Komitees (bei Eltern: Kinder) + Chat-Sperre */}
               <div className="mt-3 flex min-w-0 flex-wrap items-stretch gap-2">
@@ -310,6 +331,9 @@ export function RolesTab() {
         )}
       </div>
 
+      {rechteFuer && (
+        <PersonRechteSheet profil={rechteFuer.p} name={rechteFuer.name} onClose={() => setRechteFuer(null)} />
+      )}
       {kinderFuer && (
         <KinderSheet profil={kinderFuer} darf={darfKinder} onClose={() => setKinderFuer(null)} />
       )}

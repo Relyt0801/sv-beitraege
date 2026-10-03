@@ -112,6 +112,8 @@ export const TOUR_WEG = () => {
   try {
     const d = new Date().toISOString();
     for (const k of ['sv:tour:v3:team', 'sv:tour:v3:schueler', 'sv:tour:v3:eltern']) localStorage.setItem(k, d);
+    // Patch Notes nicht über die Prüfansichten legen
+    localStorage.setItem('sv:patch:gesehen', '999');
   } catch { /* Rahmen ohne Speicher */ }
 };
 

@@ -26,8 +26,7 @@ import { StudentCard, nextStatus } from "./components/StudentCard";
 import { StudentSheet } from "./components/StudentSheet";
 import { AddSheet } from "./components/AddSheet";
 import { MassBar } from "./components/MassBar";
-import { RolesTab } from "./components/RolesTab";
-import { PermissionsTab } from "./components/PermissionsTab";
+import { RollenRechteTab } from "./components/RollenRechteTab";
 import { EventsTab } from "./components/EventsTab";
 import { BeitraegeTab } from "./components/BeitraegeTab";
 import { FinanzenTab } from "./components/FinanzenTab";
@@ -37,6 +36,8 @@ import { EventComposer } from "./components/EventComposer";
 import { AktionSheet } from "./components/AktionSheet";
 import { SchichtAbschluss } from "./components/SchichtAbschluss";
 import { useChatZaehler } from "./lib/chat-zaehler";
+import { PatchNotes } from "./components/PatchNotes";
+import { PATCH, PATCH_MERKER } from "./lib/patchnotes";
 import { ElternProvider, useEltern } from "./eltern-store";
 import { ElternApp } from "./components/ElternApp";
 import { Icon, type IconName } from "./components/Icon";
@@ -97,13 +98,14 @@ function NachRolle() {
   );
 }
 
-type Tab = "kasse" | "events" | "themen" | "beitraege" | "finanzen" | "rollen" | "rechte";
+type Tab = "profil" | "kasse" | "events" | "themen" | "beitraege" | "finanzen" | "rollen";
 
 /** "#events" -> Events, "#chats" -> Chats. Danach wird die Marke entfernt,
  *  damit ein Neuladen nicht wieder dorthin springt. */
 function tabAusAdresse(entfernen = true): Tab | null {
   const h = window.location.hash.replace("#", "");
-  const t: Tab | null = h === "events" ? "events" : h === "chats" ? "themen" : h === "kasse" ? "kasse" : h === "finanzen" ? "finanzen" : null;
+  const t: Tab | null =
+    h === "events" ? "events" : h === "chats" ? "themen" : h === "kasse" ? "kasse" : h === "finanzen" ? "finanzen" : h === "profil" ? "profil" : null;
   if (t && entfernen) history.replaceState(null, "", window.location.pathname + window.location.search);
   return t;
 }
@@ -113,13 +115,13 @@ const SCHRITT_LISTE = 40;
 
 /** Was oben im Kopf steht – je Reiter eine kurze Überschrift. */
 const REITER_TITEL: Record<Tab, string> = {
+  profil: "Mein Profil",
   kasse: "Stufenkasse",
   events: "Events",
   themen: "Chats",
   beitraege: "Beiträge & Abiball",
   finanzen: "Finanzen",
-  rollen: "Rollen",
-  rechte: "Rechte",
+  rollen: "Rollen & Rechte",
 };
 
 function Main() {
@@ -181,6 +183,15 @@ function Main() {
   // useReiter springt vor dem Wechsel nach oben – sonst federt auf iOS die
   // Tab-Leiste, wenn der neue Reiter kürzer ist als die alte Scrollposition.
   const [tab, setTab] = useReiter<Tab>(() => tabAusAdresse(false) || "kasse");
+  // Team mit eigenem Eintrag startet – wie alle Schüler – auf der eigenen
+  // Ansicht (Reiter Profil). Nur beim Öffnen, nicht bei jedem Rollenwechsel.
+  const hatProfilReiter = isStaff && Boolean(studentId);
+  const startGewaehlt = useRef(Boolean(tabAusAdresse(false)));
+  useEffect(() => {
+    if (!roleReady || startGewaehlt.current) return;
+    startGewaehlt.current = true;
+    if (hatProfilReiter) setTab("profil");
+  }, [roleReady, hatProfilReiter, setTab]);
   useEffect(() => {
     tabAusAdresse(true);
   }, []);
@@ -206,6 +217,24 @@ function Main() {
   const [showAdd, setShowAdd] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showTour, setShowTour] = useState(false);
+  // Patch Notes: einmal je Version, nicht während der Einführung
+  const [showPatch, setShowPatch] = useState(false);
+  // Patch Notes nach dem Öffnen – wenn diese Version noch nicht gesehen wurde.
+  // Neue Zugänge sehen zuerst die Einführung; die setzt den Merker mit.
+  useEffect(() => {
+    if (!roleReady || !ready || showTour) return;
+    let gesehen: string | null = null;
+    try {
+      gesehen = localStorage.getItem(PATCH_MERKER);
+    } catch {
+      return;
+    }
+    // Versionen als Zahl vergleichen (1.10 > 1.9 gilt hier nicht – reicht für 1.1, 1.2 …)
+    if (gesehen && Number(gesehen) >= Number(PATCH.version)) return;
+    const t = setTimeout(() => setShowPatch(true), 1200);
+    return () => clearTimeout(t);
+  }, [roleReady, ready, showTour]);
+
   const gescrollt = useGescrollt(4);
   // Kopf und Tab-Leiste messen: danach richten sich Chat-Eingabe,
   // Komitee-Leiste und die Zwischenüberschriften (siehe index.css).
@@ -327,13 +356,14 @@ function Main() {
     "rounded-full bg-[rgb(118_118_128/0.12)] px-3.5 py-1.5 text-[14px] font-semibold text-brand-dark transition active:scale-95 dark:bg-[rgb(118_118_128/0.24)] dark:text-brand";
 
   const navItems: { key: Tab; icon: IconName; label: string; badge?: number; show: boolean }[] = [
+    // Team mit eigenem Eintrag: die eigene Ansicht wie bei den Schülern
+    { key: "profil", icon: "person", label: "Profil", show: hatProfilReiter },
     { key: "kasse", icon: "kasse", label: "Kasse", show: true },
     { key: "events", icon: "events", label: "Events", badge: unread, show: true },
     { key: "themen", icon: "chats", label: "Chats", badge: topicsUnread, show: showTopicsTab },
     { key: "beitraege", icon: "beitraege", label: "Beiträge", show: can("beitraege.manage") },
     { key: "finanzen", icon: "finanzen", label: "Finanzen", badge: offeneKosten, show: showFinanzen },
-    { key: "rollen", icon: "rollen", label: "Rollen", show: canManageRoles },
-    { key: "rechte", icon: "rechte", label: "Rechte", show: can("perms.manage") },
+    { key: "rollen", icon: "rollen", label: "Rollen", show: canManageRoles || can("perms.manage") },
   ];
 
   // Über eine Adresse wie #finanzen darf niemand in einen Reiter, der für ihn
@@ -567,12 +597,17 @@ function Main() {
       </div>
 
       {tab === "rollen" ? (
-        <main key={tab} className="animate-fadeIn mt-3">
-          <RolesTab />
-        </main>
-      ) : tab === "rechte" ? (
         <main key={tab} className="animate-fadeIn mt-3 pb-4">
-          <PermissionsTab />
+          <RollenRechteTab />
+        </main>
+      ) : tab === "profil" ? (
+        <main key={tab} className="animate-fadeIn mt-3">
+          <MyKasse
+            student={meinEintrag}
+            settings={settings}
+            punkte={punkte[meinEintrag?.id ?? ""] || 0}
+            ready={ready && roleReady}
+          />
         </main>
       ) : tab === "events" ? (
         <main key={tab} className="animate-fadeIn mt-3">
@@ -775,9 +810,22 @@ function Main() {
       />
       {/* Nicht zwei Begrüßungen übereinander: erst die Einführung, danach der
           Hinweis zum Home-Bildschirm. */}
-      {!showTour && <InstallOverlay />}
+      {!showTour && !showPatch && <InstallOverlay />}
       {/* Schicht vorbei: Stufenteam vergibt die Beitragspunkte mit einem Tipp */}
-      {!showTour && <SchichtAbschluss />}
+      {!showTour && !showPatch && <SchichtAbschluss />}
+      {showPatch && !showTour && (
+        <PatchNotes
+          team={isStaff}
+          onFertig={() => {
+            setShowPatch(false);
+            try {
+              localStorage.setItem(PATCH_MERKER, PATCH.version);
+            } catch {
+              /* privater Modus */
+            }
+          }}
+        />
+      )}
       <Tour
         open={showTour}
         steps={
@@ -799,7 +847,13 @@ function Main() {
         }}
         onClose={() => {
           setShowTour(false);
-          setTab("kasse");
+          setTab(hatProfilReiter ? "profil" : "kasse");
+          // Wer die Einführung gerade gesehen hat, braucht die Patch Notes nicht
+          try {
+            localStorage.setItem(PATCH_MERKER, PATCH.version);
+          } catch {
+            /* privater Modus */
+          }
           // Zeitpunkt merken, damit ein späteres Zurücksetzen erkannt wird
           localStorage.setItem(`sv:tour:v3:${isStaff ? "team" : "schueler"}`, new Date().toISOString());
         }}

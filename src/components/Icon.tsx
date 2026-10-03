@@ -31,7 +31,8 @@ export type IconName =
   | "muell"
   | "info"
   | "herz"
-  | "pfeile";
+  | "pfeile"
+  | "person";
 
 const PFADE: Record<IconName, JSX.Element> = {
   kasse: (
@@ -52,6 +53,12 @@ const PFADE: Record<IconName, JSX.Element> = {
       <path d="M4 7h16" />
       <path d="M4 12h10" />
       <path d="M4 17h7" />
+    </>
+  ),
+  person: (
+    <>
+      <circle cx="12" cy="8" r="3.6" />
+      <path d="M4.5 20.5a7.5 7.5 0 0 1 15 0" />
     </>
   ),
   rollen: (

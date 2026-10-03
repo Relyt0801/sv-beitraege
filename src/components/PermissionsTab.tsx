@@ -1,12 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
-import { useNachschub } from "../lib/liste";
-import { useVerzoegert } from "../lib/entwurf";
+import { useEffect, useState } from "react";
 import { hasSupabase, supabase } from "../lib/supabase";
 import { useRole } from "../auth/RoleProvider";
-import { useStore } from "../store";
-import { KontoZeile, Suchfeld } from "./KontoZeile";
-import { normalize } from "../lib/logic";
 import { KomiteeZugriff } from "./KomiteeZugriff";
+import { SkelettKarten } from "./Skelett";
+import { Sheet } from "./Sheet";
+import type { Profile } from "../auth/RoleProvider";
 import { PERM_CATEGORIES, PERM_ROLES, ALL_PERMS, ROLE_DEFAULTS, ROLLE_KURZ, rechteRolle, rollenDerZeile, type PermKey } from "../lib/permissions";
 
 import { meldeFehler } from "../lib/melder";
@@ -19,13 +17,11 @@ const MIT_ELTERN = [...PERM_ROLES, { key: "eltern" as const, label: "Eltern" }];
 
 
 export function PermissionsTab() {
-  const { profiles, can, isAdmin, opUserId } = useRole();
-  const { students } = useStore();
+  const { can, isAdmin } = useRole();
   const [roleMatrix, setRoleMatrix] = useState<Matrix>({});
-  const [overrides, setOverrides] = useState<Record<string, Record<string, boolean>>>({});
   const [loaded, setLoaded] = useState(false);
-  const [q, setQ] = useState("");
-  const [openUser, setOpenUser] = useState<string | null>(null);
+  // Kategorien sind zugeklappt – aufklappen, was man ändern will
+  const [offen, setOffen] = useState<Set<string>>(() => new Set());
 
   useEffect(() => {
     (async () => {
@@ -33,7 +29,7 @@ export function PermissionsTab() {
       for (const r of MIT_ELTERN) { rm[r.key] = {}; for (const p of ALL_PERMS) rm[r.key][p] = false; }
       if (!hasSupabase) {
         for (const r of MIT_ELTERN) for (const p of ALL_PERMS) rm[r.key][p] = ROLE_DEFAULTS[r.key].includes(p);
-        setRoleMatrix(rm); setOverrides({}); setLoaded(true); return;
+        setRoleMatrix(rm); setLoaded(true); return;
       }
       const { data: rp } = await supabase!.from("role_permissions").select("*");
       for (const row of (rp as { role: string; perm: string; allowed: boolean }[]) || []) {
@@ -41,10 +37,7 @@ export function PermissionsTab() {
         if (rm[zeile]) rm[zeile][row.perm] = row.allowed;
       }
       for (const p of ALL_PERMS) rm["admin"][p] = true; // Admin immer alles
-      const { data: up } = await supabase!.from("user_permissions").select("*");
-      const uo: Record<string, Record<string, boolean>> = {};
-      for (const row of (up as { user_id: string; perm: string; allowed: boolean }[]) || []) (uo[row.user_id] ||= {})[row.perm] = row.allowed;
-      setRoleMatrix(rm); setOverrides(uo); setLoaded(true);
+      setRoleMatrix(rm); setLoaded(true);
     })();
   }, []);
 
@@ -52,14 +45,6 @@ export function PermissionsTab() {
   const sichtbar = (perm: PermKey) => isAdmin || can(perm);
   const kategorien = PERM_CATEGORIES.map((c) => ({ ...c, perms: c.perms.filter((p) => sichtbar(p.key)) }))
     .filter((c) => c.perms.length > 0);
-
-  // Nachschlagen statt durchsuchen – sonst laeuft je Konto eine Suche ueber
-  // alle Personen.
-  const nachId = useMemo(() => new Map(students.map((s) => [s.id, s])), [students]);
-  const nameFor = (sid: string | null) => {
-    const s = sid ? nachId.get(sid) : null;
-    return s ? `${s.nachname}, ${s.vorname}` : null;
-  };
 
   async function toggleRole(roleKey: string, perm: PermKey) {
     if (roleKey === "admin") return;
@@ -73,49 +58,45 @@ export function PermissionsTab() {
     }
   }
 
-  async function setOverride(userId: string, perm: PermKey, val: boolean | null) {
-    setOverrides((o) => {
-      const c = { ...(o[userId] || {}) };
-      if (val === null) delete c[perm]; else c[perm] = val;
-      return { ...o, [userId]: c };
-    });
-    if (hasSupabase) {
-      if (val === null) await supabase!.from("user_permissions").delete().eq("user_id", userId).eq("perm", perm);
-      else await supabase!.from("user_permissions").upsert({ user_id: userId, perm, allowed: val });
-    }
-  }
 
-  const suche = useVerzoegert(q, 120);
-
-  const rows = useMemo(() => {
-    const norm = normalize(suche);
-    return [...profiles]
-      // Elternzugaenge haben keine Befugnisse und stehen deshalb auch nicht hier.
-      .filter((p) => p.role !== "eltern")
-      .map((p) => ({ p, name: nameFor(p.student_id) }))
-      .filter(({ p, name }) => !norm || normalize(`${p.username} ${name ?? ""}`).includes(norm))
-      .sort((a, b) => (a.name ?? a.p.username ?? "").localeCompare(b.name ?? b.p.username ?? "", "de"));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profiles, suche, nachId]);
-
-  const { sichtbar: zeilenSichtbar, marke, rest } = useNachschub(rows.length, [suche]);
 
   if (!loaded)
     return (
-      <div className="flex flex-col items-center gap-4 py-24 text-tinte-leise">
-        <div className="h-9 w-9 animate-spin rounded-full border-[3px] border-papier-linie border-t-brand dark:border-slate-700 dark:border-t-brand" />
-        <div className="text-sm font-medium">Berechtigungen werden geladen …</div>
-      </div>
+      <SkelettKarten n={4} />
     );
 
   return (
     <div className="space-y-5">
-      <p className="text-sm text-tinte-leise">Rechte gelten pro Rolle. Für einzelne Personen kannst du unten Ausnahmen setzen, die gehen dann vor. Der Admin hat immer alle Rechte.</p>
+      <p className="text-sm text-tinte-leise">
+        Rechte gelten pro Rolle. Ausnahmen für einzelne Personen setzt du unter „Rollen“: Person antippen. Der Admin
+        hat immer alle Rechte.
+      </p>
 
-      {kategorien.map((cat) => (
-        <section key={cat.label} className="card p-4">
-          <h3 className="mb-3 flex items-center gap-2 font-bold">{cat.icon} {cat.label}</h3>
-          <div className="space-y-3.5">
+      {kategorien.map((cat) => {
+        const auf = offen.has(cat.label);
+        const an = cat.perms.reduce((n, perm) => n + PERM_ROLES.filter((r) => roleMatrix[r.key]?.[perm.key]).length, 0);
+        return (
+        <section key={cat.label} className="card overflow-hidden">
+          <button
+            onClick={() => setOffen((o) => {
+              const n = new Set(o);
+              if (n.has(cat.label)) n.delete(cat.label); else n.add(cat.label);
+              return n;
+            })}
+            aria-expanded={auf}
+            className="flex w-full items-center gap-2 p-4 text-left"
+          >
+            <span className="text-lg" aria-hidden>{cat.icon}</span>
+            <span className="min-w-0 flex-1">
+              <span className="block font-bold">{cat.label}</span>
+              <span className="block text-[12px] text-tinte-leise">
+                {cat.perms.length} {cat.perms.length === 1 ? "Recht" : "Rechte"} · {an} Häkchen gesetzt
+              </span>
+            </span>
+            <span className={`text-tinte-leise transition ${auf ? "rotate-90" : ""}`} aria-hidden>›</span>
+          </button>
+          {auf && (
+          <div className="space-y-3.5 border-t border-papier-linie px-4 pb-4 pt-3 dark:border-slate-800">
             {cat.perms.map((perm) => (
               <div key={perm.key}>
                 <div className="text-[15px] font-semibold">{perm.label}</div>
@@ -143,82 +124,10 @@ export function PermissionsTab() {
               </div>
             ))}
           </div>
-        </section>
-      ))}
-
-      <section className="card p-4">
-        <h3 className="font-bold">Einzelne Personen</h3>
-        <p className="mb-3 text-[11px] text-tinte-leise">Ausnahmen für eine Person. Ohne Auswahl gilt, was die Rolle erlaubt.</p>
-        <Suchfeld wert={q} onChange={setQ} platzhalter="Person oder Konto suchen …" />
-        <div className="space-y-2">
-          {rows.slice(0, zeilenSichtbar).map(({ p }) => {
-            const ov = overrides[p.user_id] || {};
-            const count = Object.keys(ov).length;
-            const geschuetzt = Boolean(p.is_op) || p.user_id === opUserId;
-            return (
-              <div key={p.user_id} className="rounded-xl border border-papier-linie dark:border-slate-700">
-                <button onClick={() => setOpenUser(openUser === p.user_id ? null : p.user_id)} className="w-full p-3 text-left">
-                  <KontoZeile
-                    profil={p}
-                    student={p.student_id ? students.find((x) => x.id === p.student_id) : null}
-                    rechts={
-                      <span className="flex shrink-0 items-center gap-2">
-                        {count > 0 && (
-                          <span className="rounded-full bg-brand/15 px-2 py-0.5 text-[11px] font-bold text-brand">
-                            {count} Ausnahme{count > 1 ? "n" : ""}
-                          </span>
-                        )}
-                        <span className="text-tinte-leise">{openUser === p.user_id ? "▴" : "▾"}</span>
-                      </span>
-                    }
-                  />
-                </button>
-                {openUser === p.user_id && (
-                  <div className="space-y-4 border-t border-papier-linie p-3 dark:border-slate-800">
-                    {kategorien.map((cat) => (
-                      <div key={cat.label}>
-                        <div className="mb-1.5 text-[11px] font-bold uppercase tracking-wide text-tinte-leise">
-                          {cat.icon} {cat.label}
-                        </div>
-                        <div className="space-y-2.5">
-                          {cat.perms.map((perm) => {
-                            const val = ov[perm.key];
-                            return (
-                              <div key={perm.key}>
-                                <div className="mb-1 text-[13px] font-semibold leading-tight">{perm.label}</div>
-                                <div className={`grid grid-cols-2 gap-1.5 ${geschuetzt ? "pointer-events-none opacity-40" : ""}`}>
-                                  <TriBtn
-                                    active={val === true}
-                                    tone="green"
-                                    label="Erlauben"
-                                    onClick={() => setOverride(p.user_id, perm.key, val === true ? null : true)}
-                                  />
-                                  <TriBtn
-                                    active={val === false}
-                                    tone="red"
-                                    label="Verbieten"
-                                    onClick={() => setOverride(p.user_id, perm.key, val === false ? null : false)}
-                                  />
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-          {rest > 0 && (
-            <div ref={marke} className="py-6 text-center text-[12px] text-tinte-leise">
-              lädt weitere … ({rest} übrig)
-            </div>
           )}
-          {rows.length === 0 && <div className="py-8 text-center text-sm text-tinte-leise">Keine Person gefunden.</div>}
-        </div>
-      </section>
+        </section>
+        );
+      })}
 
       <KomiteeZugriff />
     </div>
@@ -240,5 +149,131 @@ function TriBtn({ active, label, onClick, tone }: { active: boolean; label: stri
     >
       {label}
     </button>
+  );
+}
+
+/**
+ * Ausnahmen für eine Person – geöffnet aus „Rollen“ (Person antippen).
+ * Je Recht drei Zustände: wie die Rolle (Standard), erlauben, verbieten.
+ * Kategorien zugeklappt, damit es übersichtlich bleibt.
+ */
+export function PersonRechteSheet({ profil, name, onClose }: { profil: Profile; name: string; onClose: () => void }) {
+  const { can, isAdmin, opUserId } = useRole();
+  const [rolle, setRolle] = useState<Record<string, boolean>>({});
+  const [ov, setOv] = useState<Record<string, boolean>>({});
+  const [offen, setOffen] = useState<Set<string>>(() => new Set());
+  const [bereit, setBereit] = useState(!hasSupabase);
+  const geschuetzt = Boolean(profil.is_op) || profil.user_id === opUserId;
+  const zeile = rechteRolle(profil.role);
+
+  useEffect(() => {
+    if (!hasSupabase) return;
+    void (async () => {
+      const [{ data: rp }, { data: up }] = await Promise.all([
+        supabase!.from("role_permissions").select("perm, allowed").eq("role", profil.role),
+        supabase!.from("user_permissions").select("perm, allowed").eq("user_id", profil.user_id),
+      ]);
+      const r: Record<string, boolean> = {};
+      for (const x of (rp as { perm: string; allowed: boolean }[]) || []) r[x.perm] = x.allowed;
+      if (zeile === "admin") for (const pk of ALL_PERMS) r[pk] = true;
+      const o: Record<string, boolean> = {};
+      for (const x of (up as { perm: string; allowed: boolean }[]) || []) o[x.perm] = x.allowed;
+      setRolle(r);
+      setOv(o);
+      setBereit(true);
+    })();
+  }, [profil.user_id, profil.role, zeile]);
+
+  async function setze(perm: PermKey, val: boolean | null) {
+    setOv((o) => {
+      const c = { ...o };
+      if (val === null) delete c[perm];
+      else c[perm] = val;
+      return c;
+    });
+    if (!hasSupabase) return;
+    const { error } =
+      val === null
+        ? await supabase!.from("user_permissions").delete().eq("user_id", profil.user_id).eq("perm", perm)
+        : await supabase!.from("user_permissions").upsert({ user_id: profil.user_id, perm, allowed: val });
+    if (error) meldeFehler("Speichern fehlgeschlagen: " + error.message);
+  }
+
+  const sichtbar = (perm: PermKey) => isAdmin || can(perm);
+  const kategorien = PERM_CATEGORIES.map((c) => ({ ...c, perms: c.perms.filter((p) => sichtbar(p.key)) })).filter(
+    (c) => c.perms.length > 0,
+  );
+  const anzahl = Object.keys(ov).length;
+
+  return (
+    <Sheet open onClose={onClose}>
+      <h2 className="text-[1.375rem] font-bold leading-tight tracking-[-0.02em]">Rechte von {name}</h2>
+      <p className="mt-1 text-[13px] leading-relaxed text-tinte-leise">
+        Ohne Ausnahme gilt, was die Rolle „{ROLLE_KURZ[zeile] ?? profil.role}“ erlaubt.
+        {anzahl > 0 && ` ${anzahl} Ausnahme${anzahl > 1 ? "n" : ""} gesetzt.`}
+        {geschuetzt && " Dieses Konto ist geschützt und lässt sich nicht ändern."}
+      </p>
+      {!bereit ? (
+        <div className="mt-4">
+          <SkelettKarten n={3} />
+        </div>
+      ) : (
+        <div className="mt-4 grid gap-2.5">
+          {kategorien.map((cat) => {
+            const auf = offen.has(cat.label);
+            const ausn = cat.perms.filter((pp) => ov[pp.key] !== undefined).length;
+            return (
+              <section key={cat.label} className="overflow-hidden rounded-2xl bg-[rgb(118_118_128/0.08)] dark:bg-[rgb(118_118_128/0.18)]">
+                <button
+                  onClick={() =>
+                    setOffen((o) => {
+                      const n = new Set(o);
+                      if (n.has(cat.label)) n.delete(cat.label);
+                      else n.add(cat.label);
+                      return n;
+                    })
+                  }
+                  aria-expanded={auf}
+                  className="flex w-full items-center gap-2 px-4 py-3 text-left"
+                >
+                  <span aria-hidden>{cat.icon}</span>
+                  <span className="min-w-0 flex-1 font-semibold">{cat.label}</span>
+                  {ausn > 0 && (
+                    <span className="rounded-full bg-brand/15 px-2 py-0.5 text-[11px] font-bold text-brand">{ausn}</span>
+                  )}
+                  <span className={`text-tinte-leise transition ${auf ? "rotate-90" : ""}`} aria-hidden>›</span>
+                </button>
+                {auf && (
+                  <div className={`space-y-3 px-4 pb-4 ${geschuetzt ? "pointer-events-none opacity-40" : ""}`}>
+                    {cat.perms.map((perm) => {
+                      const val = ov[perm.key];
+                      const standard = Boolean(rolle[perm.key]);
+                      return (
+                        <div key={perm.key}>
+                          <div className="text-[14px] font-semibold leading-tight">{perm.label}</div>
+                          <div className="mb-1.5 text-[11px] leading-snug text-tinte-leise">{perm.desc}</div>
+                          <div className="grid grid-cols-3 gap-1.5">
+                            <TriBtn
+                              active={val === undefined}
+                              label={`Wie Rolle (${standard ? "ja" : "nein"})`}
+                              onClick={() => void setze(perm.key, null)}
+                            />
+                            <TriBtn active={val === true} tone="green" label="Erlauben" onClick={() => void setze(perm.key, true)} />
+                            <TriBtn active={val === false} tone="red" label="Verbieten" onClick={() => void setze(perm.key, false)} />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </section>
+            );
+          })}
+        </div>
+      )}
+      <button className="btn-primary mt-4" onClick={onClose}>
+        Fertig
+      </button>
+    </Sheet>
   );
 }

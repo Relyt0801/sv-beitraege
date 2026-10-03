@@ -81,7 +81,7 @@ interface StoreValue {
   templates: ContribTemplate[];
   addContribution: (studentId: string, titel: string, punkte: number, datum?: string) => void;
   /** Denselben Beitrag mehreren Personen gutschreiben. */
-  addContributionMany: (studentIds: string[], titel: string, punkte: number) => void;
+  addContributionMany: (studentIds: string[], titel: string, punkte: number, datum?: string) => void;
   addTemplate: (titel: string, punkte: number) => void;
   updateTemplate: (id: string, patch: Partial<Pick<ContribTemplate, "titel" | "punkte" | "sort" | "variabel">>) => void;
   removeTemplate: (id: string) => void;
@@ -473,8 +473,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   );
 
   const addContributionMany: StoreValue["addContributionMany"] = useCallback(
-    (studentIds, titel, punkte) => {
-      const datum = new Date().toISOString().slice(0, 10);
+    (studentIds, titel, punkte, tag) => {
+      const datum = tag || new Date().toISOString().slice(0, 10);
       const neu: Contribution[] = studentIds.map((student_id) => ({
         id: crypto.randomUUID(),
         student_id,

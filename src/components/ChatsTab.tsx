@@ -253,7 +253,7 @@ function KategorieKopf({
     <div className="mb-2 flex items-center gap-2">
       <h3 className="min-w-0 flex-1 text-xs font-bold uppercase tracking-wide text-tinte-leise">
         {titel}
-        {hinweis && <span className="ml-2 font-medium normal-case tracking-normal text-tinte-leise/80">{hinweis}</span>}
+        {hinweis && <span className="ml-2 font-medium normal-case tracking-normal">{hinweis}</span>}
       </h3>
       {glocke && <Glocke an={glocke.an} setAn={glocke.setAn} name={titel} />}
     </div>
@@ -273,7 +273,9 @@ function Glocke({ an, setAn, name }: { an: boolean; setAn: (an: boolean) => void
       aria-label={`Mitteilungen für ${name}`}
       title={an ? "Mitteilungen an – antippen zum Ausschalten" : "Mitteilungen aus – antippen zum Einschalten"}
       className={`flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-[11.5px] font-bold transition active:scale-95 ${
-        an ? "bg-brand/10 text-brand dark:bg-brand/20" : "bg-[rgb(118_118_128/0.12)] text-tinte-leise dark:bg-[rgb(118_118_128/0.24)]"
+        an
+          ? "bg-brand/[0.08] text-[#004f9e] dark:bg-brand/20 dark:text-brand-soft"
+          : "bg-[rgb(118_118_128/0.12)] text-tinte-matt dark:bg-[rgb(118_118_128/0.24)] dark:text-slate-300"
       }`}
     >
       <span aria-hidden>{an ? "🔔" : "🔕"}</span>
@@ -294,8 +296,11 @@ function ChatCard({
   glocke?: { an: boolean; setAn: (an: boolean) => void; name: string };
 }) {
   return (
-    <div className={`card flex w-full items-center transition ${mine ? "" : "opacity-70"}`}>
-      <button onClick={onOpen} className="flex min-w-0 flex-1 items-center gap-3 p-4 text-left active:scale-[.99]">
+    <div className="card flex w-full items-center transition">
+      <button
+        onClick={onOpen}
+        className={`flex min-w-0 flex-1 items-center gap-3 p-4 text-left active:scale-[.99] ${mine ? "" : "opacity-70"}`}
+      >
         <span className="text-xl">{icon}</span>
         <span className="min-w-0 flex-1">
           <span className="block truncate text-[15px] font-bold">{titel}</span>

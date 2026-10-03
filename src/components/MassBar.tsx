@@ -3,6 +3,8 @@ import { HY, type Halbjahr } from "../lib/types";
 import { useStore } from "../store";
 import { useRole } from "../auth/RoleProvider";
 import { sortStudents } from "../lib/logic";
+import { Sheet } from "./Sheet";
+import { MithilfeEintragen } from "./PunkteSheet";
 
 /**
  * Leiste im Auswahl-Modus der Kasse.
@@ -23,12 +25,10 @@ export function MassBar({
   onAbwaehlen: (id: string) => void;
   onDone: () => void;
 }) {
-  const { massApply, templates, addContributionMany, students } = useStore();
+  const { massApply, addContributionMany, students } = useStore();
   const { canEditHilfen } = useRole();
   const [h, setH] = useState<Halbjahr>("EF.1");
   const [punkteOffen, setPunkteOffen] = useState(false);
-  const [titel, setTitel] = useState("");
-  const [punkte, setPunkte] = useState("5");
 
   // Nur Personen, die es noch gibt – alphabetisch wie in der Liste.
   const ausgewaehlt = useMemo(() => sortStudents(students.filter((s) => selected.has(s.id))), [students, selected]);
@@ -53,72 +53,6 @@ export function MassBar({
       ))}
     </div>
   );
-
-  if (punkteOffen)
-    return (
-      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-papier-linie bg-white/95 px-3.5 py-2.5 pb-[calc(env(safe-area-inset-bottom)+0.6rem)] backdrop-blur dark:border-slate-800 dark:bg-slate-900/95">
-        <div className="mb-1 text-sm font-bold">
-          Mithilfe für {ausgewaehlt.length} Person{ausgewaehlt.length === 1 ? "" : "en"}
-        </div>
-        <p className="mb-1.5 text-[11px] text-tinte-leise">
-          Alle hier bekommen sofort eine Mitteilung. Wer nicht dabei war: antippen zum Abwählen.
-        </p>
-        <div className="mb-2">{namen}</div>
-        {templates.length > 0 && (
-          <div className="mb-2 flex flex-wrap gap-1.5">
-            {templates.map((t) => (
-              <button
-                key={t.id}
-                onClick={() => {
-                  setTitel(t.titel);
-                  setPunkte(String(t.punkte));
-                }}
-                className="rounded-full border border-brand/40 px-2.5 py-1 text-[13px] font-semibold text-brand"
-              >
-                {t.titel} <span className="opacity-60">+{t.punkte}</span>
-              </button>
-            ))}
-          </div>
-        )}
-        <div className="flex items-center gap-2">
-          <input
-            className="field min-w-0 flex-1 py-2"
-            placeholder="Wofür? z. B. Standdienst"
-            value={titel}
-            onChange={(e) => setTitel(e.target.value)}
-          />
-          <input
-            type="number"
-            min={0}
-            className="w-16 rounded-xl border border-papier-linie bg-papier-matt px-2 py-2 text-center dark:border-slate-700 dark:bg-slate-800"
-            value={punkte}
-            onChange={(e) => setPunkte(e.target.value)}
-          />
-          <button
-            onClick={() => setPunkteOffen(false)}
-            className="rounded-xl border border-papier-linie px-3 py-2 text-sm font-semibold text-tinte-matt dark:border-slate-700"
-          >
-            Zurück
-          </button>
-          <button
-            disabled={!titel.trim() || disabled}
-            onClick={() => {
-              addContributionMany(
-                ausgewaehlt.map((s) => s.id),
-                titel,
-                Number(punkte) || 0,
-              );
-              setTitel("");
-              setPunkteOffen(false);
-              onDone();
-            }}
-            className="rounded-xl bg-brand px-4 py-2 text-sm font-bold text-white disabled:opacity-40"
-          >
-            Eintragen
-          </button>
-        </div>
-      </div>
-    );
 
   return (
     <div className="fixed inset-x-0 bottom-0 z-40 flex flex-wrap items-center gap-2 border-t border-papier-linie bg-white/95 px-3.5 py-2.5 pb-[calc(env(safe-area-inset-bottom)+0.6rem)] backdrop-blur dark:border-slate-800 dark:bg-slate-900/95">
@@ -150,6 +84,41 @@ export function MassBar({
       <button className="rounded-xl bg-brand px-3 py-2 text-sm font-bold text-white" onClick={onDone}>
         Fertig
       </button>
+
+      {/* Mithilfe für mehrere: dasselbe Blatt wie für eine Person, oben
+          stehen die Ausgewählten (antippen = abwählen). */}
+      <Sheet open={punkteOffen} onClose={() => setPunkteOffen(false)}>
+        <div className="mb-3 flex items-start gap-3">
+          <div className="min-w-0 flex-1">
+            <div className="text-xl font-bold leading-tight">Mithilfe eintragen</div>
+            <div className="text-sm text-tinte-matt">
+              für {ausgewaehlt.length} Person{ausgewaehlt.length === 1 ? "" : "en"}
+            </div>
+          </div>
+          <button className="iconbtn" onClick={() => setPunkteOffen(false)} aria-label="Schließen">
+            ✕
+          </button>
+        </div>
+        <div className="mb-1 rounded-2xl bg-papier-matt p-3 dark:bg-slate-800/70">{namen}</div>
+        <p className="mb-3 px-1 text-[11.5px] text-tinte-leise">
+          Alle hier bekommen eine Mitteilung. Wer nicht dabei war: antippen zum Abwählen.
+        </p>
+        <MithilfeEintragen
+          knopf={`Für ${ausgewaehlt.length} eintragen`}
+          ohneKopf
+          onEintragen={(titel, p, datum) => {
+            if (!ausgewaehlt.length) return;
+            addContributionMany(
+              ausgewaehlt.map((x) => x.id),
+              titel,
+              p,
+              datum,
+            );
+            setPunkteOffen(false);
+            onDone();
+          }}
+        />
+      </Sheet>
     </div>
   );
 }

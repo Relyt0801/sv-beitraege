@@ -25,12 +25,8 @@ export function PunkteSheet({
   open: boolean;
   onClose: () => void;
 }) {
-  const { contributions, templates, addContribution, updateContribution, removeContribution } = useStore();
+  const { contributions, addContribution, updateContribution, removeContribution } = useStore();
   const { profile } = useProfiles();
-  // gewählte Vorlage + ggf. angepasster Wert + Datum der Hilfe
-  const [gewaehlt, setGewaehlt] = useState<string | null>(null);
-  const [wert, setWert] = useState("5");
-  const [datum, setDatum] = useState(() => new Date().toISOString().slice(0, 10));
 
   if (!student) return null;
   const list = contributions
@@ -39,21 +35,6 @@ export function PunkteSheet({
   const summe = list.reduce((n, c) => n + c.punkte, 0);
   const pct = prozentVon(summe, settings);
 
-  const vorlage = templates.find((t) => t.id === gewaehlt) ?? null;
-
-  function waehle(id: string) {
-    const t = templates.find((x) => x.id === id);
-    setGewaehlt(id);
-    setWert(String(t?.punkte ?? 0)); // Prozentwert der Vorlage übernehmen
-  }
-
-  function speichern() {
-    if (!vorlage) return;
-    const p = vorlage.variabel ? Math.max(0, Math.min(100, Number(wert) || 0)) : vorlage.punkte;
-    addContribution(student!.id, vorlage.titel, p, datum);
-    setGewaehlt(null);
-    setDatum(new Date().toISOString().slice(0, 10));
-  }
 
   return (
     <Sheet open={open} onClose={onClose}>
@@ -84,81 +65,7 @@ export function PunkteSheet({
 
       {editable && (
         <div className="mt-4">
-          <div className="flex items-baseline justify-between">
-            <h3 className="text-[13px] font-semibold text-tinte-matt">Mithilfe eintragen</h3>
-            <span className="text-[11px] text-tinte-leise">aus der Liste wählen</span>
-          </div>
-
-          {templates.length === 0 ? (
-            <p className="mt-2 rounded-xl border border-papier-linie bg-papier-matt p-3 text-[13px] text-tinte-matt dark:border-slate-700 dark:bg-slate-800">
-              Es steht noch nichts zur Auswahl. Das Stufenteam legt die Möglichkeiten im Reiter
-              „Beiträge" an.
-            </p>
-          ) : (
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {[...templates]
-                .sort((a, b) => a.sort - b.sort || a.punkte - b.punkte)
-                .map((t) => {
-                  const aktiv = t.id === gewaehlt;
-                  return (
-                    <button
-                      key={t.id}
-                      onClick={() => waehle(t.id)}
-                      className={`flex items-center gap-1.5 rounded-xl border px-2.5 py-2 text-[12px] font-semibold transition active:scale-[.98] ${
-                        aktiv
-                          ? "border-brand bg-brand text-white"
-                          : t.variabel
-                            ? "border-brand/30 bg-brand/5 text-tinte dark:bg-slate-800 dark:text-slate-200"
-                            : "border-papier-linie bg-white text-tinte dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
-                      }`}
-                    >
-                      {t.titel}
-                      <span className={`zahl font-bold ${aktiv ? "text-white" : "text-brand"}`}>
-                        {t.variabel ? "% frei" : `+${t.punkte} %`}
-                      </span>
-                    </button>
-                  );
-                })}
-            </div>
-          )}
-
-          {/* Datum steht schon, Wert haengt an der Vorlage: eintragen ist ein Griff. */}
-          <div className="mt-2.5 flex items-center gap-2 rounded-xl border border-papier-linie bg-papier-matt px-3 py-2 dark:border-slate-700 dark:bg-slate-800">
-            <label htmlFor="mithilfe-datum" className="shrink-0 text-[12px] font-semibold text-tinte-matt">
-              am
-            </label>
-            <input
-              id="mithilfe-datum"
-              type="date"
-              className="w-0 min-w-[7.5rem] flex-1 bg-transparent text-[13px] font-semibold outline-none"
-              value={datum}
-              onChange={(e) => setDatum(e.target.value)}
-            />
-            {vorlage?.variabel && (
-              <span className="flex shrink-0 items-center gap-1">
-                <input
-                  type="number"
-                  min={0}
-                  max={100}
-                  inputMode="numeric"
-                  className="w-14 rounded-lg border border-papier-linie bg-white px-1.5 py-1.5 text-center text-[13px] font-bold text-brand dark:border-slate-600 dark:bg-slate-900"
-                  value={wert}
-                  onChange={(e) => setWert(e.target.value)}
-                />
-                <span className="text-[12px] font-bold text-brand">%</span>
-              </span>
-            )}
-            <button
-              onClick={speichern}
-              disabled={!vorlage}
-              className="h-9 shrink-0 rounded-lg bg-brand px-3.5 text-[13px] font-bold text-white transition active:scale-[.98] disabled:opacity-40"
-            >
-              Eintragen
-            </button>
-          </div>
-          {!vorlage && templates.length > 0 && (
-            <div className="mt-1.5 text-[11px] text-tinte-leise">Erst antippen, wobei geholfen wurde.</div>
-          )}
+          <MithilfeEintragen onEintragen={(titel, p, tag) => addContribution(student.id, titel, p, tag)} />
         </div>
       )}
 
@@ -265,5 +172,123 @@ function Zeile({
         </button>
       )}
     </li>
+  );
+}
+
+/**
+ * Mithilfe eintragen: Vorlage antippen, Tag wählen, „Eintragen“. Dieselbe
+ * Ansicht für eine Person (PunkteSheet) und für mehrere (Mehrfachauswahl).
+ */
+export function MithilfeEintragen({
+  onEintragen,
+  knopf = "Eintragen",
+  ohneKopf = false,
+}: {
+  onEintragen: (titel: string, punkte: number, datum: string) => void;
+  knopf?: string;
+  /** Überschrift weglassen, wenn das Blatt selbst schon so heißt */
+  ohneKopf?: boolean;
+}) {
+  const { templates } = useStore();
+  // gewählte Vorlage + ggf. angepasster Wert + Datum der Hilfe
+  const [gewaehlt, setGewaehlt] = useState<string | null>(null);
+  const [wert, setWert] = useState("5");
+  const [datum, setDatum] = useState(() => new Date().toISOString().slice(0, 10));
+  const vorlage = templates.find((t) => t.id === gewaehlt) ?? null;
+
+  function waehle(id: string) {
+    const t = templates.find((x) => x.id === id);
+    setGewaehlt(id);
+    setWert(String(t?.punkte ?? 0)); // Prozentwert der Vorlage übernehmen
+  }
+
+  function speichern() {
+    if (!vorlage) return;
+    const p = vorlage.variabel ? Math.max(0, Math.min(100, Number(wert) || 0)) : vorlage.punkte;
+    onEintragen(vorlage.titel, p, datum);
+    setGewaehlt(null);
+    setDatum(new Date().toISOString().slice(0, 10));
+  }
+
+  return (
+    <div>
+          {!ohneKopf && (
+          <div className="flex items-baseline justify-between">
+            <h3 className="text-[13px] font-semibold text-tinte-matt">Mithilfe eintragen</h3>
+            <span className="text-[11px] text-tinte-leise">aus der Liste wählen</span>
+          </div>
+          )}
+
+          {templates.length === 0 ? (
+            <p className="mt-2 rounded-xl border border-papier-linie bg-papier-matt p-3 text-[13px] text-tinte-matt dark:border-slate-700 dark:bg-slate-800">
+              Es steht noch nichts zur Auswahl. Das Stufenteam legt die Möglichkeiten im Reiter
+              „Beiträge" an.
+            </p>
+          ) : (
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {[...templates]
+                .sort((a, b) => a.sort - b.sort || a.punkte - b.punkte)
+                .map((t) => {
+                  const aktiv = t.id === gewaehlt;
+                  return (
+                    <button
+                      key={t.id}
+                      onClick={() => waehle(t.id)}
+                      className={`flex items-center gap-1.5 rounded-xl border px-2.5 py-2 text-[12px] font-semibold transition active:scale-[.98] ${
+                        aktiv
+                          ? "border-brand bg-brand text-white"
+                          : t.variabel
+                            ? "border-brand/30 bg-brand/5 text-tinte dark:bg-slate-800 dark:text-slate-200"
+                            : "border-papier-linie bg-white text-tinte dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                      }`}
+                    >
+                      {t.titel}
+                      <span className={`zahl font-bold ${aktiv ? "text-white" : "text-brand"}`}>
+                        {t.variabel ? "% frei" : `+${t.punkte} %`}
+                      </span>
+                    </button>
+                  );
+                })}
+            </div>
+          )}
+
+          {/* Datum steht schon, Wert haengt an der Vorlage: eintragen ist ein Griff. */}
+          <div className="mt-2.5 flex items-center gap-2 rounded-xl border border-papier-linie bg-papier-matt px-3 py-2 dark:border-slate-700 dark:bg-slate-800">
+            <label htmlFor="mithilfe-datum" className="shrink-0 text-[12px] font-semibold text-tinte-matt">
+              am
+            </label>
+            <input
+              id="mithilfe-datum"
+              type="date"
+              className="w-0 min-w-[7.5rem] flex-1 bg-transparent text-[13px] font-semibold outline-none"
+              value={datum}
+              onChange={(e) => setDatum(e.target.value)}
+            />
+            {vorlage?.variabel && (
+              <span className="flex shrink-0 items-center gap-1">
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  inputMode="numeric"
+                  className="w-14 rounded-lg border border-papier-linie bg-white px-1.5 py-1.5 text-center text-[13px] font-bold text-brand dark:border-slate-600 dark:bg-slate-900"
+                  value={wert}
+                  onChange={(e) => setWert(e.target.value)}
+                />
+                <span className="text-[12px] font-bold text-brand">%</span>
+              </span>
+            )}
+            <button
+              onClick={speichern}
+              disabled={!vorlage}
+              className="h-9 shrink-0 rounded-lg bg-brand px-3.5 text-[13px] font-bold text-white transition active:scale-[.98] disabled:opacity-40"
+            >
+              {knopf}
+            </button>
+          </div>
+          {!vorlage && templates.length > 0 && (
+            <div className="mt-1.5 text-[11px] text-tinte-leise">Erst antippen, wobei geholfen wurde.</div>
+          )}
+    </div>
   );
 }

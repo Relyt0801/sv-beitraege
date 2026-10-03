@@ -1,4 +1,4 @@
-# Änderungen – Stand 01.10.2026
+# Änderungen – Stand 03.10.2026
 
 Diese Datei erklärt, was sich in den letzten Runden geändert hat, **wo** es im
 Code steht und **warum** es so gebaut ist. Die Kommentare im Code selbst sind
@@ -8,6 +8,61 @@ ausführlich (auf Deutsch); hier steht der Überblick dazu.
 > Bankdaten, der `service_role`-Schlüssel und der VAPID Private Key liegen nur
 > in der Datenbank bzw. als Supabase-Secret. `privat/` ist per `.gitignore`
 > ausgeschlossen. Bitte so beibehalten.
+
+---
+
+
+## 03.10.2026: Update 1.1
+
+Patch Notes erscheinen einmal nach dem nächsten Öffnen (`src/lib/patchnotes.ts`,
+`PatchNotes.tsx`, Merker `sv:patch:gesehen`). Eltern sehen keine, Schüler keine
+Team-Punkte. Neue Zugänge sehen die Einführung; die setzt den Merker mit.
+
+**Datenbank** (eingespielt, Dateien zum Nachvollziehen):
+- `supabase/chats-1-1.sql`: `topic_reads.last_read_uebersicht` + `chat_gelesen()`
+  (Serverzeit, Chat und Übersicht getrennt), Tabelle `topic_reaktionen`
+  (👍 👎 🔥 😢 😂 ❓, eine je Person, RLS wie der Chat), `profiles.mitteilungen`
+  (Schalter des Teams), Tabelle `app_aktiv` + `bin_aktiv()` (Herzschlag, solange
+  die App sichtbar ist).
+- `supabase/mithilfe-nachtrag.sql`: Tabelle `mithilfe_nachtraege` +
+  `nachtrag_entscheiden()` (nur Team / `hilfen.edit`, legt genau einen
+  contributions-Eintrag an, Protokoll-Quelle „nachtrag“).
+- `supabase/auto-loeschen.sql`: Spalten `loeschen_chat_tage` /
+  `loeschen_antraege_tage` und `loeschfristen_setzen()` sind eingespielt.
+  **`aufraeumen()` und der nächtliche Cron-Job müssen noch im SQL Editor laufen**
+  (das Werkzeug hier darf keine Funktion mit DELETE anlegen).
+- `send-push` v23: lässt aktive Personen aus (`app_aktiv`), filtert nach den
+  Schaltern (`art: "anfrage" | "eltern"`, Kategorie „schueler“ bei Fragen,
+  Komitee-Schalter), Chat-Meldungen mit `tag: chat-<id>` + `gruppe`.
+
+**Alle**
+- Chats-Zähler (`lib/chat-zaehler.ts`): nur offene Gespräche, eigene bzw.
+  eingeschaltete Komitee-Chats, Stufenteam-Chat; erledigte Elterngespräche
+  zählen fürs Team nicht mehr. Gelesen-Marke mit Serverzeit.
+- Keine Pop-ups, solange man in der App ist (`lib/aktiv.ts`); beim Öffnen
+  verschwinden angezeigte Mitteilungen. Mehrere Nachrichten aus einem Chat →
+  eine Mitteilung „N neue Nachrichten“ (`sw.ts`).
+- Reaktionen: Nachricht gedrückt halten (Rechtsklick am Computer) →
+  Leiste mit 6 Reaktionen + „Kopieren“ (`ChatBlasen.tsx`).
+- Komitee-/Team-Chat öffnet im Chat; „Übersicht“ rechts oben, beide mit
+  eigenem roten Punkt (`KomiteePage.tsx`, `unreadCount(id, bereich)`).
+- „Mithilfe nachtragen“ (`NachtragSheet.tsx`): Vorlage oder Sonstiges (Name
+  Pflicht), Datum, Text; Rechnungs-Optik, grüner Haken, eigene Anträge mit Stand.
+- „Keine Live-Verbindung“ entfernt (`Verbindungshinweis.tsx` gelöscht), die App
+  verbindet still neu; Ladezustände als Skelette (`Skelett.tsx`).
+- Version und Uhrzeit im Profil entfernt. Datenschutz ergänzt, festes Datum.
+
+**Team**
+- Chats: Bereiche Stufenteam / Komitees / Chats mit Schülern / Chats mit Eltern
+  / Anfragen (Nachträge, Komitee-Wechsel, Entsperrungen). 🔔/🔕 je Bereich und je
+  Komitee (`lib/mitteilungen.ts`).
+- Reiter „Profil“ (eigene Schüleransicht), Start dort, wenn der Zugang einen
+  eigenen Eintrag hat.
+- Rollen & Rechte in einem Reiter (`RollenRechteTab.tsx`); Person antippen →
+  ihre einzelnen Rechte (`PersonRechteSheet`), Rechte-Bereiche zugeklappt.
+- Mehrfachauswahl → Mithilfe: dasselbe Blatt wie für eine Person, mit Datum
+  (`MithilfeEintragen` in `PunkteSheet.tsx`).
+- Profil → „Automatisch löschen“ (Admin / `perms.manage`).
 
 ---
 

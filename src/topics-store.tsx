@@ -605,7 +605,10 @@ export function TopicsProvider({ children }: { children: ReactNode }) {
     (topicId, bereich) => {
       const st = stateRef.current;
       const lastChat = st.reads[topicId] || "1970-01-01";
-      const lastUeb = st.readsUebersicht[topicId] || lastChat;
+      // Ältere Lese-Marken ohne Übersicht-Wert sind schon in loadAll mit
+      // last_read aufgefüllt – hier darf nicht auf den Chat zurückgefallen
+      // werden, sonst gilt die Übersicht mit dem Chat als gelesen.
+      const lastUeb = st.readsUebersicht[topicId] || "1970-01-01";
       const istTicket = st.topics.find((t) => t.id === topicId)?.kind === "ticket";
       let n = 0;
       for (const i of st.items) {
