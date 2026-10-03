@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { SkelettKarten } from "./Skelett";
 import { useTopics, type Topic } from "../topics-store";
 import { useRole } from "../auth/RoleProvider";
 import { UnbanRequests } from "./UnbanRequests";
@@ -15,6 +16,10 @@ import { Sheet } from "./Sheet";
 import { normalize } from "../lib/logic";
 
 import { frage } from "../lib/melder";
+import { NachtragAnfragen } from "./NachtragAnfragen";
+import { NachtragSheet } from "./NachtragSheet";
+import { kategorieAn, komiteeAn, useMitteilungen, type Kategorie } from "../lib/mitteilungen";
+import { useZaehltMit } from "../lib/chat-zaehler";
 const TEAM_CHAT_TITLE = "Stufenteam";
 
 /**
@@ -24,8 +29,11 @@ const TEAM_CHAT_TITLE = "Stufenteam";
  */
 export function ChatsTab() {
   const { topics, members, ready, unreadCount, createTopic, committeesOf, uid } = useTopics();
-  const { can, isStaff } = useRole();
+  const { can, isStaff, studentId } = useRole();
   const [anschreiben, setAnschreiben] = useState(false);
+  const [nachtragen, setNachtragen] = useState(false);
+  const { mitteilungen, setKategorie, setKomitee } = useMitteilungen();
+  const zaehlt = useZaehltMit();
   const darfVerwalten = can("chats.manage");
   // Nur wer ALLE Chats sieht, kann erkennen, welcher wirklich fehlt. Wer nur
   // einen Teil sieht (z. B. direkt nach einem Rollenwechsel, solange die Liste
@@ -70,9 +78,8 @@ export function ChatsTab() {
 
   if (!ready)
     return (
-      <div className="flex flex-col items-center gap-4 py-24 text-tinte-leise">
-        <div className="h-9 w-9 animate-spin rounded-full border-[3px] border-papier-linie border-t-brand dark:border-slate-700 dark:border-t-brand" />
-        <div className="text-sm font-medium">Chats werden geladen …</div>
+      <div className="pt-2">
+        <SkelettKarten n={4} />
       </div>
     );
 
@@ -111,15 +118,17 @@ export function ChatsTab() {
       return (reihenfolge.get(a.tag) ?? 99) - (reihenfolge.get(b.tag) ?? 99);
     });
   const offeneTickets = tickets.filter((t) => t.status !== "erledigt");
-  const erledigt = tickets.filter((t) => t.status === "erledigt");
-  const ticketUngelesen = tickets.reduce((n, t) => n + unreadCount(t.id), 0);
+  // Rote Zahl nur für offene Gespräche – erledigte zählen nicht mehr
+  const ticketUngelesen = offeneTickets.reduce((n, t) => n + unreadCount(t.id), 0);
+
+  const glocke = (k: Kategorie) => ({ an: kategorieAn(mitteilungen, k), setAn: (an: boolean) => void setKategorie(k, an) });
 
   return (
-    <div className="space-y-5 pb-4">
+    <div className="space-y-6 pb-4">
       {/* Der Chat des Stufenteams – nur fürs Team, ganz oben */}
       {isStaff && teamChat && (
         <section>
-          <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-tinte-leise">Stufenteam</h3>
+          <KategorieKopf titel="Stufenteam" />
           <ChatCard
             titel="Stufenteam-Chat"
             icon="👑"
@@ -131,9 +140,10 @@ export function ChatsTab() {
       )}
 
       <section>
-        <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-tinte-leise">
-          {isStaff ? "Alle Komitees" : "Mein Komitee"}
-        </h3>
+        <KategorieKopf
+          titel={isStaff ? "Komitees" : "Mein Komitee"}
+          hinweis={isStaff ? "🔔 = Mitteilungen und roter Punkt auch für fremde Komitees" : undefined}
+        />
         {komiteeChats.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-papier-linie py-8 text-center text-sm text-tinte-leise dark:border-slate-700">
             {meineKoms.length
@@ -142,76 +152,168 @@ export function ChatsTab() {
           </div>
         ) : (
           <div className="grid items-start gap-2.5 lg:grid-cols-2">
-            {komiteeChats.map((t) => (
-              <ChatCard
-                key={t.id}
-                titel={committeeLabel(t.tag)}
-                icon={committeeIcon(t.tag)}
-                unread={unreadCount(t.id)}
-                mine={meineKoms.includes(t.tag)}
-                onOpen={() => setOpenId(t.id)}
-              />
-            ))}
+            {komiteeChats.map((t) => {
+              const mein = meineKoms.includes(t.tag);
+              const an = komiteeAn(mitteilungen, t.tag, mein);
+              return (
+                <ChatCard
+                  key={t.id}
+                  titel={committeeLabel(t.tag)}
+                  icon={committeeIcon(t.tag)}
+                  unread={zaehlt(t) ? unreadCount(t.id) : 0}
+                  mine={mein || an}
+                  onOpen={() => setOpenId(t.id)}
+                  glocke={isStaff ? { an, setAn: (x) => void setKomitee(t.tag, x), name: committeeLabel(t.tag) } : undefined}
+                />
+              );
+            })}
           </div>
         )}
       </section>
 
-      <section>
-        <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-tinte-leise">
-          {isStaff ? "Gespräche" : "Stufenteam"}
-        </h3>
+      {isStaff ? (
+        <>
+          <section>
+            <KategorieKopf titel="Chats mit Schülern" glocke={glocke("schueler")} />
+            <div className="grid grid-cols-1 gap-2.5">
+              <TicketUebersichtKarte
+                offene={offeneTickets}
+                unread={ticketUngelesen}
+                onOpen={() => setTicketListe(true)}
+                onAnschreiben={() => setAnschreiben(true)}
+              />
+              <SchuelerAnschreiben open={anschreiben} onClose={() => setAnschreiben(false)} />
+            </div>
+          </section>
 
-        {/* Bitten aus der Stufe: Komitee wechseln, Sperre aufheben.
-            Der Abstand gehoert hierher: vorher stiessen die Elternkarten
-            direkt an die Ticketkarte und der Anschreiben-Knopf sass auf ihr.
-            grid-cols-1: sonst drueckt ein langer Titel die Seite auf kleinen
-            Handys breiter als den Bildschirm. */}
-        <div className="grid grid-cols-1 gap-2.5">
-        {isStaff ? (
-          <>
-            <KomiteeRequests />
-            <UnbanRequests />
-            <TicketUebersichtKarte
-              offene={offeneTickets}
-              unread={ticketUngelesen}
-              onOpen={() => setTicketListe(true)}
-              onAnschreiben={() => setAnschreiben(true)}
-            />
+          <section>
+            <KategorieKopf titel="Chats mit Eltern" glocke={glocke("eltern")} />
             <ElternTeamTab />
-            <SchuelerAnschreiben open={anschreiben} onClose={() => setAnschreiben(false)} />
-          </>
-        ) : (
-          <ChatCard
-            titel="Frag das Stufenteam"
-            icon="🛡️"
-            unread={ticketUngelesen}
-            mine
-            onOpen={() => setTeamOffen(true)}
-          />
-        )}
-        </div>
-      </section>
+          </section>
+
+          <section>
+            <KategorieKopf titel="Anfragen" glocke={glocke("anfragen")} />
+            {/* Was offen ist, steht hier als Karte. Ist nichts offen, bleibt
+                die Liste leer und der Satz darunter erscheint. */}
+            <div className="peer grid grid-cols-1 gap-2.5 empty:hidden">
+              <NachtragAnfragen />
+              <KomiteeRequests />
+              <UnbanRequests />
+            </div>
+            <p className="hidden rounded-2xl border border-dashed border-papier-linie py-6 text-center text-[13px] text-tinte-leise peer-empty:block dark:border-slate-700">
+              Gerade keine offenen Anfragen. Kostenanfragen stehen unter Finanzen, Terminanfragen unter Events.
+            </p>
+            {studentId && (
+              <button
+                onClick={() => setNachtragen(true)}
+                className="mt-2.5 w-full rounded-xl py-2 text-[13px] font-semibold text-brand"
+              >
+                🙌 Eigene Mithilfe nachtragen
+              </button>
+            )}
+          </section>
+        </>
+      ) : (
+        <section>
+          <KategorieKopf titel="Stufenteam" />
+          <div className="grid grid-cols-1 gap-2.5">
+            <ChatCard
+              titel="Frag das Stufenteam"
+              icon="🛡️"
+              unread={ticketUngelesen}
+              mine
+              onOpen={() => setTeamOffen(true)}
+            />
+            <ChatCard
+              titel="Mithilfe nachtragen"
+              unter="Vergessen eingetragen? Hier beantragen."
+              icon="🙌"
+              unread={0}
+              mine
+              onOpen={() => setNachtragen(true)}
+            />
+          </div>
+        </section>
+      )}
+
+      <NachtragSheet open={nachtragen} onClose={() => setNachtragen(false)} />
     </div>
   );
 }
 
-function ChatCard({
-  titel, icon, unread, mine, onOpen,
-}: { titel: string; icon: string; unread: number; mine: boolean; onOpen: () => void }) {
+/** Überschrift eines Bereichs, rechts optional der Mitteilungs-Schalter. */
+function KategorieKopf({
+  titel, glocke, hinweis,
+}: {
+  titel: string;
+  glocke?: { an: boolean; setAn: (an: boolean) => void };
+  hinweis?: string;
+}) {
+  return (
+    <div className="mb-2 flex items-center gap-2">
+      <h3 className="min-w-0 flex-1 text-xs font-bold uppercase tracking-wide text-tinte-leise">
+        {titel}
+        {hinweis && <span className="ml-2 font-medium normal-case tracking-normal text-tinte-leise/80">{hinweis}</span>}
+      </h3>
+      {glocke && <Glocke an={glocke.an} setAn={glocke.setAn} name={titel} />}
+    </div>
+  );
+}
+
+/** Mitteilungen an/aus – klein, damit es nicht wie eine Hauptaktion wirkt. */
+function Glocke({ an, setAn, name }: { an: boolean; setAn: (an: boolean) => void; name: string }) {
   return (
     <button
-      onClick={onOpen}
-      className={`card flex w-full items-center gap-3 p-4 text-left transition active:scale-[.99] ${mine ? "" : "opacity-70"}`}
+      onClick={(e) => {
+        e.stopPropagation();
+        setAn(!an);
+      }}
+      role="switch"
+      aria-checked={an}
+      aria-label={`Mitteilungen für ${name}`}
+      title={an ? "Mitteilungen an – antippen zum Ausschalten" : "Mitteilungen aus – antippen zum Einschalten"}
+      className={`flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-[11.5px] font-bold transition active:scale-95 ${
+        an ? "bg-brand/10 text-brand dark:bg-brand/20" : "bg-[rgb(118_118_128/0.12)] text-tinte-leise dark:bg-[rgb(118_118_128/0.24)]"
+      }`}
     >
-      <span className="text-xl">{icon}</span>
-      <span className="min-w-0 flex-1 truncate text-[15px] font-bold">{titel}</span>
-      {unread > 0 && (
-        <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[11px] font-bold text-white">
-          {unread > 9 ? "9+" : unread}
+      <span aria-hidden>{an ? "🔔" : "🔕"}</span>
+      {an ? "an" : "aus"}
+    </button>
+  );
+}
+
+function ChatCard({
+  titel, unter, icon, unread, mine, onOpen, glocke,
+}: {
+  titel: string;
+  unter?: string;
+  icon: string;
+  unread: number;
+  mine: boolean;
+  onOpen: () => void;
+  glocke?: { an: boolean; setAn: (an: boolean) => void; name: string };
+}) {
+  return (
+    <div className={`card flex w-full items-center transition ${mine ? "" : "opacity-70"}`}>
+      <button onClick={onOpen} className="flex min-w-0 flex-1 items-center gap-3 p-4 text-left active:scale-[.99]">
+        <span className="text-xl">{icon}</span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-[15px] font-bold">{titel}</span>
+          {unter && <span className="block truncate text-[12px] text-tinte-leise">{unter}</span>}
+        </span>
+        {unread > 0 && (
+          <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[11px] font-bold text-white">
+            {unread > 9 ? "9+" : unread}
+          </span>
+        )}
+        {!glocke && <span className="text-slate-300">›</span>}
+      </button>
+      {glocke && (
+        <span className="pr-3">
+          <Glocke an={glocke.an} setAn={glocke.setAn} name={glocke.name} />
         </span>
       )}
-      <span className="text-slate-300">›</span>
-    </button>
+    </div>
   );
 }
 

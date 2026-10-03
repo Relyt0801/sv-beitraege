@@ -1,4 +1,5 @@
 import { HY, type Settings, type Student } from "../lib/types";
+import { SkelettKarten } from "./Skelett";
 import { useStore } from "../store";
 import { basisOffen, beitragFuer, isPreJoin, naechsteStufe, prozentVon, ticketBetrag } from "../lib/logic";
 import { HalbjahrLegende, TermChip } from "./TermChip";
@@ -34,10 +35,7 @@ export function MyKasse({
 
   if (!ready)
     return (
-      <div className="flex flex-col items-center justify-center gap-4 py-24 text-tinte-leise">
-        <div className="h-8 w-8 animate-spin rounded-full border-[3px] border-slate-200 border-t-slate-500 dark:border-slate-700 dark:border-t-slate-300" />
-        <div className="text-sm font-medium">Deine Beiträge werden geladen …</div>
-      </div>
+      <SkelettKarten n={3} gross />
     );
 
   if (!student)

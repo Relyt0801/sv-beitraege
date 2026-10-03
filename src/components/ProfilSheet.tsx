@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { LoeschfristenSheet } from "./LoeschfristenSheet";
 import { Sheet, SheetKopf } from "./Sheet";
 import { Avatar } from "./Avatar";
 import { personIcon } from "../lib/committees";
@@ -28,7 +29,7 @@ export function ProfilSheet({
   onTutorial?: () => void;
 }) {
   const { mein, uid, aktualisiere, neuLaden } = useProfiles();
-  const { isStaff, isOp, role } = useRole();
+  const { isStaff, isOp, role, can } = useRole();
   const istEltern = role === "eltern";
   // In der Elternansicht laeuft kein Chat-Speicher – dann bleibt die Komiteeliste leer.
   const topics = useTopicsOptional();
@@ -50,6 +51,7 @@ export function ProfilSheet({
   // Protokoll und Sicherung. Den ganzen Bereich gibt es NUR hier im eigenen
   // Profil – und nur beim Admin (Kassenwart: nur die Sicherheitskopie).
   const [protokollOffen, setProtokollOffen] = useState(false);
+  const [loeschOffen, setLoeschOffen] = useState(false);
 
   const meine = committeesOf(uid);
   const istAdmin = role === "admin";
@@ -354,6 +356,12 @@ export function ProfilSheet({
             <span>🗂️</span> Protokoll &amp; Sicherung
           </button>
         )}
+        {/* Wann die Datenbank Altes löscht – Admin und wer Rechte verwaltet */}
+        {hasSupabase && (istAdmin || can("perms.manage")) && (
+          <button className={row} onClick={() => setLoeschOffen(true)}>
+            <span>🧹</span> Automatisch löschen
+          </button>
+        )}
         {/* Der Kassenwart darf sich die Sicherheitskopie holen – aber kein Protokoll. */}
         {hasSupabase && istKassenwart && (
           <button className={row} onClick={() => setProtokollOffen(true)}>
@@ -378,12 +386,12 @@ export function ProfilSheet({
       <div className="mt-5">
         <RechtLinks />
       </div>
-      <Versionszeile />
 
       <button className="btn-primary mt-4" onClick={onClose}>
         Fertig
       </button>
 
+      <LoeschfristenSheet open={loeschOffen} onClose={() => setLoeschOffen(false)} />
       {(istAdmin || istKassenwart) && (
         <ProtokollSheet
           open={protokollOffen}
@@ -424,14 +432,3 @@ function Pushpruefung() {
   );
 }
 
-/** Welcher Stand läuft gerade? Hilft bei der Fehlersuche ("ist das schon live?"). */
-function Versionszeile() {
-  const commit = typeof __BAU_COMMIT__ === "string" ? __BAU_COMMIT__ : "dev";
-  const zeit = typeof __BAU_ZEIT__ === "string" ? __BAU_ZEIT__ : "";
-  const datum = zeit ? new Date(zeit).toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" }) : "";
-  return (
-    <p className="mt-3 text-center text-[11px] text-tinte-leise">
-      Stand {datum} · Version {commit}
-    </p>
-  );
-}

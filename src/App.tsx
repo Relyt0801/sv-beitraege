@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { SkelettZeilen } from "./components/Skelett";
 import { HY, type Halbjahr, type Status } from "./lib/types";
 import { normalize, offenGesamt, offenStufe, sortStudents, staffelVon } from "./lib/logic";
 import { MyKasse } from "./components/MyKasse";
@@ -19,7 +20,7 @@ import { Sheet } from "./components/Sheet";
 import { ProfilesProvider, useProfiles } from "./profiles-store";
 import { EventsProvider, useEvents } from "./events-store";
 import { TermineProvider, useTermine } from "./termine-store";
-import { TopicsProvider, useTopics } from "./topics-store";
+import { TopicsProvider } from "./topics-store";
 import { ChatsTab } from "./components/ChatsTab";
 import { StudentCard, nextStatus } from "./components/StudentCard";
 import { StudentSheet } from "./components/StudentSheet";
@@ -35,6 +36,7 @@ import { KassenKopf } from "./components/KassenKopf";
 import { EventComposer } from "./components/EventComposer";
 import { AktionSheet } from "./components/AktionSheet";
 import { SchichtAbschluss } from "./components/SchichtAbschluss";
+import { useChatZaehler } from "./lib/chat-zaehler";
 import { ElternProvider, useEltern } from "./eltern-store";
 import { ElternApp } from "./components/ElternApp";
 import { Icon, type IconName } from "./components/Icon";
@@ -124,14 +126,16 @@ function Main() {
   const { students, punkte, settings, ready, mode, reload, setTerm, setSettings, exportData, importData } = useStore();
   const { can, canEditData, canEditHilfen, canEditBeitrag, canManageRoles, isStaff, ready: roleReady, role, loginByStudent, userByStudent, studentId, tourResetAt } = useRole();
   const { events: allEvents, reads } = useEvents();
-  const { topics, unreadCount } = useTopics();
   // Kennung fürs eigene Namensbild aus dem Profil-Speicher – im Themen-Speicher
   // liegt sie in einer Referenz und ist beim ersten Zeichnen noch leer.
   const { uid } = useProfiles();
   const { theme, toggle } = useTheme();
 
   const showTopicsTab = true;
-  const topicsUnreadChats = topics.reduce((s, t) => s + unreadCount(t.id), 0);
+  // Nur was zählt: offene Gespräche, eigene (bzw. eingeschaltete) Komitee-
+  // Chats, Stufenteam-Chat. Erledigtes und alte Ordner nicht mehr (vorher
+  // stand dauerhaft „9+“).
+  const topicsUnreadChats = useChatZaehler();
 
   // Abo beim Öffnen still auffrischen (fragt nie selbst nach Erlaubnis).
   usePushAuffrischen();
@@ -601,10 +605,7 @@ function Main() {
       ) : (
         <main className="card mt-3 divide-y divide-papier-linie overflow-hidden dark:divide-slate-800" data-tour="liste">
           {!ready && (
-            <div className="flex flex-col items-center justify-center gap-4 py-24 text-tinte-leise">
-              <div className="h-8 w-8 animate-spin rounded-full border-[3px] border-slate-200 border-t-slate-500 dark:border-slate-700 dark:border-t-slate-300" />
-              <div className="text-sm font-medium">Beitragsliste wird geladen …</div>
-            </div>
+            <SkelettZeilen n={8} />
           )}
           {ready && filtered.length === 0 && (
             <div className="py-16 text-center text-sm text-tinte-leise">

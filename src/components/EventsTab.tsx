@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { SkelettKarten } from "./Skelett";
 import { useEvents } from "../events-store";
 import { useRole } from "../auth/RoleProvider";
 import { WerHatGestimmt } from "./WerHatGestimmt";
@@ -133,10 +134,7 @@ export function EventsTab() {
 
   if (!ready) {
     return rahmen(
-      <div className="flex flex-col items-center justify-center gap-4 py-16 text-tinte-leise">
-        <div className="h-9 w-9 animate-spin rounded-full border-[3px] border-papier-linie border-t-brand dark:border-slate-700 dark:border-t-brand" />
-        <div className="text-sm font-medium">Events werden geladen …</div>
-      </div>,
+      <SkelettKarten n={3} gross />,
     );
   }
   if (events.length === 0)

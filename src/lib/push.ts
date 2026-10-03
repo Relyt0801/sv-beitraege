@@ -107,9 +107,17 @@ export async function sendePush(body: Record<string, unknown>): Promise<void> {
 }
 
 /** Push an das Stufenteam (z. B. neue Terminanfrage). */
-export async function pushAnTeam(title: string, body: string, url = "./#events"): Promise<void> {
-  await sendePush({ an_team: true, title, body, url });
+export async function pushAnTeam(
+  title: string, body: string, url = "./#events", opt?: { art?: PushArt },
+): Promise<void> {
+  await sendePush({ an_team: true, title, body, url, ...(opt?.art ? { art: opt.art } : {}) });
 }
+
+/**
+ * Kategorie für die Mitteilungs-Schalter des Teams (Spam-Schutz):
+ * "anfrage" = Anfragen (Nachträge, Komitee-Wechsel, …), "eltern" = Chats mit Eltern.
+ */
+export type PushArt = "anfrage" | "eltern";
 
 /**
  * Meldung an Schüler und ihre Eltern, z. B. "Q1.1 bezahlt". Je Person eigener
@@ -132,10 +140,14 @@ export async function pushZuTermin(termin_id: string, title?: string, body?: str
 
 /** Push direkt an bestimmte Nutzer senden (via Edge Function). */
 export async function pushToUsers(
-  user_ids: string[], title: string, body: string, url = "./", opt?: { auchSelbst?: boolean },
+  user_ids: string[], title: string, body: string, url = "./", opt?: { auchSelbst?: boolean; art?: PushArt },
 ): Promise<void> {
   if (!user_ids.length) return;
-  await sendePush({ user_ids, title, body, url, ...(opt?.auchSelbst ? { auch_selbst: true } : {}) });
+  await sendePush({
+    user_ids, title, body, url,
+    ...(opt?.auchSelbst ? { auch_selbst: true } : {}),
+    ...(opt?.art ? { art: opt.art } : {}),
+  });
 }
 
 /**

@@ -69,6 +69,20 @@ export interface TopicItem {
 
 const LS = "sv-beitraege:topics";
 
+/** Reaktionen, die es gibt – dieselbe Liste prüft die Datenbank. */
+export const REAKTIONEN = ["👍", "👎", "🔥", "😢", "😂", "❓"] as const;
+export type Reaktion = (typeof REAKTIONEN)[number];
+
+/**
+ * Gehört ein Eintrag in die Übersicht (Angepinntes, Abstimmungen, To-dos)
+ * oder in den Chat? Beide haben einen eigenen roten Punkt und eine eigene
+ * Gelesen-Marke.
+ */
+export const istUebersichtItem = (i: Pick<TopicItem, "type" | "pinned">) =>
+  i.type === "todo" || i.type === "umfrage" || (i.type === "nachricht" && i.pinned);
+
+export type LeseBereich = "chat" | "uebersicht";
+
 /** Alte Zeilen ohne kind/status auffüllen, damit die Anzeige nicht bricht. */
 const normTopic = (t: any): Topic => ({ ...t, kind: (t?.kind as Topic["kind"]) || "ordner", status: t?.status || "offen" });
 const uuid = () => (crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random()));
@@ -84,6 +98,12 @@ interface TopicsValue {
   /** Rohe Stimmen je Beitrag – für nicht-anonyme Abstimmungen (nur sichtbar, wer Profile sieht). */
   voters: Record<string, { user_id: string; option_id: string }[]>;
   reads: Record<string, string>; // topicId -> last_read ISO
+  /** topicId -> zuletzt gelesen in der Übersicht (Angepinntes, Abstimmungen, To-dos) */
+  readsUebersicht: Record<string, string>;
+  /** itemId -> Reaktionen */
+  reaktionen: Record<string, { user_id: string; emoji: string }[]>;
+  /** Eigene Reaktion setzen (null = zurücknehmen). */
+  reagieren: (itemId: string, emoji: Reaktion | null) => Promise<void>;
   uid: string;
   ready: boolean;
   createTopic: (t: NewTopic) => Promise<string | null>;
@@ -98,8 +118,10 @@ interface TopicsValue {
   updateItem: (id: string, patch: Partial<Pick<TopicItem, "done" | "pinned">>) => Promise<void>;
   deleteItem: (id: string) => Promise<void>;
   vote: (itemId: string, optionId: string, multi?: boolean) => Promise<void>;
-  markRead: (topicId: string) => void;
-  unreadCount: (topicId: string) => number;
+  /** Als gelesen markieren – Chat und Übersicht getrennt (ohne Angabe: beides). */
+  markRead: (topicId: string, bereich?: LeseBereich) => void;
+  /** Ungelesene fremde Einträge – nur Chat, nur Übersicht oder (ohne Angabe) beides. */
+  unreadCount: (topicId: string, bereich?: LeseBereich) => number;
 }
 
 const Ctx = createContext<TopicsValue | null>(null);
@@ -126,11 +148,13 @@ export function TopicsProvider({ children }: { children: ReactNode }) {
   const [voteCounts, setVoteCounts] = useState<Record<string, Record<string, number>>>({});
   const [voters, setVoters] = useState<Record<string, { user_id: string; option_id: string }[]>>({});
   const [reads, setReads] = useState<Record<string, string>>({});
+  const [readsUebersicht, setReadsUebersicht] = useState<Record<string, string>>({});
+  const [reaktionen, setReaktionen] = useState<Record<string, { user_id: string; emoji: string }[]>>({});
   const [ready, setReady] = useState(!hasSupabase);
   const uidRef = useRef("local-user");
   const nameRef = useRef("du");
-  const stateRef = useRef({ topics, items, members, topicTags, tagMembers, myVotes, reads });
-  stateRef.current = { topics, items, members, topicTags, tagMembers, myVotes, reads };
+  const stateRef = useRef({ topics, items, members, topicTags, tagMembers, myVotes, reads, readsUebersicht });
+  stateRef.current = { topics, items, members, topicTags, tagMembers, myVotes, reads, readsUebersicht };
   // Realtime feuert oft mehrfach hintereinander – Nachladen bündeln statt
   // für jedes Ereignis sieben Abfragen zu starten.
   const nachladeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -152,6 +176,7 @@ export function TopicsProvider({ children }: { children: ReactNode }) {
       setTagMembersState(d.tagMembers || {});
       setMyVotes(d.myVotes || {});
       setReads(d.reads || {});
+      setReadsUebersicht(d.readsUebersicht || {});
     } catch { /* ignore */ }
   }, []);
   useEffect(() => {
@@ -169,7 +194,7 @@ export function TopicsProvider({ children }: { children: ReactNode }) {
       setVoters(roh);
       saveLocal();
     }
-  }, [myVotes, topics, items, members, topicTags, reads, saveLocal]);
+  }, [myVotes, topics, items, members, topicTags, reads, readsUebersicht, saveLocal]);
 
   // ---------- Supabase ----------
   const loadAll = useCallback(async () => {
@@ -218,8 +243,24 @@ export function TopicsProvider({ children }: { children: ReactNode }) {
     setVoteCounts(counts);
     setVoters(roh);
     const rr: Record<string, string> = {};
-    for (const row of r || []) if (row.user_id === uidRef.current) rr[row.topic_id] = row.last_read;
+    const ru: Record<string, string> = {};
+    for (const row of r || []) {
+      if (row.user_id !== uidRef.current) continue;
+      rr[row.topic_id] = row.last_read;
+      // Ohne eigene Übersicht-Marke galt bisher: beim Öffnen alles gelesen
+      ru[row.topic_id] = row.last_read_uebersicht || row.last_read;
+    }
     setReads(rr);
+    setReadsUebersicht(ru);
+    // Reaktionen: eigene Abfrage, damit ein Fehler (z. B. Tabelle fehlt noch)
+    // den Rest nicht aufhält
+    const { data: re, error: reFehler } = await supabase!.from("topic_reaktionen").select("item_id, user_id, emoji");
+    if (!reFehler) {
+      const rk: Record<string, { user_id: string; emoji: string }[]> = {};
+      for (const row of (re as { item_id: string; user_id: string; emoji: string }[]) || [])
+        (rk[row.item_id] ||= []).push({ user_id: row.user_id, emoji: row.emoji });
+      setReaktionen(rk);
+    }
     setReady(true);
   }, []);
 
@@ -287,6 +328,22 @@ export function TopicsProvider({ children }: { children: ReactNode }) {
             return next;
           });
         })
+        // Reaktionen einzeln einarbeiten – kein Nachladen der ganzen Chats
+        .on("postgres_changes", { event: "*", schema: "public", table: "topic_reaktionen" }, (p) => {
+          const alt = p.old as { item_id?: string; user_id?: string };
+          const neu = p.new as { item_id?: string; user_id?: string; emoji?: string };
+          setReaktionen((prev) => {
+            const next = { ...prev };
+            if (alt?.item_id && alt.user_id)
+              next[alt.item_id] = (next[alt.item_id] || []).filter((x) => x.user_id !== alt.user_id);
+            if (p.eventType !== "DELETE" && neu?.item_id && neu.user_id && neu.emoji)
+              next[neu.item_id] = [
+                ...(next[neu.item_id] || []).filter((x) => x.user_id !== neu.user_id),
+                { user_id: neu.user_id, emoji: neu.emoji },
+              ];
+            return next;
+          });
+        })
         .on("postgres_changes", { event: "*", schema: "public", table: "topic_members" }, planeNachladen)
         .on("postgres_changes", { event: "*", schema: "public", table: "topic_tags" }, planeNachladen)
         .on("postgres_changes", { event: "*", schema: "public", table: "tag_members" }, planeNachladen)
@@ -304,6 +361,7 @@ export function TopicsProvider({ children }: { children: ReactNode }) {
     const { data: sub } = supabase!.auth.onAuthStateChange((event) => {
       if (event === "SIGNED_IN" || event === "SIGNED_OUT") {
         setTopics([]); setItems([]); setMembersState({}); setTopicTagsState({}); setMyVotes({}); setReads({});
+        setReadsUebersicht({}); setReaktionen({});
         abmelden?.();
         abmelden = null;
         void start();
@@ -524,26 +582,64 @@ export function TopicsProvider({ children }: { children: ReactNode }) {
     }
   }, [planeNachladen]);
 
-  const markRead: TopicsValue["markRead"] = useCallback((topicId) => {
-    const now = new Date().toISOString();
-    setReads((p) => ({ ...p, [topicId]: now }));
-    if (hasSupabase)
-      supabase!.from("topic_reads").upsert({ topic_id: topicId, user_id: uidRef.current, last_read: now }).then(({ error }) => { if (error) console.warn("[speichern]", error.message); }); // then() nötig, sonst wird nie gesendet
+  const markRead: TopicsValue["markRead"] = useCallback((topicId, bereich) => {
+    // Die Gerätezeit kann nachgehen – dann blieben gerade gelesene Nachrichten
+    // (Serverzeit) „ungelesen“. Darum lokal mindestens bis zur jüngsten
+    // Nachricht, gespeichert wird mit der Uhr des Servers (chat_gelesen).
+    const jungste = stateRef.current.items
+      .filter((i) => i.topic_id === topicId)
+      .reduce((m, i) => (i.created_at > m ? i.created_at : m), "");
+    const jetzt = new Date().toISOString();
+    const marke = jungste > jetzt ? jungste : jetzt;
+    const bereiche: LeseBereich[] = bereich ? [bereich] : ["chat", "uebersicht"];
+    for (const b of bereiche) {
+      (b === "chat" ? setReads : setReadsUebersicht)((p) => ({ ...p, [topicId]: marke }));
+      if (hasSupabase)
+        void supabase!.rpc("chat_gelesen", { p_topic: topicId, p_bereich: b }).then(({ error }) => {
+          if (error) console.warn("[gelesen]", error.message);
+        });
+    }
   }, []);
 
   const unreadCount: TopicsValue["unreadCount"] = useCallback(
-    (topicId) => {
-      const last = stateRef.current.reads[topicId] || "1970-01-01";
-      return stateRef.current.items.filter(
-        (i) => i.topic_id === topicId && i.created_at > last && i.created_by !== uidRef.current,
-      ).length;
+    (topicId, bereich) => {
+      const st = stateRef.current;
+      const lastChat = st.reads[topicId] || "1970-01-01";
+      const lastUeb = st.readsUebersicht[topicId] || lastChat;
+      const istTicket = st.topics.find((t) => t.id === topicId)?.kind === "ticket";
+      let n = 0;
+      for (const i of st.items) {
+        if (i.topic_id !== topicId || i.created_by === uidRef.current) continue;
+        // Gespräche mit dem Team haben keine Übersicht – alles ist Chat
+        const ueb = !istTicket && istUebersichtItem(i);
+        if (ueb ? bereich === "chat" : bereich === "uebersicht") continue;
+        if (i.created_at > (ueb ? lastUeb : lastChat)) n++;
+      }
+      return n;
     },
     // items/reads über stateRef aktuell
-    [items, reads],
+    [items, reads, readsUebersicht, topics],
   );
 
+  const reagieren: TopicsValue["reagieren"] = useCallback(async (itemId, emoji) => {
+    const ich = uidRef.current;
+    setReaktionen((prev) => ({
+      ...prev,
+      [itemId]: [...(prev[itemId] || []).filter((x) => x.user_id !== ich), ...(emoji ? [{ user_id: ich, emoji }] : [])],
+    }));
+    if (!hasSupabase) return;
+    const { error } = emoji
+      ? await supabase!.from("topic_reaktionen").upsert({ item_id: itemId, user_id: ich, emoji })
+      : await supabase!.from("topic_reaktionen").delete().eq("item_id", itemId).eq("user_id", ich);
+    if (error) {
+      meldeFehler("Reaktion ging nicht: " + error.message);
+      planeNachladen();
+    }
+  }, [planeNachladen]);
+
   const value: TopicsValue = {
-    topics, items, members, topicTags, tagMembers, myVotes, voteCounts, voters, reads, uid: uidRef.current, ready,
+    topics, items, members, topicTags, tagMembers, myVotes, voteCounts, voters, reads, readsUebersicht, reaktionen, reagieren,
+    uid: uidRef.current, ready,
     createTopic, updateTopic, deleteTopic, setMembers, setTagMembers, setUserCommittee, selfAssignCommittee, committeesOf, postItem, updateItem, deleteItem, vote, markRead, unreadCount,
   };
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

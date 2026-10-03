@@ -36,7 +36,7 @@ export async function stelleAnfrage(nachricht: string): Promise<{ ok: boolean; e
         ? "Du hast für diese Sperre schon eine Anfrage gestellt."
         : error.message,
     };
-  void pushAnTeam("Entsperr-Anfrage", "Jemand bittet darum, wieder schreiben zu dürfen.", "./#chats");
+  void pushAnTeam("Entsperr-Anfrage", "Jemand bittet darum, wieder schreiben zu dürfen.", "./#chats", { art: "anfrage" });
   return { ok: true };
 }
 

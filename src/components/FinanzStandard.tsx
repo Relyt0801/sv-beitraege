@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { SkelettKarten } from "./Skelett";
 import { useStore } from "../store";
 import { basisOffen } from "../lib/logic";
 import { hasSupabase } from "../lib/supabase";
@@ -26,10 +27,7 @@ export function FinanzStandard({ aktionName }: { aktionName?: (id: string) => st
     return <div className="card p-6 text-center text-sm text-tinte-matt">Die Finanzen lassen sich gerade nicht laden: {fehler}</div>;
   if (!d)
     return (
-      <div className="flex flex-col items-center gap-3 py-16 text-tinte-leise">
-        <div className="h-8 w-8 animate-spin rounded-full border-[3px] border-papier-linie border-t-brand dark:border-slate-700" />
-        <span className="text-sm">Finanzen werden geladen …</span>
-      </div>
+      <SkelettKarten n={3} gross />
     );
   return <FinanzStandardInhalt d={d} />;
 }

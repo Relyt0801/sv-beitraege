@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { SkelettText } from "./Skelett";
 import { useSchichtStatus, useTermine } from "../termine-store";
 import { committeeIcon, committeeLabel } from "../lib/committees";
 import {
@@ -208,7 +209,9 @@ export function Wochenstreifen({
         </div>
 
         {!ready ? (
-          <div className="py-3 text-center text-[12px] text-tinte-leise">Termine werden geladen …</div>
+          <div className="py-2">
+            <SkelettText zeilen={2} />
+          </div>
         ) : desTages.length === 0 ? (
           <div className="py-3 text-center text-[12px] text-tinte-leise">Nichts eingetragen.</div>
         ) : (

@@ -43,8 +43,10 @@ Deno.serve(async (req) => {
       return json({ passt });
     }
 
-    const { probe, auch_selbst, ohne_eltern, event_id, termin_id, an_team, user_ids, chat_item_id, angepinnt, an_personen, eltern_info_id, title: directTitle, body: directBody, url: wunschUrl } = koerper as {
+    const { probe, auch_selbst, ohne_eltern, event_id, termin_id, an_team, user_ids, chat_item_id, angepinnt, an_personen, eltern_info_id, art, title: directTitle, body: directBody, url: wunschUrl } = koerper as {
       probe?: boolean;
+      /** Kategorie für die Mitteilungs-Schalter des Teams: "anfrage" | "eltern" */
+      art?: string;
       /** Bestätigung an sich selbst (z. B. sich selbst in eine Schicht eingeteilt). */
       auch_selbst?: boolean;
       /** an_personen: nur die Person selbst, nicht ihre Eltern (Beitragshilfen). */
@@ -70,6 +72,26 @@ Deno.serve(async (req) => {
       privat,
     );
 
+    // Wer gerade in der App ist (Herzschlag in app_aktiv), bekommt kein Pop-up –
+    // er sieht die Neuigkeit ohnehin an den roten Punkten.
+    const ohneAktive = async (ids: string[]) => {
+      if (!ids.length) return ids;
+      const { data } = await supabase.from("app_aktiv").select("user_id").gt("bis", new Date().toISOString()).in("user_id", ids);
+      const da = new Set((data || []).map((x: { user_id: string }) => x.user_id));
+      return ids.filter((u) => !da.has(u));
+    };
+    // Mitteilungs-Schalter (profiles.mitteilungen): Kategorie ausgeschaltet → raus
+    const ohneAbgeschaltete = async (ids: string[], kategorie: string) => {
+      if (!ids.length) return ids;
+      const { data } = await supabase.from("profiles").select("user_id, mitteilungen").in("user_id", ids);
+      const aus = new Set(
+        (data || [])
+          .filter((x: { mitteilungen?: Record<string, unknown> }) => x.mitteilungen?.[kategorie] === false)
+          .map((x: { user_id: string }) => x.user_id),
+      );
+      return ids.filter((u) => !aus.has(u));
+    };
+
     // Schicht vorbei (Aufruf kommt alle 5 Minuten aus der Datenbank, pg_cron).
     // Nimmt keinen Text und keine Empfänger an: der Server sucht die beendeten
     // Schichten selbst und markiert sie, jede Meldung geht also genau einmal
@@ -83,7 +105,7 @@ Deno.serve(async (req) => {
       // Sofort markieren – ein zweiter Aufruf findet sie nicht mehr.
       await supabase.from("termine").update({ abschluss_gemeldet_at: new Date().toISOString() }).in("id", liste.map((x) => x.id));
       const { data: team } = await supabase.from("profiles").select("user_id").or("role.in.(stufenteam,kassenwart,admin,sprecher,stv_sprecher),is_op.eq.true");
-      const ids = [...new Set((team || []).map((p: { user_id: string }) => p.user_id))];
+      const ids = await ohneAktive([...new Set((team || []).map((p: { user_id: string }) => p.user_id))]);
       const { data: subs } = ids.length ? await supabase.from("push_subscriptions").select("*").in("user_id", ids) : { data: [] };
       const erste = liste[0];
       const payload = JSON.stringify({
@@ -126,6 +148,9 @@ Deno.serve(async (req) => {
     let body = "";
     // Mehrere unterschiedliche Meldungen in einem Aufruf (z. B. Zahlungen für 20 Personen)
     let einzeln: { ids: string[]; title: string; body: string }[] | null = null;
+    // Chat: Meldungen desselben Chats fasst das Handy zusammen („3 neue Nachrichten“)
+    let pushTag: string | undefined;
+    let gruppe: string | undefined;
 
     const TEAM = ["stufenteam", "kassenwart", "admin", "sprecher", "stv_sprecher"];
     // Befugnisse, mit denen jemand anderen etwas zuteilt, freigibt oder
@@ -168,12 +193,14 @@ Deno.serve(async (req) => {
         if (ziele.length < vorher) console.log("Direkt-Modus: nicht erlaubte Empfänger entfernt:", vorher - ziele.length);
       }
       userIds = ziele;
+      if (art === "eltern" || art === "anfrage") userIds = await ohneAbgeschaltete(userIds, art === "eltern" ? "eltern" : "anfragen");
       title = kurz(directTitle || "Stufenkasse", 80);
       body = kurz(directBody, 200);
     } else if (an_team) {
       // An das Stufenteam, z. B. eine neue Terminanfrage
       const { data } = await supabase.from("profiles").select("user_id").in("role", TEAM);
       userIds = (data || []).map((p: { user_id: string }) => p.user_id);
+      if (art === "anfrage") userIds = await ohneAbgeschaltete(userIds, "anfragen");
       title = kurz(directTitle || "Stufenkasse", 80);
       body = kurz(directBody, 200);
     } else if (eltern_info_id) {
@@ -238,7 +265,7 @@ Deno.serve(async (req) => {
       if (tp.kind === "ticket") {
         // Gespräch Schüler <-> Stufenteam
         const person = [tp.created_by as string, ...mitglieder].filter((u) => u && !istTeam(u));
-        userIds = istTeam(it.created_by as string) ? person : teamIds;
+        userIds = istTeam(it.created_by as string) ? person : await ohneAbgeschaltete(teamIds, "schueler");
       } else if (tp.admin_only) {
         userIds = [...rolle.entries()].filter(([, r]) => r === "admin").map(([u]) => u);
       } else if (tp.visibility === "stufenteam") {
@@ -250,6 +277,16 @@ Deno.serve(async (req) => {
           ? await supabase.from("tag_members").select("user_id").in("tag", tags)
           : { data: [] };
         userIds = [...mitglieder, ...(g || []).map((x: { user_id: string }) => x.user_id)];
+        // Komitee-Schalter des Teams: fremde Komitee-Chats einschalten, eigene
+        // ausschalten (profiles.mitteilungen.komitees[slug])
+        if (tp.tag) {
+          const { data: pm } = await supabase.from("profiles").select("user_id, mitteilungen").in("role", TEAM);
+          for (const x of (pm || []) as { user_id: string; mitteilungen?: { komitees?: Record<string, boolean> } }[]) {
+            const w = x.mitteilungen?.komitees?.[tp.tag];
+            if (w === true) userIds.push(x.user_id);
+            if (w === false) userIds = userIds.filter((u) => u !== x.user_id);
+          }
+        }
       }
       // Eltern sind in keinem Chat.
       userIds = [...new Set(userIds)].filter((u) => rolle.get(u) !== "eltern");
@@ -271,6 +308,8 @@ Deno.serve(async (req) => {
       body = tp.kind === "ticket" && istTeam(it.created_by as string) ? text : `${von}: ${text}`;
       if (it.type === "umfrage") body = `${von} fragt: ${it.body || it.title}`;
       if (ziel === "./") ziel = "./#chats";
+      pushTag = `chat-${tp.id}`;
+      gruppe = title;
     } else if (termin_id) {
       // Ein Termin oder eine Schichtreihe: an alle, die ihn sehen dürfen –
       // mit denselben Regeln wie im Kalender.
@@ -350,6 +389,11 @@ Deno.serve(async (req) => {
     // Ausnahme: eine Bestätigung im Direkt-Modus (z. B. man teilt sich selbst ein).
     const selbstErlaubt = Boolean(auch_selbst) && Array.isArray(user_ids) && user_ids.length > 0;
     if (!selbstErlaubt) userIds = userIds.filter((u) => u !== selbst);
+    userIds = await ohneAktive(userIds);
+    if (einzeln) {
+      const alle = await ohneAktive([...new Set(einzeln.flatMap((p) => p.ids))]);
+      einzeln = einzeln.map((p) => ({ ...p, ids: p.ids.filter((u) => alle.includes(u)) }));
+    }
     const pakete = einzeln ?? [{ ids: userIds, title, body }];
     const alleIds = [...new Set(pakete.flatMap((p) => p.ids))];
 
@@ -370,7 +414,8 @@ Deno.serve(async (req) => {
         title: paket.title,
         body: paket.body.slice(0, 120),
         url: ziel,
-        tag: event_id ? `event-${event_id}` : termin_id ? `termin-${termin_id}` : eltern_info_id ? `eltern-info-${eltern_info_id}` : undefined,
+        tag: pushTag ?? (event_id ? `event-${event_id}` : termin_id ? `termin-${termin_id}` : eltern_info_id ? `eltern-info-${eltern_info_id}` : undefined),
+        gruppe,
       });
       await Promise.all(
         (subs || [])

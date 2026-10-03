@@ -29,7 +29,7 @@ const asset = (file: string) => new URL(file, self.registration.scope).href;
 
 // Push: Nachricht anzeigen, auch wenn die App geschlossen ist
 self.addEventListener("push", (event: PushEvent) => {
-  let data: { title?: string; body?: string; url?: string; tag?: string } = {};
+  let data: { title?: string; body?: string; url?: string; tag?: string; gruppe?: string } = {};
   try {
     data = event.data ? event.data.json() : {};
   } catch {
@@ -51,7 +51,7 @@ self.addEventListener("push", (event: PushEvent) => {
     lang: "de",
     timestamp: Date.now(),
     vibrate: [80, 40, 80],
-    data: { url: data.url || "./" },
+    data: { url: data.url || "./", anzahl: 1 },
   };
   // Gleiche Quelle (z. B. dasselbe Event) ersetzt die alte Meldung statt zu stapeln.
   if (data.tag) {
@@ -59,15 +59,27 @@ self.addEventListener("push", (event: PushEvent) => {
     options.renotify = true;
   }
 
+  const zeigen = async () => {
+    let titel = data.title || "Stufenkasse";
+    // Mehrere Nachrichten aus demselben Chat: eine Meldung „3 neue Nachrichten“
+    // statt drei einzelne. Die alte Meldung mit demselben tag wird ersetzt.
+    if (data.tag?.startsWith("chat-")) {
+      const alt = await self.registration.getNotifications({ tag: data.tag }).catch(() => [] as Notification[]);
+      const vorher = alt.reduce((n, x) => n + (Number((x.data as { anzahl?: number })?.anzahl) || 1), 0);
+      if (vorher > 0) {
+        const anzahl = vorher + 1;
+        titel = data.gruppe || titel;
+        options.body = `${anzahl} neue Nachrichten`;
+        options.data = { url: data.url || "./", anzahl };
+      }
+    }
+    await self.registration.showNotification(titel, options);
+  };
+
   // Roter Punkt am App-Symbol, bis die App wieder geöffnet wird (dort wird
   // er durch die echte Zahl ersetzt).
   const nav = self.navigator as WorkerNavigator & { setAppBadge?: () => Promise<void> };
-  event.waitUntil(
-    Promise.all([
-      self.registration.showNotification(data.title || "Stufenkasse", options),
-      nav.setAppBadge?.().catch(() => {}) ?? Promise.resolve(),
-    ]),
-  );
+  event.waitUntil(Promise.all([zeigen(), nav.setAppBadge?.().catch(() => {}) ?? Promise.resolve()]));
 });
 
 self.addEventListener("notificationclick", (event: NotificationEvent) => {

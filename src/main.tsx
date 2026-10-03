@@ -3,7 +3,7 @@ import ReactDOM from "react-dom/client";
 import App from "./App";
 import { StoreProvider } from "./store";
 import { Fehlerfang } from "./components/Fehlerfang";
-import { Verbindungshinweis } from "./components/Verbindungshinweis";
+import { startAktiv } from "./lib/aktiv";
 import { MelderProvider } from "./components/Melder";
 // Keine eigenen Schriften: Die App nutzt die Systemschrift des Geraets –
 // San Francisco auf iPhone, iPad und Mac. Nichts wird nachgeladen, also
@@ -119,12 +119,14 @@ if (typeof __BAU_ZEIT__ === "string" && __BAU_ZEIT__ && import.meta.env.PROD) {
   document.addEventListener("visibilitychange", () => void vergleichen());
 }
 
+// Wer in der App ist, bekommt keine Pop-ups (siehe lib/aktiv.ts)
+startAktiv();
+
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <Fehlerfang>
       {/* Ganz außen, damit auch die Datenspeicher Meldungen zeigen können. */}
       <MelderProvider>
-        <Verbindungshinweis />
         <StoreProvider>
           <App />
         </StoreProvider>

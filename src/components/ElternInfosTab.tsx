@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { SkelettText } from "./Skelett";
 import { useEltern } from "../eltern-store";
 import { useRole } from "../auth/RoleProvider";
 import { datumLang } from "./BeitragsListe";
@@ -47,7 +48,9 @@ export function ElternInfosTab() {
       <section className="card p-5">
         <h2 className="text-lg font-bold">Vom Stufenteam</h2>
         {!bereit ? (
-          <p className="mt-2 text-[13px] text-tinte-leise">Wird geladen …</p>
+          <div className="mt-2">
+            <SkelettText zeilen={3} />
+          </div>
         ) : infos.length === 0 ? (
           <p className="mt-2 text-[13px] text-tinte-leise">Noch keine Neuigkeiten.</p>
         ) : (

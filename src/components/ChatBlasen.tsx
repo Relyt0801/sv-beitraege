@@ -1,9 +1,11 @@
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useChatEnde } from "../lib/gescrollt";
-import type { TopicItem } from "../topics-store";
+import { REAKTIONEN, useTopicsOptional, type Reaktion, type TopicItem } from "../topics-store";
 import { Avatar, PersonName } from "./Avatar";
 import { MuteKnopf } from "./MuteKnopf";
 
-import { frage } from "../lib/melder";
+import { frage, melde } from "../lib/melder";
 /**
  * Nachrichtenliste im WhatsApp-Stil: fremde Nachrichten links mit Kreis (oben, auf Höhe des Namens) und
  * farbigem Namen in der Blase, eigene rechts ohne Namen.
@@ -27,13 +29,32 @@ export function ChatBlase({
       <Avatar userId={m.created_by} name={m.author} size={28} />
     </span>
   );
+  const topics = useTopicsOptional();
+  const blase = useRef<HTMLDivElement>(null);
+  const [menue, setMenue] = useState<DOMRect | null>(null);
+  const halten = useLangDruck(() => {
+    if (!blase.current || m.nicht_gesendet) return;
+    try {
+      navigator.vibrate?.(10);
+    } catch {
+      /* nicht überall erlaubt */
+    }
+    setMenue(blase.current.getBoundingClientRect());
+  });
+  const reaktionen = topics?.reaktionen[m.id] || [];
+  const meine = reaktionen.find((r) => r.user_id === topics?.uid)?.emoji ?? null;
+  const reagieren = (e: Reaktion | null) => void topics?.reagieren(m.id, e);
+
   return (
     <div className={`flex items-start gap-2 ${meins ? "justify-end" : "justify-start"}`}>
       {!meins && kreis}
+      <div className={`flex max-w-[78%] flex-col sm:max-w-[65%] lg:max-w-[50%] ${meins ? "items-end" : "items-start"}`}>
       <div
-        className={`max-w-[78%] rounded-2xl px-3.5 py-2 sm:max-w-[65%] lg:max-w-[50%] ${
-          meins ? "bg-brand text-white" : "bg-white shadow-card dark:bg-slate-900 dark:shadow-cardDark"
-        }`}
+        ref={blase}
+        {...halten}
+        className={`select-none rounded-2xl px-3.5 py-2 transition [-webkit-touch-callout:none] ${
+          menue ? "scale-[1.03]" : ""
+        } ${meins ? "bg-brand text-white" : "bg-white shadow-card dark:bg-slate-900 dark:shadow-cardDark"}`}
       >
         <PersonName
           userId={m.created_by}
@@ -67,7 +88,164 @@ export function ChatBlase({
           {!meins && <MuteKnopf userId={m.created_by} name={m.author} topicId={m.topic_id} />}
         </div>
       </div>
+      {reaktionen.length > 0 && (
+        <ReaktionsChips liste={reaktionen} meine={meine} onTippen={(e) => reagieren(meine === e ? null : e)} />
+      )}
+      </div>
       {meins && kreis}
+      {menue &&
+        createPortal(
+          <ReaktionsMenue
+            rect={menue}
+            rechts={meins}
+            meine={meine}
+            onWahl={(e) => {
+              reagieren(meine === e ? null : e);
+              setMenue(null);
+            }}
+            onKopieren={() => {
+              void navigator.clipboard?.writeText(m.body).then(() => melde("Kopiert"), () => undefined);
+              setMenue(null);
+            }}
+            onSchliessen={() => setMenue(null)}
+          />,
+          document.body,
+        )}
+    </div>
+  );
+}
+
+/**
+ * Gedrückt halten (Handy) oder Rechtsklick (Computer) – ohne dass dabei die
+ * Textauswahl oder das System-Menü aufgeht. Wer beim Halten wischt (scrollt),
+ * löst nichts aus.
+ */
+function useLangDruck(los: () => void) {
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const start = useRef<{ x: number; y: number } | null>(null);
+  const stopp = () => {
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = null;
+    start.current = null;
+  };
+  useEffect(() => stopp, []);
+  return {
+    onPointerDown: (e: React.PointerEvent) => {
+      if (e.pointerType === "mouse" && e.button !== 0) return;
+      start.current = { x: e.clientX, y: e.clientY };
+      timer.current = setTimeout(() => {
+        stopp();
+        los();
+      }, 450);
+    },
+    onPointerMove: (e: React.PointerEvent) => {
+      if (!start.current) return;
+      if (Math.abs(e.clientX - start.current.x) > 8 || Math.abs(e.clientY - start.current.y) > 8) stopp();
+    },
+    onPointerUp: stopp,
+    onPointerCancel: stopp,
+    onPointerLeave: stopp,
+    onContextMenu: (e: React.MouseEvent) => {
+      e.preventDefault();
+      stopp();
+      los();
+    },
+  };
+}
+
+/** Kleine Schildchen unter der Blase: 👍 2  🔥 1 – die eigene ist blau umrandet. */
+function ReaktionsChips({
+  liste, meine, onTippen,
+}: {
+  liste: { user_id: string; emoji: string }[];
+  meine: string | null;
+  onTippen: (e: Reaktion) => void;
+}) {
+  const zahl = new Map<string, number>();
+  for (const r of liste) zahl.set(r.emoji, (zahl.get(r.emoji) || 0) + 1);
+  const reihe = REAKTIONEN.filter((e) => zahl.has(e));
+  return (
+    <div className="-mt-1.5 flex flex-wrap gap-1 px-1.5">
+      {reihe.map((e) => (
+        <button
+          key={e}
+          onClick={() => onTippen(e)}
+          aria-label={`${e} ${zahl.get(e)}${meine === e ? ", deine Reaktion – antippen zum Zurücknehmen" : ""}`}
+          className={`flex items-center gap-0.5 rounded-full border px-1.5 py-[1px] text-[12px] leading-5 shadow-sm transition active:scale-90 ${
+            meine === e
+              ? "border-brand/60 bg-brand/10 dark:bg-brand/25"
+              : "border-black/[0.06] bg-white dark:border-white/10 dark:bg-slate-800"
+          }`}
+        >
+          <span>{e}</span>
+          {(zahl.get(e) || 0) > 1 && <span className="zahl text-[11px] font-bold text-tinte-matt dark:text-slate-300">{zahl.get(e)}</span>}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * Menü nach dem Gedrückthalten – wie bei iMessage: der Rest wird abgedunkelt,
+ * über der Nachricht die Leiste mit den Reaktionen, darunter „Kopieren“.
+ */
+function ReaktionsMenue({
+  rect, rechts, meine, onWahl, onKopieren, onSchliessen,
+}: {
+  rect: DOMRect;
+  rechts: boolean;
+  meine: string | null;
+  onWahl: (e: Reaktion) => void;
+  onKopieren: () => void;
+  onSchliessen: () => void;
+}) {
+  useEffect(() => {
+    const esc = (e: KeyboardEvent) => e.key === "Escape" && onSchliessen();
+    window.addEventListener("keydown", esc);
+    return () => window.removeEventListener("keydown", esc);
+  }, [onSchliessen]);
+  const breite = 6 * 44 + 16;
+  const vw = window.innerWidth;
+  const links = Math.max(8, Math.min(vw - breite - 8, rechts ? rect.right - breite : rect.left));
+  // Leiste über der Nachricht – passt sie oben nicht hin, darunter
+  const oben = rect.top > 140 ? rect.top - 60 : rect.bottom + 10;
+  const menueOben = rect.top > 140 ? rect.bottom + 10 : oben + 62;
+  return (
+    <div className="fixed inset-0 z-[95]" role="dialog" aria-label="Reagieren">
+      <button
+        className="absolute inset-0 cursor-default bg-black/25 backdrop-blur-[2px] animate-fadeIn"
+        aria-label="Schließen"
+        onClick={onSchliessen}
+      />
+      <div
+        className="absolute flex animate-popIn gap-1 rounded-full bg-white/95 p-2 shadow-glas backdrop-blur-xl dark:bg-slate-800/95"
+        style={{ left: links, top: oben }}
+      >
+        {REAKTIONEN.map((e) => (
+          <button
+            key={e}
+            onClick={() => onWahl(e)}
+            aria-label={meine === e ? `${e} zurücknehmen` : `Mit ${e} reagieren`}
+            aria-pressed={meine === e}
+            className={`flex h-10 w-10 items-center justify-center rounded-full text-[22px] transition active:scale-90 ${
+              meine === e ? "bg-brand/15 dark:bg-brand/30" : "hover:bg-black/[0.05] dark:hover:bg-white/10"
+            }`}
+          >
+            {e}
+          </button>
+        ))}
+      </div>
+      <div
+        className="absolute w-44 animate-popIn overflow-hidden rounded-2xl bg-white/95 shadow-glas backdrop-blur-xl dark:bg-slate-800/95"
+        style={{ left: Math.max(8, Math.min(vw - 184, rechts ? rect.right - 176 : rect.left)), top: Math.min(menueOben, window.innerHeight - 60) }}
+      >
+        <button
+          onClick={onKopieren}
+          className="flex w-full items-center justify-between px-4 py-3 text-left text-[15px] font-medium hover:bg-black/[0.04] dark:hover:bg-white/[0.06]"
+        >
+          Kopieren <span aria-hidden>⧉</span>
+        </button>
+      </div>
     </div>
   );
 }

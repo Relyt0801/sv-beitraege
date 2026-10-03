@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTopics, type Topic, type TopicItem } from "../topics-store";
 import { useRole } from "../auth/RoleProvider";
 import { useStore } from "../store";
@@ -26,10 +26,10 @@ export function KomiteePage({ topic, onBack }: { topic: Topic; onBack: () => voi
   // To-dos, Abstimmungen und Angepinntes anderer löschen (eigenes Recht, 28.09.)
   const darfEintraege = can("chats.delete_items");
   const [neu, setNeu] = useState<Neu>(null);
-  const [tab, setTab] = useState<"uebersicht" | "chat">("uebersicht");
-  // Wie viel im Chat neu ist – gemerkt beim Öffnen, denn "gelesen" wird die
-  // Seite sofort. Sonst sähe man auf der Übersicht nicht, dass im Chat etwas wartet.
-  const [chatNeu, setChatNeu] = useState(() => unreadCount(topic.id));
+  // Man landet im Chat; die Übersicht (Angepinntes, Abstimmungen, To-dos)
+  // liegt rechts oben als zweite Ansicht. Beide haben ihren eigenen roten
+  // Punkt und ihre eigene Gelesen-Marke.
+  const [tab, setTab] = useState<"uebersicht" | "chat">("chat");
 
   const alle = useMemo(
     () => items.filter((i) => i.topic_id === topic.id).sort((a, b) => (a.created_at < b.created_at ? -1 : 1)),
@@ -40,18 +40,12 @@ export function KomiteePage({ topic, onBack }: { topic: Topic; onBack: () => voi
   const todos = alle.filter((i) => i.type === "todo");
   const chat = alle.filter((i) => (i.type === "nachricht" && !i.pinned) || i.type === "system");
 
-  // Kommt eine fremde Nachricht, während man auf der Übersicht ist: mitzählen.
-  const bisher = useRef(0);
+  // Gelesen wird nur, was man gerade sieht
   useEffect(() => {
-    const fremde = chat.filter((i) => i.created_by !== uid).length;
-    if (bisher.current && fremde > bisher.current && tab === "uebersicht") setChatNeu((n) => n + (fremde - bisher.current));
-    bisher.current = fremde;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chat.length]);
+    markRead(topic.id, tab);
+  }, [topic.id, tab, alle.length, markRead]);
 
-  useEffect(() => {
-    markRead(topic.id);
-  }, [topic.id, alle.length, markRead]);
+  const neuAndere = unreadCount(topic.id, tab === "chat" ? "uebersicht" : "chat");
 
   const titel = topic.tag ? committeeLabel(topic.tag) : topic.title;
   const icon = topic.tag ? committeeIcon(topic.tag) : "💬";
@@ -62,28 +56,19 @@ export function KomiteePage({ topic, onBack }: { topic: Topic; onBack: () => voi
         <button className="iconbtn" onClick={onBack} aria-label="Zurück">‹</button>
         <span className="text-xl">{icon}</span>
         <div className="min-w-0 flex-1 truncate text-[17px] font-bold">{titel}</div>
-        <div className="flex gap-1 rounded-xl bg-papier-matt p-1 dark:bg-slate-800">
-          <button
-            onClick={() => setTab("uebersicht")}
-            className={`rounded-lg px-2.5 py-1 text-xs font-bold ${tab === "uebersicht" ? "bg-white text-brand shadow-card dark:bg-slate-900" : "text-tinte-matt"}`}
-          >
-            Übersicht
-          </button>
-          <button
-            onClick={() => {
-              setTab("chat");
-              setChatNeu(0);
-            }}
-            className={`flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-bold ${tab === "chat" ? "bg-white text-brand shadow-card dark:bg-slate-900" : "text-tinte-matt"}`}
-          >
-            Chat
-            {chatNeu > 0 && tab !== "chat" && (
-              <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
-                {chatNeu > 9 ? "9+" : chatNeu}
-              </span>
-            )}
-          </button>
-        </div>
+        <button
+          onClick={() => setTab(tab === "chat" ? "uebersicht" : "chat")}
+          aria-label={tab === "chat" ? "Übersicht öffnen" : "Zurück zum Chat"}
+          className="relative flex shrink-0 items-center gap-1.5 rounded-xl bg-[rgb(118_118_128/0.12)] px-3 py-1.5 text-[13px] font-bold text-tinte-matt transition active:scale-95 dark:bg-[rgb(118_118_128/0.24)] dark:text-slate-200"
+        >
+          <span aria-hidden>{tab === "chat" ? "📋" : "💬"}</span>
+          {tab === "chat" ? "Übersicht" : "Chat"}
+          {neuAndere > 0 && (
+            <span className="flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+              {neuAndere > 9 ? "9+" : neuAndere}
+            </span>
+          )}
+        </button>
       </div>
 
       {banned && (

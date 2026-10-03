@@ -297,6 +297,7 @@ export function ElternProvider({ children }: { children: ReactNode }) {
         anTeam ? `Eltern: ${t.betreff}` : t.betreff,
         anTeam ? text.trim().slice(0, 110) : `Antwort vom Stufenteam: ${text.trim().slice(0, 90)}`,
         anTeam ? "./#chats" : "./#infos",
+        anTeam ? { art: "eltern" } : undefined,
       );
     }
   }, [tickets]);
@@ -427,6 +428,9 @@ export function ElternProvider({ children }: { children: ReactNode }) {
    * der Zeitpunkt, an dem ich zuletzt reingeschaut habe.
    */
   const ungelesen = tickets.filter((t) => {
+    // Erledigte Gespräche zählen fürs Team nicht mehr mit (vorher stand
+    // dadurch dauerhaft eine Zahl am Chats-Reiter)
+    if (istTeam.current && t.erledigt) return false;
     const meine = nachrichten.filter((n) => n.ticket_id === t.id);
     const fremd = meine.filter((n) => n.user_id !== uid.current);
     if (!fremd.length) return false;

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { SkelettText } from "./Skelett";
 import { useEltern } from "../eltern-store";
 import { useRole } from "../auth/RoleProvider";
 import { useStore } from "../store";
@@ -41,7 +42,9 @@ export function KontoTab({ personen, du = false }: { personen?: Student[]; du?: 
 
   if (!konto)
     return (
-      <div className="card p-6 text-center text-sm text-tinte-matt">Die Kontodaten werden geladen …</div>
+      <div className="card p-6">
+        <SkelettText zeilen={4} />
+      </div>
     );
 
   if (!konto.iban)

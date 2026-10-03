@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { SkelettKarten } from "./Skelett";
 import { useStore } from "../store";
 import { useRole } from "../auth/RoleProvider";
 import { useTermine } from "../termine-store";
@@ -149,10 +150,7 @@ export function FinanzenTab({ kosten }: { kosten: KostenValue }) {
 
   if (!fin.bereit)
     return (
-      <div className="flex flex-col items-center gap-3 py-16 text-tinte-leise">
-        <div className="h-8 w-8 animate-spin rounded-full border-[3px] border-papier-linie border-t-brand dark:border-slate-700" />
-        <span className="text-sm">Kassenbuch wird geladen …</span>
-      </div>
+      <SkelettKarten n={3} gross />
     );
 
   if (fin.fehler)

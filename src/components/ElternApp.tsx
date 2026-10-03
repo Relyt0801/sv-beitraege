@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { SkelettKarten } from "./Skelett";
 import { HY } from "../lib/types";
 import { basisOffen, beitragFuer, prozentVon, punkteIndex, ticketBetrag } from "../lib/logic";
 import { useStore } from "../store";
@@ -224,10 +225,7 @@ export function ElternApp() {
         {reiter === "uebersicht" && <InstallKarte />}
         {reiter === "uebersicht" &&
           (laedt ? (
-            <div className="flex flex-col items-center justify-center gap-4 py-24 text-tinte-leise">
-              <div className="h-8 w-8 animate-spin rounded-full border-[3px] border-slate-200 border-t-slate-500 dark:border-slate-700 dark:border-t-slate-300" />
-              <div className="text-sm font-medium">Wird geladen …</div>
-            </div>
+            <SkelettKarten n={2} gross />
           ) : (
             <div key="uebersicht" className="grid animate-fadeIn gap-5">
               {/* Erst die Summe für die ganze Familie, dann jedes Kind einzeln. */}
