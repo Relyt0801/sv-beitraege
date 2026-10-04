@@ -27,8 +27,8 @@ export function KomiteePage({ topic, onBack }: { topic: Topic; onBack: () => voi
   const darfEintraege = can("chats.delete_items");
   const [neu, setNeu] = useState<Neu>(null);
   // Man landet im Chat; die Übersicht (Angepinntes, Abstimmungen, To-dos)
-  // liegt rechts oben als zweite Ansicht. Beide haben ihren eigenen roten
-  // Punkt und ihre eigene Gelesen-Marke.
+  // ist der zweite Knopf daneben. Beide haben ihren eigenen roten Punkt und
+  // ihre eigene Gelesen-Marke.
   const [tab, setTab] = useState<"uebersicht" | "chat">("chat");
 
   const alle = useMemo(
@@ -45,30 +45,38 @@ export function KomiteePage({ topic, onBack }: { topic: Topic; onBack: () => voi
     markRead(topic.id, tab);
   }, [topic.id, tab, alle.length, markRead]);
 
-  const neuAndere = unreadCount(topic.id, tab === "chat" ? "uebersicht" : "chat");
-
   const titel = topic.tag ? committeeLabel(topic.tag) : topic.title;
   const icon = topic.tag ? committeeIcon(topic.tag) : "💬";
 
   return (
     <div>
-      <div className="sticky top-[var(--kopf)] z-10 -mx-3 flex items-center gap-2 border-b border-papier-linie bg-papier-matt/95 px-3 py-2 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95 sm:-mx-5 sm:px-5">
+      <div className="sticky top-[var(--kopf)] z-10 -mx-3 border-b border-papier-linie bg-papier-matt/95 px-3 py-2 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95 sm:-mx-5 sm:px-5">
+      <div className="flex items-center gap-2">
         <button className="iconbtn" onClick={onBack} aria-label="Zurück">‹</button>
         <span className="text-xl">{icon}</span>
         <div className="min-w-0 flex-1 truncate text-[17px] font-bold">{titel}</div>
-        <button
-          onClick={() => setTab(tab === "chat" ? "uebersicht" : "chat")}
-          aria-label={tab === "chat" ? "Übersicht öffnen" : "Zurück zum Chat"}
-          className="relative flex shrink-0 items-center gap-1.5 rounded-xl bg-[rgb(118_118_128/0.12)] px-3 py-1.5 text-[13px] font-bold text-tinte-matt transition active:scale-95 dark:bg-[rgb(118_118_128/0.24)] dark:text-slate-200"
-        >
-          <span aria-hidden>{tab === "chat" ? "📋" : "💬"}</span>
-          {tab === "chat" ? "Übersicht" : "Chat"}
-          {neuAndere > 0 && (
-            <span className="flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
-              {neuAndere > 9 ? "9+" : neuAndere}
-            </span>
-          )}
-        </button>
+      </div>
+      {/* Zwei Knöpfe: Chat (Standard) und Übersicht – jeder mit eigenem roten Punkt */}
+      <div className="seg mt-2">
+        {(["chat", "uebersicht"] as const).map((k) => {
+          const n = tab === k ? 0 : unreadCount(topic.id, k);
+          return (
+            <button
+              key={k}
+              onClick={() => setTab(k)}
+              aria-pressed={tab === k}
+              className={`seg-item flex items-center justify-center gap-1.5 ${tab === k ? "seg-aktiv" : ""}`}
+            >
+              {k === "chat" ? "💬 Chat" : "📋 Übersicht"}
+              {n > 0 && (
+                <span className="flex h-[17px] min-w-[17px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+                  {n > 9 ? "9+" : n}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
       </div>
 
       {banned && (

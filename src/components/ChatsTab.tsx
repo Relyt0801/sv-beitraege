@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { SkelettKarten } from "./Skelett";
 import { useTopics, type Topic } from "../topics-store";
@@ -18,6 +19,7 @@ import { normalize } from "../lib/logic";
 import { frage } from "../lib/melder";
 import { NachtragAnfragen } from "./NachtragAnfragen";
 import { NachtragSheet } from "./NachtragSheet";
+import { Schalter } from "./Schalter";
 import { kategorieAn, komiteeAn, useMitteilungen, type Kategorie } from "../lib/mitteilungen";
 import { useZaehltMit } from "../lib/chat-zaehler";
 const TEAM_CHAT_TITLE = "Stufenteam";
@@ -176,35 +178,37 @@ export function ChatsTab() {
       {isStaff ? (
         <>
           <section>
-            <KategorieKopf titel="Chats mit Schülern" glocke={glocke("schueler")} />
+            <KategorieKopf titel="Chats mit Schülern" />
             <div className="grid grid-cols-1 gap-2.5">
               <TicketUebersichtKarte
                 offene={offeneTickets}
                 unread={ticketUngelesen}
                 onOpen={() => setTicketListe(true)}
                 onAnschreiben={() => setAnschreiben(true)}
+                glocke={<MitteilungsZeile {...glocke("schueler")} name="Chats mit Schülern" />}
               />
               <SchuelerAnschreiben open={anschreiben} onClose={() => setAnschreiben(false)} />
             </div>
           </section>
 
           <section>
-            <KategorieKopf titel="Chats mit Eltern" glocke={glocke("eltern")} />
-            <ElternTeamTab />
+            <KategorieKopf titel="Chats mit Eltern" />
+            <ElternTeamTab glocke={<MitteilungsZeile {...glocke("eltern")} name="Chats mit Eltern" />} />
           </section>
 
           <section>
-            <KategorieKopf titel="Anfragen" glocke={glocke("anfragen")} />
-            {/* Was offen ist, steht hier als Karte. Ist nichts offen, bleibt
-                die Liste leer und der Satz darunter erscheint. */}
+            <KategorieKopf titel="Anfragen" />
+            {/* Offene Anfragen stehen als Karten darüber; darunter ein Feld mit
+                dem Hinweis (wenn nichts offen ist) und dem Mitteilungs-Schalter. */}
             <div className="peer grid grid-cols-1 gap-2.5 empty:hidden">
               <NachtragAnfragen />
               <KomiteeRequests />
               <UnbanRequests />
             </div>
-            <p className="hidden rounded-2xl border border-dashed border-papier-linie py-6 text-center text-[13px] text-tinte-leise peer-empty:block dark:border-slate-700">
-              Gerade keine offenen Anfragen. Kostenanfragen stehen unter Finanzen, Terminanfragen unter Events.
-            </p>
+            <div className="card mt-2.5 overflow-hidden peer-empty:mt-0 [&>p]:hidden peer-empty:[&>p]:block [&>div]:border-t-0 peer-empty:[&>div]:border-t">
+              <p className="px-4 py-3 text-[13px] text-tinte-leise">Gerade keine offenen Anfragen.</p>
+              <MitteilungsZeile {...glocke("anfragen")} name="Anfragen" />
+            </div>
             {studentId && (
               <button
                 onClick={() => setNachtragen(true)}
@@ -517,8 +521,8 @@ function TicketChat({ topic, onBack }: { topic: Topic; onBack: () => void }) {
 
 /** Karte "Gespräche mit Schülern" – steht direkt über den Gesprächen mit Eltern. */
 function TicketUebersichtKarte({
-  offene, unread, onOpen, onAnschreiben,
-}: { offene: Topic[]; unread: number; onOpen: () => void; onAnschreiben: () => void }) {
+  offene, unread, onOpen, onAnschreiben, glocke,
+}: { offene: Topic[]; unread: number; onOpen: () => void; onAnschreiben: () => void; glocke?: ReactNode }) {
   const { profile } = useProfiles();
   const neueste = offene[0];
   const person = useTicketPerson(neueste ?? null);
@@ -552,7 +556,22 @@ function TicketUebersichtKarte({
         <span className="min-w-0 flex-1 truncate text-[14px] text-tinte-matt dark:text-slate-300">{text}</span>
         <span className="shrink-0 text-[13px] font-bold text-brand">Alle ansehen ›</span>
       </button>
+      {glocke && <div className="-mx-4 -mb-4 mt-3 sm:-mx-5 sm:-mb-5">{glocke}</div>}
     </section>
+  );
+}
+
+/**
+ * Mitteilungen für einen Bereich an/aus – als Zeile IM Feld (unten, mit
+ * Trennlinie), nicht mehr als Knopf über den Feldern.
+ */
+function MitteilungsZeile({ an, setAn, name }: { an: boolean; setAn: (an: boolean) => void; name: string }) {
+  return (
+    <div className="flex min-h-[48px] items-center gap-3 border-t border-black/[0.06] px-4 py-2 dark:border-white/[0.08]">
+      <span aria-hidden className="text-[15px]">{an ? "🔔" : "🔕"}</span>
+      <span className="min-w-0 flex-1 text-[14px] text-tinte-matt dark:text-slate-300">Mitteilungen</span>
+      <Schalter an={an} onChange={setAn} label={`Mitteilungen für ${name}`} />
+    </div>
   );
 }
 

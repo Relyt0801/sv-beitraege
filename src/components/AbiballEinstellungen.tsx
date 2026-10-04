@@ -4,7 +4,8 @@ import { abiballVon, bonusGrenze, ticketPreise, sortStudents } from "../lib/logi
 import { useEntwurf } from "../lib/entwurf";
 import type { Abiball, Settings } from "../lib/types";
 import { bestellNummer, countdown, euroAusCent, useJetzt, useTicketBestellungen, verkaufStatus, type TicketBestellung } from "../lib/tickets";
-import { frage } from "../lib/melder";
+import { frage, melde } from "../lib/melder";
+import { pushAnPersonen } from "../lib/push";
 import { Gruppe, Zeile } from "./Liste";
 import { Schalter } from "./Schalter";
 import { zeitpunktSchoen } from "./AbiTicket";
@@ -182,6 +183,7 @@ function AbiballGruppe({ a, setze }: { a: Abiball; setze: (p: Partial<Abiball>) 
 // ---------------------------------------------------------------- Verkauf
 
 function VerkaufGruppe({ settings, a, setze }: { settings: Settings; a: Abiball; setze: (p: Partial<Abiball>) => void }) {
+  const { students } = useStore();
   const abMs = a.verkaufAb ? Date.parse(a.verkaufAb) : NaN;
   const jetzt = useJetzt(Number.isFinite(abMs) && abMs > Date.now());
   const status = verkaufStatus(a, jetzt);
@@ -236,6 +238,28 @@ function VerkaufGruppe({ settings, a, setze }: { settings: Settings; a: Abiball;
             )}
           </div>
         </>
+      )}
+      {status !== "aus" && (
+        <Zeile
+          label="📣 Alle informieren"
+          onClick={() =>
+            void frage(
+              status === "bald"
+                ? `Allen Schülern und Eltern Bescheid geben, dass der Verkauf ${zeitpunktSchoen(a.verkaufAb!)} startet?`
+                : "Allen Schülern und Eltern Bescheid geben, dass der Ticketverkauf läuft?",
+              "Senden",
+            ).then((ok) => {
+              if (!ok) return;
+              const titel = "🎟️ Abiball-Tickets";
+              const text =
+                status === "bald" ? `Der Verkauf startet ${zeitpunktSchoen(a.verkaufAb!)}.` : "Der Ticketverkauf läuft – jetzt in der App bestellen.";
+              void pushAnPersonen(
+                students.map((x) => ({ student_id: x.id, title: titel, body: text })),
+                "./#kasse",
+              ).then(() => melde("Mitteilung verschickt"));
+            })
+          }
+        />
       )}
       <Zeile label="Höchstens je Person">
         <Zahl wert={max.wert} min={1} max={20} onChange={max.aendern} onBlur={max.jetztSpeichern} label="Tickets je Person" />

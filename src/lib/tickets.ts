@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { hasSupabase, supabase } from "./supabase";
 import { abonniere } from "./realtime";
+import { pushAnPersonen } from "./push";
 import type { Abiball } from "./types";
 
 /**
@@ -170,10 +171,24 @@ export function useTicketBestellungen(aktiv = true) {
         .update({ status, bearbeitet_at: new Date().toISOString(), bearbeitet_von: s.session?.user.id ?? null })
         .eq("id", id);
       if (error) return error.message;
+      // Bezahlt? Dann bekommen die Person und ihre Eltern Bescheid.
+      const b = liste.find((x) => x.id === id);
+      if (b && status === "bezahlt") {
+        void pushAnPersonen(
+          [
+            {
+              student_id: b.student_id,
+              title: "🎟️ Abiball-Tickets bezahlt",
+              body: `${b.anzahl} ${b.anzahl === 1 ? "Ticket" : "Tickets"} · ${euroAusCent(b.betrag_cent)} sind angekommen. Danke!`,
+            },
+          ],
+          "./#kasse",
+        );
+      }
       void laden();
       return null;
     },
-    [laden],
+    [laden, liste],
   );
 
   return { liste, verkauft, bereit, laden, bestellen, setzeStatus };

@@ -12,6 +12,21 @@ ausführlich (auf Deutsch); hier steht der Überblick dazu.
 ---
 
 
+## 04.10.2026: Wischen, Chats, Buchungen nach Monaten, Prüfrunde
+
+- Kalender (Monat/Woche/Tag) und Wochenleiste: waagerecht wischen blättert
+  (`lib/wischen.ts`), die neue Ansicht gleitet von der Seite herein.
+- Chats: Mitteilungs-Schalter für Schüler-/Eltern-Chats und Anfragen sitzen
+  jetzt als Zeile IM jeweiligen Feld. Komitee: zwei Knöpfe „Chat“ (Standard)
+  und „Übersicht“, jeder mit eigenem roten Punkt, oben fest.
+- Finanzen → Buchungen: je Monat ein aufklappbares Feld mit Anzahl und Summe,
+  nur der neueste Monat ist offen; beim Suchen alle Treffer-Monate.
+- Tickets: „bezahlt“ schickt der Person und ihren Eltern eine Mitteilung;
+  Beiträge → Ticket hat „📣 Alle informieren“ (Verkaufsstart).
+- Datenbank (eingespielt): Trigger-Funktionen nicht mehr per API aufrufbar,
+  feste search_path für sechs Hilfsfunktionen. Push-Protokoll der letzten
+  24 h ohne Fehler.
+
 ## 04.10.2026: Apple-Schema in der ganzen App
 
 - `components/Liste.tsx`: gemeinsame Bausteine – `RechnungKopf` (oben mittig

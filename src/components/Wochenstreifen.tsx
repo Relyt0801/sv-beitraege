@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useWischen } from "../lib/wischen";
 import { SkelettText } from "./Skelett";
 import { useSchichtStatus, useTermine } from "../termine-store";
 import { committeeIcon, committeeLabel } from "../lib/committees";
@@ -53,13 +54,18 @@ export function Wochenstreifen({
   const meins = (t: Termin) => betrifftMich(t, meineKomitees, meineStudentIds);
   const st = useSchichtStatus();
 
+  const [richtung, setRichtung] = useState(0);
   function woche(richtung: number) {
+    setRichtung(richtung);
     const neu = plusTage(woStart, richtung * 7);
     setWoStart(neu);
     // Beim Blättern den ersten Tag der Woche zeigen, außer die aktuelle
     // Woche ist gemeint – dann bleibt heute stehen.
     setGewaehlt(neu === montagVon(heute) ? heute : neu);
   }
+
+  // Wochen auch per Wischen über die Tagesleiste
+  const { handler: wischen, zug } = useWischen(woche);
 
   const monatBeschriftung = () => {
     const a = ausKey(tage[0]);
@@ -143,7 +149,12 @@ export function Wochenstreifen({
       )}
 
       {/* ------------------------------------------------ sieben Tage */}
-      <div className="grid grid-cols-7 gap-1">
+      <div
+        {...wischen}
+        key={woStart}
+        className={`grid touch-pan-y grid-cols-7 gap-1 ${richtung > 0 ? "animate-vonRechts" : richtung < 0 ? "animate-vonLinks" : ""}`}
+        style={zug ? { transform: `translateX(${zug}px)` } : undefined}
+      >
         {tage.map((k) => {
           const liste = anTag(termine, k);
           const istHeute = k === heute;

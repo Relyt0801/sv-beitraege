@@ -7,7 +7,6 @@ import { useProfiles } from "../profiles-store";
 import { basisOffen } from "../lib/logic";
 import { FinanzStandard } from "./FinanzStandard";
 import { BuchungSheet, FarbWahl, Kennzahlen, PostenBereiche } from "./FinanzBereiche";
-import { useNachschub } from "../lib/liste";
 import { committeeIcon, committeeLabel } from "../lib/committees";
 import {
   EINNAHME_QUELLEN, QUELLE_NAME, STANDARD_FARBE, buchungFarbe, centAus, euro, euroKurz, farbHex,
@@ -922,16 +921,26 @@ function VerlaufKarte({
     });
   }, [buchungen, filter, q, aktionName]);
 
-  const { sichtbar, marke } = useNachschub(liste.length, [filter, q]);
-
+  // Nach Monaten gruppiert, jeder Monat klappt auf. Offen ist zuerst nur der
+  // neueste; beim Suchen sind alle Treffer-Monate offen.
   const gruppen = useMemo(() => {
     const m = new Map<string, Buchung[]>();
-    for (const b of liste.slice(0, sichtbar)) {
+    for (const b of liste) {
       const k = b.datum.slice(0, 7);
       (m.get(k) || m.set(k, []).get(k)!).push(b);
     }
     return [...m.entries()];
-  }, [liste, sichtbar]);
+  }, [liste]);
+  const [offen, setOffen] = useState<Set<string>>(() => new Set());
+  const neuester = gruppen[0]?.[0];
+  const istOffen = (monat: string) => (q.trim() ? true : offen.has(monat) !== (monat === neuester));
+  const umschalten = (monat: string) =>
+    setOffen((alt) => {
+      const neu = new Set(alt);
+      if (neu.has(monat)) neu.delete(monat);
+      else neu.add(monat);
+      return neu;
+    });
 
   const FILTER: [Filter, string][] = [
     ["alle", "Alle"],
@@ -971,26 +980,42 @@ function VerlaufKarte({
       {liste.length === 0 ? (
         <div className="card py-10 text-center text-[14px] text-tinte-leise">Keine Buchungen.</div>
       ) : (
-        <div className="grid grid-cols-[minmax(0,1fr)] gap-5">
+        <div className="grid grid-cols-[minmax(0,1fr)] gap-2.5">
           {gruppen.map(([monat, zeilen]) => {
             const summe = zeilen.reduce((n, b) => n + (b.quelle === "abgleich" ? 0 : b.cent), 0);
+            const auf = istOffen(monat);
             return (
-              <div key={monat}>
-                <div className="abschnitt flex items-baseline justify-between">
-                  <span>{monatName(monat)}</span>
-                  <span className="zahl normal-case tracking-normal">
+              <ul key={monat} className="liste border border-black/[0.04] dark:border-white/[0.06]">
+                <li>
+                <button
+                  onClick={() => umschalten(monat)}
+                  aria-expanded={auf}
+                  className="flex min-h-[52px] w-full items-center gap-3 px-4 py-2.5 text-left transition active:bg-black/[0.04] dark:active:bg-white/[0.06]"
+                >
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[16px] font-semibold">{monatName(monat)}</span>
+                    <span className="block text-[12.5px] text-tinte-leise">
+                      {zeilen.length} {zeilen.length === 1 ? "Buchung" : "Buchungen"}
+                    </span>
+                  </span>
+                  <span className={`zahl shrink-0 text-[15px] font-semibold ${summe > 0 ? "text-bezahlt" : ""}`}>
                     {summe >= 0 ? "+" : "−"} {euro(Math.abs(summe))}
                   </span>
-                </div>
-                <ul className="liste border border-black/[0.04] dark:border-white/[0.06]">
-                  {zeilen.map((b) => (
+                  <span
+                    aria-hidden
+                    className={`shrink-0 text-[13px] text-tinte-leise transition-transform duration-200 ${auf ? "rotate-90" : ""}`}
+                  >
+                    ›
+                  </span>
+                </button>
+                </li>
+                {auf &&
+                  zeilen.map((b) => (
                     <Zeile key={b.id} b={b} kategorien={kategorien} aktionName={aktionName} onOeffnen={() => setAuswahl(b)} />
                   ))}
-                </ul>
-              </div>
+              </ul>
             );
           })}
-          {sichtbar < liste.length && <div ref={marke} className="h-6" />}
         </div>
       )}
 

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useWischen } from "../lib/wischen";
 import { useSchichtStatus, useTermine } from "../termine-store";
 import { useRole } from "../auth/RoleProvider";
 import { committeeIcon, committeeLabel } from "../lib/committees";
@@ -65,7 +66,11 @@ export function Kalender({
   const hatSchichten = useMemo(() => stufenTermine.some((t) => st(t) !== null), [stufenTermine, st]);
 
   // ---------------------------------------------------------- blättern
+  // Richtung der letzten Bewegung – danach gleitet die neue Ansicht von
+  // rechts (vor) oder links (zurück) herein.
+  const [richtung, setRichtung] = useState(0);
   function weiter(richtung: number) {
+    setRichtung(richtung);
     if (ansicht === "monat") {
       const d = ausKey(anker);
       d.setMonth(d.getMonth() + richtung, 1);
@@ -83,6 +88,9 @@ export function Kalender({
     window.addEventListener("keydown", taste);
     return () => window.removeEventListener("keydown", taste);
   }, [onSchliessen]);
+
+  // Nach links wischen = weiter, nach rechts = zurück (Monat, Woche, Tag)
+  const { handler: wischen, zug } = useWischen(weiter);
 
   const titel =
     ansicht === "monat"
@@ -161,8 +169,15 @@ export function Kalender({
       </header>
 
       {/* ------------------------------------------------ Inhalt */}
-      <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] sm:px-5">
-        <div className="mx-auto max-w-5xl">
+      <div
+        className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-3 py-3 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] sm:px-5"
+        {...wischen}
+      >
+        <div
+          key={`${ansicht}-${anker}`}
+          className={`mx-auto max-w-5xl ${richtung > 0 ? "animate-vonRechts" : richtung < 0 ? "animate-vonLinks" : ""}`}
+          style={zug ? { transform: `translateX(${zug}px)`, transition: "none" } : undefined}
+        >
           {/* Testphase: Kalender-Verbindung, nur für die Testkonten */}
           {kalenderDemo && (
             <button

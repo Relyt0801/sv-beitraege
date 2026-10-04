@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { useState } from "react";
 import { useEltern } from "../eltern-store";
 import { useRole } from "../auth/RoleProvider";
@@ -11,7 +12,7 @@ import { frage } from "../lib/melder";
  * Was das Stufenteam mit den Eltern zu tun hat: Infos anheften und die
  * Anfragen der Eltern beantworten. Erscheint im Reiter Chats.
  */
-export function ElternTeamTab() {
+export function ElternTeamTab({ glocke }: { glocke?: ReactNode } = {}) {
   const { infos, tickets, nachrichten, infoAnlegen, infoLoeschen, antworten, ticketSchliessen, ticketLoeschen, zuordnung, konten, anEltern, alsGelesen } = useEltern();
   const { uid } = useRole();
   const { profile } = useProfiles();
@@ -261,6 +262,7 @@ export function ElternTeamTab() {
             })}
           </ul>
         )}
+        {glocke && <div className="-mx-4 -mb-4 mt-3 sm:-mx-5 sm:-mb-5">{glocke}</div>}
       </section>
     </div>
   );
