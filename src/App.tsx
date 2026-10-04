@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { SkelettZeilen } from "./components/Skelett";
 import { HY, type Halbjahr, type Status } from "./lib/types";
 import { normalize, offenGesamt, offenStufe, sortStudents, staffelVon } from "./lib/logic";
+import { neuLadenBeobachten } from "./lib/neuladen";
 import { MyKasse } from "./components/MyKasse";
 import { PunkteSheet } from "./components/PunkteSheet";
 import { ProfilSheet } from "./components/ProfilSheet";
@@ -141,6 +142,9 @@ function Main() {
 
   // Abo beim Öffnen still auffrischen (fragt nie selbst nach Erlaubnis).
   usePushAuffrischen();
+
+  // „Update bei allen erzwingen“ (Profil, Admin): offene Apps laden neu
+  useEffect(() => neuLadenBeobachten(), []);
 
   // Main läuft erst hinter Zustimmungs- und Passwort-Gate. Vorher liefert die
   // Datenbank wegen RLS (has_consented) nichts – deshalb hier einmal nachladen.

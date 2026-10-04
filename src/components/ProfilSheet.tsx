@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { neuLadenErzwingen } from "../lib/neuladen";
 import { LoeschfristenSheet } from "./LoeschfristenSheet";
 import { Sheet, SheetKopf } from "./Sheet";
 import { Avatar } from "./Avatar";
@@ -16,7 +17,7 @@ import { abmelden, enablePush, pushConfigured, pushDiagnose, pushPermission } fr
 import { ProtokollSheet } from "./ProtokollSheet";
 import { RechtLinks } from "./Rechtliches";
 
-import { frage, meldeFehler } from "../lib/melder";
+import { frage, melde, meldeFehler } from "../lib/melder";
 /** Das eigene Profil: Bild, Namensfarbe, Passwort, Komitee-Wechsel, Hilfe. */
 export function ProfilSheet({
   open,
@@ -360,6 +361,25 @@ export function ProfilSheet({
         {hasSupabase && (istAdmin || can("perms.manage")) && (
           <button className={row} onClick={() => setLoeschOffen(true)}>
             <span>🧹</span> Automatisch löschen
+          </button>
+        )}
+        {/* Notfall: alle offenen Apps sofort auf den neuesten Stand bringen */}
+        {hasSupabase && (istAdmin || can("perms.manage")) && (
+          <button
+            className={row}
+            onClick={() =>
+              void frage(
+                "Alle offenen Apps jetzt neu laden?\n\nWer gerade tippt, wird erst danach neu geladen.",
+                "Neu laden",
+              ).then(async (ok) => {
+                if (!ok) return;
+                const f = await neuLadenErzwingen();
+                if (f) meldeFehler("Ging nicht: " + f);
+                else melde("Alle Apps laden jetzt neu");
+              })
+            }
+          >
+            <span>🔄</span> Update bei allen erzwingen
           </button>
         )}
         {/* Der Kassenwart darf sich die Sicherheitskopie holen – aber kein Protokoll. */}
