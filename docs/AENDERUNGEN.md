@@ -12,6 +12,28 @@ ausführlich (auf Deutsch); hier steht der Überblick dazu.
 ---
 
 
+## 04.10.2026: Funktionen an/aus, Zitatwand, Events aufgeräumt
+
+- **Funktionen** (`lib/funktionen.ts`, `components/Funktionen.tsx`, SQL
+  `supabase/funktionen-zitate.sql`): Profil → Funktionen schaltet Abiball-
+  Tickets, Abi-Album, Zitatwand und Pop-up-Umfragen für alle an/aus
+  (`app_settings.funktionen`, nur über `funktion_setzen()`; ein Trigger hält
+  das Team davon ab, die Spalte direkt zu ändern). Recht
+  `funktionen.verwalten`. Wer verwaltet, sieht Ausgeschaltetes weiter mit
+  Hinweis „Aus – nur du siehst das“. Wer innerhalb was darf: Rechte-Reiter.
+- **Zitatwand** (`lib/zitate.ts`, `components/Zitate.tsx`): dunkle Karte im
+  Profil mit „Zitat des Tages“, Einreichen mit Live-Vorschau, Wand mit
+  Filter Lehrer/Schüler, Sortierung 🔥 Top / Neu, Plätze 1–3. Prüfen (✓/✕)
+  für `zitate.pruefen`; Abgelehntes wird geleert. Rechte `zitate.nutzen`,
+  `zitate.pruefen`.
+- **Abi-Album**: Zahnrad oben im Album (Recht `album.kategorien`) für die
+  Kategorien – jetzt auch löschen (🗑). Der Eintrag im Profil ist weg.
+- **Events**: „Nachricht“ ist raus. „Info“ hat jetzt alle Optionen
+  (Hervorheben, „alle mit offenem Beitrag auswählen“); im Feed steht nur
+  „Info“ (alte Nachrichten ebenfalls). Neu im Formular: „📊 Umfrage“ öffnet
+  die Pop-up-Umfragen; oben im Reiter eine Umfragen-Karte. Im Profil sind
+  die Umfragen nicht mehr.
+
 ## 04.10.2026: Abi-Album, Pop-up-Umfragen, Nachtragen oben
 
 - **Abi-Album** (`lib/album.ts`, `components/Album.tsx`, SQL `supabase/abi-album.sql`):

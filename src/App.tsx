@@ -46,7 +46,8 @@ import { InstallKarte, InstallOverlay } from "./components/InstallHinweis";
 import { useGescrollt, useHoeheAlsVariable, useReiter } from "./lib/gescrollt";
 import { Schalter } from "./components/Schalter";
 import { AlbumProvider } from "./components/Album";
-import { UmfragePopup } from "./components/Umfragen";
+import { FunktionenProvider } from "./lib/funktionen";
+import { UmfragePopup, UmfragenSheet } from "./components/Umfragen";
 import { NachtragSheet } from "./components/NachtragSheet";
 
 import { frage, melde, meldeFehler } from "./lib/melder";
@@ -55,7 +56,9 @@ export default function App() {
     <AuthGate>
       <PasswordGate>
         <RoleProvider>
-          <NachRolle />
+          <FunktionenProvider>
+            <NachRolle />
+          </FunktionenProvider>
         </RoleProvider>
       </PasswordGate>
     </AuthGate>
@@ -217,6 +220,7 @@ function Main() {
   }, [setTab]);
   const [showComposer, setShowComposer] = useState(false);
   const [showAktion, setShowAktion] = useState(false);
+  const [showUmfragen, setShowUmfragen] = useState(false);
   const [query, setQuery] = useState("");
   const [showFilter, setShowFilter] = useState(false);
   const [min, setMin] = useState("");
@@ -842,7 +846,12 @@ function Main() {
           setShowComposer(false);
           setShowAktion(true);
         }}
+        onUmfrage={() => {
+          setShowComposer(false);
+          setShowUmfragen(true);
+        }}
       />
+      <UmfragenSheet open={showUmfragen} onClose={() => setShowUmfragen(false)} />
       <AktionSheet offen={showAktion} onSchliessen={() => setShowAktion(false)} />
       <ProfilSheet
         open={showSettings}

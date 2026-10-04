@@ -396,6 +396,24 @@ export function useAlbum(aktiv: boolean, uid: string | null, meineStudentId: str
     [kategorien.length, laden],
   );
 
+  /** Kategorie ganz entfernen (Einträge dazu werden nicht mehr angezeigt) */
+  const kategorieLoeschen = useCallback(
+    async (id: string): Promise<string | null> => {
+      if (!hasSupabase) {
+        demoAendern((d) => {
+          d.kategorien = d.kategorien.filter((k) => k.id !== id);
+        });
+        return null;
+      }
+      const { error } = await supabase!.from("album_kategorien").delete().eq("id", id);
+      if (error) return error.message;
+      await laden();
+      return null;
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [laden],
+  );
+
   /** Reihenfolge tauschen (hoch/runter) */
   const kategorieVerschieben = useCallback(
     async (id: string, richtung: -1 | 1) => {
@@ -431,6 +449,7 @@ export function useAlbum(aktiv: boolean, uid: string | null, meineStudentId: str
     kommentarLiken,
     kategorieSpeichern,
     kategorieVerschieben,
+    kategorieLoeschen,
     neuLaden: laden,
   };
 }

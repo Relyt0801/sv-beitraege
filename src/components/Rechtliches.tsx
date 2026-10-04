@@ -138,6 +138,9 @@ function Datenschutz() {
         Gelöschte Kommentare werden geleert. Stammdaten kann nur die Person selbst ändern.
       </P>
       <P>
+        <b>Zitatwand:</b> eingereichte Zitate (Text, wer es gesagt hat, wann/wo), wer sie eingereicht hat und die
+        🔥-Stimmen. Sichtbar erst nach der Prüfung durch das Team; Abgelehntes wird geleert. Keine Eltern.
+      </P>      <P>
         <b>Umfragen:</b> Deine Antworten und ob du fertig bist. Ausgewertet wird nur gezählt – einzelne Antworten
         sieht niemand, auch nicht das Stufenteam. Freitext-Antworten erscheinen in der Auswertung ohne Namen.
       </P>
@@ -210,7 +213,7 @@ function Datenschutz() {
         Speicherstand der Nacht wird 30 Tage aufbewahrt, Sicherheitskopien vor einem Zurücksetzen 90 Tage. Das
         Protokoll wird nach zwei Jahren automatisch gelöscht. Wer die Stufe verlässt, kann seinen Zugang beim
         Stufenteam löschen lassen. Ticketbestellungen bleiben bis nach dem Abiball (für die Abrechnung) und werden
-        danach mit den übrigen Daten gelöscht. Abi-Album und Umfragen bleiben bis zum Druck der Abizeitung bzw.
+        danach mit den übrigen Daten gelöscht. Abi-Album, Zitate und Umfragen bleiben bis zum Druck der Abizeitung bzw.
         bis das Stufenteam sie löscht.
       </P>
       <P>

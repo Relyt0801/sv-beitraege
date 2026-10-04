@@ -83,13 +83,25 @@ export function Sheet({ open, onClose, children }: { open: boolean; onClose: () 
 }
 
 /** Überschrift im Blatt – links der Titel, rechts ein runder Schließen-Knopf. */
-export function SheetKopf({ titel, unter, onClose }: { titel: ReactNode; unter?: ReactNode; onClose: () => void }) {
+export function SheetKopf({
+  titel,
+  unter,
+  onClose,
+  extra,
+}: {
+  titel: ReactNode;
+  unter?: ReactNode;
+  onClose: () => void;
+  /** Weitere runde Knöpfe links neben dem Schließen (z. B. Einstellungen) */
+  extra?: ReactNode;
+}) {
   return (
     <div className="mb-4 flex items-start gap-3">
       <div className="min-w-0 flex-1">
         <h2 className="text-[1.375rem] font-bold leading-tight tracking-[-0.02em]">{titel}</h2>
         {unter && <p className="mt-0.5 text-[13px] text-tinte-leise">{unter}</p>}
       </div>
+      {extra}
       <button
         type="button"
         onClick={onClose}

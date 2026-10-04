@@ -40,8 +40,15 @@ export interface NewEvent {
   options: string[]; // Antwort-Labels
 }
 
+/**
+ * "nachricht" gibt es nur noch für alte Beiträge – neu angelegt wird nur
+ * Info (mit allen Optionen, die früher die Nachricht hatte) und Abstimmung.
+ */
 export const TYPE_META: Record<EventType, { label: string; icon: string }> = {
-  info: { label: "Infobeitrag", icon: "📌" },
+  info: { label: "Info", icon: "📌" },
   umfrage: { label: "Abstimmung", icon: "🗳️" },
-  nachricht: { label: "Nachricht", icon: "✉️" },
+  nachricht: { label: "Info", icon: "📌" },
 };
+
+/** Was man im Formular neu anlegen kann */
+export const NEUE_TYPEN: EventType[] = ["info", "umfrage"];

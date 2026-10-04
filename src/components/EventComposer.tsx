@@ -5,20 +5,26 @@ import { useRole } from "../auth/RoleProvider";
 import { COMMITTEES, committeeIcon } from "../lib/committees";
 import { useEvents } from "../events-store";
 import { normalize, offenGesamt, sortStudents } from "../lib/logic";
-import { TYPE_META, type EventType } from "../lib/events";
+import { NEUE_TYPEN, TYPE_META, type EventType } from "../lib/events";
+import { useFunktionen } from "../lib/funktionen";
 
 export function EventComposer({
   open,
   onClose,
   onVorlagen,
+  onUmfrage,
 }: {
   open: boolean;
   onClose: () => void;
   /** Wechsel zum Ausschreiben einer Aktion (Waffelverkauf & Co.). */
   onVorlagen?: () => void;
+  /** Wechsel zu den Pop-up-Umfragen (eigenes Fenster mit Fragen und Auswertung). */
+  onUmfrage?: () => void;
 }) {
   const { students, settings, punkte } = useStore();
-  const { canEditBeitrag } = useRole();
+  const { can } = useRole();
+  const { sichtbar } = useFunktionen();
+  const umfragenErlaubt = Boolean(onUmfrage) && sichtbar("umfragen") && (can("umfragen.verwalten") || can("umfragen.ergebnisse"));
   const { createEvent } = useEvents();
 
   const [type, setType] = useState<EventType>("info");
@@ -62,7 +68,7 @@ export function EventComposer({
       type,
       title: title.trim(),
       body: body.trim(),
-      is_warning: type === "nachricht" && isWarning,
+      is_warning: type === "info" && isWarning,
       audience,
       target_ids: audience === "selected" ? [...targets] : [],
       tags: audience === "komitee" ? [...tags] : [],
@@ -86,7 +92,7 @@ export function EventComposer({
       {/* Typ – Vorlagen stehen gleichberechtigt daneben, fuehren aber in ein
           eigenes Fenster: eine Aktion hat Schichten statt Antwortmoeglichkeiten. */}
       <div className="mb-4 grid grid-cols-2 gap-1.5 rounded-xl bg-papier-matt p-1 dark:bg-slate-800 sm:grid-cols-4">
-        {(Object.keys(TYPE_META) as EventType[]).map((t) => (
+        {NEUE_TYPEN.map((t) => (
           <button
             key={t}
             onClick={() => setType(t)}
@@ -95,6 +101,11 @@ export function EventComposer({
             {TYPE_META[t].icon} {TYPE_META[t].label}
           </button>
         ))}
+        {umfragenErlaubt && (
+          <button onClick={onUmfrage} className={`${seg} text-tinte-matt`}>
+            📊 Umfrage
+          </button>
+        )}
         {onVorlagen && (
           <button onClick={onVorlagen} className={`${seg} text-tinte-matt`}>
             🧇 Vorlagen
@@ -147,10 +158,10 @@ export function EventComposer({
         </div>
       )}
 
-      {/* Warnung (nur Kassenwart/Admin) */}
-      {type === "nachricht" && canEditBeitrag && (
+      {/* Hervorheben: rot, mit ⚠️ – z. B. für Zahlungserinnerungen */}
+      {type === "info" && (
         <div className="mb-3">
-          <Toggle label="Als Warnung markieren (rot)" on={isWarning} set={setIsWarning} />
+          <Toggle label="Hervorheben (rot)" on={isWarning} set={setIsWarning} />
         </div>
       )}
 
@@ -202,7 +213,7 @@ export function EventComposer({
           </div>
         </div>
       )}
-      {type === "nachricht" && canEditBeitrag && (
+      {type === "info" && (
         <button onClick={selectUnpaid} className="mb-2 text-sm font-semibold text-brand">
           → alle mit offenem Beitrag (bis {settings.aktuelles_halbjahr}) auswählen
         </button>

@@ -11,6 +11,7 @@ import { Icon } from "./Icon";
 import { useState } from "react";
 import { TicketBereich } from "./AbiTicket";
 import { AlbumKarte } from "./Album";
+import { ZitateKarte } from "./Zitate";
 
 /**
  * Die eigene Ansicht für alle, die nicht im Stufenteam sind.
@@ -104,6 +105,7 @@ export function MyKasse({
 
       {/* ------------------------------------------ Abi-Album (nur mit Recht) */}
       <AlbumKarte className="lg:col-span-2" />
+      <ZitateKarte className="lg:col-span-2" />
 
       {/* ------------------------------------------ Halbjahre mit Preis */}
       <section className="card p-4 sm:p-5 lg:col-span-2">

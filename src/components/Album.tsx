@@ -15,6 +15,8 @@ import {
   type Steckbrief,
 } from "../lib/album";
 import { frage, melde, meldeFehler } from "../lib/melder";
+import { useFunktionen } from "../lib/funktionen";
+import { AusHinweis } from "./Funktionen";
 
 /* ====================================================================== */
 /* Gemeinsamer Zustand: einmal laden, Karte und Blatt teilen ihn          */
@@ -23,7 +25,8 @@ const AlbumCtx = createContext<Album | null>(null);
 
 export function AlbumProvider({ children }: { children: ReactNode }) {
   const { can, uid, studentId, isEltern } = useRole();
-  const darf = !isEltern && (can("album.nutzen") || can("album.kategorien"));
+  const { sichtbar } = useFunktionen();
+  const darf = !isEltern && sichtbar("album") && (can("album.nutzen") || can("album.kategorien"));
   const album = useAlbum(darf, uid, studentId);
   return (
     <AlbumCtx.Provider value={darf ? album : null}>
@@ -127,7 +130,9 @@ export function AlbumKarte({ className = "" }: { className?: string }) {
   const vorschau = album.personen.slice(0, 5);
 
   return (
-    <section className={`relative overflow-hidden rounded-[1.4rem] bg-gradient-to-br from-[#D9480F] via-[#C2255C] to-[#6741D9] p-4 text-white shadow-[0_10px_30px_-12px_rgba(194,37,92,.6)] sm:p-5 ${className}`}>
+    <div className={className}>
+    <AusHinweis funktion="album" className="mb-1.5 px-1" />
+    <section className={`relative overflow-hidden rounded-[1.4rem] bg-gradient-to-br from-[#D9480F] via-[#C2255C] to-[#6741D9] p-4 text-white shadow-[0_10px_30px_-12px_rgba(194,37,92,.6)] sm:p-5`}>
       {/* Deko: schräg liegende Polaroids */}
       <div aria-hidden className="pointer-events-none absolute -right-3 -top-2 flex rotate-[8deg] gap-1.5 opacity-90">
         {[0, 1].map((i) => (
@@ -179,6 +184,7 @@ export function AlbumKarte({ className = "" }: { className?: string }) {
         )}
       </div>
     </section>
+    </div>
   );
 }
 
@@ -221,7 +227,26 @@ export function AlbumSheet({ open, start, album, onClose }: { open: boolean; sta
               titel={<span className="font-buch italic">Abi-Album</span>}
               unter={nutzen ? `${album.personen.length} Personen · ${album.steckbriefe.filter((s) => fortschritt(s, album.kategorien) > 0).length} begonnen` : "Kategorien verwalten"}
               onClose={onClose}
+              extra={
+                can("album.kategorien") ? (
+                  <button
+                    type="button"
+                    onClick={() => setKategorienOffen(true)}
+                    aria-label="Steckbrief-Kategorien bearbeiten"
+                    title="Steckbrief-Kategorien"
+                    className="-my-1.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition active:scale-90"
+                  >
+                    <span className="flex h-[30px] w-[30px] items-center justify-center rounded-full bg-[rgb(118_118_128/0.12)] text-tinte-matt dark:bg-[rgb(118_118_128/0.24)] dark:text-slate-300">
+                      <svg viewBox="0 0 24 24" className="h-[17px] w-[17px]" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                        <circle cx="12" cy="12" r="3" />
+                        <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z" />
+                      </svg>
+                    </span>
+                  </button>
+                ) : undefined
+              }
             />
+            <AusHinweis funktion="album" className="-mt-2 mb-3" />
             {nutzen && studentId && (
               <div className="seg mb-4">
                 <button className={`seg-item ${ansicht.art === "alle" ? "seg-aktiv" : ""}`} onClick={() => setAnsicht({ art: "alle" })}>
@@ -237,12 +262,10 @@ export function AlbumSheet({ open, start, album, onClose }: { open: boolean; sta
             ) : nutzen ? (
               <AlleSteckbriefe album={album} oeffnen={(id) => setAnsicht({ art: "person", id })} />
             ) : null}
-            {can("album.kategorien") && (
-              <Gruppe className="mt-6">
-                <Zeile label="📝 Steckbrief-Kategorien" onClick={() => setKategorienOffen(true)}>
-                  <span className="text-[15px] text-tinte-leise">{album.kategorien.filter((k) => k.aktiv).length}</span>
-                </Zeile>
-              </Gruppe>
+            {!nutzen && can("album.kategorien") && (
+              <button className="btn-primary w-full" onClick={() => setKategorienOffen(true)}>
+                Kategorien bearbeiten
+              </button>
             )}
           </>
         )}
@@ -700,7 +723,7 @@ export function KategorienSheet({ open, album, onClose }: { open: boolean; album
 
   return (
     <Sheet open={open} onClose={onClose}>
-      <SheetKopf titel="Steckbrief-Kategorien" unter="Die Stammdaten-Felder, die alle ausfüllen. Ausgeblendete bleiben gespeichert." onClose={onClose} />
+      <SheetKopf titel="Steckbrief-Kategorien" unter="Die Stammdaten-Felder, die alle ausfüllen. Antippen zum Ändern, Schalter blendet aus, 🗑 löscht." onClose={onClose} />
       <Gruppe>
         {album.kategorien.map((k, i) =>
           bearbeite === k.id ? (
@@ -751,6 +774,23 @@ export function KategorienSheet({ open, album, onClose }: { open: boolean; album
                 {k.platzhalter && <span className="block truncate text-[12px] text-tinte-leise">{k.platzhalter}</span>}
               </button>
               <Schalter an={k.aktiv} label={`${k.titel} anzeigen`} onChange={(v) => void album.kategorieSpeichern({ ...k, aktiv: v })} />
+              <button
+                aria-label={`${k.titel} löschen`}
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[16px] transition active:scale-90 active:bg-red-500/10"
+                onClick={() =>
+                  void frage(
+                    `„${k.titel}“ löschen?\n\nWas schon eingetragen wurde, wird bei niemandem mehr angezeigt. Nur ausblenden geht mit dem Schalter.`,
+                    "Löschen",
+                    true,
+                  ).then(async (ok) => {
+                    if (!ok) return;
+                    const f = await album.kategorieLoeschen(k.id);
+                    if (f) meldeFehler("Ging nicht: " + f);
+                  })
+                }
+              >
+                🗑
+              </button>
             </div>
           ),
         )}
@@ -764,7 +804,7 @@ export function KategorienSheet({ open, album, onClose }: { open: boolean; album
           onChange={(e) => setNeu(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && void anlegen()}
         />
-        <button className="btn-primary !min-h-[44px] px-4 !text-[15px]" disabled={!neu.trim()} onClick={() => void anlegen()}>
+        <button className="btn-primary !min-h-[44px] !w-auto shrink-0 px-4 !text-[15px]" disabled={!neu.trim()} onClick={() => void anlegen()}>
           Hinzufügen
         </button>
       </div>

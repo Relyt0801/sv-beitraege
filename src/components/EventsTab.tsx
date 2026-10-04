@@ -15,6 +15,7 @@ import { AbschlussHinweis } from "./SchichtAbschluss";
 import { AnfragenFuerTeam, MeineAnfragen } from "./TerminAnfragen";
 import { useTermine } from "../termine-store";
 import { PrivatTerminSheet } from "./KalenderSyncSheet";
+import { UmfragenKarte } from "./Umfragen";
 
 import { frage } from "../lib/melder";
 export function EventsTab() {
@@ -80,6 +81,9 @@ export function EventsTab() {
       <AbschlussHinweis />
 
       <AktionenListe />
+
+      {/* Pop-up-Umfragen: laufende auf einen Blick (Team mit Recht) */}
+      <UmfragenKarte />
 
       {inhalt}
 
@@ -198,7 +202,7 @@ function EventCard({
     <div className={`card p-4 sm:p-5 ${e.is_warning ? "!border-red-400 bg-red-50/40 dark:bg-red-500/5" : ""}`}>
       <div className="mb-1 flex items-center gap-2 text-xs font-semibold text-tinte-leise">
         <span>{e.is_warning ? "⚠️" : meta.icon}</span>
-        <span>{e.is_warning ? "Warnung" : meta.label}</span>
+        <span>{meta.label}</span>
         {e.audience === "selected" && <span>· gezielt</span>}
         {e.audience === "komitee" && <span>· {(e.tags || []).map(committeeLabel).join(", ") || "Komitees"}</span>}
         <span className="ml-auto">{date}</span>

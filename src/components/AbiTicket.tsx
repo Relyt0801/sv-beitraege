@@ -1,3 +1,5 @@
+import { useFunktionen } from "../lib/funktionen";
+import { AusHinweis } from "./Funktionen";
 import { useState } from "react";
 import type { Abiball, Settings, Student } from "../lib/types";
 import { abiballVon, bestellBetrag, ticketPreise } from "../lib/logic";
@@ -501,16 +503,21 @@ export function TicketBereich({
   fuerEltern?: boolean;
   className?: string;
 }) {
+  // Profil → Funktionen: Tickets ganz ausgeblendet (nur wer verwaltet, sieht sie mit Hinweis)
+  const { sichtbar } = useFunktionen();
+  const zeigen = sichtbar("abiball");
   const [auf, setAuf] = useState(false);
   const { status } = useVerkauf(settings);
-  const { liste } = useTicketBestellungen(true);
+  const { liste } = useTicketBestellungen(zeigen);
   const mitKasse = status !== "aus" || liste.some((b) => b.student_id === student.id);
 
   const eigenes = <AbiTicket art="erstes" student={student} settings={settings} prozent={prozent} fuerEltern={fuerEltern} onClick={() => setAuf(true)} />;
   const gaeste = <AbiTicket art="weiteres" student={student} settings={settings} prozent={prozent} onClick={() => setAuf(true)} klein />;
 
+  if (!zeigen) return null;
   return (
     <section className={`card p-4 sm:p-5 ${className}`} data-tour="abiball-ticket">
+      <AusHinweis funktion="abiball" className="mb-2" />
       <div className="flex items-baseline justify-between gap-2">
         <h2 className="text-[15px] font-semibold">Abiball-Ticket</h2>
         <button onClick={() => setAuf(true)} className="-my-2 py-2 text-[13px] font-semibold text-brand-dark dark:text-brand">

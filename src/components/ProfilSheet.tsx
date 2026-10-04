@@ -16,8 +16,7 @@ import { useTheme } from "../lib/theme";
 import { abmelden, enablePush, pushConfigured, pushDiagnose, pushPermission } from "../lib/push";
 import { ProtokollSheet } from "./ProtokollSheet";
 import { RechtLinks } from "./Rechtliches";
-import { UmfragenSheet } from "./Umfragen";
-import { KategorienSheet, useAlbumOptional } from "./Album";
+import { FunktionenSheet } from "./Funktionen";
 
 import { frage, melde, meldeFehler } from "../lib/melder";
 /** Das eigene Profil: Bild, Namensfarbe, Passwort, Komitee-Wechsel, Hilfe. */
@@ -55,9 +54,7 @@ export function ProfilSheet({
   // Profil – und nur beim Admin (Kassenwart: nur die Sicherheitskopie).
   const [protokollOffen, setProtokollOffen] = useState(false);
   const [loeschOffen, setLoeschOffen] = useState(false);
-  const [umfragenOffen, setUmfragenOffen] = useState(false);
-  const [kategorienOffen, setKategorienOffen] = useState(false);
-  const album = useAlbumOptional();
+  const [funktionenOffen, setFunktionenOffen] = useState(false);
 
   const meine = committeesOf(uid);
   const istAdmin = role === "admin";
@@ -355,15 +352,10 @@ export function ProfilSheet({
             <span>🔑</span> Passwort ändern
           </button>
         )}
-        {/* Pop-up-Umfragen und Abi-Album – je nach Recht */}
-        {!istEltern && (can("umfragen.verwalten") || can("umfragen.ergebnisse")) && (
-          <button className={row} onClick={() => setUmfragenOffen(true)}>
-            <span>📊</span> Umfragen
-          </button>
-        )}
-        {album && can("album.kategorien") && (
-          <button className={row} onClick={() => setKategorienOffen(true)}>
-            <span>📝</span> Steckbrief-Kategorien
+        {/* Ganze Bereiche (Tickets, Album, Zitate, Umfragen) für alle an/aus */}
+        {can("funktionen.verwalten") && (
+          <button className={row} onClick={() => setFunktionenOffen(true)}>
+            <span>🧩</span> Funktionen
           </button>
         )}
         {/* Nur der Admin. Steht bewusst hier und in keinem Reiter: so taucht der
@@ -425,8 +417,7 @@ export function ProfilSheet({
 
 
       <LoeschfristenSheet open={loeschOffen} onClose={() => setLoeschOffen(false)} />
-      <UmfragenSheet open={umfragenOffen} onClose={() => setUmfragenOffen(false)} kategorien={album?.kategorien.filter((k) => k.aktiv).map((k) => k.titel)} />
-      {album && <KategorienSheet open={kategorienOffen} album={album} onClose={() => setKategorienOffen(false)} />}
+      <FunktionenSheet open={funktionenOffen} onClose={() => setFunktionenOffen(false)} />
       {(istAdmin || istKassenwart) && (
         <ProtokollSheet
           open={protokollOffen}

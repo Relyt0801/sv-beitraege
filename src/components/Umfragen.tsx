@@ -21,6 +21,9 @@ import {
   type Zielgruppe,
 } from "../lib/umfragen";
 import { personVerlauf } from "../lib/album";
+import { useAlbumOptional } from "./Album";
+import { useFunktionen } from "../lib/funktionen";
+import { AusHinweis } from "./Funktionen";
 import { pushAnPersonen, pushAnTeam } from "../lib/push";
 import { frage as fragen_, melde, meldeFehler } from "../lib/melder";
 
@@ -41,14 +44,16 @@ export function UmfragePopup({ bereitZumZeigen, onSichtbar }: { bereitZumZeigen:
     (z: Zielgruppe) => (z === "alle" ? true : z === "schueler" ? !istEltern : z === "team" ? isStaff : istEltern),
     [istEltern, isStaff],
   );
-  const u = useOffeneUmfragen(ready, fuerMich);
+  // Profil → Funktionen: Umfragen aus = keine Pop-ups (auch nicht beim Admin)
+  const { an } = useFunktionen();
+  const u = useOffeneUmfragen(ready && an.umfragen, fuerMich);
   const [spaeter, setSpaeter] = useState<Set<string>>(new Set());
   // Die gerade gezeigte Umfrage bleibt stehen, bis man sie schließt – auch
   // nach dem Abschicken (sonst verschwände der Dank sofort).
   const [fest, setFest] = useState<string | null>(null);
   const kandidat = u.offen.find((x) => !spaeter.has(x.id)) || null;
   const aktuell = (fest && u.alle.find((x) => x.id === fest)) || kandidat;
-  const zeigen = bereitZumZeigen && u.bereit && Boolean(aktuell);
+  const zeigen = an.umfragen && bereitZumZeigen && u.bereit && Boolean(aktuell);
   const personen = useUmfragePersonen(zeigen && u.fragen.some((f) => f.umfrage_id === aktuell?.id && f.typ === "person"));
 
   useEffect(() => {
@@ -430,8 +435,10 @@ const VORLAGEN: { name: string; beschreibung: string; bauen: (kategorien: string
   },
 ];
 
-export function UmfragenSheet({ open, onClose, kategorien = [] }: { open: boolean; onClose: () => void; kategorien?: string[] }) {
+export function UmfragenSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { can } = useRole();
+  const album = useAlbumOptional();
+  const kategorien = album?.kategorien.filter((k) => k.aktiv).map((k) => k.titel) ?? [];
   const v = useUmfragenVerwaltung(open);
   const [bearbeite, setBearbeite] = useState<Umfrage | "neu" | null>(null);
   const [vorlage, setVorlage] = useState<ReturnType<(typeof VORLAGEN)[number]["bauen"]> | null>(null);
@@ -448,6 +455,7 @@ export function UmfragenSheet({ open, onClose, kategorien = [] }: { open: boolea
     <>
       <Sheet open={open && !bearbeite && !ergebnisVon} onClose={onClose}>
         <SheetKopf titel="Umfragen" unter="Erscheinen als Pop-up beim nächsten Öffnen der App. Fortschritt wird gespeichert." onClose={onClose} />
+        <AusHinweis funktion="umfragen" className="-mt-2 mb-3" />
         {verwalten && (
           <>
             <button className="btn-primary w-full !bg-gradient-to-r !from-[#5E5CE6] !to-[#BF5AF2]" onClick={() => (setVorlage(null), setBearbeite("neu"))}>
@@ -875,5 +883,42 @@ function ErgebnisSheet({
         </button>
       )}
     </Sheet>
+  );
+}
+
+/* ====================================================================== */
+/* Karte im Reiter Events (Team mit Recht)                                */
+/* ====================================================================== */
+export function UmfragenKarte() {
+  const { can, isEltern } = useRole();
+  const { sichtbar } = useFunktionen();
+  const darf = !isEltern && sichtbar("umfragen") && (can("umfragen.verwalten") || can("umfragen.ergebnisse"));
+  const [offen, setOffen] = useState(false);
+  const v = useUmfragenVerwaltung(darf && !offen);
+  if (!darf) return null;
+  const laufen = v.umfragen.filter((u) => u.status === "aktiv");
+  const entwuerfe = v.umfragen.filter((u) => u.status === "entwurf").length;
+  return (
+    <>
+      <button
+        onClick={() => setOffen(true)}
+        className="mb-3 flex w-full items-center gap-3 overflow-hidden rounded-[1.25rem] bg-gradient-to-r from-[#5E5CE6] to-[#9B4DDB] px-4 py-3.5 text-left text-white shadow-[0_8px_22px_-12px_rgba(94,92,230,.8)] transition active:scale-[.99]"
+      >
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/20 text-[20px]">📊</span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-[15px] font-semibold">Pop-up-Umfragen</span>
+          <span className="block truncate text-[12.5px] text-white/85">
+            {laufen.length
+              ? `${laufen.length} ${laufen.length === 1 ? "läuft" : "laufen"}: ${laufen.map((u) => u.titel).join(", ")}`
+              : entwuerfe
+                ? `${entwuerfe} ${entwuerfe === 1 ? "Entwurf" : "Entwürfe"} · keine läuft`
+                : "Neue Umfrage, Ranking oder Abstimmung starten"}
+          </span>
+        </span>
+        {laufen.length > 0 && <span className="h-2.5 w-2.5 shrink-0 animate-pulse rounded-full bg-[#30D158]" />}
+        <span aria-hidden className="text-[18px] text-white/80">›</span>
+      </button>
+      <UmfragenSheet open={offen} onClose={() => setOffen(false)} />
+    </>
   );
 }
