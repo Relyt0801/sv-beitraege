@@ -12,11 +12,36 @@ ausführlich (auf Deutsch); hier steht der Überblick dazu.
 ---
 
 
+## 04.10.2026: Feinschliff zu 1.2 (ohne Patch Notes)
+
+- **Tab-Leiste** (App.tsx, ElternApp.tsx): wie in iOS ganz unten angedockt,
+  volle Breite, deckender Hintergrund mit Haarlinie – nichts scheint mehr durch.
+- **Ring** (Ring.tsx): dreistellige Zahl kleiner, „%“ klein daneben – passt in
+  den Ring, die Stufen-Striche schneiden nicht mehr hinein.
+- **Bonus über 100 %** neu gedacht: alle `bonusSchritt` % über 100 wird das
+  1. Ticket um `bonusProSchritt` € günstiger, höchstens `bonusMax` €
+  (`bonusGrenze()` = ab da zählt nichts mehr). App (lib/logic.ts) und Server
+  (`ticket_erstes_cent`, eingespielt) rechnen gleich.
+- **Abiball**: Tag und Uhrzeit getrennt einstellbar, stehen auf beiden Tickets.
+  Gäste-Ticket schwarz-gold; bei Eltern steht es oben.
+- **Ticket-Ansicht**: gruppiert wie der Rest der App (1. Ticket, weitere
+  Tickets, Abiball), ohne „Helferzuschuss bei 0 %“. Vor dem Verkaufsstart keine
+  Kasse mehr, nur eine kleine Info. Lange Hinweistexte gekürzt.
+- **Mithilfe eintragen** (MithilfeBlatt.tsx): Blatt wie eine Rechnung, Aktion
+  über „Aktion ›“ mit Suche auswählen – für eine Person und für mehrere.
+- **Automatisch löschen**: 1 Tag, 3 Tage, 1 Woche, 1 Monat; neu auch fürs
+  Protokoll (`loeschen_protokoll_tage`, `loeschfristen_setzen(c, a, p)`).
+- **Protokoll schlanker**: `audit_schreiben()` (eingespielt) lässt Passwortwechsel,
+  Komitee-Beitritte, einzelne Mithilfe und automatische Beitragsbuchungen weg,
+  kürzt Texte und speichert keine Details mehr.
+- Noch im SQL Editor auszuführen: `supabase/aufraeumen-kuerzer.sql` (Fristen ab
+  1 Tag, `aufraeumen()` mit Protokoll, altes Protokoll einmalig ausdünnen).
+
 ## 03.10.2026: Update 1.2 – Abiball-Ticket, Bonus über 100 %, Ticketverkauf
 
 **Datenbank** (`supabase/abiball-tickets.sql`, eingespielt):
-- `app_settings.abiball` (jsonb): `ueber100`, `bonusBis`, `bonusRabatt`,
-  `verkaufAb`, `maxProPerson`, `kontingent`, `ort`, `datum`. Standard: Bonus aus,
+- `app_settings.abiball` (jsonb): `ueber100`, `bonusSchritt`, `bonusProSchritt`, `bonusMax`,
+  `verkaufAb`, `maxProPerson`, `kontingent`, `ort`, `datum`, `uhrzeit`. Standard: Bonus aus,
   Verkauf nicht freigegeben.
 - Tabelle `ticket_bestellungen` (Person, Anzahl, Betrag in Cent, Status
   offen/bezahlt/storniert). Lesen: eigene, Eltern über `parent_children`,
@@ -30,8 +55,7 @@ ausführlich (auf Deutsch); hier steht der Überblick dazu.
 **Preislogik** (`lib/logic.ts → ticketPreise()`, eine Stelle für alle Ansichten):
 `standard` = Grundpreis + Helferzuschuss bei 0 % (durchgestrichen auf dem
 Ticket), `erstes` = Grundpreis + Zuschlag der erreichten Stufe − Bonus,
-`weiteres` = Grundpreis. Bonus = `bonusRabatt × (Prozent − 100) / (bonusBis − 100)`,
-gerundet; der Preis fällt nie unter 0 €. `prozentVon()` deckelt bei 100 % bzw. bei `bonusBis`.
+`weiteres` = Grundpreis. Bonus siehe 04.10.2026. Der Preis fällt nie unter 0 €.
 
 **Oberfläche:**
 - `AbiTicket.tsx`: personalisiertes Ticket (Name, Ort/Datum erst wenn

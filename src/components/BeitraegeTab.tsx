@@ -156,9 +156,7 @@ export function BeitraegeTab() {
       <section className="card h-fit p-4 sm:p-5">
         <h2 className="text-lg font-bold">Abiball-Ticket</h2>
         <p className="mt-0.5 text-[13px] leading-relaxed text-tinte-matt dark:text-slate-400">
-          Der Helferzuschuss gilt <b>nur fürs erste Ticket</b>. Jedes weitere kostet den
-          Grundpreis. Es zählt immer die höchste erreichte Stufe, 60 % zählen also als 50 %.
-          Darunter: Bonus über 100 %, Ort und Datum und der Ticketverkauf.
+          Der Helferzuschuss gilt nur fürs 1. Ticket. Es zählt die höchste erreichte Stufe.
         </p>
 
         <label className="mt-4 flex items-center gap-3 rounded-2xl bg-papier-matt p-3 dark:bg-slate-800/70">
@@ -176,7 +174,7 @@ export function BeitraegeTab() {
         </label>
         {grund === 0 && (
           <p className="mt-1.5 text-[12px] text-tinte-leise">
-            Steht 0 drin, ist der Preis noch offen. Dann sehen alle nur den Helferzuschuss und niemand kann bestellen.
+            0 = Preis noch offen.
           </p>
         )}
 
@@ -281,7 +279,6 @@ function StufenZeile({
       <span className="shrink-0 whitespace-nowrap text-[15px] font-bold text-brand">ab {stufe.ab} %</span>
       <span className="min-w-0 flex-1 truncate text-[13px] text-tinte-matt dark:text-slate-400">
         1. Ticket {grund + betrag.wert} €
-        {grund > 0 && betrag.wert > 0 ? ` (${grund} + ${betrag.wert})` : ""}
       </span>
       <div className="flex shrink-0 items-center gap-1 rounded-lg bg-papier-matt px-2 py-1 dark:bg-slate-800">
         <span className="text-[13px] font-semibold text-tinte-leise">+</span>

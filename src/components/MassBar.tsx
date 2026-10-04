@@ -3,8 +3,7 @@ import { HY, type Halbjahr } from "../lib/types";
 import { useStore } from "../store";
 import { useRole } from "../auth/RoleProvider";
 import { sortStudents } from "../lib/logic";
-import { Sheet } from "./Sheet";
-import { MithilfeEintragen } from "./PunkteSheet";
+import { MithilfeBlatt } from "./MithilfeBlatt";
 
 /**
  * Leiste im Auswahl-Modus der Kasse.
@@ -85,40 +84,31 @@ export function MassBar({
         Fertig
       </button>
 
-      {/* Mithilfe für mehrere: dasselbe Blatt wie für eine Person, oben
+      {/* Mithilfe für mehrere: dasselbe Blatt wie für eine Person. Unten
           stehen die Ausgewählten (antippen = abwählen). */}
-      <Sheet open={punkteOffen} onClose={() => setPunkteOffen(false)}>
-        <div className="mb-3 flex items-start gap-3">
-          <div className="min-w-0 flex-1">
-            <div className="text-xl font-bold leading-tight">Mithilfe eintragen</div>
-            <div className="text-sm text-tinte-matt">
-              für {ausgewaehlt.length} Person{ausgewaehlt.length === 1 ? "" : "en"}
-            </div>
+      <MithilfeBlatt
+        open={punkteOffen}
+        onClose={() => setPunkteOffen(false)}
+        fuer={`${ausgewaehlt.length} Person${ausgewaehlt.length === 1 ? "" : "en"}`}
+        knopf={`Für ${ausgewaehlt.length} eintragen`}
+        zusatz={
+          <div className="mt-4">
+            <div className="mb-1.5 px-4 text-[12px] font-semibold uppercase tracking-[0.04em] text-tinte-leise">Wer war dabei?</div>
+            <div className="rounded-2xl bg-[rgb(118_118_128/0.08)] p-3 dark:bg-[rgb(118_118_128/0.18)]">{namen}</div>
+            <p className="mt-1.5 px-4 text-[11.5px] text-tinte-leise">Antippen zum Abwählen. Alle bekommen eine Mitteilung.</p>
           </div>
-          <button className="iconbtn" onClick={() => setPunkteOffen(false)} aria-label="Schließen">
-            ✕
-          </button>
-        </div>
-        <div className="mb-1 rounded-2xl bg-papier-matt p-3 dark:bg-slate-800/70">{namen}</div>
-        <p className="mb-3 px-1 text-[11.5px] text-tinte-leise">
-          Alle hier bekommen eine Mitteilung. Wer nicht dabei war: antippen zum Abwählen.
-        </p>
-        <MithilfeEintragen
-          knopf={`Für ${ausgewaehlt.length} eintragen`}
-          ohneKopf
-          onEintragen={(titel, p, datum) => {
-            if (!ausgewaehlt.length) return;
-            addContributionMany(
-              ausgewaehlt.map((x) => x.id),
-              titel,
-              p,
-              datum,
-            );
-            setPunkteOffen(false);
-            onDone();
-          }}
-        />
-      </Sheet>
+        }
+        onEintragen={(titel, p, datum) => {
+          if (!ausgewaehlt.length) return;
+          addContributionMany(
+            ausgewaehlt.map((x) => x.id),
+            titel,
+            p,
+            datum,
+          );
+          onDone();
+        }}
+      />
     </div>
   );
 }

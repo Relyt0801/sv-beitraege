@@ -66,30 +66,35 @@ export interface Settings {
 export interface Abiball {
   /** Über 100 % sammeln erlaubt (Standard: aus) */
   ueber100: boolean;
-  /** Bis zu dieser Prozentzahl wird gezählt, z. B. 150 */
-  bonusBis: number;
-  /** So viel € Rabatt aufs 1. Ticket gibt es bei bonusBis (dazwischen anteilig) */
-  bonusRabatt: number;
+  /** Alle so viel Prozent über 100 … */
+  bonusSchritt: number;
+  /** … wird das 1. Ticket um so viel € günstiger */
+  bonusProSchritt: number;
+  /** Höchstens so viel € Bonus insgesamt */
+  bonusMax: number;
   /** Ab wann Tickets bestellt werden können (ISO), null = Verkauf nicht freigegeben */
   verkaufAb: string | null;
   /** Höchstens so viele Tickets je Person */
   maxProPerson: number;
   /** Tickets insgesamt, 0 = unbegrenzt */
   kontingent: number;
-  /** Ort und Datum – erscheinen erst auf dem Ticket, wenn eingetragen */
+  /** Ort, Tag (YYYY-MM-DD) und Uhrzeit (HH:MM) – erscheinen erst auf dem Ticket, wenn eingetragen */
   ort: string;
   datum: string | null;
+  uhrzeit: string;
 }
 
 export const ABIBALL_STANDARD: Abiball = {
   ueber100: false,
-  bonusBis: 150,
-  bonusRabatt: 10,
+  bonusSchritt: 10,
+  bonusProSchritt: 2,
+  bonusMax: 10,
   verkaufAb: null,
   maxProPerson: 4,
   kontingent: 0,
   ort: "",
   datum: null,
+  uhrzeit: "",
 };
 
 /** Kontodaten der Stufenkasse. Stehen nur in der Datenbank, nie im Quellcode. */

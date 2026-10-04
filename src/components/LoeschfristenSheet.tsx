@@ -6,10 +6,10 @@ import { Gruppe } from "./NachtragSheet";
 
 const WAHL: { tage: number | null; text: string }[] = [
   { tage: null, text: "Nie" },
-  { tage: 30, text: "30 Tage" },
-  { tage: 90, text: "90 Tage" },
-  { tage: 180, text: "180 Tage" },
-  { tage: 365, text: "1 Jahr" },
+  { tage: 1, text: "1 Tag" },
+  { tage: 3, text: "3 Tage" },
+  { tage: 7, text: "1 Woche" },
+  { tage: 30, text: "1 Monat" },
 ];
 
 /**
@@ -19,28 +19,35 @@ const WAHL: { tage: number | null; text: string }[] = [
 export function LoeschfristenSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [chat, setChat] = useState<number | null>(null);
   const [antraege, setAntraege] = useState<number | null>(null);
+  const [protokoll, setProtokoll] = useState<number | null>(null);
   const [bereit, setBereit] = useState(false);
 
   useEffect(() => {
     if (!open || !hasSupabase) return;
     void supabase!
       .from("app_settings")
-      .select("loeschen_chat_tage, loeschen_antraege_tage")
+      .select("loeschen_chat_tage, loeschen_antraege_tage, loeschen_protokoll_tage")
       .eq("id", 1)
       .maybeSingle()
       .then(({ data }) => {
-        const d = data as { loeschen_chat_tage?: number | null; loeschen_antraege_tage?: number | null } | null;
+        const d = data as {
+          loeschen_chat_tage?: number | null;
+          loeschen_antraege_tage?: number | null;
+          loeschen_protokoll_tage?: number | null;
+        } | null;
         setChat(d?.loeschen_chat_tage ?? null);
         setAntraege(d?.loeschen_antraege_tage ?? null);
+        setProtokoll(d?.loeschen_protokoll_tage ?? null);
         setBereit(true);
       });
   }, [open]);
 
-  async function speichern(c: number | null, a: number | null) {
+  async function speichern(c: number | null, a: number | null, p: number | null) {
     setChat(c);
     setAntraege(a);
+    setProtokoll(p);
     if (!hasSupabase) return;
-    const { error } = await supabase!.rpc("loeschfristen_setzen", { p_chat: c, p_antraege: a });
+    const { error } = await supabase!.rpc("loeschfristen_setzen", { p_chat: c, p_antraege: a, p_protokoll: p });
     if (error) meldeFehler("Speichern ging nicht: " + error.message);
     else melde("Gespeichert");
   }
@@ -49,25 +56,21 @@ export function LoeschfristenSheet({ open, onClose }: { open: boolean; onClose: 
     <Sheet open={open} onClose={onClose}>
       <div className="mx-auto max-w-md">
         <h2 className="text-[1.375rem] font-bold tracking-[-0.02em]">Automatisch löschen</h2>
-        <p className="mt-1 text-[13.5px] leading-relaxed text-tinte-matt dark:text-slate-400">
-          Damit die Datenbank nicht vollläuft, räumt sie jede Nacht auf. Gilt für alle in der Stufe. Gelöschtes
-          lässt sich nicht zurückholen.
-        </p>
+        <p className="mt-1 text-[13px] text-tinte-leise">Jede Nacht, für alle. Gelöschtes ist weg.</p>
 
         <Gruppe titel="Chat-Nachrichten">
-          <Auswahl wert={chat} bereit={bereit} onWahl={(t) => void speichern(t, antraege)} />
-          <p className="px-4 pb-3 text-[12px] leading-relaxed text-tinte-leise">
-            Nachrichten und ihre Reaktionen, erledigte Gespräche mit Schülern und Eltern. Angepinntes, Abstimmungen
-            und To-dos bleiben.
-          </p>
+          <Auswahl wert={chat} bereit={bereit} onWahl={(t) => void speichern(t, antraege, protokoll)} />
+          <p className="px-4 pb-3 text-[12px] text-tinte-leise">Angepinntes, Abstimmungen und To-dos bleiben.</p>
         </Gruppe>
 
         <Gruppe titel="Bearbeitete Anträge">
-          <Auswahl wert={antraege} bereit={bereit} onWahl={(t) => void speichern(chat, t)} />
-          <p className="px-4 pb-3 text-[12px] leading-relaxed text-tinte-leise">
-            Entschiedene Nachträge, Komitee-Wechsel, Entsperrungen, Termin- und Kostenanfragen. Offene bleiben immer,
-            Buchungen im Kassenbuch auch.
-          </p>
+          <Auswahl wert={antraege} bereit={bereit} onWahl={(t) => void speichern(chat, t, protokoll)} />
+          <p className="px-4 pb-3 text-[12px] text-tinte-leise">Offene Anträge und Kassenbuch bleiben.</p>
+        </Gruppe>
+
+        <Gruppe titel="Protokoll">
+          <Auswahl wert={protokoll} bereit={bereit} onWahl={(t) => void speichern(chat, antraege, t)} />
+          <p className="px-4 pb-3 text-[12px] text-tinte-leise">Sonst nach 2 Jahren.</p>
         </Gruppe>
       </div>
     </Sheet>

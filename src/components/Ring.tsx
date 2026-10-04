@@ -109,19 +109,27 @@ export function Ring({
         {gold ? (
           <>
             <span
-              className={`zahl bg-gradient-to-b from-[#C9961E] to-[#8A650A] bg-clip-text font-extrabold text-transparent dark:from-[#F6DD8B] dark:to-[#D9A92B] ${
-                klein ? "text-[14px]" : "text-[17px]"
+              className={`zahl bg-gradient-to-b from-[#C9961E] to-[#8A650A] bg-clip-text font-extrabold tracking-[-0.03em] text-transparent dark:from-[#F6DD8B] dark:to-[#D9A92B] ${
+                klein ? "text-[14px]" : "text-[18px]"
               }`}
             >
-              {pct}&nbsp;%
+              {pct}
+              <span className="ml-[1px] text-[0.62em]">%</span>
             </span>
-            <span className="mt-0.5 text-[8.5px] font-extrabold uppercase tracking-[0.14em] text-[#9A7410] dark:text-[#E9C460]">
+            <span className="mt-0.5 text-[8px] font-extrabold uppercase tracking-[0.12em] text-[#9A7410] dark:text-[#E9C460]">
               ✦ Bonus
             </span>
           </>
         ) : (
-          <span className={`zahl font-extrabold ${klein ? "text-xl" : "text-2xl"} ${voll ? "text-bezahlt" : "text-brand"}`}>
-            {pct}&nbsp;%
+          // Die Zahl muss in den Ring passen: dreistellig etwas kleiner,
+          // das Prozentzeichen klein daneben – sonst schneiden die Striche hinein.
+          <span
+            className={`zahl font-extrabold tracking-[-0.03em] ${
+              pct >= 100 ? (klein ? "text-[15px]" : "text-[19px]") : klein ? "text-lg" : "text-[23px]"
+            } ${voll ? "text-bezahlt" : "text-brand"}`}
+          >
+            {pct}
+            <span className="ml-[1px] text-[0.62em]">%</span>
           </span>
         )}
       </div>

@@ -147,7 +147,7 @@ function Datenschutz() {
         Daten ihres Kindes, keine Chats und keine Daten anderer.
       </P>
       <P>
-        <b>Protokoll:</b> wichtige Änderungen (Rollen, Zugänge, Passwortwechsel, Komitees, Zahlungen,
+        <b>Protokoll:</b> wichtige Änderungen (Rollen, Rechte, Zugänge, Sperren, Zahlungen,
         Kassenbuch) mit Zeitpunkt und der Person, die sie ausgelöst hat. Das Protokoll sieht ausschließlich der
         Admin.
       </P>
@@ -205,7 +205,7 @@ function Datenschutz() {
       <P>
         Zusätzlich kann der Admin festlegen, dass <b>Chat-Nachrichten samt Reaktionen</b>, erledigte Gespräche und
         <b> bearbeitete Anträge</b> (Nachträge, Komitee-Wechsel, Entsperrungen, Termin- und Kostenanfragen)
-        nach einer Frist automatisch gelöscht werden (30 Tage bis 1 Jahr). Angepinntes, Abstimmungen, To-dos,
+        nach einer Frist automatisch gelöscht werden (1 Tag bis 1 Monat), ebenso das Protokoll. Angepinntes, Abstimmungen, To-dos,
         offene Anträge und Buchungen im Kassenbuch bleiben davon unberührt.
       </P>
 

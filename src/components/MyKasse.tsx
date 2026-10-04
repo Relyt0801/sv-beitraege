@@ -127,12 +127,12 @@ export function MyKasse({
           <div className="min-w-0 flex-1">
             <div className="text-[14px] font-semibold leading-snug">
               {pct > 100 && bonus.ueber100
-                ? `Stark! Über 100 % gibt es Bonus: ${preise.rabatt} € weniger aufs erste Ticket.`
+                ? `Stark! ${preise.rabatt} € Bonus aufs erste Ticket.`
                 : pct >= 100
                   ? bonus.ueber100
-                    ? `Kein Zuschlag mehr – und bis ${bonus.bonusBis} % wird dein Ticket noch günstiger.`
-                    : "Geschafft. Auf dein erstes Abiball-Ticket kommt kein Zuschlag mehr."
-                  : "Mehr Prozent = weniger Helferzuschuss auf dein Abiball-Ticket."}
+                    ? `Kein Zuschlag mehr. Alle ${bonus.bonusSchritt} % mehr: −${bonus.bonusProSchritt} €.`
+                    : "Geschafft – kein Zuschlag mehr aufs erste Ticket."
+                  : "Mehr Prozent = günstigeres Abiball-Ticket."}
             </div>
             {next && (
               <div className="mt-1.5 text-[13px] leading-relaxed text-tinte-matt">

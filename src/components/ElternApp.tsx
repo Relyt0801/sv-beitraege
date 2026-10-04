@@ -283,23 +283,23 @@ export function ElternApp() {
         )}
       </main>
 
-      {/* Schwebende Tab-Leiste aus Glas */}
-      <nav className="pointer-events-none fixed inset-x-0 bottom-0 z-20 px-4 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] lg:hidden">
-        <div className="glas pointer-events-auto mx-auto flex max-w-sm rounded-[1.9rem] border border-black/[0.06] p-1 shadow-glas dark:border-white/10">
+      {/* Tab-Leiste wie in iOS: unten angedockt, volle Breite, deckend */}
+      <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-black/[0.08] bg-[rgb(var(--glas))] pb-[env(safe-area-inset-bottom)] dark:border-white/[0.08] lg:hidden">
+        <div className="mx-auto flex max-w-md px-1">
           {NAV.map((n) => (
             <button
               key={n.key}
               data-tour={`tab-${n.key}`}
               onClick={() => setReiter(n.key)}
               aria-current={reiter === n.key ? "page" : undefined}
-              className={`relative flex flex-1 flex-col items-center gap-0.5 rounded-[1.5rem] pb-1.5 pt-2 text-[11px] font-semibold transition duration-300 ease-ios active:scale-90 ${
-                reiter === n.key ? "bg-black/[0.06] text-brand dark:bg-white/[0.12] dark:text-brand-dark" : "text-tinte dark:text-slate-100"
+              className={`relative flex flex-1 flex-col items-center gap-[3px] pb-1 pt-[7px] text-[10px] font-medium transition duration-200 ease-ios active:scale-90 ${
+                reiter === n.key ? "text-brand dark:text-brand-dark" : "text-[#6E6E73] dark:text-[#A1A1A6]"
               }`}
             >
-              <span className="relative flex h-[22px] items-center leading-none">
-                <Icon name={n.icon} size={22} strich={reiter === n.key ? 2.2 : 1.8} />
+              <span className="relative flex h-[24px] items-center leading-none">
+                <Icon name={n.icon} size={24} strich={reiter === n.key ? 2.2 : 1.7} />
                 {Boolean(n.zahl) && (
-                  <span className="absolute -right-3 -top-1.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#FF3B30] px-1 text-[11px] font-semibold text-white ring-2 ring-white dark:ring-slate-900">
+                  <span className="absolute -right-3 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#FF3B30] px-1 text-[11px] font-semibold text-white ring-2 ring-[rgb(var(--glas))]">
                     {n.zahl}
                   </span>
                 )}
@@ -398,7 +398,7 @@ function KindKarte({
           <div className="mt-3 flex items-center gap-4">
             <StaffelRing pct={pct} settings={settings} />
             <div className="min-w-0 flex-1 text-[14px] leading-relaxed text-tinte-matt dark:text-slate-300">
-              Wenn Ihr Kind bei Aktionen mithilft, zahlt es weniger Helferzuschuss auf das 1. Abiball-Ticket.
+              Mithilfe macht das 1. Abiball-Ticket Ihres Kindes günstiger.
             </div>
           </div>
 

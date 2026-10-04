@@ -1,5 +1,5 @@
 import type { Settings } from "../lib/types";
-import { abiballVon, bonusAnteil, naechsteStufe, prozentVon, staffelVon, ticketPreise } from "../lib/logic";
+import { abiballVon, bonusAnteil, bonusGrenze, naechsteStufe, prozentVon, staffelVon, ticketPreise } from "../lib/logic";
 
 /**
  * Fortschritt in Prozent: "45 %" mit Balken und Markierungen bei jeder Stufe
@@ -80,22 +80,22 @@ export function StufenHinweis({ pct, settings }: { pct: number; settings: Settin
   const next = naechsteStufe(pct, settings);
   const grund = settings.ticket_preis || 0;
   const a = abiballVon(settings);
-  if (!next && a.ueber100 && pct < a.bonusBis)
+  if (!next && a.ueber100 && pct < bonusGrenze(a))
     return (
       <div className="mt-1.5 text-[12px] font-semibold text-[#8A650A] dark:text-[#E9C460]">
-        Kein Zuschlag mehr. Bis {a.bonusBis} % wird das erste Ticket noch bis zu {a.bonusRabatt} € günstiger.
+        ✦ Alle {a.bonusSchritt} % mehr: −{a.bonusProSchritt} € (höchstens −{a.bonusMax} €)
       </div>
     );
   if (!next)
     return (
       <div className="mt-1.5 text-[12px] font-semibold text-emerald-600 dark:text-emerald-400">
-        Volle 100 %. Auf dein erstes Abiball-Ticket kommt kein Aufschlag mehr.
+        100 % – kein Zuschlag mehr.
       </div>
     );
   return (
     <div className="mt-1.5 text-[12px] text-tinte-matt dark:text-slate-400">
-      Noch <b className="text-tinte dark:text-slate-200">{next.fehlt} %</b> bis {next.ab} %. Dann
-      kostet das erste Ticket nur noch {grund + next.betrag} €, also {next.spart} € weniger.
+      Noch <b className="text-tinte dark:text-slate-200">{next.fehlt} %</b> → 1. Ticket {next.spart} € günstiger
+      {grund > 0 ? ` (${grund + next.betrag} €)` : ""}
     </div>
   );
 }

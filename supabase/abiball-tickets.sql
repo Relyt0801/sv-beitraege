@@ -3,9 +3,10 @@
 -- Einmal im SQL Editor ausführen (idempotent). Keine Namen, keine Schlüssel.
 --
 -- app_settings.abiball (jsonb):
---   ueber100 (bool), bonusBis (%), bonusRabatt (€ bei bonusBis),
---   verkaufAb (Zeitpunkt, null = nicht freigegeben), maxProPerson,
---   kontingent (0 = unbegrenzt), ort, datum
+--   ueber100 (bool), bonusSchritt (alle x % über 100 …), bonusProSchritt
+--   (… y € günstiger), bonusMax (höchstens z €), verkaufAb (Zeitpunkt,
+--   null = nicht freigegeben), maxProPerson, kontingent (0 = unbegrenzt),
+--   ort, datum (YYYY-MM-DD), uhrzeit (HH:MM)
 --
 -- ticket_bestellungen: wer wie viele Tickets bestellt hat und was zu
 -- überweisen ist. Bestellen geht nur über ticket_bestellen() – der Preis wird
@@ -55,7 +56,9 @@ declare
   deckel int;
   grund numeric;
   aufschlag numeric := 0;
-  bonus_bis int;
+  schritt int;
+  pro int;
+  maxi int;
   rabatt numeric := 0;
   st jsonb;
   erste boolean := true;
@@ -63,13 +66,18 @@ begin
   select * into s from public.app_settings where id = 1;
   a := coalesce(s.abiball, '{}'::jsonb);
   grund := coalesce(s.ticket_preis, 0);
-  bonus_bis := greatest(110, least(300, coalesce(round((a->>'bonusBis')::numeric)::int, 150)));
-  deckel := case when coalesce((a->>'ueber100')::boolean, false) then bonus_bis else 100 end;
+  -- wie abiballVon()/bonusGrenze() in lib/logic.ts
+  schritt := greatest(1, least(100, coalesce(round((a->>'bonusSchritt')::numeric)::int, 10)));
+  pro := greatest(0, least(100, coalesce(round((a->>'bonusProSchritt')::numeric)::int, 2)));
+  maxi := greatest(0, least(500, coalesce(round((a->>'bonusMax')::numeric)::int, 10)));
+  deckel := case
+    when not coalesce((a->>'ueber100')::boolean, false) then 100
+    when pro <= 0 or maxi <= 0 then 100 + schritt
+    else least(1000, 100 + ceil(maxi::numeric / pro)::int * schritt) end;
   select coalesce(sum(c.punkte), 0) into punkte from public.contributions c where c.student_id = p_student;
   pct := greatest(0, least(deckel, round(punkte / greatest(1, coalesce(s.ziel_punkte, 100)) * 100)::int));
 
-  -- Staffel: Betrag der höchsten erreichten Stufe (bis 100 %)
-  -- (wie ticketBetrag(): Start mit der untersten Stufe, dann die höchste erreichte)
+  -- Staffel: Start mit der untersten Stufe, dann die höchste erreichte (bis 100 %)
   for st in
     select x from jsonb_array_elements(case when jsonb_typeof(s.staffel) = 'array' and jsonb_array_length(s.staffel) > 0
       then s.staffel else
@@ -80,13 +88,12 @@ begin
     erste := false;
   end loop;
 
+  -- Bonus: alle „schritt“ % über 100 → „pro“ € weniger, höchstens „maxi“ €
   if coalesce((a->>'ueber100')::boolean, false) and pct > 100 then
-    rabatt := least(grund + aufschlag,
-      round(coalesce((a->>'bonusRabatt')::numeric, 0) * least(1, (pct - 100)::numeric / (bonus_bis - 100))));
+    rabatt := least(grund + aufschlag, maxi, floor((pct - 100)::numeric / schritt) * pro);
   end if;
   return ((grund + aufschlag - rabatt) * 100)::bigint;
 end $$;
--- nur intern (aus ticket_bestellen), damit niemand fremde Stände abfragt
 revoke all on function public.ticket_erstes_cent(uuid) from public, anon, authenticated;
 
 -- Verkaufsstand: wie viele verkauft (gesamt) und wie viele davon meine

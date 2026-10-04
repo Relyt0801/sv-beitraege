@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useStore } from "../store";
-import { abiballVon, ticketPreise, sortStudents } from "../lib/logic";
+import { abiballVon, bonusGrenze, ticketPreise, sortStudents } from "../lib/logic";
 import { useEntwurf } from "../lib/entwurf";
 import type { Abiball, Settings } from "../lib/types";
 import { bestellNummer, countdown, euroAusCent, useJetzt, useTicketBestellungen, verkaufStatus, type TicketBestellung } from "../lib/tickets";
@@ -53,74 +53,45 @@ export function AbiballEinstellungen() {
 // ---------------------------------------------------------------- Bonus
 
 function BonusGruppe({ settings, a, setze }: { settings: Settings; a: Abiball; setze: (p: Partial<Abiball>) => void }) {
-  const bis = useEntwurf(a.bonusBis, (w) => setze({ bonusBis: w }), 350);
-  const rabatt = useEntwurf(a.bonusRabatt, (w) => setze({ bonusRabatt: w }), 350);
-  const vorschau = { ...settings, abiball: { ...a, bonusBis: bis.wert, bonusRabatt: rabatt.wert } };
-  const bei100 = ticketPreise(100, vorschau);
-  const mitte = Math.round((100 + bis.wert) / 2);
-  const beiMitte = ticketPreise(mitte, vorschau);
-  const beiMax = ticketPreise(bis.wert, vorschau);
+  const schritt = useEntwurf(a.bonusSchritt, (w) => setze({ bonusSchritt: w }), 350);
+  const pro = useEntwurf(a.bonusProSchritt, (w) => setze({ bonusProSchritt: w }), 350);
+  const max = useEntwurf(a.bonusMax, (w) => setze({ bonusMax: w }), 350);
+  const vorschauA = { ...a, bonusSchritt: schritt.wert, bonusProSchritt: pro.wert, bonusMax: max.wert };
+  const vorschau = { ...settings, abiball: vorschauA };
+  const grenze = bonusGrenze(vorschauA);
   const grund = settings.ticket_preis || 0;
-  const maxRabatt = Math.max(50, grund);
+  // Vier Beispiele: 100 %, zwei Schritte dazwischen, Höchstwert
+  const punkte = [...new Set([100, 100 + schritt.wert, 100 + 2 * schritt.wert, grenze])].filter((x) => x <= grenze).slice(0, 4);
 
   return (
     <Gruppe titel="Bonus über 100 %">
       <Zeile label="Über 100 % sammeln">
         <Schalter an={a.ueber100} onChange={(v) => setze({ ueber100: v })} label="Über 100 % sammeln" />
       </Zeile>
-      {!a.ueber100 ? (
-        <div className="px-4 py-2.5 text-[12.5px] leading-relaxed text-tinte-leise">
-          Aus: Bei 100 % ist Schluss. Eingeschaltet zählt die Mithilfe weiter, der Ring wird golden und das
-          erste Ticket wird zusätzlich günstiger.
-        </div>
-      ) : (
+      {a.ueber100 && (
         <>
-          <Regler
-            label="Zählt bis"
-            wert={bis.wert}
-            einheit="%"
-            min={110}
-            max={300}
-            schritt={5}
-            onChange={(w) => bis.aendern(w)}
-            onFertig={bis.jetztSpeichern}
-          />
-          <Regler
-            label={`Rabatt bei ${bis.wert} %`}
-            wert={rabatt.wert}
-            einheit="€"
-            min={0}
-            max={maxRabatt}
-            schritt={1}
-            onChange={(w) => rabatt.aendern(w)}
-            onFertig={rabatt.jetztSpeichern}
-          />
+          <Regler label="Alle" wert={schritt.wert} einheit="%" min={5} max={50} schritt={5} onChange={schritt.aendern} onFertig={schritt.jetztSpeichern} />
+          <Regler label="… günstiger um" wert={pro.wert} einheit="€" min={1} max={20} schritt={1} onChange={pro.aendern} onFertig={pro.jetztSpeichern} />
+          <Regler label="Höchstens" wert={max.wert} einheit="€" min={1} max={Math.max(50, grund)} schritt={1} onChange={max.aendern} onFertig={max.jetztSpeichern} />
           <div className="px-4 py-3">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.04em] text-tinte-leise">1. Ticket kostet dann</div>
-            <div className="mt-1.5 grid grid-cols-3 gap-1.5 text-center">
-              {[
-                { p: 100, t: bei100 },
-                { p: mitte, t: beiMitte },
-                { p: bis.wert, t: beiMax },
-              ].map(({ p, t }, i) => (
-                <div
-                  key={p}
-                  className={`rounded-xl px-1 py-2 ${
-                    i === 2
-                      ? "bg-gradient-to-br from-[#F6DD8B] via-[#D9A92B] to-[#A87A0C] text-[#2B1F00]"
-                      : "bg-white/70 dark:bg-white/[0.06]"
-                  }`}
-                >
-                  <div className="zahl text-[12px] font-bold">{p} %</div>
-                  <div className="zahl text-[15px] font-extrabold">
-                    {grund > 0 ? `${t.erstes} €` : `−${t.rabatt} €`}
+            <div className={`grid gap-1.5 text-center`} style={{ gridTemplateColumns: `repeat(${punkte.length}, minmax(0, 1fr))` }}>
+              {punkte.map((p, i) => {
+                const t = ticketPreise(p, vorschau);
+                const letzte = i === punkte.length - 1;
+                return (
+                  <div
+                    key={p}
+                    className={`rounded-xl px-1 py-2 ${
+                      letzte ? "bg-gradient-to-br from-[#F6DD8B] via-[#D9A92B] to-[#A87A0C] text-[#2B1F00]" : "bg-white/70 dark:bg-white/[0.06]"
+                    }`}
+                  >
+                    <div className="zahl text-[12px] font-bold">{p} %</div>
+                    <div className="zahl text-[15px] font-extrabold">{grund > 0 ? `${t.erstes} €` : `−${t.rabatt} €`}</div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
-            <div className="mt-1.5 text-[11.5px] text-tinte-leise">
-              Dazwischen anteilig. Weitere Tickets bleiben beim Grundpreis.
-            </div>
+            <div className="mt-1.5 text-[11.5px] text-tinte-leise">1. Ticket · ab {grenze} % kein weiterer Bonus</div>
           </div>
         </>
       )}
@@ -184,26 +155,24 @@ function Regler({
 
 function AbiballGruppe({ a, setze }: { a: Abiball; setze: (p: Partial<Abiball>) => void }) {
   const ort = useEntwurf(a.ort, (w) => setze({ ort: w.trim().slice(0, 80) }));
+  const feld = "min-w-0 bg-transparent text-right text-[15px] text-tinte-matt outline-none placeholder:text-tinte-leise dark:text-slate-300";
   return (
-    <Gruppe titel="Abiball (steht dann auf dem Ticket)">
+    <Gruppe titel="Abiball (steht auf dem Ticket)">
+      <Zeile label="Tag">
+        <input type="date" className={feld} value={a.datum ?? ""} onChange={(e) => setze({ datum: e.target.value || null })} aria-label="Tag des Abiballs" />
+      </Zeile>
+      <Zeile label="Uhrzeit">
+        <input type="time" className={feld} value={a.uhrzeit} onChange={(e) => setze({ uhrzeit: e.target.value })} aria-label="Uhrzeit des Abiballs" />
+      </Zeile>
       <Zeile label="Ort">
         <input
-          className="w-full min-w-0 bg-transparent text-right text-[15px] text-tinte-matt outline-none placeholder:text-tinte-leise dark:text-slate-300"
+          className={`w-full ${feld}`}
           placeholder="noch offen"
           value={ort.wert}
           maxLength={80}
           onChange={(e) => ort.aendern(e.target.value)}
           onBlur={ort.jetztSpeichern}
           aria-label="Ort des Abiballs"
-        />
-      </Zeile>
-      <Zeile label="Datum">
-        <input
-          type="datetime-local"
-          className="min-w-0 bg-transparent text-right text-[15px] text-tinte-matt outline-none dark:text-slate-300"
-          value={a.datum ?? ""}
-          onChange={(e) => setze({ datum: e.target.value || null })}
-          aria-label="Datum und Uhrzeit des Abiballs"
         />
       </Zeile>
     </Gruppe>
@@ -247,8 +216,7 @@ function VerkaufGruppe({ settings, a, setze }: { settings: Settings; a: Abiball;
             <span className="min-w-0 flex-1 text-[13px] leading-snug text-tinte-matt dark:text-slate-300">
               {status === "bald" ? (
                 <>
-                  Startet in <b className="zahl">{countdown(abMs - jetzt)}</b> – bis dahin sehen alle einen grauen
-                  Knopf mit Countdown.
+                  Startet in <b className="zahl">{countdown(abMs - jetzt)}</b>
                 </>
               ) : (
                 <>Läuft seit {zeitpunktSchoen(a.verkaufAb!)}.</>
@@ -277,7 +245,7 @@ function VerkaufGruppe({ settings, a, setze }: { settings: Settings; a: Abiball;
       </Zeile>
       {status !== "aus" && grund === 0 && (
         <div className="px-4 py-2.5 text-[12.5px] font-semibold text-offen">
-          Es ist noch kein Grundpreis eingetragen – ohne Preis kann niemand bestellen.
+          Ohne Grundpreis kann niemand bestellen.
         </div>
       )}
     </Gruppe>

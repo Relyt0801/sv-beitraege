@@ -90,23 +90,50 @@ export function staffelVon(s: Settings): Staffel[] {
 /** Abiball-Einstellungen mit Standardwerten für alles, was fehlt. */
 export function abiballVon(s: Settings): Abiball {
   const a = { ...ABIBALL_STANDARD, ...(s.abiball || {}) };
+  const n = (v: unknown, f: number) => (Number.isFinite(Number(v)) ? Math.round(Number(v)) : f);
+  // Früher stand Datum und Uhrzeit zusammen in „datum“ (2027-06-26T19:00)
+  let datum = a.datum || null;
+  let uhrzeit = a.uhrzeit || "";
+  if (datum && datum.includes("T")) {
+    uhrzeit = uhrzeit || datum.slice(11, 16);
+    datum = datum.slice(0, 10);
+  }
   return {
     ...a,
-    bonusBis: Math.max(110, Math.min(300, Math.round(Number(a.bonusBis) || 150))),
-    bonusRabatt: Math.max(0, Math.round(Number(a.bonusRabatt) || 0)),
-    maxProPerson: Math.max(1, Math.min(20, Math.round(Number(a.maxProPerson) || 1))),
-    kontingent: Math.max(0, Math.round(Number(a.kontingent) || 0)),
+    datum,
+    uhrzeit,
+    bonusSchritt: Math.max(1, Math.min(100, n(a.bonusSchritt, 10))),
+    bonusProSchritt: Math.max(0, Math.min(100, n(a.bonusProSchritt, 2))),
+    bonusMax: Math.max(0, Math.min(500, n(a.bonusMax, 10))),
+    maxProPerson: Math.max(1, Math.min(20, n(a.maxProPerson, 4))),
+    kontingent: Math.max(0, n(a.kontingent, 0)),
   };
 }
 
 /**
+ * Bis wie viel Prozent es noch etwas bringt: dort ist der höchste Bonus
+ * erreicht (z. B. alle 10 % 2 €, höchstens 10 € → 150 %). Darüber zählt
+ * nichts mehr.
+ */
+export function bonusGrenze(a: Abiball): number {
+  if (a.bonusProSchritt <= 0 || a.bonusMax <= 0) return 100 + a.bonusSchritt;
+  return Math.min(1000, 100 + Math.ceil(a.bonusMax / a.bonusProSchritt) * a.bonusSchritt);
+}
+
+/** Bonus in € bei diesem Stand (ohne Deckel durch den Ticketpreis). */
+export function bonusEuro(prozent: number, a: Abiball): number {
+  if (!a.ueber100 || prozent <= 100) return 0;
+  return Math.min(a.bonusMax, Math.floor((prozent - 100) / a.bonusSchritt) * a.bonusProSchritt);
+}
+
+/**
  * Gesammelte Prozent. Normal gedeckelt bei 100 (mehr bringt nichts). Ist
- * „Über 100 %“ an, zählt es bis zur eingestellten Grenze weiter.
+ * „Über 100 %“ an, zählt es weiter bis zum höchsten Bonus.
  */
 export function prozentVon(punkte: number, s: Settings): number {
   const ziel = Math.max(1, s.ziel_punkte);
   const a = abiballVon(s);
-  const deckel = a.ueber100 ? a.bonusBis : 100;
+  const deckel = a.ueber100 ? bonusGrenze(a) : 100;
   return Math.max(0, Math.min(deckel, Math.round((punkte / ziel) * 100)));
 }
 
@@ -114,7 +141,7 @@ export function prozentVon(punkte: number, s: Settings): number {
 export function bonusAnteil(prozent: number, s: Settings): number {
   const a = abiballVon(s);
   if (!a.ueber100 || prozent <= 100) return 0;
-  return Math.min(1, (prozent - 100) / (a.bonusBis - 100));
+  return Math.min(1, (prozent - 100) / (bonusGrenze(a) - 100));
 }
 
 /**
@@ -130,7 +157,7 @@ export function ticketPreise(prozent: number, s: Settings) {
   const aufschlag0 = ticketBetrag(0, s);
   const aufschlag = ticketBetrag(Math.min(prozent, 100), s);
   const a = abiballVon(s);
-  const rabatt = Math.min(grund + aufschlag, Math.round(a.bonusRabatt * bonusAnteil(prozent, s)));
+  const rabatt = Math.min(grund + aufschlag, bonusEuro(prozent, a));
   return {
     grund,
     preisSteht: grund > 0,

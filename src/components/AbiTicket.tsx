@@ -1,5 +1,5 @@
-import { useState, type ReactNode } from "react";
-import type { Settings, Student } from "../lib/types";
+import { useState } from "react";
+import type { Abiball, Settings, Student } from "../lib/types";
 import { abiballVon, bestellBetrag, ticketPreise } from "../lib/logic";
 import {
   bestellNummer,
@@ -12,37 +12,43 @@ import {
 } from "../lib/tickets";
 import { KontoTab, jahrgangKurz } from "./KontoTab";
 import { Sheet, SheetKopf } from "./Sheet";
+import { Gruppe, Zeile } from "./NachtragSheet";
 
 /**
  * Das Abiball-Ticket – personalisiert, so wie es später auch aussehen soll.
  *
- * Es ersetzt die alten Texte („Dein erstes Ticket kostet …“): Auf dem Ticket
- * steht der Listenpreis (Grundpreis + voller Helferzuschuss bei 0 %)
- * durchgestrichen und darunter, was es bei diesem Stand wirklich kostet. Das
- * zweite Ticket zeigt den Preis für jedes weitere (Eltern, Gäste).
- *
- * Rechts daneben (bzw. darunter auf dem Handy) liegt die Kasse: bestellen,
- * sobald der Verkauf freigegeben ist, vorher ein grauer Knopf mit Countdown.
+ * Auf dem eigenen Ticket steht der Listenpreis (Grundpreis + Helferzuschuss
+ * bei 0 %) durchgestrichen und darunter, was es bei diesem Stand wirklich
+ * kostet. Das zweite Ticket (schwarz-gold) zeigt den Preis für jedes weitere –
+ * Eltern und Gäste. Rechts daneben (am Handy darunter) liegt die Kasse.
  */
 
 const SERIF = { fontFamily: 'ui-serif, "New York", "Iowan Old Style", Georgia, serif' };
 const GOLD_TEXT = "bg-gradient-to-b from-[#FBE7A1] via-[#E2B744] to-[#B8860B] bg-clip-text text-transparent";
+const GOLD = "#E2B744";
 
-/** „Sa, 26. Juni 2027 · 19:00 Uhr“ – Uhrzeit nur, wenn eine angegeben ist. */
-function datumSchoen(d: string | null): string | null {
+/** „Sa., 26. Juni 2027“ */
+function tagSchoen(d: string | null): string | null {
   if (!d) return null;
-  const mitZeit = d.includes("T");
-  const t = new Date(mitZeit ? d : `${d}T12:00`);
+  const t = new Date(`${d.slice(0, 10)}T12:00`);
   if (Number.isNaN(t.getTime())) return null;
-  const tag = t.toLocaleDateString("de-DE", { weekday: "short", day: "numeric", month: "long", year: "numeric" });
-  return mitZeit ? `${tag} · ${t.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })}` : tag;
+  return t.toLocaleDateString("de-DE", { weekday: "short", day: "numeric", month: "long", year: "numeric" });
 }
 
-/** Zeitpunkt (ISO mit Zeitzone) in Ortszeit: „Fr, 10. Oktober 2026 · 18:00 Uhr“ */
+/** Fürs Ticket kurz: „Sa., 26.06.2027 · 19:00“ – Uhrzeit nur, wenn angegeben. */
+export function abiballWann(a: Abiball): string | null {
+  if (!a.datum) return null;
+  const t = new Date(`${a.datum.slice(0, 10)}T12:00`);
+  if (Number.isNaN(t.getTime())) return null;
+  const tag = t.toLocaleDateString("de-DE", { weekday: "short", day: "2-digit", month: "2-digit", year: "numeric" });
+  return a.uhrzeit ? `${tag} · ${a.uhrzeit}` : tag;
+}
+
+/** Zeitpunkt (ISO mit Zeitzone) in Ortszeit: „Fr., 10. Oktober 2026 · 18:00 Uhr“ */
 export function zeitpunktSchoen(iso: string): string {
   const t = new Date(iso);
   if (Number.isNaN(t.getTime())) return "";
-  return `${t.toLocaleDateString("de-DE", { weekday: "short", day: "numeric", month: "long", year: "numeric" })} · ${t.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })} Uhr`;
+  return `${t.toLocaleDateString("de-DE", { weekday: "short", day: "numeric", month: "long" })} · ${t.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })} Uhr`;
 }
 
 function jahrVon(d: string | null): string {
@@ -63,17 +69,17 @@ export function AbiTicket({
   fuerEltern,
 }: {
   art: "erstes" | "weiteres";
-  fuerEltern?: boolean;
   student: Student;
   settings: Settings;
   prozent: number;
   onClick?: () => void;
   klein?: boolean;
+  fuerEltern?: boolean;
 }) {
   const p = ticketPreise(prozent, settings);
   const a = abiballVon(settings);
   const erstes = art === "erstes";
-  const datum = datumSchoen(a.datum);
+  const wann = abiballWann(a);
   const Tag = onClick ? "button" : "div";
 
   // Kerben der Perforation in der Farbe der Karte, auf der das Ticket liegt
@@ -82,88 +88,67 @@ export function AbiTicket({
   return (
     <Tag
       onClick={onClick}
-      aria-label={onClick ? (erstes ? "Dein Abiball-Ticket ansehen" : "Weiteres Ticket ansehen") : undefined}
-      className={`group relative flex w-full overflow-hidden text-left transition duration-300 ${
+      aria-label={onClick ? (erstes ? "Abiball-Ticket ansehen" : "Gäste-Ticket ansehen") : undefined}
+      className={`group relative flex w-full overflow-hidden text-left text-white ring-1 ring-[#E2B744]/45 transition duration-300 ${
         onClick ? "active:scale-[.985] sm:hover:-translate-y-0.5" : ""
       } ${klein ? "rounded-[18px]" : "rounded-[22px]"} ${
-        erstes
-          ? "text-white shadow-[0_10px_30px_-10px_rgba(10,25,60,.55)] ring-1 ring-[#E2B744]/45"
-          : "text-[#14233F] shadow-[0_6px_20px_-10px_rgba(10,25,60,.35)] ring-1 ring-[#14233F]/10 dark:text-slate-100 dark:ring-white/10"
+        erstes ? "shadow-[0_10px_30px_-10px_rgba(10,25,60,.55)]" : "shadow-[0_10px_30px_-12px_rgba(0,0,0,.6)]"
       }`}
       style={{
         background: erstes
           ? "radial-gradient(120% 140% at 0% 0%, #23467F 0%, #12284D 45%, #0A1730 100%)"
-          : undefined,
+          : "radial-gradient(120% 140% at 0% 0%, #2A2622 0%, #141210 50%, #050505 100%)",
       }}
     >
-      {/* Hintergrund des zweiten Tickets: Perlmutt hell, im Dunkelmodus Graphit */}
-      {!erstes && (
-        <span
-          aria-hidden
-          className="absolute inset-0 bg-[linear-gradient(135deg,#FDFCF8_0%,#EEF1F7_60%,#E3E8F1_100%)] dark:bg-[linear-gradient(135deg,#2C2C2E_0%,#232326_100%)]"
-        />
-      )}
       {/* feines Guilloche-Muster wie auf Wertpapieren */}
       <span
         aria-hidden
-        className={`pointer-events-none absolute inset-0 ${erstes ? "opacity-[0.16]" : "opacity-[0.07] dark:opacity-[0.1]"}`}
+        className={`pointer-events-none absolute inset-0 ${erstes ? "opacity-[0.16]" : "opacity-[0.2]"}`}
         style={{
           backgroundImage:
             "repeating-radial-gradient(circle at 85% 120%, transparent 0 9px, currentColor 9px 10px), repeating-radial-gradient(circle at -10% -30%, transparent 0 13px, currentColor 13px 14px)",
-          color: erstes ? "#E2B744" : "#14233F",
+          color: GOLD,
           maskImage: "linear-gradient(90deg, rgba(0,0,0,.9), rgba(0,0,0,.25))",
           WebkitMaskImage: "linear-gradient(90deg, rgba(0,0,0,.9), rgba(0,0,0,.25))",
         }}
       />
+      {/* goldene Kante oben beim Gäste-Ticket */}
+      {!erstes && <span aria-hidden className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#E2B744]/80 to-transparent" />}
       {/* Glanz, der beim Drüberfahren über das Ticket wandert */}
-      {erstes && (
-        <span
-          aria-hidden
-          className="pointer-events-none absolute -inset-y-6 -left-1/3 w-1/4 rotate-12 bg-gradient-to-r from-transparent via-white/15 to-transparent transition-transform duration-700 group-hover:translate-x-[520%]"
-        />
-      )}
+      <span
+        aria-hidden
+        className="pointer-events-none absolute -inset-y-6 -left-1/3 w-1/4 rotate-12 bg-gradient-to-r from-transparent via-white/15 to-transparent transition-transform duration-700 group-hover:translate-x-[520%]"
+      />
 
       {/* ------------------------------------------ linker Teil */}
       <div className={`relative min-w-0 flex-1 ${klein ? "px-4 py-3" : "px-4 py-4 sm:px-5"}`}>
-        <div
-          className={`flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.22em] ${
-            erstes ? "text-[#E9C460]" : "text-[#5B6B87] dark:text-slate-400"
-          }`}
-        >
+        <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.22em] text-[#E9C460]">
           <span aria-hidden>✦</span> Abiball{jahrVon(a.datum)}
         </div>
         <div
-          className={`mt-1.5 truncate font-semibold leading-tight tracking-[-0.01em] ${klein ? "text-[17px]" : "text-[21px] sm:text-[23px]"}`}
+          className={`mt-1.5 truncate font-semibold leading-tight tracking-[-0.01em] ${klein ? "text-[18px]" : "text-[21px] sm:text-[23px]"}`}
           style={SERIF}
         >
           {erstes ? `${student.vorname} ${student.nachname}` : "Eltern & Gäste"}
         </div>
-        <div className={`mt-0.5 truncate text-[11.5px] ${erstes ? "text-white/60" : "text-[#5B6B87] dark:text-slate-400"}`}>
+        <div className="mt-0.5 truncate text-[11.5px] text-white/60">
           {erstes ? "Persönliches Ticket · 1. Karte" : "Jedes weitere Ticket"}
         </div>
 
-        {(a.ort || datum) && !klein && (
-          <div className={`mt-2.5 grid gap-0.5 text-[12px] ${erstes ? "text-white/85" : "text-[#2A3B5C] dark:text-slate-300"}`}>
-            {datum && (
-              <span>
-                <span aria-hidden className="mr-1.5 opacity-70">◷</span>
-                {datum}
+        {(a.ort || wann) && (
+          <div className={`grid gap-0.5 text-white/85 ${klein ? "mt-1.5 text-[11.5px]" : "mt-2.5 text-[12px]"}`}>
+            {wann && (
+              <span className="truncate">
+                <span aria-hidden className="mr-1.5 text-[#E9C460]">◷</span>
+                {wann}
               </span>
             )}
             {a.ort && (
               <span className="truncate">
-                <span aria-hidden className="mr-1.5 opacity-70">⌖</span>
+                <span aria-hidden className="mr-1.5 text-[#E9C460]">⌖</span>
                 {a.ort}
               </span>
             )}
-          </div>
-        )}
-        {erstes && !klein && (
-          <div className="mt-2.5 flex items-center gap-2">
-            <span className="h-px flex-1 bg-gradient-to-r from-[#E2B744]/60 to-transparent" />
-            <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/45">
-              {prozent} % mitgeholfen
-            </span>
           </div>
         )}
       </div>
@@ -172,115 +157,41 @@ export function AbiTicket({
       <div aria-hidden className="relative w-0 shrink-0">
         <span className={`${kerbe} -top-2.5`} />
         <span className={`${kerbe} -bottom-2.5`} />
-        <span
-          className={`absolute inset-y-3 left-0 border-l-[1.5px] border-dashed ${
-            erstes ? "border-white/25" : "border-[#14233F]/20 dark:border-white/20"
-          }`}
-        />
+        <span className="absolute inset-y-3 left-0 border-l-[1.5px] border-dashed border-white/25" />
       </div>
 
       {/* ------------------------------------------ Abriss mit Preis */}
-      <div
-        className={`relative flex shrink-0 flex-col items-center justify-center text-center ${
-          klein ? "w-[36%] px-2 py-3 sm:w-[32%]" : "w-[36%] px-2.5 py-4 sm:w-[32%]"
-        }`}
-      >
-        <div className={`text-[9.5px] font-bold uppercase tracking-[0.18em] ${erstes ? "text-white/55" : "text-[#5B6B87] dark:text-slate-400"}`}>
-          {erstes && !fuerEltern ? "Dein Preis" : "Preis"}
+      <div className="relative flex w-[36%] shrink-0 flex-col items-center justify-center px-2 py-3 text-center sm:w-[32%]">
+        <div className="text-[9.5px] font-bold uppercase tracking-[0.18em] text-white/55">
+          {erstes ? (fuerEltern ? "1. Ticket" : "Dein Preis") : "je Karte"}
         </div>
-        {erstes ? (
-          p.preisSteht ? (
-            <>
-              {p.standard > p.erstes && (
-                <div className="zahl mt-0.5 text-[13px] font-semibold text-white/50 line-through decoration-[#E2B744]/80 decoration-2">
-                  {p.standard} €
-                </div>
-              )}
-              <div className={`zahl font-extrabold leading-none tracking-[-0.03em] ${GOLD_TEXT} ${klein ? "text-[26px]" : "text-[34px]"}`}>
-                {p.erstes}&nbsp;€
-              </div>
-              {p.gespart > 0 && (
-                <div className="mt-1.5 whitespace-nowrap rounded-full bg-[#E2B744]/20 px-2 py-0.5 text-[10.5px] font-bold text-[#F6DD8B]">
-                  −{p.gespart} € gespart
-                </div>
-              )}
-            </>
-          ) : (
-            <>
-              <div className={`mt-0.5 font-semibold ${klein ? "text-[15px]" : "text-[17px]"}`} style={SERIF}>
-                Preis folgt
-              </div>
-              <div className="mt-1 text-[10.5px] leading-tight text-white/70">
-                Zuschlag{" "}
-                {p.aufschlag0 > p.aufschlag && <span className="line-through opacity-60">{p.aufschlag0} €</span>}{" "}
-                <b className="text-[#F6DD8B]">{p.aufschlag - p.rabatt} €</b>
-              </div>
-            </>
-          )
-        ) : p.preisSteht ? (
-          <>
-            <div className={`zahl font-extrabold leading-none tracking-[-0.03em] ${klein ? "text-[24px]" : "text-[30px]"}`}>
-              {p.weiteres}&nbsp;€
-            </div>
-            <div className="mt-1.5 text-[10.5px] font-semibold text-[#5B6B87] dark:text-slate-400">je Karte</div>
-          </>
-        ) : (
+        {!p.preisSteht ? (
           <div className={`mt-0.5 font-semibold ${klein ? "text-[15px]" : "text-[17px]"}`} style={SERIF}>
             Preis folgt
+          </div>
+        ) : erstes ? (
+          <>
+            {p.standard > p.erstes && (
+              <div className="zahl mt-0.5 text-[13px] font-semibold text-white/50 line-through decoration-[#E2B744]/80 decoration-2">
+                {p.standard} €
+              </div>
+            )}
+            <div className={`zahl font-extrabold leading-none tracking-[-0.03em] ${GOLD_TEXT} ${klein ? "text-[26px]" : "text-[34px]"}`}>
+              {p.erstes}&nbsp;€
+            </div>
+            {p.gespart > 0 && (
+              <div className="mt-1.5 whitespace-nowrap rounded-full bg-[#E2B744]/20 px-2 py-0.5 text-[10.5px] font-bold text-[#F6DD8B]">
+                −{p.gespart} € gespart
+              </div>
+            )}
+          </>
+        ) : (
+          <div className={`zahl mt-0.5 font-extrabold leading-none tracking-[-0.03em] ${GOLD_TEXT} ${klein ? "text-[26px]" : "text-[30px]"}`}>
+            {p.weiteres}&nbsp;€
           </div>
         )}
       </div>
     </Tag>
-  );
-}
-
-// ================================================================ Rechnung
-
-/** So setzt sich der Preis zusammen – wie eine Rechnung, Zeile für Zeile. */
-export function TicketRechnung({ settings, prozent, fuerEltern }: { settings: Settings; prozent: number; fuerEltern?: boolean }) {
-  const p = ticketPreise(prozent, settings);
-  const a = abiballVon(settings);
-  const g = (n: number) => (p.preisSteht ? `${n} €` : "folgt");
-  return (
-    <div className="overflow-hidden rounded-2xl bg-[rgb(118_118_128/0.08)] dark:bg-[rgb(118_118_128/0.16)]">
-      <RZeile label="Grundpreis" wert={g(p.grund)} />
-      {p.aufschlag0 > p.aufschlag && (
-        <RZeile label="Helferzuschuss bei 0 %" wert={<span className="text-tinte-leise line-through">+{p.aufschlag0} €</span>} />
-      )}
-      <RZeile
-        label={fuerEltern ? `Helferzuschuss bei ${Math.min(prozent, 100)} %` : `Helferzuschuss bei deinen ${Math.min(prozent, 100)} %`}
-        wert={`+${p.aufschlag} €`}
-      />
-      {a.ueber100 && (
-        <RZeile
-          label={<span className="text-[#8A650A] dark:text-[#E9C460]">✦ Bonus über 100 %{prozent > 100 ? ` (${prozent} %)` : ""}</span>}
-          wert={
-            <span className="text-[#8A650A] dark:text-[#E9C460]">
-              {p.rabatt > 0 ? `−${p.rabatt} €` : <span className="font-medium opacity-70">bis −{a.bonusRabatt} €</span>}
-            </span>
-          }
-        />
-      )}
-      <div className="flex items-baseline justify-between gap-3 border-t border-black/[0.06] bg-white/60 px-4 py-3 dark:border-white/10 dark:bg-white/[0.04]">
-        <span className="text-[14px] font-bold">{fuerEltern ? "1. Ticket" : "Dein 1. Ticket"}</span>
-        <span className="zahl text-[17px] font-extrabold">
-          {p.preisSteht ? `${p.erstes} €` : `${p.aufschlag - p.rabatt} € Zuschlag`}
-        </span>
-      </div>
-      <div className="flex items-baseline justify-between gap-3 bg-white/60 px-4 pb-3 dark:bg-white/[0.04]">
-        <span className="text-[13px] text-tinte-matt dark:text-slate-400">Jedes weitere Ticket</span>
-        <span className="zahl text-[14px] font-bold text-tinte-matt dark:text-slate-300">{g(p.weiteres)}</span>
-      </div>
-    </div>
-  );
-}
-
-function RZeile({ label, wert }: { label: ReactNode; wert: ReactNode }) {
-  return (
-    <div className="flex items-baseline justify-between gap-3 border-b border-black/[0.05] px-4 py-2.5 last:border-0 dark:border-white/[0.06]">
-      <span className="text-[13.5px] text-tinte-matt dark:text-slate-300">{label}</span>
-      <span className="zahl shrink-0 text-[14px] font-semibold">{wert}</span>
-    </div>
   );
 }
 
@@ -292,11 +203,27 @@ const STATUS_TEXT: Record<TicketBestellung["status"], string> = {
   storniert: "Storniert",
 };
 
+/** Kleine Info-Zeile statt großer Kästen */
+function Info({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex items-center gap-2 rounded-xl bg-[rgb(118_118_128/0.08)] px-3 py-2 text-[12.5px] text-tinte-matt dark:bg-[rgb(118_118_128/0.16)] dark:text-slate-300">
+      {children}
+    </div>
+  );
+}
+
+/** Der Verkaufsstand – damit der Bereich weiß, ob rechts eine Kasse steht. */
+function useVerkauf(settings: Settings) {
+  const a = abiballVon(settings);
+  const abMs = a.verkaufAb ? Date.parse(a.verkaufAb) : NaN;
+  const jetzt = useJetzt(Number.isFinite(abMs) && abMs > Date.now());
+  return { a, abMs, jetzt, status: verkaufStatus(a, jetzt) };
+}
+
 /**
- * Rechte Seite: bestellen und überweisen. Vor dem Start ein grauer Knopf mit
- * Countdown; ist der Verkauf nicht freigegeben, nur ein leiser Hinweis.
- * Eltern bestellen nicht selbst, sehen aber die Bestellungen und können sie
- * bezahlen.
+ * Die Kasse: vor dem Start grauer Knopf mit Countdown, danach bestellen und
+ * überweisen. Eltern bestellen nicht selbst, sehen aber die Bestellungen und
+ * können sie bezahlen. Ist der Verkauf nicht freigegeben, gibt es hier nichts.
  */
 export function TicketKasse({
   student,
@@ -309,12 +236,9 @@ export function TicketKasse({
   prozent: number;
   fuerEltern?: boolean;
 }) {
-  const a = abiballVon(settings);
+  const { a, abMs, jetzt, status } = useVerkauf(settings);
   const p = ticketPreise(prozent, settings);
   const { liste, verkauft, bestellen } = useTicketBestellungen(true);
-  const abMs = a.verkaufAb ? Date.parse(a.verkaufAb) : NaN;
-  const jetzt = useJetzt(Number.isFinite(abMs) && abMs > Date.now());
-  const status = verkaufStatus(a, jetzt);
 
   const meine = liste.filter((b) => b.student_id === student.id);
   const aktiv = meine.filter((b) => b.status !== "storniert");
@@ -342,27 +266,14 @@ export function TicketKasse({
     }
   }
 
-  return (
-    <div className="flex h-full flex-col gap-2.5">
-      {/* ---------------- Knopf je nach Verkaufsstand */}
-      {status === "aus" && (
-        <div className="flex flex-1 flex-col items-center justify-center rounded-2xl border border-dashed border-papier-linie px-4 py-5 text-center dark:border-slate-700">
-          <div className="text-[22px]" aria-hidden>🎟️</div>
-          <div className="mt-1 text-[14px] font-semibold">Ticketverkauf noch nicht gestartet</div>
-          <div className="mt-0.5 text-[12.5px] leading-relaxed text-tinte-leise">
-            {fuerEltern
-              ? `Sobald es losgeht, bestellt ${student.vorname} hier – Sie können dann direkt überweisen.`
-              : "Sobald das Stufenteam den Verkauf startet, bestellst du hier."}
-          </div>
-        </div>
-      )}
+  if (status === "aus" && meine.length === 0) return null;
 
+  return (
+    <div className="grid content-start gap-2.5">
       {status === "bald" && (
         <div className="rounded-2xl bg-[rgb(118_118_128/0.08)] p-4 text-center dark:bg-[rgb(118_118_128/0.16)]">
           <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-tinte-leise">Verkauf startet in</div>
-          <div className="zahl mt-1 text-[1.9rem] font-extrabold leading-none tracking-[-0.02em]" aria-live="off">
-            {countdown(abMs - jetzt)}
-          </div>
+          <div className="zahl mt-1 text-[1.9rem] font-extrabold leading-none tracking-[-0.02em]">{countdown(abMs - jetzt)}</div>
           <div className="mt-1 text-[12px] text-tinte-leise">{zeitpunktSchoen(a.verkaufAb!)}</div>
           {!fuerEltern && (
             <button
@@ -380,19 +291,15 @@ export function TicketKasse({
           <div className="flex items-center justify-between gap-2">
             <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#E9C460]">Tickets bestellen</span>
             {a.kontingent > 0 && (
-              <span className="text-[11px] font-semibold text-white/60">
-                noch {Math.max(0, a.kontingent - verkauft)} frei
-              </span>
+              <span className="text-[11px] font-semibold text-white/60">noch {Math.max(0, a.kontingent - verkauft)} frei</span>
             )}
           </div>
 
           {!p.preisSteht ? (
-            <div className="mt-2 text-[13px] text-white/75">Der Ticketpreis steht noch nicht fest. Bestellen geht, sobald er eingetragen ist.</div>
+            <div className="mt-2 text-[13px] text-white/75">Preis steht noch nicht fest.</div>
           ) : moeglich <= 0 ? (
             <div className="mt-2 text-[13px] text-white/75">
-              {restPerson <= 0
-                ? `Du hast schon ${schon} Tickets – mehr als ${a.maxProPerson} je Person gehen nicht.`
-                : "Alle Tickets sind vergeben."}
+              {restPerson <= 0 ? `Höchstens ${a.maxProPerson} je Person – du hast alle.` : "Alle Tickets sind vergeben."}
             </div>
           ) : (
             <>
@@ -419,11 +326,7 @@ export function TicketKasse({
                 <div className="text-right">
                   <div className={`zahl text-[1.7rem] font-extrabold leading-none ${GOLD_TEXT}`}>{betrag} €</div>
                   <div className="mt-0.5 text-[11px] text-white/55">
-                    {schon === 0
-                      ? n > 1
-                        ? `${p.erstes} € + ${n - 1} × ${p.weiteres} €`
-                        : "dein 1. Ticket"
-                      : `${n} × ${p.weiteres} €`}
+                    {schon === 0 ? (n > 1 ? `${p.erstes} € + ${n - 1} × ${p.weiteres} €` : "dein 1. Ticket") : `${n} × ${p.weiteres} €`}
                   </div>
                 </div>
               </div>
@@ -435,7 +338,7 @@ export function TicketKasse({
                 {busy ? "Einen Moment …" : `${n} ${n === 1 ? "Ticket" : "Tickets"} bestellen`}
               </button>
               <div className="mt-1.5 text-center text-[11px] text-white/50">
-                Höchstens {a.maxProPerson} je Person{schon > 0 ? ` · du hast schon ${schon}` : ""}. Danach überweisen.
+                Max. {a.maxProPerson} je Person{schon > 0 ? ` · du hast ${schon}` : ""}
               </div>
             </>
           )}
@@ -444,13 +347,9 @@ export function TicketKasse({
       )}
 
       {status === "laeuft" && fuerEltern && aktiv.length === 0 && (
-        <div className="rounded-2xl bg-[rgb(118_118_128/0.08)] p-4 text-center text-[13px] leading-relaxed text-tinte-matt dark:bg-[rgb(118_118_128/0.16)] dark:text-slate-300">
-          Der Ticketverkauf läuft. Bestellen kann {student.vorname} über den eigenen Zugang – danach sehen Sie die
-          Bestellung hier und können überweisen.
-        </div>
+        <Info>🎟️ Verkauf läuft – {student.vorname} bestellt über den eigenen Zugang.</Info>
       )}
 
-      {/* ---------------- eigene Bestellungen */}
       {meine.length > 0 && (
         <div className="overflow-hidden rounded-2xl bg-[rgb(118_118_128/0.08)] dark:bg-[rgb(118_118_128/0.16)]">
           <div className="px-4 pb-1 pt-2.5 text-[11px] font-bold uppercase tracking-[0.14em] text-tinte-leise">
@@ -508,7 +407,7 @@ export function TicketUeberweisen({
     <Sheet open onClose={onClose}>
       <SheetKopf
         titel="Tickets überweisen"
-        unter={`${bestellung.anzahl} ${bestellung.anzahl === 1 ? "Ticket" : "Tickets"} · Bestellung ${bestellNummer(bestellung)}`}
+        unter={`${bestellung.anzahl} ${bestellung.anzahl === 1 ? "Ticket" : "Tickets"} · ${bestellNummer(bestellung)}`}
         onClose={onClose}
       />
       <div className="mb-4 flex flex-col items-center rounded-2xl bg-gradient-to-b from-[#12284D] to-[#0A1730] px-4 py-5 text-center text-white ring-1 ring-[#E2B744]/40">
@@ -516,17 +415,68 @@ export function TicketUeberweisen({
         <div className={`zahl mt-1 text-[2.6rem] font-extrabold leading-none tracking-[-0.03em] ${GOLD_TEXT}`}>
           {euroAusCent(bestellung.betrag_cent)}
         </div>
-        <div className="mt-1.5 text-[12px] text-white/60">
-          Sobald das Geld da ist, markiert das Stufenteam die Bestellung als bezahlt.
-        </div>
       </div>
       <KontoTab
         personen={[student]}
         du={du}
         zweck={zweck}
         betrag={euroAusCent(bestellung.betrag_cent)}
-        hinweis="Bitte genau diesen Verwendungszweck angeben – nur so können wir die Überweisung deiner Bestellung zuordnen."
+        hinweis="Bitte genau diesen Verwendungszweck angeben."
       />
+    </Sheet>
+  );
+}
+
+// ================================================================ Ansicht
+
+/** Die Ticket-Ansicht: großes Ticket, darunter Preis und Abiball wie überall in der App gruppiert. */
+function TicketAnsicht({
+  student,
+  settings,
+  prozent,
+  fuerEltern,
+  onClose,
+}: {
+  student: Student;
+  settings: Settings;
+  prozent: number;
+  fuerEltern?: boolean;
+  onClose: () => void;
+}) {
+  const p = ticketPreise(prozent, settings);
+  const a = abiballVon(settings);
+  const wert = (t: string, klasse = "") => <span className={`zahl text-[15px] font-semibold ${klasse}`}>{t}</span>;
+  return (
+    <Sheet open onClose={onClose}>
+      <SheetKopf titel={fuerEltern ? `Ticket von ${student.vorname}` : "Dein Abiball-Ticket"} onClose={onClose} />
+      <AbiTicket art="erstes" student={student} settings={settings} prozent={prozent} fuerEltern={fuerEltern} />
+
+      <Gruppe titel="1. Ticket">
+        <Zeile label="Grundpreis">{wert(p.preisSteht ? `${p.grund} €` : "folgt", "text-tinte-matt dark:text-slate-300")}</Zeile>
+        <Zeile label={`Helferzuschuss (${Math.min(prozent, 100)} %)`}>{wert(`+${p.aufschlag} €`, "text-tinte-matt dark:text-slate-300")}</Zeile>
+        {a.ueber100 && (
+          <Zeile label="✦ Bonus">{wert(p.rabatt > 0 ? `−${p.rabatt} €` : "0 €", "text-[#8A650A] dark:text-[#E9C460]")}</Zeile>
+        )}
+        <Zeile label="Preis">
+          <span className="zahl text-[17px] font-extrabold">{p.preisSteht ? `${p.erstes} €` : `+${p.aufschlag - p.rabatt} €`}</span>
+        </Zeile>
+      </Gruppe>
+
+      <Gruppe titel="Weitere Tickets">
+        <Zeile label="Eltern & Gäste, je Karte">{wert(p.preisSteht ? `${p.weiteres} €` : "folgt")}</Zeile>
+      </Gruppe>
+
+      {(a.datum || a.ort) && (
+        <Gruppe titel="Abiball">
+          {a.datum && <Zeile label="Tag">{wert(tagSchoen(a.datum) || "", "text-tinte-matt dark:text-slate-300")}</Zeile>}
+          {a.uhrzeit && <Zeile label="Uhrzeit">{wert(`${a.uhrzeit} Uhr`, "text-tinte-matt dark:text-slate-300")}</Zeile>}
+          {a.ort && <Zeile label="Ort">{wert(a.ort, "text-tinte-matt dark:text-slate-300")}</Zeile>}
+        </Gruppe>
+      )}
+
+      <div className="mt-4">
+        <TicketKasse student={student} settings={settings} prozent={prozent} fuerEltern={fuerEltern} />
+      </div>
     </Sheet>
   );
 }
@@ -534,9 +484,9 @@ export function TicketUeberweisen({
 // ================================================================ Bereich
 
 /**
- * Der Ticket-Bereich auf der eigenen Seite (und bei den Eltern): links beide
- * Tickets, rechts die Kasse. Antippen eines Tickets öffnet die Ticket-Ansicht
- * mit der genauen Rechnung.
+ * Der Ticket-Bereich auf der eigenen Seite (und bei den Eltern). Links die
+ * Tickets, rechts die Kasse – die gibt es erst, wenn der Verkauf freigegeben
+ * ist; vorher nur eine kleine Info. Eltern sehen ihr Gäste-Ticket zuerst.
  */
 export function TicketBereich({
   student,
@@ -552,44 +502,40 @@ export function TicketBereich({
   className?: string;
 }) {
   const [auf, setAuf] = useState(false);
+  const { status } = useVerkauf(settings);
+  const { liste } = useTicketBestellungen(true);
+  const mitKasse = status !== "aus" || liste.some((b) => b.student_id === student.id);
+
+  const eigenes = <AbiTicket art="erstes" student={student} settings={settings} prozent={prozent} fuerEltern={fuerEltern} onClick={() => setAuf(true)} />;
+  const gaeste = <AbiTicket art="weiteres" student={student} settings={settings} prozent={prozent} onClick={() => setAuf(true)} klein />;
+
   return (
     <section className={`card p-4 sm:p-5 ${className}`} data-tour="abiball-ticket">
       <div className="flex items-baseline justify-between gap-2">
         <h2 className="text-[15px] font-semibold">Abiball-Ticket</h2>
         <button onClick={() => setAuf(true)} className="-my-2 py-2 text-[13px] font-semibold text-brand-dark dark:text-brand">
-          Ticket ansehen ›
+          Details ›
         </button>
       </div>
-      <div className="mt-3 grid gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(280px,1fr)]">
+      <div className={`mt-3 grid gap-4 ${mitKasse ? "lg:grid-cols-[minmax(0,1.4fr)_minmax(280px,1fr)]" : ""}`}>
         <div className="grid content-start gap-2.5">
-          <AbiTicket art="erstes" student={student} settings={settings} prozent={prozent} fuerEltern={fuerEltern} onClick={() => setAuf(true)} />
-          <AbiTicket art="weiteres" student={student} settings={settings} prozent={prozent} onClick={() => setAuf(true)} klein />
-          <p className="px-1 text-[11.5px] leading-relaxed text-tinte-leise">
-            {fuerEltern
-              ? "Der Helferzuschuss gilt nur für das 1. Ticket Ihres Kindes. Ihre Karten kosten den normalen Preis. Hat nichts mit dem Stufenbeitrag zu tun."
-              : "Mithilfe senkt nur dein eigenes 1. Ticket. Karten für Eltern und Gäste kosten den normalen Preis. Hat nichts mit dem Stufenbeitrag zu tun."}
-          </p>
+          {fuerEltern ? (
+            <>
+              {gaeste}
+              {eigenes}
+            </>
+          ) : (
+            <>
+              {eigenes}
+              {gaeste}
+            </>
+          )}
+          {!mitKasse && <Info>🎟️ Der Ticketverkauf ist noch nicht gestartet.</Info>}
         </div>
-        <TicketKasse student={student} settings={settings} prozent={prozent} fuerEltern={fuerEltern} />
+        {mitKasse && <TicketKasse student={student} settings={settings} prozent={prozent} fuerEltern={fuerEltern} />}
       </div>
 
-      <Sheet open={auf} onClose={() => setAuf(false)}>
-        <SheetKopf
-          titel={fuerEltern ? `Abiball-Ticket von ${student.vorname}` : "Dein Abiball-Ticket"}
-          unter="So setzt sich der Preis zusammen"
-          onClose={() => setAuf(false)}
-        />
-        <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-          <div className="grid content-start gap-2.5 sm:col-span-2">
-            <AbiTicket art="erstes" student={student} settings={settings} prozent={prozent} fuerEltern={fuerEltern} />
-          </div>
-          <TicketRechnung settings={settings} prozent={prozent} fuerEltern={fuerEltern} />
-          <div className="grid content-start gap-2.5">
-            <AbiTicket art="weiteres" student={student} settings={settings} prozent={prozent} klein />
-            <TicketKasse student={student} settings={settings} prozent={prozent} fuerEltern={fuerEltern} />
-          </div>
-        </div>
-      </Sheet>
+      {auf && <TicketAnsicht student={student} settings={settings} prozent={prozent} fuerEltern={fuerEltern} onClose={() => setAuf(false)} />}
     </section>
   );
 }
