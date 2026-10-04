@@ -84,3 +84,9 @@ update public.audit_log set details = '{}'::jsonb where details <> '{}'::jsonb;
 
 -- Prüfen: sollte jetzt deutlich weniger sein
 select aktion, count(*) from public.audit_log group by 1 order by 2 desc;
+
+-- 4) (eingespielt 04.10.2026) Protokoll nur lesen: App-Zugänge dürfen nichts
+--    schreiben, ändern oder leeren – geschrieben wird nur über audit_schreiben(),
+--    gelöscht nur nachts über aufraeumen(). DELETE blockt zusätzlich RLS.
+revoke insert, update, truncate, references, trigger on public.audit_log from anon, authenticated;
+revoke all on public.audit_log from anon;

@@ -1,4 +1,5 @@
 import { hasSupabase, supabase } from "./supabase";
+import { PERM_CATEGORIES, rolleName } from "./permissions";
 
 /**
  * Protokoll und Speicherstände.
@@ -42,6 +43,80 @@ export const BEREICHE: { key: string; label: string; icon: string }[] = [
   { key: "kasse", label: "Kasse", icon: "💰" },
   { key: "sicherung", label: "Sicherung", icon: "🗄️" },
 ];
+
+/**
+ * Jede Zeile gleich gebaut: wer/was betroffen ist (Name) und kurz, was
+ * passiert ist – Stichworte statt ganzer Sätze. Funktioniert auch für alte
+ * Einträge, die noch als Satz gespeichert sind.
+ */
+export function protokollKurz(z: Pick<LogZeile, "aktion" | "bereich" | "ziel_name" | "klartext" | "akteur_name">): {
+  name: string;
+  was: string;
+} {
+  const t = (z.klartext || "").trim();
+  const ziel = (z.ziel_name || "").trim();
+  // „Name: Rest“ → „Rest“
+  const ohneName = ziel && t.startsWith(`${ziel}: `) ? t.slice(ziel.length + 2) : t.replace(/^[^:„"]{2,60}: /, "");
+  const anf = (x: string) => (x.match(/[„"]([^“"]+)[“"]/) || [])[1] || "";
+  const betrag = (t.match(/(\d[\d.]*,\d{2} €)/) || [])[1] || "";
+  const rolle = (x: string) => x.replace(/\b([a-z_]+)\b/g, (r) => (/^(schueler|sprecher|stv_sprecher|stufenteam|kassenwart|admin|eltern)$/.test(r) ? rolleName(r) : r));
+  // erster Buchstabe groß, kein Satzpunkt
+  const kurz = (x: string) => {
+    const y = x.replace(/[.!]$/, "").trim();
+    return y.charAt(0).toUpperCase() + y.slice(1);
+  };
+  const recht = (k: string) => PERM_CATEGORIES.flatMap((c) => c.perms).find((p) => p.key === k)?.label || k;
+
+  switch (z.aktion) {
+    case "beitrag.geaendert":
+      return { name: ziel, was: kurz(ohneName.replace(/^Beitrag /, "")) };
+    case "einstellungen.geaendert":
+      return { name: "Einstellungen", was: t.replace(/^Einstellungen geändert: /, "") };
+    case "eltern.verknuepft":
+      return { name: ziel, was: `Elternzugang verknüpft${anf(t) ? ` · ${anf(t)}` : ""}` };
+    case "eltern.geloest":
+      return { name: ziel, was: `Elternzugang gelöst${anf(t) ? ` · ${anf(t)}` : ""}` };
+    case "kasse.gebucht":
+      return { name: ziel || "Kasse", was: `Buchung ${betrag}`.trim() };
+    case "kasse.geloescht":
+      return { name: ziel || "Kasse", was: `Buchung gelöscht ${betrag}`.trim() };
+    case "komitee.vorsitz":
+      return { name: ziel, was: `Vorsitz ${anf(t)}`.trim() };
+    case "komitee.vorsitz_weg":
+      return { name: ziel, was: `Vorsitz ${anf(t)} abgegeben`.replace("  ", " ") };
+    case "komitee.zugeteilt":
+      return { name: ziel, was: `Komitee ${anf(t)}`.trim() };
+    case "komitee.entfernt":
+      return { name: ziel, was: `Komitee ${anf(t)} verlassen`.replace("  ", " ") };
+    case "konto.erstellt": {
+      const r = (t.match(/Rolle: ([a-z_]+)/) || [])[1];
+      return { name: ziel || anf(t), was: `Zugang angelegt${r ? ` · ${rolleName(r)}` : ""}` };
+    }
+    case "konto.geloescht":
+      return { name: ziel || anf(t), was: "Zugang gelöscht" };
+    case "konto.verknuepft":
+      return { name: ziel, was: "Verknüpfung geändert" };
+    case "passwort.zurueckgesetzt":
+      return { name: ziel, was: "Passwort zurückgesetzt" };
+    case "passwort.geaendert":
+      return { name: ziel, was: "Passwort geändert" };
+    case "person.angelegt":
+      return { name: ziel || anf(t), was: "Person angelegt" };
+    case "mithilfe.geloescht":
+      return { name: ziel, was: `Mithilfe gelöscht · ${anf(t)}${(t.match(/ (\+\d+ %)/) || [])[1] ? ` ${(t.match(/ (\+\d+ %)/) || [])[1]}` : ""}` };
+    case "mithilfe.geaendert":
+      return { name: ziel, was: kurz(ohneName.replace(/^Mithilfe /, "Mithilfe: ")) };
+    case "rolle.geaendert":
+      return { name: ziel, was: rolle(ohneName) };
+    case "recht.geaendert":
+      return {
+        name: ziel ? rolle(ziel) : "Rechte",
+        was: kurz(ohneName.replace(/^Recht [„"]([^“"]+)[“"]/, (_m, k: string) => recht(k))),
+      };
+  }
+  // alles andere: Name vorne, Rest kurz
+  return { name: ziel || z.akteur_name || "System", was: kurz(ohneName) };
+}
 
 /** Wie viele Zeilen pro Nachladen. */
 export const SEITE = 60;
@@ -142,11 +217,14 @@ export async function speicherstandHerunterladen(s: Speicherstand): Promise<{ ok
 
 /** Das Protokoll als Tabelle für Excel/Numbers. */
 export function protokollAlsCsv(zeilen: LogZeile[]) {
-  const kopf = ["Zeitpunkt", "Bereich", "Aktion", "Wer", "Betrifft", "Was"];
+  const kopf = ["Zeitpunkt", "Name", "Was", "Von", "Bereich"];
   const zeile = (w: string[]) => w.map((x) => `"${String(x ?? "").replace(/"/g, '""')}"`).join(";");
   const text = [
     zeile(kopf),
-    ...zeilen.map((z) => zeile([zeitpunktDe(z.at), z.bereich, z.aktion, z.akteur_name, z.ziel_name, z.klartext])),
+    ...zeilen.map((z) => {
+      const k = protokollKurz(z);
+      return zeile([zeitpunktDe(z.at), k.name, k.was, z.akteur_name || "System", z.bereich]);
+    }),
   ].join("\r\n");
   // BOM, sonst zeigt Excel Umlaute als Kraut an.
   datei("﻿" + text, "text/csv;charset=utf-8", `stufenkasse-protokoll-${new Date().toISOString().slice(0, 10)}.csv`);

@@ -7,6 +7,7 @@ import {
   ladeSpeicherstaende,
   letzterAutomatischer,
   protokollAlsCsv,
+  protokollKurz,
   speicherstandHerunterladen,
   speicherstandJetzt,
   speicherstandUebernehmen,
@@ -320,14 +321,9 @@ export function ProtokollSheet({
             onChange={(e) => setSuche(e.target.value)}
           />
 
-          <div className="grid gap-1.5">
+          <div className="divide-y divide-black/[0.06] overflow-hidden rounded-2xl bg-[rgb(118_118_128/0.08)] dark:divide-white/[0.08] dark:bg-[rgb(118_118_128/0.18)]">
             {zeilen.map((z) => (
-              <div key={z.id} className="rounded-xl border border-papier-linie px-3 py-2.5 dark:border-slate-700">
-                <div className="text-[14px] font-semibold leading-snug">{z.klartext}</div>
-                <div className="mt-0.5 text-[11.5px] text-tinte-leise">
-                  {zeitpunktDe(z.at)} · {z.akteur_name || "System"}
-                </div>
-              </div>
+              <ProtokollZeile key={z.id} z={z} />
             ))}
           </div>
 
@@ -354,5 +350,28 @@ export function ProtokollSheet({
         Fertig
       </button>
     </Sheet>
+  );
+}
+
+/** Eine Zeile: Icon des Bereichs, Name, kurz was passiert ist – rechts wann, darunter von wem. */
+function ProtokollZeile({ z }: { z: LogZeile }) {
+  const { name, was } = protokollKurz(z);
+  const icon = BEREICHE.find((b) => b.key === z.bereich)?.icon ?? "•";
+  const d = new Date(z.at);
+  const wann = Number.isNaN(d.getTime())
+    ? ""
+    : d.toLocaleString("de-DE", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+  return (
+    <div className="flex items-start gap-3 px-3.5 py-2.5" title={z.klartext}>
+      <span aria-hidden className="mt-0.5 w-5 shrink-0 text-center text-[15px]">{icon}</span>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-baseline gap-2">
+          <span className="min-w-0 flex-1 truncate text-[14.5px] font-semibold">{name || "—"}</span>
+          <span className="zahl shrink-0 text-[11.5px] text-tinte-leise">{wann}</span>
+        </div>
+        <div className="truncate text-[13.5px] text-tinte-matt dark:text-slate-300">{was}</div>
+        <div className="truncate text-[11.5px] text-tinte-leise">von {z.akteur_name || "System"}</div>
+      </div>
+    </div>
   );
 }
