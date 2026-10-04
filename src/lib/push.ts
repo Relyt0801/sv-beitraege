@@ -138,6 +138,14 @@ export async function pushZuTermin(termin_id: string, title?: string, body?: str
   await sendePush({ termin_id, title, body, url: "./#events" });
 }
 
+/**
+ * Abi-Album: Kommentar, fremder Text, Freigabe. Text und Empfänger baut der
+ * Server selbst (Schüler dürfen sonst keine Schüler direkt benachrichtigen).
+ */
+export async function pushAlbum(a: { art: "kommentar"; kommentar_id: string } | { art: "text"; student_id: string } | { art: "freigabe"; an: string[] }): Promise<void> {
+  await sendePush({ album: a });
+}
+
 /** Push direkt an bestimmte Nutzer senden (via Edge Function). */
 export async function pushToUsers(
   user_ids: string[], title: string, body: string, url = "./", opt?: { auchSelbst?: boolean; art?: PushArt },

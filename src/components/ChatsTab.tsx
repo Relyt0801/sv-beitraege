@@ -209,14 +209,6 @@ export function ChatsTab() {
               <p className="px-4 py-3 text-[13px] text-tinte-leise">Gerade keine offenen Anfragen.</p>
               <MitteilungsZeile {...glocke("anfragen")} name="Anfragen" />
             </div>
-            {studentId && (
-              <button
-                onClick={() => setNachtragen(true)}
-                className="mt-2.5 w-full rounded-xl py-2 text-[13px] font-semibold text-brand"
-              >
-                🙌 Eigene Mithilfe nachtragen
-              </button>
-            )}
           </section>
         </>
       ) : (

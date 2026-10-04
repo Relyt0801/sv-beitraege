@@ -114,6 +114,8 @@ export const TOUR_WEG = () => {
     for (const k of ['sv:tour:v3:team', 'sv:tour:v3:schueler', 'sv:tour:v3:eltern']) localStorage.setItem(k, d);
     // Patch Notes nicht über die Prüfansichten legen
     localStorage.setItem('sv:patch:gesehen', '999');
+    // Einmaliger Hinweis auf den Nachtragen-Knopf
+    localStorage.setItem('sv:hinweis:nachtragen', '1');
   } catch { /* Rahmen ohne Speicher */ }
 };
 

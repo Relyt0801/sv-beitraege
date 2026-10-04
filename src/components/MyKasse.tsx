@@ -10,6 +10,7 @@ import { Sheet, SheetKopf } from "./Sheet";
 import { Icon } from "./Icon";
 import { useState } from "react";
 import { TicketBereich } from "./AbiTicket";
+import { AlbumKarte } from "./Album";
 
 /**
  * Die eigene Ansicht für alle, die nicht im Stufenteam sind.
@@ -19,6 +20,18 @@ import { TicketBereich } from "./AbiTicket";
  * Ticketpreis gleichwertig nebeneinander – man musste erst suchen, worum es
  * geht.
  */
+/** Abschnittstitel mit kleinem farbigen Zeichen – damit nicht alles gleich grau aussieht. */
+function Titel({ zeichen, farbe, children }: { zeichen: string; farbe: string; children: string }) {
+  return (
+    <h2 className="flex items-center gap-2 text-[15px] font-semibold">
+      <span aria-hidden className={`flex h-7 w-7 items-center justify-center rounded-[9px] text-[14px] ${farbe}`}>
+        {zeichen}
+      </span>
+      {children}
+    </h2>
+  );
+}
+
 export function MyKasse({
   student,
   settings,
@@ -89,10 +102,13 @@ export function MyKasse({
         <KontoTab personen={[student]} du />
       </Sheet>
 
+      {/* ------------------------------------------ Abi-Album (nur mit Recht) */}
+      <AlbumKarte className="lg:col-span-2" />
+
       {/* ------------------------------------------ Halbjahre mit Preis */}
       <section className="card p-4 sm:p-5 lg:col-span-2">
-        <div className="flex items-baseline justify-between">
-          <h2 className="text-[15px] font-semibold">Deine Halbjahre</h2>
+        <div className="flex items-center justify-between gap-2">
+          <Titel zeichen="🗓️" farbe="bg-[#0A84FF]/15">Deine Halbjahre</Titel>
           <span className="text-[12px] text-tinte-leise">
             EF je {beitragFuer("EF.1", settings)} €, Q1/Q2 je {beitragFuer("Q1.1", settings)} €
           </span>
@@ -120,7 +136,7 @@ export function MyKasse({
 
       {/* ------------------------------------------ Prozentstand */}
       <section className="card p-4 sm:p-5" data-tour="meine-punkte">
-        <h2 className="text-[15px] font-semibold">Mithilfe bei Aktionen</h2>
+        <Titel zeichen="🙌" farbe="bg-[#30D158]/20">Mithilfe bei Aktionen</Titel>
 
         <div className="mt-3 flex items-center gap-4">
           <StaffelRing pct={pct} settings={settings} />
@@ -148,7 +164,7 @@ export function MyKasse({
 
       {/* ------------------------------------------ meine Beiträge */}
       <section className="card p-4 sm:p-5">
-        <h2 className="text-[15px] font-semibold">Wobei du geholfen hast</h2>
+        <Titel zeichen="📋" farbe="bg-[#FF9F0A]/20">Wobei du geholfen hast</Titel>
         <BeitragsListe
           eintraege={meine}
           leerText="Noch nichts eingetragen. Wenn du mithilfst, trägt das Stufenteam es hier ein."

@@ -75,6 +75,8 @@ export default {
           "\"Segoe UI Variable Text\"", "\"Segoe UI\"", "Roboto", "\"Helvetica Neue\"", "Arial", "sans-serif",
         ],
         // Fuer Betraege und grosse Titel: SF Pro Display mit gleich breiten Ziffern.
+        // Abi-Album: Zitate und freie Texte wie gedruckt
+        buch: ["\"Iowan Old Style\"", "\"New York\"", "Charter", "Georgia", "serif"],
         zahl: [
           "-apple-system", "BlinkMacSystemFont", "\"SF Pro Display\"", "system-ui",
           "\"Segoe UI Variable Display\"", "\"Segoe UI\"", "Roboto", "\"Helvetica Neue\"", "Arial", "sans-serif",
@@ -103,6 +105,7 @@ export default {
         aufsteigen: { "0%": { transform: "translateY(8px)", opacity: "0" }, "100%": { transform: "translateY(0)", opacity: "1" } },
         vonRechts: { "0%": { transform: "translateX(28px)", opacity: "0" }, "100%": { transform: "translateX(0)", opacity: "1" } },
         vonLinks: { "0%": { transform: "translateX(-28px)", opacity: "0" }, "100%": { transform: "translateX(0)", opacity: "1" } },
+        herz: { "0%": { transform: "scale(1)" }, "35%": { transform: "scale(1.35)" }, "70%": { transform: "scale(.92)" }, "100%": { transform: "scale(1)" } },
         puls: { "0%,100%": { boxShadow: "0 0 0 0 rgb(var(--brand) / .45)" }, "50%": { boxShadow: "0 0 0 8px rgb(var(--brand) / 0)" } },
       },
       animation: {
@@ -110,6 +113,7 @@ export default {
         popIn: "popIn .28s cubic-bezier(.32,.72,0,1)",
         fadeIn: "fadeIn .2s ease",
         aufsteigen: "aufsteigen .32s cubic-bezier(.32,.72,0,1) backwards",
+        herz: "herz .45s cubic-bezier(.32,.72,0,1)",
         puls: "puls 1.8s ease-in-out infinite",
         vonRechts: "vonRechts .28s cubic-bezier(.32,.72,0,1)",
         vonLinks: "vonLinks .28s cubic-bezier(.32,.72,0,1)",

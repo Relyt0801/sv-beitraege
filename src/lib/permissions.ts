@@ -17,7 +17,12 @@ export type PermKey =
   | "finanzen.view"
   | "finanzen.manage"
   | "roles.manage"
-  | "perms.manage";
+  | "perms.manage"
+  | "album.nutzen"
+  | "album.kategorien"
+  | "album.moderieren"
+  | "umfragen.verwalten"
+  | "umfragen.ergebnisse";
 
 /** eltern: Das Recht lässt sich auch Elternzugängen geben (eigene Schaltfläche im Rechte-Reiter). */
 export interface PermDef { key: PermKey; label: string; desc: string; eltern?: boolean }
@@ -66,6 +71,19 @@ export const PERM_CATEGORIES: PermCategory[] = [
     label: "Termine", icon: "📅", perms: [
       { key: "termine.manage", label: "Termine verwalten", desc: "Termine anlegen, ändern, löschen und festlegen, wer sie sehen darf." },
       { key: "kalender.test", label: "Kalender-Verbindung (Testphase)", desc: "Stufen-Termine als Abo ins Handy holen und den eigenen Handy-Kalender in der App anzeigen. Noch im Test – nur einzelnen Personen geben." },
+    ],
+  },
+  {
+    label: "Abi-Album", icon: "📖", perms: [
+      { key: "album.nutzen", label: "Abi-Album nutzen", desc: "Eigenen Steckbrief ausfüllen, die anderen ansehen, kommentieren und liken." },
+      { key: "album.kategorien", label: "Steckbrief-Kategorien", desc: "Die Stammdaten-Felder festlegen (z. B. Nach dem Abi, Lieblingslied)." },
+      { key: "album.moderieren", label: "Album moderieren", desc: "Kommentare und Texte anderer entfernen." },
+    ],
+  },
+  {
+    label: "Umfragen", icon: "📊", perms: [
+      { key: "umfragen.verwalten", label: "Umfragen verwalten", desc: "Pop-up-Umfragen anlegen, starten und beenden. Sie erscheinen beim nächsten Öffnen der App." },
+      { key: "umfragen.ergebnisse", label: "Ergebnisse sehen", desc: "Gezählte Ergebnisse ansehen – auch während eine Umfrage läuft. Einzelne Antworten sieht niemand." },
     ],
   },
   {

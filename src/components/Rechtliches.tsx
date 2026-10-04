@@ -132,6 +132,16 @@ function Datenschutz() {
         und das Stufenteam bzw. wer die Kasse führt. Bankdaten der Zahlenden werden nicht gespeichert.
       </P>
       <P>
+        <b>Abi-Album:</b> Wer mitmacht, speichert im eigenen Steckbrief die Felder, die das Stufenteam festlegt (z. B.
+        „Nach dem Abi“, Lieblingslied), einen freien Text, wer den Text geschrieben hat, und wen man dafür freigibt.
+        Dazu Kommentare (mit Namen) und „Gefällt mir“. Das sehen alle, die das Album nutzen dürfen – keine Eltern.
+        Gelöschte Kommentare werden geleert. Stammdaten kann nur die Person selbst ändern.
+      </P>
+      <P>
+        <b>Umfragen:</b> Deine Antworten und ob du fertig bist. Ausgewertet wird nur gezählt – einzelne Antworten
+        sieht niemand, auch nicht das Stufenteam. Freitext-Antworten erscheinen in der Auswertung ohne Namen.
+      </P>
+      <P>
         <b>Ob du gerade in der App bist:</b> Solange die App offen und sichtbar ist, meldet sie das alle 30 Sekunden
         kurz an den Server. Gespeichert wird nur ein Zeitpunkt, der nach knapp einer Minute abläuft und dann
         überschrieben wird – damit du keine Pop-ups bekommst, während du ohnehin in der App bist. Niemand sonst
@@ -200,7 +210,8 @@ function Datenschutz() {
         Speicherstand der Nacht wird 30 Tage aufbewahrt, Sicherheitskopien vor einem Zurücksetzen 90 Tage. Das
         Protokoll wird nach zwei Jahren automatisch gelöscht. Wer die Stufe verlässt, kann seinen Zugang beim
         Stufenteam löschen lassen. Ticketbestellungen bleiben bis nach dem Abiball (für die Abrechnung) und werden
-        danach mit den übrigen Daten gelöscht.
+        danach mit den übrigen Daten gelöscht. Abi-Album und Umfragen bleiben bis zum Druck der Abizeitung bzw.
+        bis das Stufenteam sie löscht.
       </P>
       <P>
         Zusätzlich kann der Admin festlegen, dass <b>Chat-Nachrichten samt Reaktionen</b>, erledigte Gespräche und

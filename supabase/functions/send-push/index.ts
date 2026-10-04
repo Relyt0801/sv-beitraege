@@ -43,8 +43,10 @@ Deno.serve(async (req) => {
       return json({ passt });
     }
 
-    const { probe, auch_selbst, ohne_eltern, event_id, termin_id, an_team, user_ids, chat_item_id, angepinnt, an_personen, eltern_info_id, art, title: directTitle, body: directBody, url: wunschUrl } = koerper as {
+    const { probe, auch_selbst, ohne_eltern, event_id, termin_id, an_team, user_ids, chat_item_id, angepinnt, an_personen, eltern_info_id, album, art, title: directTitle, body: directBody, url: wunschUrl } = koerper as {
       probe?: boolean;
+      /** Abi-Album: Kommentar, fremder Text oder Freigabe – Text und Empfänger rechnet der Server aus. */
+      album?: { art?: string; student_id?: string; kommentar_id?: string; an?: string[] };
       /** Kategorie für die Mitteilungs-Schalter des Teams: "anfrage" | "eltern" */
       art?: string;
       /** Bestätigung an sich selbst (z. B. sich selbst in eine Schicht eingeteilt). */
@@ -173,7 +175,53 @@ Deno.serve(async (req) => {
       verwaltet = Boolean((up && up.length) || (rp && rp.length));
     }
 
-    if (Array.isArray(user_ids) && user_ids.length) {
+    if (album && typeof album === "object") {
+      // Abi-Album: Schüler dürfen sonst keine anderen Schüler benachrichtigen.
+      // Deshalb nimmt der Server hier keinen Text an, sondern prüft, dass der
+      // Absender das Ereignis gerade selbst ausgelöst hat, und baut die
+      // Meldung selbst.
+      // Älter als 10 Minuten = kein frisches Ereignis
+      const alt = (t: unknown) => !t || Date.parse(String(t)) < Date.now() - 10 * 60_000;
+      const { data: meinP } = await supabase.from("profiles").select("student_id").eq("user_id", selbst).maybeSingle();
+      const meinSid = (meinP?.student_id as string | null) || null;
+      const besitzer = async (sids: string[]) => {
+        if (!sids.length) return [] as string[];
+        const { data } = await supabase.from("profiles").select("user_id").in("student_id", sids).neq("role", "eltern");
+        return (data || []).map((x: { user_id: string }) => x.user_id);
+      };
+      if (album.art === "kommentar") {
+        const { data: k } = await supabase.from("album_kommentare")
+          .select("id, student_id, user_id, autor_name, text, created_at, geloescht").eq("id", String(album.kommentar_id || "")).maybeSingle();
+        if (!k || k.user_id !== selbst || k.geloescht || alt(k.created_at)) return json({ error: "nicht erlaubt" }, 403);
+        userIds = await besitzer([k.student_id]);
+        title = "💬 Neuer Kommentar";
+        body = kurz(`${k.autor_name}: ${k.text}`, 200);
+      } else if (album.art === "text") {
+        const { data: sb } = await supabase.from("album_steckbriefe")
+          .select("student_id, freigabe, freigabe_an, text_von_name, text_at").eq("student_id", String(album.student_id || "")).maybeSingle();
+        const darf = sb && meinSid && sb.student_id !== meinSid && !alt(sb.text_at) &&
+          (sb.freigabe === "alle" || (sb.freigabe === "gezielt" && (sb.freigabe_an || []).includes(meinSid)));
+        if (!darf) return json({ error: "nicht erlaubt" }, 403);
+        userIds = await besitzer([sb.student_id]);
+        title = "📖 Dein Steckbrief";
+        body = kurz(`${sb.text_von_name || "Jemand"} hat deinen Text geschrieben.`, 200);
+      } else if (album.art === "freigabe") {
+        if (!meinSid) return json({ error: "nicht erlaubt" }, 403);
+        const { data: sb } = await supabase.from("album_steckbriefe")
+          .select("freigabe, freigabe_an, updated_at").eq("student_id", meinSid).maybeSingle();
+        if (!sb || sb.freigabe !== "gezielt" || alt(sb.updated_at)) return json({ error: "nicht erlaubt" }, 403);
+        const an = (Array.isArray(album.an) ? album.an.map(String) : []).filter((x) => (sb.freigabe_an || []).includes(x)).slice(0, 50);
+        userIds = await besitzer(an);
+        const { data: st } = await supabase.from("students").select("vorname, nachname").eq("id", meinSid).maybeSingle();
+        const name = st ? `${st.vorname} ${String(st.nachname || "").slice(0, 1)}.` : "Jemand";
+        title = "📖 Steckbrief freigegeben";
+        body = `${name} möchte, dass du den Text für den Steckbrief schreibst.`;
+      } else {
+        return json({ error: "unbekannt" }, 400);
+      }
+      ziel = "./#album";
+      pushTag = `album-${album.art}`;
+    } else if (Array.isArray(user_ids) && user_ids.length) {
       // Direkt-Modus (z. B. Themen-Benachrichtigungen, Schicht-Zuteilung).
       // Wer nichts verwaltet (Schüler, Eltern), darf so nur das Team und die
       // Finanzverwaltung erreichen – vorher konnte jedes Konto beliebigen

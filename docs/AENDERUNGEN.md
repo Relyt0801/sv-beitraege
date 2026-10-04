@@ -12,6 +12,34 @@ ausführlich (auf Deutsch); hier steht der Überblick dazu.
 ---
 
 
+## 04.10.2026: Abi-Album, Pop-up-Umfragen, Nachtragen oben
+
+- **Abi-Album** (`lib/album.ts`, `components/Album.tsx`, SQL `supabase/abi-album.sql`):
+  Karte „Dein Steckbrief“ im Profil (Kasse-Ansicht). Stammdaten-Felder legt das
+  Team fest (Profil → Steckbrief-Kategorien); ausfüllen kann sie **nur die
+  Person selbst** (RPC `album_stammdaten_speichern`). Den freien Text schreibt
+  man selbst oder gibt ihn frei – für alle oder gezielt (`album_freigabe_setzen`,
+  `album_text_schreiben` prüft die Freigabe). Kommentare und Likes wie bei
+  Instagram, auch auf Kommentare. Mitschüler dürfen `students` nicht lesen –
+  Namen kommen über `album_personen()`, der Verfassername wird beim Schreiben
+  festgehalten. Kein Löschen über die API: Likes werden umgeschaltet (`an`),
+  Kommentare ausgeblendet und geleert (`album_kommentar_entfernen`).
+- **Pop-up-Umfragen** (`lib/umfragen.ts`, `components/Umfragen.tsx`): Profil →
+  Umfragen. Vorlagen „Schülerranking“, „Welche Rankings?“, „Steckbrief-
+  Kategorien“. Fragetypen: eine/mehrere Antworten, Freitext, Person, Skala.
+  Läuft eine Umfrage, erscheint sie beim nächsten Öffnen (nach Einführung und
+  Patch Notes); Pflicht-Umfragen ohne „Später“. Jede Antwort wird sofort
+  gespeichert, beim nächsten Öffnen geht es an derselben Stelle weiter.
+  Ergebnis nur gezählt über `umfrage_ergebnis()`.
+- **Rechte** (alle neu, Standard nur Admin): `album.nutzen`,
+  `album.kategorien`, `album.moderieren`, `umfragen.verwalten`,
+  `umfragen.ergebnisse`. Zum Freischalten im Rechte-Reiter der Rolle geben.
+- **Nachtragen**: grüner Knopf oben neben dem Profilbild, einmaliger Hinweis
+  beim nächsten Öffnen (`sv:hinweis:nachtragen`). Der Knopf unten in den
+  Chats ist weg.
+- Profil: Abschnittstitel mit farbigem Zeichen. Demo: Album für alle außer
+  Eltern freigeschaltet (nur ohne Datenbank).
+
 ## 04.10.2026: Wischen, Chats, Buchungen nach Monaten, Prüfrunde
 
 - Kalender (Monat/Woche/Tag) und Wochenleiste: waagerecht wischen blättert

@@ -45,6 +45,9 @@ import { Icon, type IconName } from "./components/Icon";
 import { InstallKarte, InstallOverlay } from "./components/InstallHinweis";
 import { useGescrollt, useHoeheAlsVariable, useReiter } from "./lib/gescrollt";
 import { Schalter } from "./components/Schalter";
+import { AlbumProvider } from "./components/Album";
+import { UmfragePopup } from "./components/Umfragen";
+import { NachtragSheet } from "./components/NachtragSheet";
 
 import { frage, melde, meldeFehler } from "./lib/melder";
 export default function App() {
@@ -80,6 +83,7 @@ function NachRolle() {
         <ElternProvider>
           <ElternApp />
           <InstallOverlay />
+          <UmfragePopup bereitZumZeigen />
         </ElternProvider>
       </ProfilesProvider>
     );
@@ -90,7 +94,9 @@ function NachRolle() {
         <TermineProvider>
           <TopicsProvider>
             <ElternProvider>
-              <Main />
+              <AlbumProvider>
+                <Main />
+              </AlbumProvider>
             </ElternProvider>
           </TopicsProvider>
         </TermineProvider>
@@ -110,6 +116,8 @@ function tabAusAdresse(entfernen = true): Tab | null {
   if (t && entfernen) history.replaceState(null, "", window.location.pathname + window.location.search);
   return t;
 }
+
+const NACHTRAG_HINWEIS = "sv:hinweis:nachtragen";
 
 /** Wie viele Personenzeilen auf einmal dazukommen. */
 const SCHRITT_LISTE = 40;
@@ -221,6 +229,10 @@ function Main() {
   const [showAdd, setShowAdd] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showTour, setShowTour] = useState(false);
+  // Mithilfe nachtragen: Knopf oben neben dem Profil, einmal mit Hinweis
+  const [nachtragOffen, setNachtragOffen] = useState(false);
+  const [nachtragHinweis, setNachtragHinweis] = useState(false);
+  const [umfrageSichtbar, setUmfrageSichtbar] = useState(false);
   // Patch Notes: einmal je Version, nicht während der Einführung
   const [showPatch, setShowPatch] = useState(false);
   // Patch Notes nach dem Öffnen – wenn diese Version noch nicht gesehen wurde.
@@ -238,6 +250,18 @@ function Main() {
     const t = setTimeout(() => setShowPatch(true), 1200);
     return () => clearTimeout(t);
   }, [roleReady, ready, showTour]);
+
+  // Einmaliger Hinweis auf den Nachtragen-Knopf – erst, wenn nichts anderes offen ist
+  useEffect(() => {
+    if (!roleReady || !ready || !studentId || showTour || showPatch || umfrageSichtbar) return;
+    try {
+      if (localStorage.getItem(NACHTRAG_HINWEIS)) return;
+    } catch {
+      return;
+    }
+    const t = setTimeout(() => setNachtragHinweis(true), 1600);
+    return () => clearTimeout(t);
+  }, [roleReady, ready, studentId, showTour, showPatch, umfrageSichtbar]);
 
   const gescrollt = useGescrollt(4);
   // Kopf und Tab-Leiste messen: danach richten sich Chat-Eingabe,
@@ -433,6 +457,18 @@ function Main() {
             <button className="iconbtn" onClick={toggle} aria-label={theme === "dark" ? "Helles Design" : "Dunkles Design"} title="Hell/Dunkel">
               <Icon name={theme === "dark" ? "sonne" : "mond"} size={19} />
             </button>
+            {studentId && (
+              <button
+                data-tour="nachtragen"
+                onClick={() => setNachtragOffen(true)}
+                className="flex h-10 items-center gap-1 rounded-full bg-gradient-to-br from-[#34C759] to-[#0FA968] px-3 text-[13px] font-semibold text-white shadow-[0_4px_12px_-4px_rgba(16,169,104,.7)] transition active:scale-90"
+                aria-label="Mithilfe nachtragen"
+                title="Mithilfe nachtragen"
+              >
+                <span aria-hidden className="text-[15px] leading-none">🙌</span>
+                <span className="hidden min-[380px]:inline">Nachtragen</span>
+              </button>
+            )}
             <button
               data-tour="profil"
               onClick={() => setShowSettings(true)}
@@ -821,6 +857,27 @@ function Main() {
       {!showTour && !showPatch && <InstallOverlay />}
       {/* Schicht vorbei: Stufenteam vergibt die Beitragspunkte mit einem Tipp */}
       {!showTour && !showPatch && <SchichtAbschluss />}
+      <NachtragSheet open={nachtragOffen} onClose={() => setNachtragOffen(false)} />
+      {/* Pop-up-Umfragen: nach Einführung und Patch Notes, vor allem anderen */}
+      <UmfragePopup bereitZumZeigen={roleReady && ready && !showTour && !showPatch} onSichtbar={setUmfrageSichtbar} />
+      <Tour
+        open={nachtragHinweis}
+        steps={[
+          {
+            anchor: "nachtragen",
+            title: "Neu: Mithilfe nachtragen",
+            text: "Bei einer Aktion geholfen, aber es wurde nicht eingetragen? Hier oben beantragst du es – das Stufenteam bestätigt.",
+          },
+        ]}
+        onClose={() => {
+          setNachtragHinweis(false);
+          try {
+            localStorage.setItem(NACHTRAG_HINWEIS, "1");
+          } catch {
+            /* privater Modus */
+          }
+        }}
+      />
       {showPatch && !showTour && (
         <PatchNotes
           team={isStaff}
