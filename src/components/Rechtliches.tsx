@@ -145,8 +145,9 @@ function Datenschutz() {
         gezählte Top 3, nie wer wen gewählt hat. Die Lehrerliste enthält Namen und Fächer von Lehrkräften.
       </P>
       <P>
-        <b>Spotify:</b> Ein Spotify-Player im Steckbrief lädt erst, wenn du auf „Auf Spotify abspielen“ tippst.
-        Erst dann werden Daten (u. a. deine IP-Adresse) an Spotify übertragen.
+        <b>Spotify:</b> Steht im Steckbrief ein Spotify-Link, holt unser Server einmal Titel, Künstler und Cover von
+        Spotify und speichert sie bei uns – beim Ansehen geht dadurch nichts an Spotify. Erst wenn du auf
+        „Abspielen“ oder „In Spotify öffnen“ tippst, verbindet sich dein Gerät mit Spotify (u. a. deine IP-Adresse).
       </P>
       <P>
         <b>Umfragen:</b> Deine Antworten und ob du fertig bist. Ausgewertet wird nur gezählt – einzelne Antworten

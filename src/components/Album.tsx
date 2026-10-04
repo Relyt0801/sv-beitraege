@@ -16,7 +16,7 @@ import {
 } from "../lib/album";
 import { frage, melde, meldeFehler } from "../lib/melder";
 import { useFunktionen } from "../lib/funktionen";
-import { SpotifyKnopf, ohneLink, spotifyAus } from "./Spotify";
+import { SpotifyKarte, ohneLink, spotifyAus } from "./Spotify";
 import { AusHinweis } from "./Funktionen";
 
 /* ====================================================================== */
@@ -346,6 +346,7 @@ function SteckbriefAnsicht({
   onClose: () => void;
 }) {
   const { studentId, can } = useRole();
+  const { an } = useFunktionen();
   const p = album.personen.find((x) => x.id === id);
   const s: Steckbrief | undefined = album.steckbriefVon(id);
   const ich = studentId === id;
@@ -413,10 +414,17 @@ function SteckbriefAnsicht({
               }`}
             >
               <div className="text-[11px] font-semibold uppercase tracking-[0.06em] text-tinte-leise">{k.titel}</div>
-              <div className="mt-0.5 text-[15px] font-medium leading-snug">
-                {spotifyAus(s!.stammdaten[k.id]) ? ohneLink(s!.stammdaten[k.id]) || "Lied auf Spotify" : s!.stammdaten[k.id]}
-              </div>
-              <SpotifyKnopf wert={s!.stammdaten[k.id]} />
+              {spotifyAus(s!.stammdaten[k.id]) ? (
+                <>
+                  {/* Mit Spotify-Funktion: Karte statt Link; sonst nur der Text ohne Link */}
+                  {(!an.spotify || ohneLink(s!.stammdaten[k.id])) && (
+                    <div className="mt-0.5 text-[15px] font-medium leading-snug">{ohneLink(s!.stammdaten[k.id]) || "Lied auf Spotify"}</div>
+                  )}
+                  <SpotifyKarte wert={s!.stammdaten[k.id]} fallbackTitel={ohneLink(s!.stammdaten[k.id])} />
+                </>
+              ) : (
+                <div className="mt-0.5 text-[15px] font-medium leading-snug">{s!.stammdaten[k.id]}</div>
+              )}
             </div>
           ))}
         </div>
@@ -570,6 +578,7 @@ function TextFeld({ wert, setzen, platzhalter }: { wert: string; setzen: (v: str
 
 /* ---------------------------------------------------------------- Mein Steckbrief */
 function MeinSteckbrief({ album, vorschau }: { album: Album; vorschau: () => void }) {
+  const spotifyAn = useFunktionen().an.spotify;
   const { studentId } = useRole();
   const s = studentId ? album.steckbriefVon(studentId) : undefined;
   const kat = album.kategorien.filter((k) => k.aktiv);
@@ -634,11 +643,12 @@ function MeinSteckbrief({ album, vorschau }: { album: Album; vorschau: () => voi
               onChange={(e) => setDaten((d) => ({ ...d, [k.id]: e.target.value }))}
               className="mt-0.5 block w-full bg-transparent text-[15px] outline-none placeholder:text-tinte-leise/70"
             />
-            {/lied|song|musik/i.test(k.titel) && (
+            {spotifyAn && /lied|song|musik/i.test(k.titel) && (
               <span className="mt-1 block text-[11.5px] leading-snug text-tinte-leise">
-                {spotifyAus(daten[k.id] || "") ? "✓ Spotify-Link erkannt – im Steckbrief gibt es einen Abspielknopf." : "Tipp: Spotify-Link einfügen (Teilen → Link kopieren), dann kann man es im Steckbrief abspielen."}
+                {spotifyAus(daten[k.id] || "") ? "✓ Spotify-Link erkannt – so sieht es im Steckbrief aus:" : "Tipp: In Spotify beim Lied auf Teilen → Link kopieren und hier einfügen. Dann gibt es im Steckbrief Cover und Hörprobe."}
               </span>
             )}
+            {spotifyAus(daten[k.id] || "") && <SpotifyKarte wert={daten[k.id]} fallbackTitel={ohneLink(daten[k.id])} />}
           </label>
         ))}
         {kat.length === 0 && <p className="px-4 py-3 text-[13px] text-tinte-leise">Das Team hat noch keine Kategorien angelegt.</p>}

@@ -329,6 +329,13 @@ export function ZahnradKnopf({ label, onClick }: { label: string; onClick: () =>
   );
 }
 
+/** Für Profil → Funktionen: Kategorien und Lehrerliste ohne das Ranking-Blatt */
+export function RankingVerwaltungSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { uid } = useRole();
+  const r = useRankings(open, uid);
+  return <RankingVerwaltung open={open} onClose={onClose} r={r} />;
+}
+
 function RankingVerwaltung({ open, onClose, r }: { open: boolean; onClose: () => void; r: Rankings }) {
   const { can } = useRole();
   const [teil, setTeil] = useState<"kategorien" | "lehrer">(can("rankings.verwalten") ? "kategorien" : "lehrer");

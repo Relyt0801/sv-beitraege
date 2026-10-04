@@ -12,6 +12,23 @@ ausführlich (auf Deutsch); hier steht der Überblick dazu.
 ---
 
 
+## 05.10.2026: Sichtbarkeit für alle, Funktionen-Zentrale, Spotify-Karte
+
+- **Warum andere nichts sahen:** Album, Zitate und Rankings brauchen neben
+  dem Funktionen-Schalter das Recht „… nutzen“, und das hatte nur der Admin.
+  Jetzt (Datenbank, sofort wirksam) dürfen alle Schüler und das Team sie
+  nutzen; sichtbar wird es erst über den Schalter. Verwalten bleibt Admin.
+- **Profil → Funktionen** ist die Zentrale: je Bereich der An/Aus-Schalter,
+  „Nutzen dürfen: …“ mit Schnell-Schalter (alle Schüler + Team) und Knöpfe
+  zu den Einstellungen – Steckbrief-Kategorien, Lehrerliste,
+  Ranking-Kategorien, Umfragen.
+- **Spotify** (`components/Spotify.tsx`, Edge Function `spotify-info`, Tabelle
+  `spotify_titel`, SQL `supabase/spotify.sql`): Karte mit Cover, Titel,
+  Künstler und 30-Sekunden-Hörprobe (eigener Player mit Fortschrittsring),
+  „Ganzes Lied in Spotify“ öffnet Spotify (mit Konto ganzes Lied). Infos holt
+  der Server, gespeichert 30 Tage. Eigener Funktionen-Schalter „Spotify im
+  Steckbrief“ (Standard an). Vorschau schon beim Ausfüllen.
+
 ## 04.10.2026: Abi-Rankings, Lehrerliste, Übernehmen aus Umfragen, iOS-Leiste
 
 - **Abi-Rankings** (`lib/rankings.ts`, `components/Rankings.tsx`, SQL

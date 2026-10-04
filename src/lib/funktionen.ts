@@ -12,17 +12,18 @@ import { useRole } from "../auth/RoleProvider";
  * Ausgeschaltetes sieht nur, wer die Funktionen verwaltet – mit Hinweis –,
  * damit man vorbereiten kann, bevor alle es sehen.
  */
-export type FunktionKey = "abiball" | "album" | "zitate" | "rankings" | "umfragen";
+export type FunktionKey = "abiball" | "album" | "zitate" | "rankings" | "umfragen" | "spotify";
 
 export const FUNKTIONEN: { key: FunktionKey; titel: string; zeichen: string; text: string }[] = [
   { key: "abiball", titel: "Abiball-Tickets", zeichen: "🎟️", text: "Ticket-Bereich bei Schülern und Eltern." },
   { key: "album", titel: "Abi-Album", zeichen: "📖", text: "Steckbriefe mit Kommentaren und Likes." },
   { key: "zitate", titel: "Zitatwand", zeichen: "💬", text: "Zitate von Lehrern und Mitschülern sammeln und abstimmen." },
   { key: "rankings", titel: "Abi-Rankings", zeichen: "🏆", text: "Schüler- und Lehrer-Rankings mit Top 3." },
+  { key: "spotify", titel: "Spotify im Steckbrief", zeichen: "🎵", text: "Lieder aus Spotify-Links mit Cover und 30-Sekunden-Hörprobe." },
   { key: "umfragen", titel: "Pop-up-Umfragen", zeichen: "📊", text: "Umfragen, die beim Öffnen der App erscheinen." },
 ];
 
-const STANDARD: Record<FunktionKey, boolean> = { abiball: true, album: false, zitate: false, rankings: false, umfragen: true };
+const STANDARD: Record<FunktionKey, boolean> = { abiball: true, album: false, zitate: false, rankings: false, umfragen: true, spotify: true };
 const DEMO = "sv-funktionen-demo";
 
 interface Ctx {

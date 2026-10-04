@@ -166,12 +166,16 @@ export function rollenDerZeile(key: string): string[] {
 // Standard-Rechte je Rolle (Fallback im Client, Seeds in permissions.sql identisch)
 const TEAM_STANDARD: PermKey[] = ["chats.view_all", "chats.delete_messages", "chats.delete_items", "chats.manage", "komitees.assign", "data.edit", "hilfen.edit", "termine.manage", "mod.timeout", "finanzen.basis", "finanzen.view"];
 
+// Abizeitung nutzen: alle Schüler und das Team (sichtbar erst, wenn die
+// Funktion im Profil eingeschaltet ist). Verwalten bleibt beim Admin.
+const ABIZEITUNG: PermKey[] = ["album.nutzen", "zitate.nutzen", "rankings.nutzen"];
+
 export const ROLE_DEFAULTS: Record<string, PermKey[]> = {
-  schueler: ["finanzen.basis"],
+  schueler: ["finanzen.basis", ...ABIZEITUNG],
   eltern: ["finanzen.basis"], // Elternzugang: nur die Standard-Ansicht der Finanzen
-  sprecher: [...TEAM_STANDARD],
-  stv_sprecher: [...TEAM_STANDARD],
-  stufenteam: [...TEAM_STANDARD],
-  kassenwart: [...TEAM_STANDARD, "kasse.edit", "beitraege.manage", "finanzen.manage"],
+  sprecher: [...TEAM_STANDARD, ...ABIZEITUNG],
+  stv_sprecher: [...TEAM_STANDARD, ...ABIZEITUNG],
+  stufenteam: [...TEAM_STANDARD, ...ABIZEITUNG],
+  kassenwart: [...TEAM_STANDARD, "kasse.edit", "beitraege.manage", "finanzen.manage", ...ABIZEITUNG],
   admin: [...ALL_PERMS],
 };

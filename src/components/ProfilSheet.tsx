@@ -16,7 +16,7 @@ import { useTheme } from "../lib/theme";
 import { abmelden, enablePush, pushConfigured, pushDiagnose, pushPermission } from "../lib/push";
 import { ProtokollSheet } from "./ProtokollSheet";
 import { RechtLinks } from "./Rechtliches";
-import { FunktionenSheet } from "./Funktionen";
+import { FunktionenSheet } from "./FunktionenSheet";
 
 import { frage, melde, meldeFehler } from "../lib/melder";
 /** Das eigene Profil: Bild, Namensfarbe, Passwort, Komitee-Wechsel, Hilfe. */
