@@ -12,6 +12,34 @@ ausführlich (auf Deutsch); hier steht der Überblick dazu.
 ---
 
 
+## 04.10.2026: Abi-Rankings, Lehrerliste, Übernehmen aus Umfragen, iOS-Leiste
+
+- **Abi-Rankings** (`lib/rankings.ts`, `components/Rankings.tsx`, SQL
+  `supabase/rankings-lehrer.sql`): Karte im Profil, Blatt mit zwei Spalten
+  Schüler | Lehrer, je Kategorie die Top 3 (Treppchen), aktualisiert sich
+  alle 15 s. Stimmen geheim (nur gezählt über `ranking_stand()`), änderbar,
+  „weiß nicht“ möglich. Funktion „rankings“, Rechte `rankings.nutzen`,
+  `rankings.verwalten`.
+- **Pflicht über Umfragen**: Umfrage-Schalter „Abi-Rankings abfragen“
+  (`umfragen.mit_rankings`) bzw. Vorlage „Rankings ausfüllen“ – jede aktive
+  Kategorie wird ein Schritt im Pop-up; die Stimme landet direkt im Ranking.
+- **Übernehmen aus Ergebnissen**: bei Auswahl- und Freitextfragen
+  „Übernehmen als Ranking / Steckbrief-Feld …“ – meistgewählte sind
+  vorausgewählt, vorhandene Titel werden übersprungen.
+- **Lehrerliste** (Recht `lehrer.verwalten`): Zahnrad in den Rankings und in
+  der Zitatwand; Lehrkräfte sind beim Zitat-Einreichen und im Lehrer-Ranking
+  auswählbar (Mitschüler über `stufe_personen()`), „Andere …“ als Freitext.
+- **Zitate**: Karte zeigt immer das neueste freigegebene Zitat; wer prüft,
+  kann Zitate nachträglich bearbeiten und löschen (wird geleert).
+- **Spotify**: Steht ein Spotify-Link im Steckbrief (z. B. Lieblingslied),
+  gibt es „Auf Spotify abspielen“ – der Player lädt erst nach dem Tippen
+  (2-Klick, vorher geht nichts an Spotify). Ohne Spotify-Konto Hörprobe.
+- **iPhone**: Tab-Leiste rutschte nach dem Tippen (Tastatur) in die Mitte
+  (iOS-Fehler, Fenster bleibt verkleinert). `lib/ios-fenster.ts` misst nach
+  dem Verlassen eines Feldes neu.
+- Profil: Abschnittstitel mit weißen Symbolen auf farbigen Flächen statt
+  Emojis; Umfrage-Vorlagen als Raster (Handy untereinander).
+
 ## 04.10.2026: Funktionen an/aus, Zitatwand, Events aufgeräumt
 
 - **Funktionen** (`lib/funktionen.ts`, `components/Funktionen.tsx`, SQL

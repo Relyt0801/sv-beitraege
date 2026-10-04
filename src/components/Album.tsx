@@ -16,6 +16,7 @@ import {
 } from "../lib/album";
 import { frage, melde, meldeFehler } from "../lib/melder";
 import { useFunktionen } from "../lib/funktionen";
+import { SpotifyKnopf, ohneLink, spotifyAus } from "./Spotify";
 import { AusHinweis } from "./Funktionen";
 
 /* ====================================================================== */
@@ -408,11 +409,14 @@ function SteckbriefAnsicht({
             <div
               key={k.id}
               className={`rounded-2xl bg-[rgb(118_118_128/0.08)] px-3.5 py-2.5 dark:bg-[rgb(118_118_128/0.18)] ${
-                (s!.stammdaten[k.id] || "").length > 22 || (felder.length % 2 === 1 && i === felder.length - 1) ? "col-span-2" : ""
+                (s!.stammdaten[k.id] || "").length > 22 || Boolean(spotifyAus(s!.stammdaten[k.id] || "")) || (felder.length % 2 === 1 && i === felder.length - 1) ? "col-span-2" : ""
               }`}
             >
               <div className="text-[11px] font-semibold uppercase tracking-[0.06em] text-tinte-leise">{k.titel}</div>
-              <div className="mt-0.5 text-[15px] font-medium leading-snug">{s!.stammdaten[k.id]}</div>
+              <div className="mt-0.5 text-[15px] font-medium leading-snug">
+                {spotifyAus(s!.stammdaten[k.id]) ? ohneLink(s!.stammdaten[k.id]) || "Lied auf Spotify" : s!.stammdaten[k.id]}
+              </div>
+              <SpotifyKnopf wert={s!.stammdaten[k.id]} />
             </div>
           ))}
         </div>
@@ -630,6 +634,11 @@ function MeinSteckbrief({ album, vorschau }: { album: Album; vorschau: () => voi
               onChange={(e) => setDaten((d) => ({ ...d, [k.id]: e.target.value }))}
               className="mt-0.5 block w-full bg-transparent text-[15px] outline-none placeholder:text-tinte-leise/70"
             />
+            {/lied|song|musik/i.test(k.titel) && (
+              <span className="mt-1 block text-[11.5px] leading-snug text-tinte-leise">
+                {spotifyAus(daten[k.id] || "") ? "✓ Spotify-Link erkannt – im Steckbrief gibt es einen Abspielknopf." : "Tipp: Spotify-Link einfügen (Teilen → Link kopieren), dann kann man es im Steckbrief abspielen."}
+              </span>
+            )}
           </label>
         ))}
         {kat.length === 0 && <p className="px-4 py-3 text-[13px] text-tinte-leise">Das Team hat noch keine Kategorien angelegt.</p>}

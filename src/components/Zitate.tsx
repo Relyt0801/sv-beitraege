@@ -4,7 +4,9 @@ import { useRole } from "../auth/RoleProvider";
 import { useFunktionen } from "../lib/funktionen";
 import { useZitate, type Zitat, type ZitatArt, type Zitatwand } from "../lib/zitate";
 import { AusHinweis } from "./Funktionen";
-import { meldeFehler } from "../lib/melder";
+import { frage, meldeFehler } from "../lib/melder";
+import { useLehrer, useStufePersonen } from "../lib/rankings";
+import { LehrerListe, ZahnradKnopf } from "./Rankings";
 
 /**
  * Zitatwand im Profil: dunkle Karte mit dem „Zitat des Tages“, darunter
@@ -20,9 +22,9 @@ export function ZitateKarte({ className = "" }: { className?: string }) {
 
   const frei = wand.zitate.filter((z) => z.status === "frei");
   const warten = wand.zitate.filter((z) => z.status === "offen").length;
-  // Zitat des Tages: wechselt täglich, aus den freigegebenen
-  const tag = Math.floor(Date.now() / 864e5);
-  const heute = frei.length ? frei[tag % frei.length] : null;
+  // Immer das neueste freigegebene Zitat (zuletzt geprüft)
+  const zeit = (z: Zitat) => z.geprueft_at || z.created_at;
+  const heute = frei.length ? [...frei].sort((a, b) => zeit(b).localeCompare(zeit(a)))[0] : null;
 
   return (
     <div className={className}>
@@ -32,7 +34,7 @@ export function ZitateKarte({ className = "" }: { className?: string }) {
           ”
         </span>
         <div className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[#E9C460]">
-          {heute ? "Zitat des Tages" : "Zitatwand"}
+          {heute ? "Neuestes Zitat" : "Zitatwand"}
         </div>
         {heute ? (
           <button onClick={() => setOffen("liste")} className="mt-2 block text-left">
@@ -74,11 +76,17 @@ function ZitateSheet({
   setAnsicht: (a: null | "liste" | "neu" | "pruefen") => void;
 }) {
   const { can } = useRole();
+  const [lehrerOffen, setLehrerOffen] = useState(false);
   const schliessen = () => setAnsicht(null);
   const warten = wand.zitate.filter((z) => z.status === "offen");
 
   return (
-    <Sheet open={ansicht !== null} onClose={schliessen}>
+    <>
+    <Sheet open={lehrerOffen && ansicht !== null} onClose={() => setLehrerOffen(false)}>
+      <SheetKopf titel="Lehrerliste" unter="Zum Auswählen bei Zitaten und im Lehrer-Ranking." onClose={() => setLehrerOffen(false)} />
+      <LehrerListe aktiv={lehrerOffen} />
+    </Sheet>
+    <Sheet open={ansicht !== null && !lehrerOffen} onClose={schliessen}>
       {ansicht === "neu" ? (
         <Einreichen wand={wand} fertig={() => setAnsicht("liste")} schliessen={schliessen} />
       ) : (
@@ -88,6 +96,8 @@ function ZitateSheet({
             unter={`${wand.zitate.filter((z) => z.status === "frei").length} Zitate`}
             onClose={schliessen}
             extra={
+              <>
+              {can("lehrer.verwalten") && <ZahnradKnopf label="Lehrerliste pflegen" onClick={() => setLehrerOffen(true)} />}
               <button
                 type="button"
                 onClick={() => setAnsicht("neu")}
@@ -96,6 +106,7 @@ function ZitateSheet({
               >
                 <span className="flex h-[30px] w-[30px] items-center justify-center rounded-full bg-brand text-[18px] font-bold leading-none text-white">+</span>
               </button>
+              </>
             }
           />
           {can("zitate.pruefen") && (
@@ -112,6 +123,7 @@ function ZitateSheet({
         </>
       )}
     </Sheet>
+    </>
   );
 }
 
@@ -170,22 +182,66 @@ function Wand({ wand }: { wand: Zitatwand }) {
 }
 
 function ZitatZeile({ z, platz, wand }: { z: Zitat; platz: number; wand: Zitatwand }) {
+  const { can } = useRole();
   const an = wand.meineStimme(z.id);
   const n = wand.stimmenVon(z.id);
   const [tick, setTick] = useState(0);
+  const [edit, setEdit] = useState<null | { text: string; wer: string; kontext: string }>(null);
+
+  if (edit)
+    return (
+      <div className="space-y-2 rounded-2xl bg-[rgb(118_118_128/0.08)] p-3 dark:bg-[rgb(118_118_128/0.18)]">
+        <textarea className="field min-h-[80px] resize-y font-buch" maxLength={300} value={edit.text} onChange={(e) => setEdit({ ...edit, text: e.target.value })} />
+        <div className="grid grid-cols-2 gap-2">
+          <input className="field" maxLength={60} placeholder="Wer" value={edit.wer} onChange={(e) => setEdit({ ...edit, wer: e.target.value })} />
+          <input className="field" maxLength={60} placeholder="Wann / wo" value={edit.kontext} onChange={(e) => setEdit({ ...edit, kontext: e.target.value })} />
+        </div>
+        <div className="flex gap-2">
+          <button
+            className="btn-grau flex-1 !min-h-[40px] !text-[15px] !text-red-600"
+            onClick={() =>
+              void frage("Dieses Zitat löschen? Es wird geleert und verschwindet von der Wand.", "Löschen", true).then(async (ok) => {
+                if (!ok) return;
+                const f = await wand.pruefen(z.id, "abgelehnt");
+                if (f) meldeFehler(f);
+              })
+            }
+          >
+            Löschen
+          </button>
+          <button className="btn-grau flex-1 !min-h-[40px] !text-[15px]" onClick={() => setEdit(null)}>
+            Abbrechen
+          </button>
+          <button
+            className="btn-primary flex-1 !min-h-[40px] !text-[15px]"
+            onClick={async () => {
+              const f = await wand.bearbeiten(z.id, edit);
+              if (f) return meldeFehler(f);
+              setEdit(null);
+            }}
+          >
+            Sichern
+          </button>
+        </div>
+      </div>
+    );
+
   return (
     <div className="flex gap-3 rounded-2xl bg-[rgb(118_118_128/0.08)] p-4 dark:bg-[rgb(118_118_128/0.18)]">
       <div className="min-w-0 flex-1">
         {platz > 0 && platz <= 3 && n > 0 && (
-          <div className="mb-1 text-[11px] font-bold uppercase tracking-[0.08em] text-[#9A7410] dark:text-[#E9C460]">
-            {["🥇", "🥈", "🥉"][platz - 1]} Platz {platz}
-          </div>
+          <div className="mb-1 text-[11px] font-bold uppercase tracking-[0.08em] text-[#9A7410] dark:text-[#E9C460]">Platz {platz}</div>
         )}
         <div className="font-buch text-[17px] leading-[1.4]">„{z.text}“</div>
         <div className="mt-1.5 text-[13px] text-tinte-leise">
           — {z.wer}
           {z.kontext ? `, ${z.kontext}` : ""}
         </div>
+        {can("zitate.pruefen") && (
+          <button className="mt-1.5 text-[12.5px] font-semibold text-brand-dark dark:text-brand" onClick={() => setEdit({ text: z.text, wer: z.wer, kontext: z.kontext })}>
+            Bearbeiten
+          </button>
+        )}
       </div>
       <button
         onClick={() => {
@@ -215,7 +271,17 @@ function Einreichen({ wand, fertig, schliessen }: { wand: Zitatwand; fertig: () 
   const [kontext, setKontext] = useState("");
   const [busy, setBusy] = useState(false);
   const [gesendet, setGesendet] = useState(false);
+  const [andere, setAndere] = useState(false);
+  const [suche, setSuche] = useState("");
+  const { lehrer } = useLehrer(true);
+  const personen = useStufePersonen(true);
   const geht = text.trim().length > 2 && wer.trim().length > 0;
+  const q = suche.trim().toLowerCase();
+  const namen =
+    art === "lehrer"
+      ? lehrer.filter((l) => l.aktiv).map((l) => l.name)
+      : personen.map((p) => `${p.vorname} ${p.nachname ? p.nachname[0] + "." : ""}`.trim());
+  const treffer = namen.filter((n) => !q || n.toLowerCase().includes(q));
 
   if (gesendet)
     return (
@@ -255,15 +321,42 @@ function Einreichen({ wand, fertig, schliessen }: { wand: Zitatwand; fertig: () 
       </div>
 
       <div className="seg mt-4">
-        <button className={`seg-item ${art === "lehrer" ? "seg-aktiv" : ""}`} onClick={() => setArt("lehrer")}>
+        <button className={`seg-item ${art === "lehrer" ? "seg-aktiv" : ""}`} onClick={() => (setArt("lehrer"), setWer(""), setAndere(false))}>
           Lehrer
         </button>
-        <button className={`seg-item ${art === "schueler" ? "seg-aktiv" : ""}`} onClick={() => setArt("schueler")}>
+        <button className={`seg-item ${art === "schueler" ? "seg-aktiv" : ""}`} onClick={() => (setArt("schueler"), setWer(""), setAndere(false))}>
           Mitschüler
         </button>
       </div>
+      <h3 className="mb-1.5 mt-4 px-1 text-[12px] font-semibold uppercase tracking-[0.04em] text-tinte-leise">Wer hat es gesagt?</h3>
+      {namen.length > 8 && !andere && (
+        <input className="field mb-2" placeholder="Suchen" value={suche} onChange={(e) => setSuche(e.target.value)} />
+      )}
+      {!andere && (
+        <div className="flex max-h-40 flex-wrap gap-1.5 overflow-y-auto">
+          {treffer.map((n) => (
+            <button
+              key={n}
+              onClick={() => setWer(n)}
+              className={`rounded-full px-3 py-1.5 text-[14px] font-semibold transition active:scale-95 ${
+                wer === n ? "bg-brand text-white" : "bg-[rgb(118_118_128/0.12)] dark:bg-[rgb(118_118_128/0.24)]"
+              }`}
+            >
+              {n}
+            </button>
+          ))}
+          <button
+            onClick={() => (setAndere(true), setWer(""))}
+            className="rounded-full border border-dashed border-black/20 px-3 py-1.5 text-[14px] font-semibold text-tinte-matt dark:border-white/25 dark:text-slate-300"
+          >
+            Andere …
+          </button>
+        </div>
+      )}
       <div className="mt-3 space-y-2">
-        <input className="field" maxLength={60} placeholder={art === "lehrer" ? "Wer? z. B. Frau …" : "Wer? Vorname, Initial"} value={wer} onChange={(e) => setWer(e.target.value)} />
+        {(andere || namen.length === 0) && (
+          <input className="field" maxLength={60} autoFocus={andere} placeholder={art === "lehrer" ? "Name, z. B. Frau …" : "Vorname, Initial"} value={wer} onChange={(e) => setWer(e.target.value)} />
+        )}
         <textarea className="field min-h-[96px] resize-y" maxLength={300} placeholder="Was wurde gesagt?" value={text} onChange={(e) => setText(e.target.value)} />
         <input className="field" maxLength={60} placeholder="Wann / wo (optional), z. B. Deutsch-LK" value={kontext} onChange={(e) => setKontext(e.target.value)} />
       </div>

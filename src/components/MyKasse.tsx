@@ -7,11 +7,12 @@ import { StaffelKacheln, StaffelRing } from "./Staffel";
 import { BeitragsListe } from "./BeitragsListe";
 import { KontoTab } from "./KontoTab";
 import { Sheet, SheetKopf } from "./Sheet";
-import { Icon } from "./Icon";
+import { Icon, type IconName } from "./Icon";
 import { useState } from "react";
 import { TicketBereich } from "./AbiTicket";
 import { AlbumKarte } from "./Album";
 import { ZitateKarte } from "./Zitate";
+import { RankingKarte } from "./Rankings";
 
 /**
  * Die eigene Ansicht für alle, die nicht im Stufenteam sind.
@@ -21,12 +22,15 @@ import { ZitateKarte } from "./Zitate";
  * Ticketpreis gleichwertig nebeneinander – man musste erst suchen, worum es
  * geht.
  */
-/** Abschnittstitel mit kleinem farbigen Zeichen – damit nicht alles gleich grau aussieht. */
-function Titel({ zeichen, farbe, children }: { zeichen: string; farbe: string; children: string }) {
+/**
+ * Abschnittstitel mit Symbol wie in den iOS-Einstellungen: weißes
+ * Linien-Symbol auf einer farbigen, abgerundeten Fläche.
+ */
+function Titel({ icon, farbe, children }: { icon: IconName; farbe: string; children: string }) {
   return (
-    <h2 className="flex items-center gap-2 text-[15px] font-semibold">
-      <span aria-hidden className={`flex h-7 w-7 items-center justify-center rounded-[9px] text-[14px] ${farbe}`}>
-        {zeichen}
+    <h2 className="flex items-center gap-2.5 text-[15px] font-semibold">
+      <span aria-hidden className={`flex h-[26px] w-[26px] items-center justify-center rounded-[7px] text-white ${farbe}`}>
+        <Icon name={icon} size={16} strich={2.2} />
       </span>
       {children}
     </h2>
@@ -106,11 +110,12 @@ export function MyKasse({
       {/* ------------------------------------------ Abi-Album (nur mit Recht) */}
       <AlbumKarte className="lg:col-span-2" />
       <ZitateKarte className="lg:col-span-2" />
+      <RankingKarte className="lg:col-span-2" />
 
       {/* ------------------------------------------ Halbjahre mit Preis */}
       <section className="card p-4 sm:p-5 lg:col-span-2">
         <div className="flex items-center justify-between gap-2">
-          <Titel zeichen="🗓️" farbe="bg-[#0A84FF]/15">Deine Halbjahre</Titel>
+          <Titel icon="kalender" farbe="bg-[#0A84FF]">Deine Halbjahre</Titel>
           <span className="text-[12px] text-tinte-leise">
             EF je {beitragFuer("EF.1", settings)} €, Q1/Q2 je {beitragFuer("Q1.1", settings)} €
           </span>
@@ -138,7 +143,7 @@ export function MyKasse({
 
       {/* ------------------------------------------ Prozentstand */}
       <section className="card p-4 sm:p-5" data-tour="meine-punkte">
-        <Titel zeichen="🙌" farbe="bg-[#30D158]/20">Mithilfe bei Aktionen</Titel>
+        <Titel icon="herz" farbe="bg-[#34C759]">Mithilfe bei Aktionen</Titel>
 
         <div className="mt-3 flex items-center gap-4">
           <StaffelRing pct={pct} settings={settings} />
@@ -166,7 +171,7 @@ export function MyKasse({
 
       {/* ------------------------------------------ meine Beiträge */}
       <section className="card p-4 sm:p-5">
-        <Titel zeichen="📋" farbe="bg-[#FF9F0A]/20">Wobei du geholfen hast</Titel>
+        <Titel icon="beitraege" farbe="bg-[#FF9500]">Wobei du geholfen hast</Titel>
         <BeitragsListe
           eintraege={meine}
           leerText="Noch nichts eingetragen. Wenn du mithilfst, trägt das Stufenteam es hier ein."

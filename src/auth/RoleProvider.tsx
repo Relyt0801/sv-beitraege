@@ -118,7 +118,7 @@ export function RoleProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (hasSupabase) return;
     // Demo: Abi-Album und Zitate zum Ausprobieren für alle außer Eltern (in echt nur mit Recht)
-    const demoAlbum: PermKey[] = role === "eltern" ? [] : ["album.nutzen", "zitate.nutzen"];
+    const demoAlbum: PermKey[] = role === "eltern" ? [] : ["album.nutzen", "zitate.nutzen", "rankings.nutzen"];
     setPerms(new Set(role === "admin" ? ALL_PERMS : [...(ROLE_DEFAULTS[role] || []), ...demoAlbum]));
   }, [role]);
   useEffect(() => {

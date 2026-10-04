@@ -25,7 +25,10 @@ export type PermKey =
   | "umfragen.ergebnisse"
   | "zitate.nutzen"
   | "zitate.pruefen"
-  | "funktionen.verwalten";
+  | "funktionen.verwalten"
+  | "rankings.nutzen"
+  | "rankings.verwalten"
+  | "lehrer.verwalten";
 
 /** eltern: Das Recht lässt sich auch Elternzugängen geben (eigene Schaltfläche im Rechte-Reiter). */
 export interface PermDef { key: PermKey; label: string; desc: string; eltern?: boolean }
@@ -77,12 +80,15 @@ export const PERM_CATEGORIES: PermCategory[] = [
     ],
   },
   {
-    label: "Abi-Album & Zitate", icon: "📖", perms: [
+    label: "Abizeitung (Album, Zitate, Rankings)", icon: "📖", perms: [
       { key: "album.nutzen", label: "Abi-Album nutzen", desc: "Eigenen Steckbrief ausfüllen, die anderen ansehen, kommentieren und liken." },
       { key: "album.kategorien", label: "Steckbrief-Kategorien", desc: "Die Stammdaten-Felder festlegen (z. B. Nach dem Abi, Lieblingslied)." },
       { key: "album.moderieren", label: "Album moderieren", desc: "Kommentare und Texte anderer entfernen." },
       { key: "zitate.nutzen", label: "Zitatwand nutzen", desc: "Zitate einreichen, die freigegebenen ansehen und mit 🔥 abstimmen." },
-      { key: "zitate.pruefen", label: "Zitate prüfen", desc: "Eingereichte Zitate freigeben oder ablehnen (abgelehnte werden geleert)." },
+      { key: "zitate.pruefen", label: "Zitate prüfen", desc: "Eingereichte Zitate freigeben, ablehnen, nachträglich ändern oder löschen." },
+      { key: "rankings.nutzen", label: "Rankings nutzen", desc: "In den Schüler- und Lehrer-Rankings abstimmen und die Top 3 sehen." },
+      { key: "rankings.verwalten", label: "Rankings verwalten", desc: "Ranking-Kategorien anlegen, ändern, löschen – auch direkt aus Umfrage-Ergebnissen." },
+      { key: "lehrer.verwalten", label: "Lehrerliste pflegen", desc: "Lehrkräfte für Lehrer-Rankings und Zitate eintragen, ändern, löschen." },
     ],
   },
   {
@@ -95,7 +101,7 @@ export const PERM_CATEGORIES: PermCategory[] = [
     label: "Rollen & Rechte", icon: "👑", perms: [
       { key: "roles.manage", label: "Rollen ändern", desc: "Rollen anderer Personen setzen." },
       { key: "perms.manage", label: "Berechtigungen vergeben", desc: "Diesen Rechte-Reiter benutzen." },
-      { key: "funktionen.verwalten", label: "Funktionen an/aus", desc: "Ganze Bereiche für alle ein- oder ausschalten (Abiball-Tickets, Abi-Album, Zitate, Umfragen) – im Profil." },
+      { key: "funktionen.verwalten", label: "Funktionen an/aus", desc: "Ganze Bereiche für alle ein- oder ausschalten (Abiball-Tickets, Abi-Album, Zitate, Rankings, Umfragen) – im Profil." },
     ],
   },
 ];

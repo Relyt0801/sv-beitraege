@@ -5,6 +5,7 @@ import { StoreProvider } from "./store";
 import { Fehlerfang } from "./components/Fehlerfang";
 import { startAktiv } from "./lib/aktiv";
 import { MelderProvider } from "./components/Melder";
+import { iosFensterReparieren } from "./lib/ios-fenster";
 // Keine eigenen Schriften: Die App nutzt die Systemschrift des Geraets –
 // San Francisco auf iPhone, iPad und Mac. Nichts wird nachgeladen, also
 // auch keine IP-Adresse an Dritte (DSGVO).
@@ -23,6 +24,9 @@ import "./index.css";
  *    Satz neu geladen, sondern sobald das Feld verlassen wird oder die App in
  *    den Hintergrund geht – so geht keine Eingabe verloren.
  */
+// iPhone: Tab-Leiste rutscht nach dem Tippen sonst in die Mitte (siehe Datei)
+iosFensterReparieren();
+
 if ("serviceWorker" in navigator) {
   let neugeladen = false;
   const tipptGerade = () => {

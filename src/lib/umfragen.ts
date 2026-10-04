@@ -11,7 +11,8 @@ import { useStore } from "../store";
  * beim nächsten Mal an derselben Stelle weiter. Ergebnisse gibt es nur
  * gezählt (umfrage_ergebnis), einzelne Antworten sieht niemand.
  */
-export type FrageTyp = "einfach" | "mehrfach" | "text" | "person" | "skala";
+/** "ranking" gibt es nur im Pop-up: so werden die Abi-Rankings abgefragt (nicht in der Datenbank) */
+export type FrageTyp = "einfach" | "mehrfach" | "text" | "person" | "skala" | "ranking";
 export type Zielgruppe = "schueler" | "team" | "eltern" | "alle";
 
 export interface Umfrage {
@@ -22,6 +23,8 @@ export interface Umfrage {
   pflicht: boolean;
   zielgruppe: Zielgruppe;
   ergebnis_sichtbar: boolean;
+  /** Zusätzlich alle aktiven Abi-Rankings abfragen (Stimmen landen im Ranking) */
+  mit_rankings?: boolean;
   created_at: string;
   gestartet_at: string | null;
   endet_at: string | null;
@@ -57,7 +60,11 @@ export const TYP_NAME: Record<FrageTyp, string> = {
   text: "Freitext",
   person: "Person wählen",
   skala: "Skala 1–5",
+  ranking: "Abi-Ranking",
 };
+
+/** Antwort „weiß nicht“ bei Rankings im Pop-up */
+export const WEISS_NICHT = "__weiss_nicht__";
 
 export const ZIEL_NAME: Record<Zielgruppe, string> = {
   schueler: "Alle Schüler",
@@ -160,7 +167,7 @@ export function useOffeneUmfragen(aktiv: boolean, fuerMich: (z: Zielgruppe) => b
     () =>
       umfragen
         .filter((u) => u.status === "aktiv" && fuerMich(u.zielgruppe) && !fertig.has(u.id) && (!u.endet_at || new Date(u.endet_at) > new Date()))
-        .filter((u) => fragen.some((f) => f.umfrage_id === u.id))
+        .filter((u) => u.mit_rankings || fragen.some((f) => f.umfrage_id === u.id))
         .sort((a, b) => Number(b.pflicht) - Number(a.pflicht) || (a.gestartet_at || "").localeCompare(b.gestartet_at || "")),
     [umfragen, fertig, fragen, fuerMich],
   );
@@ -250,6 +257,7 @@ export function useUmfragenVerwaltung(aktiv: boolean) {
         pflicht: u.pflicht ?? true,
         zielgruppe: u.zielgruppe || "schueler",
         ergebnis_sichtbar: u.ergebnis_sichtbar ?? false,
+        mit_rankings: u.mit_rankings ?? false,
       };
       if (!hasSupabase) {
         const d = demoLesen();

@@ -24,6 +24,7 @@ export interface Zitat {
   eingereicht_von: string;
   eingereicht_name: string;
   created_at: string;
+  geprueft_at?: string | null;
 }
 
 interface Stimme {
@@ -150,11 +151,33 @@ export function useZitate(aktiv: boolean, uid: string | null) {
       setZitate((l) => (status === "abgelehnt" ? l.filter((z) => z.id !== id) : l.map((z) => (z.id === id ? { ...z, status } : z))));
       if (!hasSupabase) {
         const d = demoLesen();
-        d.zitate = d.zitate.map((z) => (z.id === id ? { ...z, status } : z));
+        d.zitate = d.zitate.map((z) => (z.id === id ? { ...z, status, geprueft_at: new Date().toISOString() } : z));
         demoSchreiben(d);
         return null;
       }
       const { error } = await supabase!.from("zitate").update({ status }).eq("id", id);
+      if (error) {
+        await laden();
+        return error.message;
+      }
+      return null;
+    },
+    [laden],
+  );
+
+  /** Nachträglich ändern (Recht zitate.pruefen) */
+  const bearbeiten = useCallback(
+    async (id: string, z: { text: string; wer: string; kontext: string }): Promise<string | null> => {
+      const sauber = { text: z.text.trim().slice(0, 300), wer: z.wer.trim().slice(0, 60), kontext: z.kontext.trim().slice(0, 60) };
+      if (!sauber.text || !sauber.wer) return "Zitat und Name fehlen";
+      setZitate((l) => l.map((x) => (x.id === id ? { ...x, ...sauber } : x)));
+      if (!hasSupabase) {
+        const d = demoLesen();
+        d.zitate = d.zitate.map((x) => (x.id === id ? { ...x, ...sauber } : x));
+        demoSchreiben(d);
+        return null;
+      }
+      const { error } = await supabase!.from("zitate").update(sauber).eq("id", id);
       if (error) {
         await laden();
         return error.message;
@@ -183,7 +206,7 @@ export function useZitate(aktiv: boolean, uid: string | null) {
   const stimmenVon = useCallback((id: string) => stimmen.filter((s) => s.zitat_id === id).length, [stimmen]);
   const meineStimme = useCallback((id: string) => stimmen.some((s) => s.zitat_id === id && s.user_id === me), [stimmen, me]);
 
-  return { bereit, zitate, me, einreichen, pruefen, abstimmen, stimmenVon, meineStimme };
+  return { bereit, zitate, me, einreichen, pruefen, bearbeiten, abstimmen, stimmenVon, meineStimme };
 }
 
 export type Zitatwand = ReturnType<typeof useZitate>;

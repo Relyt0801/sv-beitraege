@@ -141,6 +141,14 @@ function Datenschutz() {
         <b>Zitatwand:</b> eingereichte Zitate (Text, wer es gesagt hat, wann/wo), wer sie eingereicht hat und die
         🔥-Stimmen. Sichtbar erst nach der Prüfung durch das Team; Abgelehntes wird geleert. Keine Eltern.
       </P>      <P>
+        <b>Abi-Rankings und Lehrerliste:</b> deine Stimme je Ranking (wen du gewählt hast). Sichtbar ist nur die
+        gezählte Top 3, nie wer wen gewählt hat. Die Lehrerliste enthält Namen und Fächer von Lehrkräften.
+      </P>
+      <P>
+        <b>Spotify:</b> Ein Spotify-Player im Steckbrief lädt erst, wenn du auf „Auf Spotify abspielen“ tippst.
+        Erst dann werden Daten (u. a. deine IP-Adresse) an Spotify übertragen.
+      </P>
+      <P>
         <b>Umfragen:</b> Deine Antworten und ob du fertig bist. Ausgewertet wird nur gezählt – einzelne Antworten
         sieht niemand, auch nicht das Stufenteam. Freitext-Antworten erscheinen in der Auswertung ohne Namen.
       </P>

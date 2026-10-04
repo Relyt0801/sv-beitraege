@@ -7,6 +7,7 @@ import { useRole } from "../auth/RoleProvider";
 import { useStore } from "../store";
 import {
   TYP_NAME,
+  WEISS_NICHT,
   ZIEL_NAME,
   beantwortet,
   useOffeneUmfragen,
@@ -24,6 +25,8 @@ import { personVerlauf } from "../lib/album";
 import { useAlbumOptional } from "./Album";
 import { useFunktionen } from "../lib/funktionen";
 import { AusHinweis } from "./Funktionen";
+import { useLehrer, useRankings, useStufePersonen, type Lehrer, type RankingArt, type StufenPerson } from "../lib/rankings";
+import { ZielWahl } from "./Rankings";
 import { pushAnPersonen, pushAnTeam } from "../lib/push";
 import { frage as fragen_, melde, meldeFehler } from "../lib/melder";
 
@@ -38,7 +41,7 @@ const name = (p: UPerson) => `${p.vorname} ${p.nachname}`;
  * Jede Antwort wird sofort gespeichert.
  */
 export function UmfragePopup({ bereitZumZeigen, onSichtbar }: { bereitZumZeigen: boolean; onSichtbar?: (an: boolean) => void }) {
-  const { role, isStaff, ready } = useRole();
+  const { role, isStaff, ready, can, uid } = useRole();
   const istEltern = role === "eltern";
   const fuerMich = useCallback(
     (z: Zielgruppe) => (z === "alle" ? true : z === "schueler" ? !istEltern : z === "team" ? isStaff : istEltern),
@@ -56,6 +59,26 @@ export function UmfragePopup({ bereitZumZeigen, onSichtbar }: { bereitZumZeigen:
   const zeigen = an.umfragen && bereitZumZeigen && u.bereit && Boolean(aktuell);
   const personen = useUmfragePersonen(zeigen && u.fragen.some((f) => f.umfrage_id === aktuell?.id && f.typ === "person"));
 
+  // „Rankings ausfüllen lassen“: jede aktive Ranking-Kategorie wird ein
+  // Schritt. Die Stimme landet direkt im Ranking (dort ist sie änderbar).
+  const mitRankings = zeigen && Boolean(aktuell?.mit_rankings) && an.rankings && can("rankings.nutzen");
+  const rk = useRankings(mitRankings, uid);
+  const { lehrer } = useLehrer(mitRankings);
+  const stufe = useStufePersonen(mitRankings);
+  const rankingFragen: Frage[] = mitRankings && aktuell
+    ? rk.kategorien
+        .filter((k) => k.aktiv && (k.art === "schueler" || lehrer.some((l) => l.aktiv)))
+        .map((k, n) => ({ id: `rk:${k.id}`, umfrage_id: aktuell.id, sort: 10000 + n, typ: "ranking" as FrageTyp, titel: k.titel, optionen: [k.art], pflicht: true }))
+    : [];
+  const alleAntworten: Record<string, Wert> = { ...u.antworten };
+  for (const [k, v] of Object.entries(rk.meine)) alleAntworten[`rk:${k}`] = v ?? WEISS_NICHT;
+  const antworten2 = async (f: Frage, w: Wert) => {
+    if (!f.id.startsWith("rk:")) return u.antworten_(f, w);
+    return rk.abstimmen(f.id.slice(3), w === WEISS_NICHT ? null : String(w));
+  };
+  // Erst zeigen, wenn die Rankings geladen sind – sonst fehlen die Schritte
+  const rankingsBereit = !mitRankings || rk.bereit;
+
   useEffect(() => {
     if (zeigen && aktuell && fest !== aktuell.id) setFest(aktuell.id);
   }, [zeigen, aktuell, fest]);
@@ -64,16 +87,20 @@ export function UmfragePopup({ bereitZumZeigen, onSichtbar }: { bereitZumZeigen:
     onSichtbar?.(zeigen);
   }, [zeigen, onSichtbar]);
 
-  if (!zeigen || !aktuell) return null;
+  if (!zeigen || !aktuell || !rankingsBereit) return null;
+  const fragenListe = [...u.fragen.filter((f) => f.umfrage_id === aktuell.id).sort((a, b) => a.sort - b.sort), ...rankingFragen];
+  if (!fragenListe.length) return null;
   return createPortal(
     <UmfrageLauf
       key={aktuell.id}
       umfrage={aktuell}
-      fragen={u.fragen.filter((f) => f.umfrage_id === aktuell.id).sort((a, b) => a.sort - b.sort)}
-      antworten={u.antworten}
+      fragen={fragenListe}
+      antworten={alleAntworten}
       personen={personen}
+      stufe={stufe}
+      lehrer={lehrer.filter((l) => l.aktiv)}
       nochWeitere={u.offen.filter((x) => x.id !== aktuell.id && !spaeter.has(x.id)).length}
-      antworten_={u.antworten_}
+      antworten_={antworten2}
       abschliessen={u.abschliessen}
       ende={() => {
         setSpaeter((s) => new Set(s).add(aktuell.id));
@@ -89,6 +116,8 @@ function UmfrageLauf({
   fragen,
   antworten,
   personen,
+  stufe,
+  lehrer,
   nochWeitere,
   antworten_,
   abschliessen,
@@ -98,6 +127,8 @@ function UmfrageLauf({
   fragen: Frage[];
   antworten: Record<string, Wert>;
   personen: UPerson[];
+  stufe: StufenPerson[];
+  lehrer: Lehrer[];
   nochWeitere: number;
   antworten_: (f: Frage, w: Wert) => Promise<string | null>;
   abschliessen: (id: string) => Promise<string | null>;
@@ -197,7 +228,18 @@ function UmfrageLauf({
               </div>
               <h3 className="mt-1 text-[1.2rem] font-bold leading-snug">{f.titel}</h3>
               <div className="mt-4">
-                <Antwort f={f} wert={wert} personen={personen} setzen={setzen} />
+                {f.typ === "ranking" ? (
+                  <ZielWahl
+                    art={(f.optionen[0] as RankingArt) || "schueler"}
+                    personen={stufe}
+                    lehrer={lehrer}
+                    wert={wert === WEISS_NICHT ? null : (wert as string | undefined)}
+                    gewaehlt={wert !== undefined}
+                    setzen={(ziel) => void setzen(ziel ?? WEISS_NICHT, true)}
+                  />
+                ) : (
+                  <Antwort f={f} wert={wert} personen={personen} setzen={setzen} />
+                )}
               </div>
             </div>
           ) : null}
@@ -385,16 +427,17 @@ function TextAntwort({ text, setText, speichern }: { text: string; setText: (t: 
 /* ====================================================================== */
 type EntwurfFrage = Omit<Frage, "id" | "umfrage_id">;
 
-const VORLAGEN: { name: string; beschreibung: string; bauen: (kategorien: string[]) => { titel: string; beschreibung: string; fragen: EntwurfFrage[] } }[] = [
+type Vorlage = { titel: string; beschreibung: string; fragen: EntwurfFrage[]; mitRankings?: boolean };
+
+const VORLAGEN: { name: string; beschreibung: string; bauen: (kategorien: string[]) => Vorlage }[] = [
   {
-    name: "🏆 Schülerranking",
-    beschreibung: "Wer wird am ehesten …? Je Frage eine Person.",
+    name: "🏆 Rankings ausfüllen",
+    beschreibung: "Alle Schüler- und Lehrer-Rankings als Pflicht abfragen.",
     bauen: () => ({
-      titel: "Schülerranking",
-      beschreibung: "Für die Abizeitung: Wähle bei jeder Frage eine Person. Geheim – gezählt wird nur, wie oft jemand gewählt wurde.",
-      fragen: ["Wird am ehesten berühmt", "Kommt garantiert zu spät zur eigenen Hochzeit", "Hat immer Snacks dabei", "Wird am ehesten Lehrer*in an unserer Schule"].map(
-        (titel, i) => ({ sort: i + 1, typ: "person" as FrageTyp, titel, optionen: [], pflicht: false }),
-      ),
+      titel: "Abi-Rankings",
+      beschreibung: "Für die Abizeitung: Wähle bei jedem Ranking eine Person. Geheim – gezählt wird nur, wie oft jemand gewählt wurde.",
+      fragen: [],
+      mitRankings: true,
     }),
   },
   {
@@ -441,7 +484,7 @@ export function UmfragenSheet({ open, onClose }: { open: boolean; onClose: () =>
   const kategorien = album?.kategorien.filter((k) => k.aktiv).map((k) => k.titel) ?? [];
   const v = useUmfragenVerwaltung(open);
   const [bearbeite, setBearbeite] = useState<Umfrage | "neu" | null>(null);
-  const [vorlage, setVorlage] = useState<ReturnType<(typeof VORLAGEN)[number]["bauen"]> | null>(null);
+  const [vorlage, setVorlage] = useState<Vorlage | null>(null);
   const [ergebnisVon, setErgebnisVon] = useState<Umfrage | null>(null);
   const verwalten = can("umfragen.verwalten");
 
@@ -461,7 +504,7 @@ export function UmfragenSheet({ open, onClose }: { open: boolean; onClose: () =>
             <button className="btn-primary w-full !bg-gradient-to-r !from-[#5E5CE6] !to-[#BF5AF2]" onClick={() => (setVorlage(null), setBearbeite("neu"))}>
               + Neue Umfrage
             </button>
-            <div className="-mx-5 mt-3 flex gap-2 overflow-x-auto px-5 pb-1 no-scrollbar">
+            <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
               {VORLAGEN.map((t) => (
                 <button
                   key={t.name}
@@ -469,7 +512,7 @@ export function UmfragenSheet({ open, onClose }: { open: boolean; onClose: () =>
                     setVorlage(t.bauen(kategorien));
                     setBearbeite("neu");
                   }}
-                  className="w-44 shrink-0 rounded-2xl bg-[rgb(118_118_128/0.08)] px-3.5 py-3 text-left transition active:scale-95 dark:bg-[rgb(118_118_128/0.18)]"
+                  className="w-full rounded-2xl bg-[rgb(118_118_128/0.08)] px-3.5 py-3 text-left transition active:scale-[.98] dark:bg-[rgb(118_118_128/0.18)]"
                 >
                   <span className="block text-[14px] font-semibold">{t.name}</span>
                   <span className="mt-0.5 block text-[12px] leading-snug text-tinte-leise">{t.beschreibung}</span>
@@ -493,7 +536,7 @@ export function UmfragenSheet({ open, onClose }: { open: boolean; onClose: () =>
                   onClick={() => (u.status === "entwurf" && verwalten ? setBearbeite(u) : setErgebnisVon(u))}
                 >
                   <span className="truncate text-[13px] text-tinte-leise">
-                    {v.fragen.filter((f) => f.umfrage_id === u.id).length} Fragen · {ZIEL_NAME[u.zielgruppe]}
+                    {v.fragen.filter((f) => f.umfrage_id === u.id).length} Fragen{u.mit_rankings ? " + Rankings" : ""} · {ZIEL_NAME[u.zielgruppe]}
                   </span>
                 </Zeile>
               ))}
@@ -533,7 +576,7 @@ function UmfrageEditor({
 }: {
   open: boolean;
   umfrage: Umfrage | null;
-  vorlage: { titel: string; beschreibung: string; fragen: EntwurfFrage[] } | null;
+  vorlage: Vorlage | null;
   fragen: Frage[];
   verwaltung: ReturnType<typeof useUmfragenVerwaltung>;
   onClose: () => void;
@@ -544,6 +587,8 @@ function UmfrageEditor({
   const [ziel, setZiel] = useState<Zielgruppe>("schueler");
   const [pflicht, setPflicht] = useState(true);
   const [sichtbar, setSichtbar] = useState(false);
+  const [mitRankings, setMitRankings] = useState(false);
+  const { can } = useRole();
   const [liste, setListe] = useState<EntwurfFrage[]>([]);
   const [busy, setBusy] = useState(false);
   const [benachrichtigen, setBenachrichtigen] = useState(true);
@@ -555,10 +600,11 @@ function UmfrageEditor({
     setZiel(umfrage?.zielgruppe ?? "schueler");
     setPflicht(umfrage?.pflicht ?? true);
     setSichtbar(umfrage?.ergebnis_sichtbar ?? false);
+    setMitRankings(umfrage?.mit_rankings ?? vorlage?.mitRankings ?? false);
     setListe(
       umfrage
         ? [...fragen].sort((a, b) => a.sort - b.sort).map(({ sort, typ, titel, optionen, pflicht }) => ({ sort, typ, titel, optionen, pflicht }))
-        : vorlage?.fragen ?? [{ sort: 1, typ: "einfach", titel: "", optionen: ["Ja", "Nein"], pflicht: true }],
+        : vorlage ? vorlage.fragen : [{ sort: 1, typ: "einfach", titel: "", optionen: ["Ja", "Nein"], pflicht: true }],
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, umfrage?.id]);
@@ -566,8 +612,8 @@ function UmfrageEditor({
   const aendern = (i: number, p: Partial<EntwurfFrage>) => setListe((l) => l.map((f, n) => (n === i ? { ...f, ...p } : f)));
   const fehler = !titel.trim()
     ? "Titel fehlt"
-    : !liste.length
-      ? "Mindestens eine Frage"
+    : !liste.length && !mitRankings
+      ? "Mindestens eine Frage (oder Rankings abfragen)"
       : liste.some((f) => !f.titel.trim())
         ? "Jede Frage braucht einen Text"
         : liste.some((f) => (f.typ === "einfach" || f.typ === "mehrfach") && f.optionen.filter((o) => o.trim()).length < 2)
@@ -577,7 +623,7 @@ function UmfrageEditor({
   async function sichern(): Promise<string | null> {
     const sauber = liste.map((f, i) => ({ ...f, sort: i + 1, optionen: f.optionen.map((o) => o.trim()).filter(Boolean) }));
     const r = await verwaltung.speichern(
-      { id: umfrage?.id, titel, beschreibung: text, zielgruppe: ziel, pflicht, ergebnis_sichtbar: sichtbar },
+      { id: umfrage?.id, titel, beschreibung: text, zielgruppe: ziel, pflicht, ergebnis_sichtbar: sichtbar, mit_rankings: mitRankings },
       sauber,
     );
     if (r.fehler) {
@@ -610,8 +656,16 @@ function UmfrageEditor({
         <Zeile label="Ergebnis für Teilnehmende">
           <Schalter an={sichtbar} onChange={setSichtbar} label="Ergebnis für Teilnehmende" />
         </Zeile>
+        {(can("rankings.verwalten") || mitRankings) && (
+          <Zeile label="Abi-Rankings abfragen">
+            <Schalter an={mitRankings} onChange={setMitRankings} label="Abi-Rankings abfragen" />
+          </Zeile>
+        )}
       </Gruppe>
-      <p className="mt-1.5 px-4 text-[12px] text-tinte-leise">Pflicht: lässt sich nicht wegklicken. Sonst gibt es „Später“.</p>
+      <p className="mt-1.5 px-4 text-[12px] text-tinte-leise">
+        Pflicht: lässt sich nicht wegklicken. Sonst gibt es „Später“.
+        {mitRankings && " Rankings: Jede aktive Ranking-Kategorie wird ein Schritt nach den Fragen – die Stimmen landen direkt in den Rankings."}
+      </p>
 
       <h3 className="mb-1.5 mt-5 px-4 text-[12px] font-semibold uppercase tracking-[0.04em] text-tinte-leise">Fragen</h3>
       <div className="space-y-3">
@@ -628,7 +682,7 @@ function UmfrageEditor({
                   aendern(i, { typ, optionen: typ === "einfach" || typ === "mehrfach" ? (f.optionen.length ? f.optionen : ["", ""]) : typ === "skala" ? ["gar nicht", "sehr"] : [] });
                 }}
               >
-                {(Object.keys(TYP_NAME) as FrageTyp[]).map((t) => (
+                {(Object.keys(TYP_NAME) as FrageTyp[]).filter((t) => t !== "ranking").map((t) => (
                   <option key={t} value={t}>
                     {TYP_NAME[t]}
                   </option>
@@ -762,7 +816,9 @@ function ErgebnisSheet({
   verwaltung: ReturnType<typeof useUmfragenVerwaltung>;
   onClose: () => void;
 }) {
-  const { can } = useRole();
+  const { can, uid } = useRole();
+  const rk = useRankings(open && can("rankings.verwalten"), uid);
+  const album = useAlbumOptional();
   const [erg, setErg] = useState<Ergebnis | null>(null);
   const [fehler, setFehler] = useState("");
   const personen = useUmfragePersonen(open && fragen.some((f) => f.typ === "person"));
@@ -801,6 +857,11 @@ function ErgebnisSheet({
             </div>
           </div>
 
+          {umfrage.mit_rankings && (
+            <p className="mt-4 rounded-xl bg-[#E9C460]/15 px-3 py-2.5 text-[13px] text-tinte-matt dark:text-slate-300">
+              Diese Umfrage fragt auch die Abi-Rankings ab. Die Plätze stehen live im Bereich Abi-Rankings.
+            </p>
+          )}
           {fragen.map((f, n) => {
             const e = erg.fragen.find((x) => x.frage_id === f.id);
             if (!e) return null;
@@ -845,6 +906,17 @@ function ErgebnisSheet({
                     ))}
                     {!eintraege.length && <p className="px-1 text-[13px] text-tinte-leise">Noch keine Stimmen.</p>}
                   </div>
+                )}
+                {(f.typ === "einfach" || f.typ === "mehrfach" || f.typ === "text") && (
+                  <Uebernehmen
+                    kandidaten={
+                      f.typ === "text"
+                        ? [...new Set(e.texte.map((t) => t.trim()).filter((t) => t && t.length <= 120))].map((t) => ({ titel: t, n: 0 }))
+                        : eintraege.map(([k, v]) => ({ titel: k, n: v }))
+                    }
+                    rk={can("rankings.verwalten") ? rk : null}
+                    album={can("album.kategorien") ? album : null}
+                  />
                 )}
               </section>
             );
@@ -920,5 +992,114 @@ export function UmfragenKarte() {
       </button>
       <UmfragenSheet open={offen} onClose={() => setOffen(false)} />
     </>
+  );
+}
+
+
+/* ---------------------------------------------------------------- Ergebnis übernehmen */
+/**
+ * Aus einem Ergebnis direkt Kategorien machen: die meistgewählten Antworten
+ * (vorausgewählt: Top 5) als Schüler-/Lehrer-Ranking oder Steckbrief-Feld.
+ * Schon vorhandene Titel werden übersprungen.
+ */
+function Uebernehmen({
+  kandidaten,
+  rk,
+  album,
+}: {
+  kandidaten: { titel: string; n: number }[];
+  rk: ReturnType<typeof useRankings> | null;
+  album: ReturnType<typeof useAlbumOptional>;
+}) {
+  type Ziel = "schueler" | "lehrer" | "steckbrief";
+  const ziele: { k: Ziel; l: string }[] = [
+    ...(rk ? [{ k: "schueler" as Ziel, l: "Schüler" }, { k: "lehrer" as Ziel, l: "Lehrer" }] : []),
+    ...(album ? [{ k: "steckbrief" as Ziel, l: "Steckbrief" }] : []),
+  ];
+  const [offen, setOffen] = useState(false);
+  const [ziel, setZiel] = useState<Ziel>(ziele[0]?.k ?? "schueler");
+  const [wahl, setWahl] = useState<Set<string>>(() => new Set(kandidaten.filter((x) => x.n > 0).slice(0, 5).map((x) => x.titel)));
+  const [busy, setBusy] = useState(false);
+  if (!ziele.length || !kandidaten.length) return null;
+
+  const vorhanden = new Set(
+    (ziel === "steckbrief" ? album?.kategorien.map((k) => k.titel) ?? [] : rk?.kategorien.filter((k) => k.art === ziel).map((k) => k.titel) ?? []).map((t) =>
+      t.trim().toLowerCase(),
+    ),
+  );
+
+  if (!offen)
+    return (
+      <button onClick={() => setOffen(true)} className="mt-2 px-1 text-[13.5px] font-semibold text-brand-dark dark:text-brand">
+        Übernehmen als Ranking / Steckbrief-Feld …
+      </button>
+    );
+
+  return (
+    <div className="mt-2 rounded-2xl border border-[#5E5CE6]/25 p-3">
+      <div className="seg mb-2.5">
+        {ziele.map((z) => (
+          <button key={z.k} className={`seg-item ${ziel === z.k ? "seg-aktiv" : ""}`} onClick={() => setZiel(z.k)}>
+            {z.l}
+          </button>
+        ))}
+      </div>
+      <div className="max-h-56 space-y-1 overflow-y-auto">
+        {kandidaten.map((x) => {
+          const da = vorhanden.has(x.titel.trim().toLowerCase());
+          const an = wahl.has(x.titel) && !da;
+          return (
+            <button
+              key={x.titel}
+              disabled={da}
+              onClick={() =>
+                setWahl((w) => {
+                  const n = new Set(w);
+                  if (n.has(x.titel)) n.delete(x.titel);
+                  else n.add(x.titel);
+                  return n;
+                })
+              }
+              className="flex w-full items-center gap-2.5 rounded-xl px-2 py-1.5 text-left text-[14px] disabled:opacity-45"
+            >
+              <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-[6px] text-[12px] font-bold text-white ${an ? "bg-[#5E5CE6]" : "ring-2 ring-inset ring-black/20 dark:ring-white/30"}`}>
+                {an ? "✓" : ""}
+              </span>
+              <span className="min-w-0 flex-1 truncate">{x.titel}</span>
+              <span className="shrink-0 text-[12px] text-tinte-leise">{da ? "schon da" : x.n ? `${x.n} ${x.n === 1 ? "Stimme" : "Stimmen"}` : ""}</span>
+            </button>
+          );
+        })}
+      </div>
+      <div className="mt-2.5 flex gap-2">
+        <button className="btn-grau flex-1 !min-h-[40px] !text-[15px]" onClick={() => setOffen(false)}>
+          Abbrechen
+        </button>
+        <button
+          className="btn-primary flex-[1.4] !min-h-[40px] !bg-[#5E5CE6] !text-[15px] disabled:opacity-40"
+          disabled={busy || ![...wahl].some((t) => !vorhanden.has(t.trim().toLowerCase()))}
+          onClick={async () => {
+            const liste = [...wahl].filter((t) => !vorhanden.has(t.trim().toLowerCase()));
+            setBusy(true);
+            let fehler: string | undefined;
+            if (ziel === "steckbrief" && album) {
+              const basis = Math.max(0, ...album.kategorien.map((k) => k.sort)) + 1;
+              for (const [i, t] of liste.entries()) {
+                const f = await album.kategorieSpeichern({ titel: t.slice(0, 60), sort: basis + i });
+                if (f) fehler = f;
+              }
+            } else if (rk) {
+              fehler = (await rk.kategorienAnlegen(liste, ziel as RankingArt)).fehler;
+            }
+            setBusy(false);
+            if (fehler) return meldeFehler("Ging nicht: " + fehler);
+            melde(`${liste.length} übernommen`, "erfolg");
+            setOffen(false);
+          }}
+        >
+          {busy ? "…" : `${[...wahl].filter((t) => !vorhanden.has(t.trim().toLowerCase())).length} übernehmen`}
+        </button>
+      </div>
+    </div>
   );
 }
