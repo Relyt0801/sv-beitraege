@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Sheet } from "./Sheet";
 import { hasSupabase, supabase } from "../lib/supabase";
 import { melde, meldeFehler } from "../lib/melder";
-import { Gruppe } from "./NachtragSheet";
+import { Gruppe } from "./Liste";
 
 const WAHL: { tage: number | null; text: string }[] = [
   { tage: null, text: "Nie" },

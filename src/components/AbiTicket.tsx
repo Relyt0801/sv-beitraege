@@ -12,7 +12,7 @@ import {
 } from "../lib/tickets";
 import { KontoTab, jahrgangKurz } from "./KontoTab";
 import { Sheet, SheetKopf } from "./Sheet";
-import { Gruppe, Zeile } from "./NachtragSheet";
+import { Gruppe, Zeile } from "./Liste";
 
 /**
  * Das Abiball-Ticket – personalisiert, so wie es später auch aussehen soll.

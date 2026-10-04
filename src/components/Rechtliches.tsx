@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { Sheet } from "./Sheet";
+import { Sheet, SheetKopf } from "./Sheet";
 
 /**
  * Impressum und Datenschutzerklärung.
@@ -254,10 +254,7 @@ export function RechtSheet({
 }) {
   return (
     <Sheet open={seite !== null} onClose={onClose}>
-      <div className="mb-3 flex items-center gap-3">
-        <span className="flex-1 text-xl font-bold">{seite === "impressum" ? "Impressum" : "Datenschutz"}</span>
-        <button type="button" className="iconbtn" onClick={onClose} aria-label="Schließen">✕</button>
-      </div>
+      <SheetKopf titel={seite === "impressum" ? "Impressum" : "Datenschutz"} onClose={onClose} />
       {seite === "impressum" ? <Impressum /> : <Datenschutz />}
       <button type="button" className="btn-primary mt-5" onClick={onClose}>
         Schließen

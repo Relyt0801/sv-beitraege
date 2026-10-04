@@ -226,6 +226,21 @@ button:not(:disabled) {
   .zeile {
     @apply flex min-h-[2.75rem] items-center gap-3 px-4 py-2.5 text-[16px];
   }
+  /* Apple-Schema für ältere Kästen: Wo noch ein Kasten mit grauem Rahmen
+     steht (rounded + border + border-papier-linie), wird er zur gefüllten
+     Zelle wie in den iOS-Listen – ohne Rahmen. Gestrichelte Leer-Hinweise
+     bleiben, wie sie sind. */
+  .rounded-xl.border.border-papier-linie:not(.border-dashed),
+  .rounded-2xl.border.border-papier-linie:not(.border-dashed),
+  .rounded-lg.border.border-papier-linie:not(.border-dashed) {
+    border-color: transparent;
+    background-color: rgb(118 118 128 / 0.08);
+  }
+  .dark .rounded-xl.border.border-papier-linie:not(.border-dashed),
+  .dark .rounded-2xl.border.border-papier-linie:not(.border-dashed),
+  .dark .rounded-lg.border.border-papier-linie:not(.border-dashed) {
+    background-color: rgb(118 118 128 / 0.18);
+  }
   /* Glas-Material fuer Kopf- und Tab-Leiste */
   .glas {
     @apply bg-[rgb(var(--glas)/0.72)] backdrop-blur-2xl backdrop-saturate-[1.8];

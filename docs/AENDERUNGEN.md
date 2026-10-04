@@ -12,6 +12,21 @@ ausführlich (auf Deutsch); hier steht der Überblick dazu.
 ---
 
 
+## 04.10.2026: Apple-Schema in der ganzen App
+
+- `components/Liste.tsx`: gemeinsame Bausteine – `RechnungKopf` (oben mittig
+  Bild, große Zahl, Titel, ✕), `Gruppe` (mit Fußnote), `Zeile` (optional
+  antippbar mit ›, rot für Löschen), `Wert`, `ZeileAuswahl`, `ZeileEingabe`,
+  `ZeileSegmente`. Neue Ansichten bitte nur noch damit bauen.
+- Person (StudentSheet), Mithilfe (PunkteSheet), Person hinzufügen (AddSheet)
+  wie eine Rechnung; Halbjahre als Liste mit Status-Kapsel (antippen schaltet um).
+- Alle Blätter haben denselben Kopf (SheetKopf) bzw. den Rechnungskopf;
+  doppelte „Fertig“-Knöpfe sind weg.
+- Chats: Komitees und Stufenteam als eine gruppierte Liste statt einzelner Karten.
+- index.css: alte Kästen mit grauem Rahmen werden automatisch zu gefüllten
+  Zellen (ohne Rahmen); Abschnittsüberschriften in Formularen einheitlich klein.
+- PunkteBar.tsx entfernt (nicht mehr benutzt).
+
 ## 04.10.2026: Feinschliff zu 1.2 (ohne Patch Notes)
 
 - **Tab-Leiste** (App.tsx, ElternApp.tsx): wie in iOS ganz unten angedockt,

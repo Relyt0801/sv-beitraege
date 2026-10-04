@@ -387,9 +387,6 @@ export function ProfilSheet({
         <RechtLinks />
       </div>
 
-      <button className="btn-primary mt-4" onClick={onClose}>
-        Fertig
-      </button>
 
       <LoeschfristenSheet open={loeschOffen} onClose={() => setLoeschOffen(false)} />
       {(istAdmin || istKassenwart) && (

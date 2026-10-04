@@ -2,6 +2,7 @@ import { useState } from "react";
 import { HY, type Halbjahr } from "../lib/types";
 import { useStore } from "../store";
 import { Sheet } from "./Sheet";
+import { Gruppe, KopfBild, RechnungKopf, ZeileEingabe, ZeileSegmente } from "./Liste";
 
 export function AddSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { addStudent } = useStore();
@@ -20,52 +21,22 @@ export function AddSheet({ open, onClose }: { open: boolean; onClose: () => void
 
   return (
     <Sheet open={open} onClose={onClose}>
-      <div className="mb-4 flex items-center gap-3">
-        <span className="flex-1 text-xl font-bold">Person hinzufügen</span>
-        <button className="iconbtn" onClick={onClose} aria-label="Schließen">
-          ✕
+      <div className="mx-auto max-w-md">
+        <RechnungKopf bild={<KopfBild text="＋" />} oben="Person hinzufügen" titel={`${vorname} ${nachname}`.trim() || " "} onClose={onClose} />
+
+        <Gruppe titel="Name">
+          <ZeileEingabe label="Nachname" value={nachname} onChange={setNachname} placeholder="Pflicht" autoFocus onEnter={submit} />
+          <ZeileEingabe label="Vorname" value={vorname} onChange={setVorname} placeholder="Vorname" onEnter={submit} />
+        </Gruppe>
+
+        <Gruppe titel="Dabei ab" fuss="Halbjahre davor zählen nicht zum Beitrag.">
+          <ZeileSegmente werte={HY} wert={ab} onWahl={setAb} />
+        </Gruppe>
+
+        <button className="btn-primary mt-5" onClick={submit} disabled={!nachname.trim()}>
+          Hinzufügen
         </button>
       </div>
-
-      <input
-        className="field mb-3"
-        placeholder="Nachname"
-        autoFocus
-        value={nachname}
-        onChange={(e) => setNachname(e.target.value)}
-        onKeyDown={(e) => e.key === "Enter" && submit()}
-      />
-      <input
-        className="field mb-4"
-        placeholder="Vorname"
-        value={vorname}
-        onChange={(e) => setVorname(e.target.value)}
-        onKeyDown={(e) => e.key === "Enter" && submit()}
-      />
-
-      <label className="mb-2 block text-sm font-medium text-tinte-matt">Dabei ab welchem Halbjahr?</label>
-      <div className="mb-2 grid grid-cols-3 gap-2">
-        {HY.map((h) => (
-          <button
-            key={h}
-            onClick={() => setAb(h)}
-            className={`rounded-xl border py-2.5 text-sm font-bold transition ${
-              ab === h
-                ? "border-brand bg-brand text-white"
-                : "border-papier-linie bg-papier-matt text-tinte-matt dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
-            }`}
-          >
-            {h}
-          </button>
-        ))}
-      </div>
-      <p className="mb-4 text-xs text-tinte-leise">
-        Halbjahre vor dem Beitritt bleiben grau und zählen nicht zum Beitrag.
-      </p>
-
-      <button className="btn-primary" onClick={submit}>
-        Hinzufügen
-      </button>
     </Sheet>
   );
 }

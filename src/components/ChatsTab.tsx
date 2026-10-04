@@ -129,13 +129,15 @@ export function ChatsTab() {
       {isStaff && teamChat && (
         <section>
           <KategorieKopf titel="Stufenteam" />
-          <ChatCard
-            titel="Stufenteam-Chat"
-            icon="👑"
-            unread={unreadCount(teamChat.id)}
-            mine
-            onOpen={() => setOpenId(teamChat.id)}
-          />
+          <div className="card divide-y divide-black/[0.06] overflow-hidden dark:divide-white/[0.08]">
+            <ChatCard
+              titel="Stufenteam-Chat"
+              icon="👑"
+              unread={unreadCount(teamChat.id)}
+              mine
+              onOpen={() => setOpenId(teamChat.id)}
+            />
+          </div>
         </section>
       )}
 
@@ -151,7 +153,7 @@ export function ChatsTab() {
               : "Du bist noch in keinem Komitee. Das Stufenteam kann dich eintragen."}
           </div>
         ) : (
-          <div className="grid items-start gap-2.5 lg:grid-cols-2">
+          <div className="card divide-y divide-black/[0.06] overflow-hidden dark:divide-white/[0.08]">
             {komiteeChats.map((t) => {
               const mein = meineKoms.includes(t.tag);
               const an = komiteeAn(mitteilungen, t.tag, mein);
@@ -216,7 +218,7 @@ export function ChatsTab() {
       ) : (
         <section>
           <KategorieKopf titel="Stufenteam" />
-          <div className="grid grid-cols-1 gap-2.5">
+          <div className="card divide-y divide-black/[0.06] overflow-hidden dark:divide-white/[0.08]">
             <ChatCard
               titel="Frag das Stufenteam"
               icon="🛡️"
@@ -296,14 +298,14 @@ function ChatCard({
   glocke?: { an: boolean; setAn: (an: boolean) => void; name: string };
 }) {
   return (
-    <div className="card flex w-full items-center transition">
+    <div className="flex w-full items-center">
       <button
         onClick={onOpen}
-        className={`flex min-w-0 flex-1 items-center gap-3 p-4 text-left active:scale-[.99] ${mine ? "" : "opacity-70"}`}
+        className={`flex min-h-[52px] min-w-0 flex-1 items-center gap-3 px-4 py-2.5 text-left transition active:bg-black/[0.04] dark:active:bg-white/[0.06] ${mine ? "" : "opacity-70"}`}
       >
         <span className="text-xl">{icon}</span>
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-[15px] font-bold">{titel}</span>
+          <span className="block truncate text-[15.5px] font-semibold">{titel}</span>
           {unter && <span className="block truncate text-[12px] text-tinte-leise">{unter}</span>}
         </span>
         {unread > 0 && (

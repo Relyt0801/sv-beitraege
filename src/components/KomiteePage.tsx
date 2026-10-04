@@ -7,7 +7,7 @@ import { WerHatGestimmt } from "./WerHatGestimmt";
 import { Avatar, PersonName } from "./Avatar";
 import { ChatBlase, SystemZeile } from "./ChatBlasen";
 import { BannHinweis } from "./BannHinweis";
-import { Sheet } from "./Sheet";
+import { Sheet, SheetKopf } from "./Sheet";
 import { useChatEnde } from "../lib/gescrollt";
 import { VorsitzZeile } from "./VorsitzSheet";
 import { Icon } from "./Icon";
@@ -416,10 +416,7 @@ function NeuSheet({ art, onClose, onSave }: { art: Neu; onClose: () => void; onS
 
   return (
     <Sheet open onClose={onClose}>
-      <div className="mb-4 flex items-center gap-3">
-        <span className="flex-1 text-xl font-bold">{titel}</span>
-        <button className="iconbtn" onClick={onClose} aria-label="Schließen">✕</button>
-      </div>
+      <SheetKopf titel={titel} onClose={onClose} />
 
       <textarea
         rows={art === "pin" ? 2 : 2}
@@ -436,7 +433,7 @@ function NeuSheet({ art, onClose, onSave }: { art: Neu; onClose: () => void; onS
 
       {art === "umfrage" && (
         <>
-          <div className="mb-2 text-sm font-semibold text-tinte-matt">Antworten</div>
+          <div className="mb-1.5 px-1 text-[12px] font-semibold uppercase tracking-[0.04em] text-tinte-leise">Antworten</div>
           {optionen.map((o, i) => (
             <input
               key={i}

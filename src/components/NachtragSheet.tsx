@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { Sheet } from "./Sheet";
+import { Gruppe, Zeile } from "./Liste";
 import { useStore } from "../store";
 import { useRole } from "../auth/RoleProvider";
 import { heuteKey, tagLang } from "../lib/termine";
@@ -227,28 +228,6 @@ function Erfolg() {
         />
       </svg>
       <div className="mt-2 text-[1.2rem] font-bold">Antrag gesendet</div>
-    </div>
-  );
-}
-
-/** Abschnitt wie in den iOS-Einstellungen: kleine Überschrift, weiße Gruppe. */
-export function Gruppe({ titel, children }: { titel: string; children: React.ReactNode }) {
-  return (
-    <section className="mt-4">
-      <h3 className="mb-1.5 px-4 text-[12px] font-semibold uppercase tracking-[0.04em] text-tinte-leise">{titel}</h3>
-      <div className="divide-y divide-black/[0.06] overflow-hidden rounded-2xl bg-[rgb(118_118_128/0.08)] dark:divide-white/[0.08] dark:bg-[rgb(118_118_128/0.18)]">
-        {children}
-      </div>
-    </section>
-  );
-}
-
-/** Eine Zeile: links die Bezeichnung, rechts der Wert. */
-export function Zeile({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="flex min-h-[48px] items-center gap-3 px-4 py-2">
-      <span className="shrink-0 text-[15px]">{label}</span>
-      <span className="flex min-w-0 flex-1 justify-end">{children}</span>
     </div>
   );
 }

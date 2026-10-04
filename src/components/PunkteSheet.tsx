@@ -2,9 +2,9 @@ import { useState } from "react";
 import type { Contribution, Settings, Student } from "../lib/types";
 import { useStore } from "../store";
 import { Sheet } from "./Sheet";
-import { PunkteBar, StaffelTabelle } from "./PunkteBar";
-import { prozentVon } from "../lib/logic";
-import { AbiTicket } from "./AbiTicket";
+import { prozentVon, ticketPreise } from "../lib/logic";
+import { StaffelKacheln } from "./Staffel";
+import { Gruppe, KopfBild, RechnungKopf } from "./Liste";
 import { MithilfeBlatt } from "./MithilfeBlatt";
 import { useProfiles } from "../profiles-store";
 
@@ -38,69 +38,57 @@ export function PunkteSheet({
   const pct = prozentVon(summe, settings);
 
 
+  const ticket = ticketPreise(pct, settings);
+
   return (
     <Sheet open={open} onClose={onClose}>
-      <div className="mb-4 flex items-start gap-3">
-        <div className="flex-1">
-          <div className="text-xl font-bold leading-tight">Gesammelte Prozent</div>
-          <div className="text-sm text-tinte-matt">
-            {student.vorname} {student.nachname}
-          </div>
-        </div>
-        <button className="iconbtn" onClick={onClose} aria-label="Schließen">
-          ✕
-        </button>
-      </div>
+      <div className="mx-auto max-w-md">
+        <RechnungKopf
+          bild={<KopfBild text="🙌" />}
+          oben={`${student.vorname} ${student.nachname}`}
+          wert={`${pct} %`}
+          wertKlasse={pct > 100 ? "text-[#9A7410] dark:text-[#E9C460]" : pct >= 100 ? "text-bezahlt dark:text-emerald-300" : "text-brand"}
+          titel="mitgeholfen"
+          unter={ticket.preisSteht ? `1. Abiball-Ticket ${ticket.erstes} €` : `Zuschlag aufs 1. Ticket ${ticket.aufschlag - ticket.rabatt} €`}
+          onClose={onClose}
+        />
 
-      <div className="mb-4 rounded-2xl bg-papier-matt p-4 dark:bg-slate-800/70">
-        <PunkteBar punkte={summe} settings={settings} />
-        <div className="mt-3">
-          <StaffelTabelle settings={settings} pct={pct} />
-        </div>
-        <div className="mt-3 grid gap-2">
-          <AbiTicket art="erstes" student={student} settings={settings} prozent={pct} klein />
-        </div>
-      </div>
+        <StaffelKacheln pct={pct} settings={settings} />
 
-      {editable && (
-        <div className="mt-4">
-          <MithilfeEintragen fuer={`${student.vorname} ${student.nachname}`} onEintragen={(titel, p, tag) => addContribution(student.id, titel, p, tag)} />
-        </div>
-      )}
-
-      <h3 className="mb-2 mt-5 text-[13px] font-semibold text-tinte-matt">Zuletzt eingetragen</h3>
-      {list.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-papier-linie py-10 text-center text-sm text-tinte-leise dark:border-slate-700">
-          Noch nichts eingetragen.
-        </div>
-      ) : (
-        <ul className="divide-y divide-papier-linie overflow-hidden rounded-2xl border border-papier-linie dark:divide-slate-700 dark:border-slate-700">
-          {list.map((c) => (
-            <Zeile
-              key={c.id}
-              c={c}
-              editable={editable}
-              // Fürs Team: wer hat das eingetragen? Steht bei Einträgen, seit die
-              // Datenbank das mitschreibt (supabase/mithilfe-nachvollziehen.sql).
-              von={editable && c.created_by ? profile[c.created_by]?.anzeigename || "Unbekannt" : ""}
-              onChange={(patch) => updateContribution(c.id, patch)}
-              onDelete={async () => {
-                if (await frage(`„${c.titel}" wirklich löschen?`, "Löschen", true)) removeContribution(c.id);
-              }}
+        {editable && (
+          <div className="mt-4">
+            <MithilfeEintragen
+              fuer={`${student.vorname} ${student.nachname}`}
+              onEintragen={(titel, p, tag) => addContribution(student.id, titel, p, tag)}
             />
-          ))}
-        </ul>
-      )}
+          </div>
+        )}
 
-      <button className="btn-primary mt-5" onClick={onClose}>
-        Fertig
-      </button>
-
+        <Gruppe titel="Eingetragen" fuss={editable && list.length > 0 ? "Antippen zum Ändern oder Löschen" : undefined}>
+          {list.length === 0 ? (
+            <div className="px-4 py-5 text-center text-[13.5px] text-tinte-leise">Noch nichts eingetragen.</div>
+          ) : (
+            list.map((c) => (
+              <EintragZeile
+                key={c.id}
+                c={c}
+                editable={editable}
+                // Fürs Team: wer hat das eingetragen? (supabase/mithilfe-nachvollziehen.sql)
+                von={editable && c.created_by ? profile[c.created_by]?.anzeigename || "Unbekannt" : ""}
+                onChange={(patch) => updateContribution(c.id, patch)}
+                onDelete={async () => {
+                  if (await frage(`„${c.titel}" wirklich löschen?`, "Löschen", true)) removeContribution(c.id);
+                }}
+              />
+            ))
+          )}
+        </Gruppe>
+      </div>
     </Sheet>
   );
 }
 
-function Zeile({
+function EintragZeile({
   c,
   editable,
   von,
@@ -120,23 +108,31 @@ function Zeile({
 
   if (edit)
     return (
-      <li className="bg-brand/5 p-3">
-        <input className="field mb-2" value={titel} onChange={(e) => setTitel(e.target.value)} autoFocus />
+      <div className="grid gap-2 px-4 py-3">
+        <input
+          className="w-full rounded-lg bg-white px-3 py-2 text-[15px] outline-none dark:bg-slate-800"
+          value={titel}
+          onChange={(e) => setTitel(e.target.value)}
+          autoFocus
+          aria-label="Wofür"
+        />
         <div className="flex items-center gap-2">
-          <input
-            type="number"
-            min={0}
-            className="w-20 rounded-lg border border-papier-linie bg-white px-2.5 py-2 text-center dark:border-slate-700 dark:bg-slate-800"
-            value={punkte}
-            onChange={(e) => setPunkte(e.target.value)}
-          />
-          <button onClick={onDelete} className="rounded-lg border border-red-300 px-3 py-2 text-sm font-bold text-red-500">
+          <span className="flex items-center gap-1">
+            <input
+              type="number"
+              min={0}
+              inputMode="numeric"
+              aria-label="Prozent"
+              className="w-16 rounded-lg bg-white px-2 py-2 text-right text-[15px] font-bold text-brand outline-none dark:bg-slate-800"
+              value={punkte}
+              onChange={(e) => setPunkte(e.target.value)}
+            />
+            <span className="text-[15px] font-bold text-brand">%</span>
+          </span>
+          <button onClick={onDelete} className="px-2 py-2 text-[14px] font-semibold text-red-600 dark:text-red-400">
             Löschen
           </button>
-          <button
-            onClick={() => setEdit(false)}
-            className="ml-auto rounded-lg border border-papier-linie px-3 py-2 text-sm font-semibold text-tinte-matt dark:border-slate-700"
-          >
+          <button onClick={() => setEdit(false)} className="ml-auto px-2 py-2 text-[14px] font-semibold text-tinte-matt dark:text-slate-300">
             Abbrechen
           </button>
           <button
@@ -144,31 +140,28 @@ function Zeile({
               onChange({ titel: titel.trim() || c.titel, punkte: Number(punkte) || 0 });
               setEdit(false);
             }}
-            className="rounded-lg bg-brand px-4 py-2 text-sm font-bold text-white"
+            className="rounded-full bg-brand px-4 py-2 text-[14px] font-bold text-white"
           >
-            Speichern
+            Sichern
           </button>
         </div>
-      </li>
+      </div>
     );
 
+  const Tag = editable ? "button" : "div";
   return (
-    <li className="flex items-center gap-3 bg-white px-3.5 py-3 dark:bg-slate-900">
-      <div className="min-w-0 flex-1">
-        <div className="truncate text-[15px] font-semibold">{c.titel}</div>
+    <Tag
+      onClick={editable ? () => setEdit(true) : undefined}
+      className={`flex min-h-[48px] w-full items-center gap-3 px-4 py-2 text-left ${editable ? "transition active:bg-black/[0.04] dark:active:bg-white/[0.06]" : ""}`}
+    >
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-[15px]">{c.titel}</span>
         {(datum || von) && (
-          <div className="truncate text-[11px] text-tinte-leise">{[datum, von && `von ${von}`].filter(Boolean).join(" · ")}</div>
+          <span className="block truncate text-[12px] text-tinte-leise">{[datum, von && `von ${von}`].filter(Boolean).join(" · ")}</span>
         )}
-      </div>
-      <span className="shrink-0 rounded-full bg-brand/12 px-2.5 py-1 text-sm font-extrabold text-brand">
-        +{c.punkte}
       </span>
-      {editable && (
-        <button onClick={() => setEdit(true)} className="shrink-0 text-tinte-leise" aria-label="Bearbeiten">
-          ✎
-        </button>
-      )}
-    </li>
+      <span className="zahl shrink-0 text-[15px] font-bold text-brand">+{c.punkte} %</span>
+    </Tag>
   );
 }
 

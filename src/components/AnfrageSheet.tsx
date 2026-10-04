@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useTermine } from "../termine-store";
 import { committeeIcon, committeeLabel } from "../lib/committees";
-import { Sheet } from "./Sheet";
+import { Sheet, SheetKopf } from "./Sheet";
 import { heuteKey } from "../lib/termine";
 
 /**
@@ -63,14 +63,7 @@ export function AnfrageSheet({ offen, onSchliessen }: { offen: boolean; onSchlie
 
   return (
     <Sheet open={offen} onClose={onSchliessen}>
-      <div className="mb-1 flex items-center gap-3">
-        <span className="min-w-0 flex-1 font-zahl text-[1.25rem] font-extrabold tracking-[-0.02em]">
-          Termin anfragen
-        </span>
-        <button className="iconbtn shrink-0" onClick={onSchliessen} aria-label="Schließen">
-          ✕
-        </button>
-      </div>
+      <SheetKopf titel={<>Termin anfragen</>} onClose={onSchliessen} />
       <p className="mb-3 text-[12px] leading-relaxed text-tinte-leise">
         Die Anfrage geht an das Stufenteam. Erst wenn sie übernommen wird, steht
         der Termin im Kalender.

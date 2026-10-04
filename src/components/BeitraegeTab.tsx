@@ -61,9 +61,9 @@ export function BeitraegeTab() {
                 : "border-papier-linie bg-white dark:border-slate-800 dark:bg-slate-900"
             }`}
           >
-            <div className={`truncate text-[11px] font-semibold ${bereich === k.key ? "text-brand" : "text-tinte-leise"}`}>{k.titel}</div>
+            <div className={`truncate text-[11px] font-semibold ${bereich === k.key ? "text-brand-dark dark:text-brand-soft" : "text-tinte-leise"}`}>{k.titel}</div>
             <div className="zahl mt-0.5 truncate text-[1.25rem] font-extrabold leading-tight">{k.wert}</div>
-            <div className="truncate text-[11px] text-tinte-leise">{k.unter}</div>
+            <div className="truncate text-[11px] text-tinte-matt dark:text-slate-400">{k.unter}</div>
           </button>
         ))}
       </div>

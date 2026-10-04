@@ -4,7 +4,7 @@ import { normalize, sortStudents } from "../lib/logic";
 import { useStore } from "../store";
 import { useTermine } from "../termine-store";
 import { useRole } from "../auth/RoleProvider";
-import { Sheet } from "./Sheet";
+import { Sheet, SheetKopf } from "./Sheet";
 import {
   FARBEN, STUNDEN, SYMBOLE, WOCHENTAG_WAHL, heuteKey, istKuerzel, plusTage, tagLang, uhr, wiederholungsTage, zeitText,
   type NeuerTermin, type Sichtbarkeit, type Termin,
@@ -205,14 +205,7 @@ export function TerminSheet({
 
   return (
     <Sheet open={offen} onClose={onSchliessen}>
-      <div className="mb-4 flex items-center gap-3">
-        <span className="min-w-0 flex-1 font-zahl text-[1.25rem] font-extrabold tracking-[-0.02em]">
-          {termin ? "Termin ändern" : "Neuer Termin"}
-        </span>
-        <button className="iconbtn shrink-0" onClick={onSchliessen} aria-label="Schließen">
-          ✕
-        </button>
-      </div>
+      <SheetKopf titel={termin ? "Termin ändern" : "Neuer Termin"} onClose={onSchliessen} />
 
       {/* ------------------------------------------------ Was */}
       <label className="mb-2 block">
@@ -449,7 +442,7 @@ export function TerminSheet({
       </div>
 
       {/* ------------------------------------------------ Wer */}
-      <div className="mb-2 text-[13px] font-semibold text-tinte-matt">Wer sieht den Termin?</div>
+      <div className="mb-1.5 px-1 text-[12px] font-semibold uppercase tracking-[0.04em] text-tinte-leise">Wer sieht den Termin?</div>
       <div className="mb-2 flex gap-1.5 rounded-xl bg-papier-matt p-1 dark:bg-slate-800">
         {(
           [

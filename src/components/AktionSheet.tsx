@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useTermine } from "../termine-store";
 import { useStore } from "../store";
 import { frage, meldeFehler } from "../lib/melder";
-import { Sheet } from "./Sheet";
+import { Sheet, SheetKopf } from "./Sheet";
 import {
   WOCHENTAG_WAHL, heuteKey, plusTage, tagLang, uhr, wiederholungsTage,
   type Aktion, type NeuerTermin,
@@ -139,17 +139,10 @@ export function AktionSheet({ offen, onSchliessen }: { offen: boolean; onSchlies
 
   return (
     <Sheet open={offen} onClose={onSchliessen}>
-      <div className="mb-4 flex items-center gap-3">
-        <span className="min-w-0 flex-1 font-zahl text-[1.25rem] font-extrabold tracking-[-0.02em]">
-          Aktion ausschreiben
-        </span>
-        <button className="iconbtn shrink-0" onClick={onSchliessen} aria-label="Schließen">
-          ✕
-        </button>
-      </div>
+      <SheetKopf titel={<>Aktion ausschreiben</>} onClose={onSchliessen} />
 
       {/* ------------------------------------------------ Welche Aktion */}
-      <div className="mb-2 text-[13px] font-semibold text-tinte-matt">Worum geht es?</div>
+      <div className="mb-1.5 px-1 text-[12px] font-semibold uppercase tracking-[0.04em] text-tinte-leise">Worum geht es?</div>
       <div className="mb-3 flex flex-wrap gap-1.5">
         {offeneAktionen.map((a) => (
           <button

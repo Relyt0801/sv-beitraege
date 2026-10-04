@@ -3,7 +3,7 @@ import { Sheet } from "./Sheet";
 import { useStore } from "../store";
 import { normalize } from "../lib/logic";
 import { heuteKey } from "../lib/termine";
-import { Gruppe, Zeile } from "./NachtragSheet";
+import { Gruppe, Zeile } from "./Liste";
 
 /**
  * Mithilfe eintragen – aufgebaut wie eine Rechnung (wie „Mithilfe nachtragen“):

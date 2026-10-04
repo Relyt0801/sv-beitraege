@@ -5,7 +5,7 @@ import { useEntwurf } from "../lib/entwurf";
 import type { Abiball, Settings } from "../lib/types";
 import { bestellNummer, countdown, euroAusCent, useJetzt, useTicketBestellungen, verkaufStatus, type TicketBestellung } from "../lib/tickets";
 import { frage } from "../lib/melder";
-import { Gruppe, Zeile } from "./NachtragSheet";
+import { Gruppe, Zeile } from "./Liste";
 import { Schalter } from "./Schalter";
 import { zeitpunktSchoen } from "./AbiTicket";
 

@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Sheet } from "./Sheet";
+import { Sheet, SheetKopf } from "./Sheet";
 import { useStore } from "../store";
 import { useRole } from "../auth/RoleProvider";
 import { COMMITTEES, committeeIcon } from "../lib/committees";
@@ -81,10 +81,7 @@ export function EventComposer({
 
   return (
     <Sheet open={open} onClose={onClose}>
-      <div className="mb-4 flex items-center gap-3">
-        <span className="flex-1 text-xl font-bold">Neu erstellen</span>
-        <button className="iconbtn" onClick={onClose} aria-label="Schließen">✕</button>
-      </div>
+      <SheetKopf titel={<>Neu erstellen</>} onClose={onClose} />
 
       {/* Typ – Vorlagen stehen gleichberechtigt daneben, fuehren aber in ein
           eigenes Fenster: eine Aktion hat Schichten statt Antwortmoeglichkeiten. */}
@@ -116,7 +113,7 @@ export function EventComposer({
       {/* Abstimmung */}
       {type === "umfrage" && (
         <div className="mb-4 rounded-2xl border border-papier-linie p-3 dark:border-slate-700">
-          <div className="mb-2 text-sm font-semibold text-tinte-matt">Antwortoptionen</div>
+          <div className="mb-1.5 px-1 text-[12px] font-semibold uppercase tracking-[0.04em] text-tinte-leise">Antwortoptionen</div>
           {options.map((o, i) => (
             <div key={i} className="mb-2 flex gap-2">
               <input
@@ -158,7 +155,7 @@ export function EventComposer({
       )}
 
       {/* Empfänger */}
-      <div className="mb-2 text-sm font-semibold text-tinte-matt">Empfänger</div>
+      <div className="mb-1.5 px-1 text-[12px] font-semibold uppercase tracking-[0.04em] text-tinte-leise">Empfänger</div>
       <div className="mb-2 flex gap-1.5 rounded-xl bg-papier-matt p-1 dark:bg-slate-800">
         <button onClick={() => setAudience("all")} className={`${seg} ${audience === "all" ? "bg-brand text-white" : "text-tinte-matt"}`}>
           Alle Schüler

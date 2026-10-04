@@ -34,7 +34,7 @@ function useNameVon(): (uid: string) => string {
     };
   }, [profile, profiles, students]);
 }
-import { Sheet } from "./Sheet";
+import { Sheet, SheetKopf } from "./Sheet";
 
 /**
  * Die beiden Vorsitzenden eines Komitees festlegen.
@@ -98,14 +98,7 @@ export function VorsitzSheet({
 
   return (
     <Sheet open={offen} onClose={onSchliessen}>
-      <div className="mb-1 flex items-center gap-3">
-        <span className="min-w-0 flex-1 font-zahl text-[1.25rem] font-extrabold tracking-[-0.02em]">
-          {committeeIcon(tag)} Vorsitz {committeeLabel(tag)}
-        </span>
-        <button className="iconbtn shrink-0" onClick={onSchliessen} aria-label="Schließen">
-          ✕
-        </button>
-      </div>
+      <SheetKopf titel={<>{committeeIcon(tag)} Vorsitz {committeeLabel(tag)}</>} onClose={onSchliessen} />
       <p className="mb-3 text-[12px] leading-relaxed text-tinte-leise">
         Zwei Vorsitzende je Komitee. Sie dürfen Termine <b>anfragen</b> – eintragen
         tut sie weiterhin nur das Stufenteam.

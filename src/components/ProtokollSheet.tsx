@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Sheet } from "./Sheet";
+import { Sheet, SheetKopf } from "./Sheet";
 import {
   BEREICHE,
   datumDe,
@@ -111,10 +111,7 @@ export function ProtokollSheet({
 
   return (
     <Sheet open={open} onClose={onClose}>
-      <div className="mb-4 flex items-center gap-3">
-        <span className="flex-1 text-xl font-bold">{nurSicherung ? "Sicherheitskopie" : "Protokoll & Sicherung"}</span>
-        <button className="iconbtn" onClick={onClose} aria-label="Schließen">✕</button>
-      </div>
+      <SheetKopf titel={nurSicherung ? "Sicherheitskopie" : "Protokoll & Sicherung"} onClose={onClose} />
 
       {fehler && (
         <div className="mb-4 rounded-xl bg-red-500/10 px-3 py-2 text-[13px] font-semibold text-red-500">{fehler}</div>

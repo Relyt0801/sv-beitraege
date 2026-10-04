@@ -6,7 +6,7 @@ import { useNachtraege, type Nachtrag } from "../lib/nachtrag";
 import { tagLang } from "../lib/termine";
 import { Avatar } from "./Avatar";
 import { Sheet } from "./Sheet";
-import { Gruppe, Zeile } from "./NachtragSheet";
+import { Gruppe, Zeile } from "./Liste";
 
 /**
  * Anträge „Mithilfe nachtragen“ fürs Team. Je Antrag eine Karte wie eine
