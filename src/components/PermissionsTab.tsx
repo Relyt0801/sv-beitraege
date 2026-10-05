@@ -5,7 +5,9 @@ import { KomiteeZugriff } from "./KomiteeZugriff";
 import { SkelettKarten } from "./Skelett";
 import { Sheet } from "./Sheet";
 import type { Profile } from "../auth/RoleProvider";
-import { PERM_CATEGORIES, PERM_ROLES, ALL_PERMS, ROLE_DEFAULTS, ROLLE_KURZ, rechteRolle, rollenDerZeile, type PermKey } from "../lib/permissions";
+import { PERM_CATEGORIES, PERM_ROLES, ALL_PERMS, ROLE_DEFAULTS, ROLLE_KURZ, KOMITEE_PERMS, rechteRolle, rollenDerZeile, type PermKey } from "../lib/permissions";
+import { COMMITTEES } from "../lib/committees";
+import { Schalter } from "./Schalter";
 
 import { meldeFehler } from "../lib/melder";
 type Matrix = Record<string, Record<string, boolean>>;
@@ -129,8 +131,98 @@ export function PermissionsTab() {
         );
       })}
 
+      {can("perms.manage") && <KomiteeRechte />}
       <KomiteeZugriff />
     </div>
+  );
+}
+
+/** Startwerte wie in supabase/komitees-motto.sql (für die Demo) */
+const KOMITEE_START: Record<string, PermKey[]> = {
+  abizeitung: ["zitate.pruefen", "rankings.verwalten", "lehrer.verwalten"],
+  "motto-pullis": ["motto.verwalten"],
+};
+const permLabel = (k: PermKey) => PERM_CATEGORIES.flatMap((c) => c.perms).find((p) => p.key === k)?.label ?? k;
+
+/**
+ * Komitee-Rechte: ganze Komitees bekommen Verwaltungsrechte zusätzlich zur
+ * Rolle (z. B. Abizeitung prüft Zitate). Wer ins Komitee kommt, hat sie
+ * sofort; wer rausgeht, verliert sie. Eine persönliche Ausnahme
+ * („Verbieten“ unter Rollen → Person) geht trotzdem vor.
+ */
+function KomiteeRechte() {
+  const [m, setM] = useState<Record<string, Set<string>>>({});
+  const [auf, setAuf] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!hasSupabase) {
+      setM(Object.fromEntries(Object.entries(KOMITEE_START).map(([t, ps]) => [t, new Set<string>(ps)])));
+      return;
+    }
+    void supabase!
+      .from("komitee_rechte")
+      .select("tag, perm, allowed")
+      .then(({ data }) => {
+        const neu: Record<string, Set<string>> = {};
+        for (const r of (data as { tag: string; perm: string; allowed: boolean }[]) || []) if (r.allowed) (neu[r.tag] ||= new Set()).add(r.perm);
+        setM(neu);
+      });
+  }, []);
+
+  async function setze(tag: string, perm: PermKey, wert: boolean) {
+    setM((alt) => {
+      const n = new Set(alt[tag] || []);
+      if (wert) n.add(perm);
+      else n.delete(perm);
+      return { ...alt, [tag]: n };
+    });
+    if (!hasSupabase) return;
+    const { error } = await supabase!.from("komitee_rechte").upsert({ tag, perm, allowed: wert }, { onConflict: "tag,perm" });
+    if (error) meldeFehler("Speichern fehlgeschlagen: " + error.message);
+  }
+
+  return (
+    <section className="card overflow-hidden">
+      <div className="p-4 pb-2">
+        <div className="flex items-center gap-2 font-bold">
+          <span aria-hidden className="text-lg">🏷️</span> Komitee-Rechte
+        </div>
+        <p className="mt-1 text-[12px] leading-snug text-tinte-leise">
+          Ganze Komitees bekommen Verwaltungsrechte zusätzlich zur Rolle – z. B. die Abizeitung prüft Zitate. Wer im Komitee ist, hat sie
+          sofort. Ausnahmen für einzelne Personen gehen vor.
+        </p>
+      </div>
+      <div className="divide-y divide-papier-linie dark:divide-slate-800">
+        {COMMITTEES.map((k) => {
+          const an = m[k.slug] || new Set<string>();
+          const offen = auf === k.slug;
+          return (
+            <div key={k.slug}>
+              <button onClick={() => setAuf(offen ? null : k.slug)} aria-expanded={offen} className="flex w-full items-center gap-2.5 px-4 py-3 text-left">
+                <span aria-hidden>{k.icon}</span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[15px] font-semibold">{k.label}</span>
+                  <span className="block truncate text-[12px] text-tinte-leise">
+                    {an.size ? KOMITEE_PERMS.filter((p) => an.has(p)).map(permLabel).join(", ") : "Keine zusätzlichen Rechte"}
+                  </span>
+                </span>
+                <span className={`text-tinte-leise transition ${offen ? "rotate-90" : ""}`} aria-hidden>›</span>
+              </button>
+              {offen && (
+                <div className="space-y-1 px-4 pb-3">
+                  {KOMITEE_PERMS.map((p) => (
+                    <div key={p} className="flex min-h-[44px] items-center gap-3">
+                      <span className="min-w-0 flex-1 text-[14px]">{permLabel(p)}</span>
+                      <Schalter an={an.has(p)} label={`${permLabel(p)} für ${k.label}`} onChange={(v) => void setze(k.slug, p, v)} />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </section>
   );
 }
 

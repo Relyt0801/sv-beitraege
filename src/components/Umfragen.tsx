@@ -41,7 +41,7 @@ const name = (p: UPerson) => `${p.vorname} ${p.nachname}`;
  * Jede Antwort wird sofort gespeichert.
  */
 export function UmfragePopup({ bereitZumZeigen, onSichtbar }: { bereitZumZeigen: boolean; onSichtbar?: (an: boolean) => void }) {
-  const { role, isStaff, ready, can, uid } = useRole();
+  const { role, isStaff, ready, can, uid, banned } = useRole();
   const istEltern = role === "eltern";
   const fuerMich = useCallback(
     (z: Zielgruppe) => (z === "alle" ? true : z === "schueler" ? !istEltern : z === "team" ? isStaff : istEltern),
@@ -56,7 +56,8 @@ export function UmfragePopup({ bereitZumZeigen, onSichtbar }: { bereitZumZeigen:
   const [fest, setFest] = useState<string | null>(null);
   const kandidat = u.offen.find((x) => !spaeter.has(x.id)) || null;
   const aktuell = (fest && u.alle.find((x) => x.id === fest)) || kandidat;
-  const zeigen = an.umfragen && bereitZumZeigen && u.bereit && Boolean(aktuell);
+  // Gesperrt: kann nicht antworten (Datenbank blockt) – also auch kein Pop-up
+  const zeigen = an.umfragen && !banned && bereitZumZeigen && u.bereit && Boolean(aktuell);
   const personen = useUmfragePersonen(zeigen && u.fragen.some((f) => f.umfrage_id === aktuell?.id && f.typ === "person"));
 
   // „Rankings ausfüllen lassen“: jede aktive Ranking-Kategorie wird ein

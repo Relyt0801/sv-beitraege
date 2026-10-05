@@ -146,6 +146,14 @@ export async function pushAlbum(a: { art: "kommentar"; kommentar_id: string } | 
   await sendePush({ album: a });
 }
 
+/**
+ * Neues Zitat eingereicht: Bestätigungsanfrage an alle mit zitate.pruefen
+ * (z. B. Komitee Abizeitung). Empfänger und Text rechnet der Server aus.
+ */
+export async function pushZitat(zitat_id: string): Promise<void> {
+  await sendePush({ zitat_id });
+}
+
 /** Push direkt an bestimmte Nutzer senden (via Edge Function). */
 export async function pushToUsers(
   user_ids: string[], title: string, body: string, url = "./", opt?: { auchSelbst?: boolean; art?: PushArt },

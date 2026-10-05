@@ -7,6 +7,7 @@ import { heuteKey, tagLang } from "../lib/termine";
 import { useNachtraege, type Nachtrag } from "../lib/nachtrag";
 import { frage } from "../lib/melder";
 import { normalize } from "../lib/logic";
+import { GesperrtZeile } from "./Gesperrt";
 
 const SONSTIGES = "__sonstiges__";
 
@@ -17,7 +18,7 @@ const SONSTIGES = "__sonstiges__";
  */
 export function NachtragSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { templates, students } = useStore();
-  const { studentId } = useRole();
+  const { studentId, banned } = useRole();
   const { liste, stellen, zurueckziehen } = useNachtraege(open);
   const ich = students.find((s) => s.id === studentId) || null;
 
@@ -38,7 +39,7 @@ export function NachtragSheet({ open, onClose }: { open: boolean; onClose: () =>
   // Fester Wert nur bei Vorlagen ohne „% frei“ – sonst legt das Team ihn fest
   const wert = vorlage && !vorlage.variabel ? vorlage.punkte : null;
   const titel = sonstiges ? name.trim() : vorlage?.titel || "";
-  const geht = Boolean(ich && titel && datum && datum <= heuteKey() && (!sonstiges || text.trim().length >= 3));
+  const geht = !banned && Boolean(ich && titel && datum && datum <= heuteKey() && (!sonstiges || text.trim().length >= 3));
 
   function zuruecksetzen() {
     setWahl(null);
@@ -191,6 +192,7 @@ export function NachtragSheet({ open, onClose }: { open: boolean; onClose: () =>
                 Dein Zugang ist mit keinem Eintrag in der Stufe verknüpft – frag das Stufenteam.
               </p>
             )}
+            <GesperrtZeile className="mt-3" />
             {fehler && <p className="mt-3 text-center text-[13px] font-semibold text-red-600">Das hat nicht geklappt: {fehler}</p>}
 
             <button disabled={!geht || sendet} onClick={() => void senden()} className="btn-primary mt-4 w-full disabled:opacity-40">

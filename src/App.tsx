@@ -210,6 +210,16 @@ function Main() {
   useEffect(() => {
     tabAusAdresse(true);
   }, []);
+  // „Neues Zitat zum Prüfen“ (./#zitate): zur eigenen Ansicht mit den Karten.
+  // Die Marke entfernt die Zitat-Karte selbst, wenn sie das Blatt öffnet.
+  useEffect(() => {
+    const zuZitaten = () => {
+      if (window.location.hash === "#zitate") setTab(hatProfilReiter ? "profil" : "kasse");
+    };
+    zuZitaten();
+    window.addEventListener("hashchange", zuZitaten);
+    return () => window.removeEventListener("hashchange", zuZitaten);
+  }, [hatProfilReiter, setTab]);
   useEffect(() => {
     const neu = () => {
       const t = tabAusAdresse();

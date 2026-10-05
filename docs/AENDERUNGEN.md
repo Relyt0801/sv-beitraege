@@ -12,6 +12,31 @@ ausführlich (auf Deutsch); hier steht der Überblick dazu.
 ---
 
 
+## 05.10.2026 (3): Rankings getrennt, Abimotto, Komitee-Rechte, Sperre überall
+
+- **Rankings getrennt** (`components/Rankings.tsx` → `RankingKarten`): zwei
+  Karten nebeneinander, „Schüler“ (blau) und „Lehrer“ (orange), jede öffnet
+  ihr eigenes Blatt mit den Kategorien als Kacheln (Top 3).
+- **Abimotto** (`lib/motto.ts`, `components/Motto.tsx`, SQL
+  `supabase/komitees-motto.sql`, Tabellen `motto_vorschlaege`,
+  `motto_stimmen`): Karte wie Zitate/Album. Vorschlagen, 👍 beliebig oft, 🔥
+  nur einmal je Person (Favorit, zählt doppelt). Verwalten (Zahnrad): ändern,
+  ausblenden, als Motto festlegen – dann steht es groß auf der Karte.
+  Funktion „Abimotto“ in Profil → Funktionen (Standard aus), Rechte
+  `motto.nutzen` (alle Schüler + Team) und `motto.verwalten`.
+- **Komitee-Rechte** (Tabelle `komitee_rechte`, `has_perm()` neu,
+  Rollen & Rechte → Rechte → Komitee-Rechte): ganze Komitees bekommen
+  Verwaltungsrechte. Start: Abizeitung = Zitate prüfen, Rankings verwalten,
+  Lehrerliste; Motto & Pullis = Abimotto verwalten. Reihenfolge: persönliche
+  Ausnahme > Komitee > Rolle. Admin kann alles weiter verteilen.
+- **Bestätigungsanfragen**: Neues Zitat → Push an alle mit „Zitate prüfen“
+  (`send-push` Modus `zitat_id`, Empfänger über `perm_empfaenger()` – der
+  Admin nur, wenn er selbst im Komitee ist). Tippen öffnet direkt „Prüfen“.
+- **Gesperrt = überall nur ansehen**: Trigger `gesperrt_blocken` auf Zitaten,
+  Album (Steckbrief, Kommentare, Likes), Rankings, Umfragen, Abimotto,
+  Nachträgen und Komitee-Anfragen. In der App steht ein Hinweis, Knöpfe zum
+  Einreichen sind weg, Pop-up-Umfragen erscheinen nicht.
+
 ## 05.10.2026 (2): Lehrerliste gefüllt, Lied suchen, Nachtragen, Reaktionen
 
 - **Lehrerliste**: Die Lehrkräfte von der Schul-Webseite stehen jetzt in der

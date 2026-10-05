@@ -17,6 +17,7 @@ import {
   type StufenPerson,
 } from "../lib/rankings";
 import { frage, meldeFehler } from "../lib/melder";
+import { GesperrtZeile, GESPERRT_TEXT } from "./Gesperrt";
 
 const MEDAILLE = ["#E9C460", "#C0C4CC", "#D4A373"];
 const kurz = (p: StufenPerson) => `${p.vorname} ${p.nachname ? p.nachname[0] + "." : ""}`.trim();
@@ -32,72 +33,103 @@ function useNamen(personen: StufenPerson[], lehrer: Lehrer[]) {
 }
 
 /* ====================================================================== */
-/* Karte im Profil                                                        */
+/* Zwei Karten im Profil: Schüler-Ranking | Lehrer-Ranking               */
 /* ====================================================================== */
-export function RankingKarte({ className = "" }: { className?: string }) {
+const ART_STIL: Record<RankingArt, { titel: string; kurz: string; verlauf: string; akzent: string; knopf: string; schatten: string }> = {
+  schueler: {
+    titel: "Schüler-Ranking",
+    kurz: "Schüler",
+    verlauf: "from-[#1E3A8A] to-[#0B1226]",
+    akzent: "text-[#8CB8FF]",
+    knopf: "bg-[#8CB8FF] text-[#0B1226]",
+    schatten: "shadow-[0_10px_30px_-14px_rgba(30,58,138,.9)]",
+  },
+  lehrer: {
+    titel: "Lehrer-Ranking",
+    kurz: "Lehrer",
+    verlauf: "from-[#7C2D12] to-[#1C0F08]",
+    akzent: "text-[#FDBA74]",
+    knopf: "bg-[#FDBA74] text-[#1C0F08]",
+    schatten: "shadow-[0_10px_30px_-14px_rgba(124,45,18,.9)]",
+  },
+};
+
+export function RankingKarten({ className = "" }: { className?: string }) {
   const { can, isEltern, uid } = useRole();
   const { sichtbar } = useFunktionen();
   const darf = !isEltern && sichtbar("rankings") && (can("rankings.nutzen") || can("rankings.verwalten"));
-  const [offen, setOffen] = useState(false);
-  const r = useRankings(darf, uid, offen);
+  const [offen, setOffen] = useState<RankingArt | null>(null);
+  const r = useRankings(darf, uid, offen !== null);
   if (!darf) return null;
-  const aktive = r.kategorien.filter((k) => k.aktiv);
-  const fertig = aktive.filter((k) => k.id in r.meine).length;
-  const offenAnzahl = aktive.length - fertig;
 
   return (
     <div className={className}>
       <AusHinweis funktion="rankings" className="mb-1.5 px-1" />
-      <section className="relative overflow-hidden rounded-[1.4rem] bg-gradient-to-br from-[#1E2A4A] to-[#0B1226] p-4 text-white shadow-[0_10px_30px_-14px_rgba(11,18,38,.8)] sm:p-5">
-        {/* Kleines Siegertreppchen */}
-        <div aria-hidden className="pointer-events-none absolute bottom-0 right-4 flex items-end gap-1 opacity-90">
-          {[
-            { h: 34, f: MEDAILLE[1], n: 2 },
-            { h: 50, f: MEDAILLE[0], n: 1 },
-            { h: 24, f: MEDAILLE[2], n: 3 },
-          ].map((s) => (
-            <span key={s.n} className="flex w-9 items-start justify-center rounded-t-md pt-1 text-[12px] font-bold text-[#1E2A4A]" style={{ height: s.h, background: s.f }}>
-              {s.n}
-            </span>
-          ))}
-        </div>
-        <div className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[#E9C460]">Abi-Rankings</div>
-        <div className="mt-1 max-w-[70%] text-[1.25rem] font-bold leading-tight">Wer wird am ehesten …?</div>
-        <div className="mt-1.5 text-[13px] text-white/75">
-          {aktive.length
-            ? offenAnzahl
-              ? `Noch ${offenAnzahl} von ${aktive.length} offen`
-              : `Alle ${aktive.length} abgestimmt – Plätze live ansehen`
-            : "Noch keine Kategorien"}
-        </div>
-        <button
-          onClick={() => setOffen(true)}
-          className="mt-4 rounded-full bg-[#E9C460] px-4 py-2 text-[14px] font-semibold text-[#1C1C1E] transition active:scale-95"
-        >
-          {offenAnzahl > 0 ? "Abstimmen" : "Ansehen"}
-        </button>
-      </section>
-      <RankingSheet open={offen} onClose={() => setOffen(false)} r={r} />
+      <div className="grid grid-cols-2 gap-3">
+        {(["schueler", "lehrer"] as RankingArt[]).map((art) => (
+          <RankingKarte key={art} art={art} r={r} oeffnen={() => setOffen(art)} />
+        ))}
+      </div>
+      <RankingSheet art={offen} onClose={() => setOffen(null)} r={r} />
     </div>
   );
 }
 
+function RankingKarte({ art, r, oeffnen }: { art: RankingArt; r: Rankings; oeffnen: () => void }) {
+  const stil = ART_STIL[art];
+  const aktive = r.kategorien.filter((k) => k.aktiv && k.art === art);
+  const offenAnzahl = aktive.filter((k) => !(k.id in r.meine)).length;
+  return (
+    <section
+      className={`relative flex min-h-[164px] flex-col overflow-hidden rounded-[1.4rem] bg-gradient-to-br p-3.5 text-white sm:p-5 ${stil.verlauf} ${stil.schatten}`}
+    >
+      {/* Kleines Siegertreppchen oben rechts – unten ist Platz für den Knopf */}
+      <div aria-hidden className="pointer-events-none absolute right-3.5 top-3.5 flex items-end gap-[2px] opacity-90 sm:right-5 sm:top-5">
+        {[
+          { h: 15, f: MEDAILLE[1], n: 2 },
+          { h: 22, f: MEDAILLE[0], n: 1 },
+          { h: 10, f: MEDAILLE[2], n: 3 },
+        ].map((s) => (
+          <span key={s.n} className="w-[14px] rounded-t-[3px] sm:w-5" style={{ height: s.h, background: s.f }} />
+        ))}
+      </div>
+      <div className={`pr-14 text-[11px] font-semibold uppercase tracking-[0.12em] ${stil.akzent}`}>Abi-Ranking</div>
+      <div className="mt-0.5 text-[1.2rem] font-bold leading-tight">{stil.kurz}</div>
+      <div className="mt-1 text-[12.5px] leading-snug text-white/75">
+        {aktive.length ? (offenAnzahl ? `Noch ${offenAnzahl} von ${aktive.length} offen` : `Alle ${aktive.length} abgestimmt`) : "Noch keine Kategorien"}
+      </div>
+      <button
+        onClick={oeffnen}
+        className={`mt-auto self-start rounded-full px-3.5 py-2 text-[13.5px] font-semibold transition active:scale-95 ${stil.knopf}`}
+      >
+        {offenAnzahl > 0 ? "Abstimmen" : "Ansehen"}
+      </button>
+    </section>
+  );
+}
+
 /* ====================================================================== */
-/* Blatt: zwei Spalten Schüler | Lehrer                                   */
+/* Blatt je Ranking                                                       */
 /* ====================================================================== */
-function RankingSheet({ open, onClose, r }: { open: boolean; onClose: () => void; r: Rankings }) {
+function RankingSheet({ art, onClose, r }: { art: RankingArt | null; onClose: () => void; r: Rankings }) {
   const { can } = useRole();
+  const open = art !== null;
   const personen = useStufePersonen(open);
   const { lehrer } = useLehrer(open);
   const name = useNamen(personen, lehrer);
   const [wahl, setWahl] = useState<RankingKategorie | null>(null);
   const [verwalten, setVerwalten] = useState(false);
   const darfVerwalten = can("rankings.verwalten") || can("lehrer.verwalten");
-  const aktive = r.kategorien.filter((k) => k.aktiv);
+  const zuletzt = art ?? "schueler";
+  const aktive = r.kategorien.filter((k) => k.aktiv && k.art === zuletzt);
+  const schliessen = () => {
+    setWahl(null);
+    onClose();
+  };
 
   return (
     <>
-      <Sheet open={open && !verwalten} onClose={onClose}>
+      <Sheet open={open && !verwalten} onClose={schliessen}>
         {wahl ? (
           <Abstimmen
             k={wahl}
@@ -106,41 +138,32 @@ function RankingSheet({ open, onClose, r }: { open: boolean; onClose: () => void
             lehrer={lehrer.filter((l) => l.aktiv)}
             name={name}
             zurueck={() => setWahl(null)}
-            onClose={onClose}
+            onClose={schliessen}
           />
         ) : (
           <>
             <SheetKopf
-              titel="Abi-Rankings"
+              titel={ART_STIL[zuletzt].titel}
               unter="Geheim: gezählt wird nur, wie oft jemand gewählt wurde. Plätze aktualisieren sich von selbst."
-              onClose={onClose}
+              onClose={schliessen}
               extra={darfVerwalten ? <ZahnradKnopf label="Rankings und Lehrer verwalten" onClick={() => setVerwalten(true)} /> : undefined}
             />
             <AusHinweis funktion="rankings" className="-mt-2 mb-3" />
-            <div className="grid grid-cols-2 gap-2.5 sm:gap-4">
-              {(["schueler", "lehrer"] as RankingArt[]).map((art) => (
-                <div key={art} className="min-w-0">
-                  <h3 className="mb-2 flex items-center gap-1.5 px-1 text-[12px] font-semibold uppercase tracking-[0.06em] text-tinte-leise">
-                    <span className={`h-2 w-2 rounded-full ${art === "schueler" ? "bg-[#0A84FF]" : "bg-[#FF9500]"}`} />
-                    {art === "schueler" ? "Schüler" : "Lehrer"}
-                  </h3>
-                  <div className="space-y-2.5">
-                    {aktive
-                      .filter((k) => k.art === art)
-                      .map((k) => (
-                        <Kachel key={k.id} k={k} r={r} name={name} onClick={() => setWahl(k)} />
-                      ))}
-                    {!aktive.some((k) => k.art === art) && (
-                      <p className="rounded-2xl border border-dashed border-black/10 px-3 py-4 text-center text-[12.5px] text-tinte-leise dark:border-white/15">Noch keine</p>
-                    )}
-                  </div>
-                </div>
+            <GesperrtZeile className="-mt-1 mb-3" />
+            <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3">
+              {aktive.map((k) => (
+                <Kachel key={k.id} k={k} r={r} name={name} onClick={() => setWahl(k)} />
               ))}
             </div>
+            {aktive.length === 0 && (
+              <p className="rounded-2xl border border-dashed border-black/10 px-3 py-6 text-center text-[13px] text-tinte-leise dark:border-white/15">
+                Noch keine Kategorien{darfVerwalten ? " – über das Zahnrad anlegen." : "."}
+              </p>
+            )}
           </>
         )}
       </Sheet>
-      <RankingVerwaltung open={open && verwalten} onClose={() => setVerwalten(false)} r={r} />
+      <RankingVerwaltung open={open && verwalten} onClose={() => setVerwalten(false)} r={r} start={zuletzt} />
     </>
   );
 }
@@ -196,12 +219,13 @@ function Abstimmen({
   zurueck: () => void;
   onClose: () => void;
 }) {
+  const { banned } = useRole();
   const st = r.stand.find((s) => s.kategorie_id === k.id);
   return (
     <div className="animate-vonRechts">
       <div className="mb-3 flex items-center justify-between">
         <button onClick={zurueck} className="py-1 text-[16px] font-semibold text-brand">
-          ‹ Rankings
+          ‹ {ART_STIL[k.art].titel}
         </button>
         <button onClick={onClose} aria-label="Schließen" className="flex h-[30px] w-[30px] items-center justify-center rounded-full bg-[rgb(118_118_128/0.12)] text-[13px] font-bold text-tinte-leise">
           ✕
@@ -227,6 +251,7 @@ function Abstimmen({
           })}
         </div>
       </div>
+      <GesperrtZeile className="mt-3" />
       <p className="mb-2 mt-4 px-1 text-[13px] text-tinte-leise">
         {k.id in r.meine ? `Deine Stimme: ${r.meine[k.id] ? name(r.meine[k.id]) : "Weiß nicht"} – du kannst sie ändern.` : "Wähle aus:"}
       </p>
@@ -237,6 +262,7 @@ function Abstimmen({
         wert={r.meine[k.id]}
         gewaehlt={k.id in r.meine}
         setzen={async (ziel) => {
+          if (banned) return meldeFehler(GESPERRT_TEXT);
           const f = await r.abstimmen(k.id, ziel);
           if (f) meldeFehler("Ging nicht: " + f);
         }}
@@ -336,7 +362,7 @@ export function RankingVerwaltungSheet({ open, onClose }: { open: boolean; onClo
   return <RankingVerwaltung open={open} onClose={onClose} r={r} />;
 }
 
-function RankingVerwaltung({ open, onClose, r }: { open: boolean; onClose: () => void; r: Rankings }) {
+function RankingVerwaltung({ open, onClose, r, start }: { open: boolean; onClose: () => void; r: Rankings; start?: RankingArt }) {
   const { can } = useRole();
   const [teil, setTeil] = useState<"kategorien" | "lehrer">(can("rankings.verwalten") ? "kategorien" : "lehrer");
   return (
@@ -352,14 +378,14 @@ function RankingVerwaltung({ open, onClose, r }: { open: boolean; onClose: () =>
           </button>
         </div>
       )}
-      {teil === "kategorien" && can("rankings.verwalten") ? <KategorienListe r={r} /> : <LehrerListe aktiv={open} />}
+      {teil === "kategorien" && can("rankings.verwalten") ? <KategorienListe r={r} start={start} /> : <LehrerListe aktiv={open} />}
     </Sheet>
   );
 }
 
-function KategorienListe({ r }: { r: Rankings }) {
+function KategorienListe({ r, start = "schueler" }: { r: Rankings; start?: RankingArt }) {
   const [neu, setNeu] = useState("");
-  const [art, setArt] = useState<RankingArt>("schueler");
+  const [art, setArt] = useState<RankingArt>(start);
   const [bearbeite, setBearbeite] = useState<string | null>(null);
   const [titel, setTitel] = useState("");
 

@@ -43,10 +43,12 @@ Deno.serve(async (req) => {
       return json({ passt });
     }
 
-    const { probe, auch_selbst, ohne_eltern, event_id, termin_id, an_team, user_ids, chat_item_id, angepinnt, an_personen, eltern_info_id, album, art, title: directTitle, body: directBody, url: wunschUrl } = koerper as {
+    const { probe, auch_selbst, ohne_eltern, event_id, termin_id, an_team, user_ids, chat_item_id, angepinnt, an_personen, eltern_info_id, album, zitat_id, art, title: directTitle, body: directBody, url: wunschUrl } = koerper as {
       probe?: boolean;
       /** Abi-Album: Kommentar, fremder Text oder Freigabe – Text und Empfänger rechnet der Server aus. */
       album?: { art?: string; student_id?: string; kommentar_id?: string; an?: string[] };
+      /** Neues Zitat eingereicht: an alle, die Zitate prüfen (z. B. Komitee Abizeitung). */
+      zitat_id?: string;
       /** Kategorie für die Mitteilungs-Schalter des Teams: "anfrage" | "eltern" */
       art?: string;
       /** Bestätigung an sich selbst (z. B. sich selbst in eine Schicht eingeteilt). */
@@ -175,7 +177,21 @@ Deno.serve(async (req) => {
       verwaltet = Boolean((up && up.length) || (rp && rp.length));
     }
 
-    if (album && typeof album === "object") {
+    if (typeof zitat_id === "string" && zitat_id) {
+      // Bestätigungsanfrage: nur für ein Zitat, das der Absender gerade selbst
+      // eingereicht hat. Empfänger = wer zitate.pruefen hat (Rolle, Komitee
+      // oder Ausnahme) – der Server rechnet das aus, Text baut er selbst.
+      const { data: z } = await supabase.from("zitate")
+        .select("id, eingereicht_von, eingereicht_name, wer, status, created_at").eq("id", zitat_id).maybeSingle();
+      const frisch = z && Date.parse(String(z.created_at)) > Date.now() - 10 * 60_000;
+      if (!z || z.eingereicht_von !== selbst || z.status !== "offen" || !frisch) return json({ error: "nicht erlaubt" }, 403);
+      const { data: pr } = await supabase.rpc("perm_empfaenger", { p: "zitate.pruefen" });
+      userIds = ((Array.isArray(pr) ? pr : []) as unknown[]).map((x) => String(x));
+      title = "💬 Neues Zitat zum Prüfen";
+      body = kurz(`${z.eingereicht_name || "Jemand"} hat ein Zitat von ${z.wer} eingereicht.`, 200);
+      ziel = "./#zitate";
+      pushTag = "zitate-pruefen";
+    } else if (album && typeof album === "object") {
       // Abi-Album: Schüler dürfen sonst keine anderen Schüler benachrichtigen.
       // Deshalb nimmt der Server hier keinen Text an, sondern prüft, dass der
       // Absender das Ereignis gerade selbst ausgelöst hat, und baut die

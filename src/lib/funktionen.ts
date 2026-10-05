@@ -12,18 +12,19 @@ import { useRole } from "../auth/RoleProvider";
  * Ausgeschaltetes sieht nur, wer die Funktionen verwaltet – mit Hinweis –,
  * damit man vorbereiten kann, bevor alle es sehen.
  */
-export type FunktionKey = "abiball" | "album" | "zitate" | "rankings" | "umfragen" | "spotify";
+export type FunktionKey = "abiball" | "album" | "zitate" | "rankings" | "umfragen" | "spotify" | "motto";
 
 export const FUNKTIONEN: { key: FunktionKey; titel: string; zeichen: string; text: string }[] = [
   { key: "abiball", titel: "Abiball-Tickets", zeichen: "🎟️", text: "Ticket-Bereich bei Schülern und Eltern." },
   { key: "album", titel: "Abi-Album", zeichen: "📖", text: "Steckbriefe mit Kommentaren und Likes." },
   { key: "zitate", titel: "Zitatwand", zeichen: "💬", text: "Zitate von Lehrern und Mitschülern sammeln und abstimmen." },
-  { key: "rankings", titel: "Abi-Rankings", zeichen: "🏆", text: "Schüler- und Lehrer-Rankings mit Top 3." },
+  { key: "rankings", titel: "Abi-Rankings", zeichen: "🏆", text: "Schüler- und Lehrer-Ranking mit Top 3." },
+  { key: "motto", titel: "Abimotto", zeichen: "✨", text: "Mottos vorschlagen, mit 👍 und 🔥 abstimmen." },
   { key: "spotify", titel: "Spotify im Steckbrief", zeichen: "🎵", text: "Lieder aus Spotify-Links mit Cover und 30-Sekunden-Hörprobe." },
   { key: "umfragen", titel: "Pop-up-Umfragen", zeichen: "📊", text: "Umfragen, die beim Öffnen der App erscheinen." },
 ];
 
-const STANDARD: Record<FunktionKey, boolean> = { abiball: true, album: false, zitate: false, rankings: false, umfragen: true, spotify: true };
+const STANDARD: Record<FunktionKey, boolean> = { abiball: true, album: false, zitate: false, rankings: false, umfragen: true, spotify: true, motto: false };
 const DEMO = "sv-funktionen-demo";
 
 interface Ctx {
@@ -41,9 +42,9 @@ export function FunktionenProvider({ children }: { children: ReactNode }) {
   const [an, setAn] = useState<Record<FunktionKey, boolean>>(() => {
     if (hasSupabase) return STANDARD;
     try {
-      return { ...STANDARD, album: true, zitate: true, rankings: true, ...JSON.parse(localStorage.getItem(DEMO) || "{}") };
+      return { ...STANDARD, album: true, zitate: true, rankings: true, motto: true, ...JSON.parse(localStorage.getItem(DEMO) || "{}") };
     } catch {
-      return { ...STANDARD, album: true, zitate: true, rankings: true };
+      return { ...STANDARD, album: true, zitate: true, rankings: true, motto: true };
     }
   });
   const [bereit, setBereit] = useState(!hasSupabase);

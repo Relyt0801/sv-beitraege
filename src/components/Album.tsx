@@ -18,6 +18,7 @@ import { frage, melde, meldeFehler } from "../lib/melder";
 import { useFunktionen } from "../lib/funktionen";
 import { LiedSuche, SpotifyKarte, ohneLink, spotifyAus } from "./Spotify";
 import { AusHinweis } from "./Funktionen";
+import { GesperrtZeile, GESPERRT_TEXT } from "./Gesperrt";
 
 /* ====================================================================== */
 /* Gemeinsamer Zustand: einmal laden, Karte und Blatt teilen ihn          */
@@ -25,10 +26,20 @@ import { AusHinweis } from "./Funktionen";
 const AlbumCtx = createContext<Album | null>(null);
 
 export function AlbumProvider({ children }: { children: ReactNode }) {
-  const { can, uid, studentId, isEltern } = useRole();
+  const { can, uid, studentId, isEltern, banned } = useRole();
   const { sichtbar } = useFunktionen();
   const darf = !isEltern && sichtbar("album") && (can("album.nutzen") || can("album.kategorien"));
-  const album = useAlbum(darf, uid, studentId);
+  const roh = useAlbum(darf, uid, studentId);
+  // Gesperrt: nichts schreiben, kommentieren, liken (die Datenbank blockt es
+  // ohnehin – so kommt sofort ein verständlicher Hinweis)
+  const album = useMemo<Album>(() => {
+    if (!banned) return roh;
+    const nein = async () => GESPERRT_TEXT;
+    const neinStill = async () => {
+      meldeFehler(GESPERRT_TEXT);
+    };
+    return { ...roh, stammdatenSpeichern: nein, textSchreiben: nein, freigabeSetzen: nein, kommentieren: nein, liken: neinStill, kommentarLiken: neinStill };
+  }, [roh, banned]);
   return (
     <AlbumCtx.Provider value={darf ? album : null}>
       {children}
@@ -248,6 +259,7 @@ export function AlbumSheet({ open, start, album, onClose }: { open: boolean; sta
               }
             />
             <AusHinweis funktion="album" className="-mt-2 mb-3" />
+            <GesperrtZeile className="-mt-1 mb-3" />
             {nutzen && studentId && (
               <div className="seg mb-4">
                 <button className={`seg-item ${ansicht.art === "alle" ? "seg-aktiv" : ""}`} onClick={() => setAnsicht({ art: "alle" })}>

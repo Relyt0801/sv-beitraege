@@ -139,8 +139,17 @@ function Datenschutz() {
       </P>
       <P>
         <b>Zitatwand:</b> eingereichte Zitate (Text, wer es gesagt hat, wann/wo), wer sie eingereicht hat und die
-        🔥-Stimmen. Sichtbar erst nach der Prüfung durch das Team; Abgelehntes wird geleert. Keine Eltern.
-      </P>      <P>
+        🔥-Stimmen. Sichtbar erst nach der Prüfung (z. B. durch das Komitee Abizeitung, das dazu eine Benachrichtigung
+        bekommt); Abgelehntes wird geleert. Keine Eltern.
+      </P>
+      <P>
+        <b>Abimotto:</b> Vorschläge (Text, optionale Erklärung, wer vorgeschlagen hat) und deine 👍/🔥-Stimmen. Andere
+        sehen nur die Zahlen; wer vorgeschlagen hat, sieht nur, wer das Motto verwaltet (z. B. Komitee Motto &amp; Pullis).
+      </P>
+      <P>
+        <b>Sperre:</b> Wer gesperrt ist, kann in dieser Zeit nirgends etwas einreichen, kommentieren, liken oder abstimmen.
+      </P>
+      <P>
         <b>Abi-Rankings und Lehrerliste:</b> deine Stimme je Ranking (wen du gewählt hast). Sichtbar ist nur die
         gezählte Top 3, nie wer wen gewählt hat. Die Lehrerliste enthält Namen und Fächer von Lehrkräften.
       </P>

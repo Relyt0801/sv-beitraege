@@ -15,6 +15,7 @@ const NUTZEN: Partial<Record<FunktionKey, PermKey>> = {
   album: "album.nutzen",
   zitate: "zitate.nutzen",
   rankings: "rankings.nutzen",
+  motto: "motto.nutzen",
 };
 /** „Alle Schüler und das Team“ – diese Rollen setzt der Schnell-Schalter */
 const ALLE: string[] = ["schueler", "sprecher", "stv_sprecher", "stufenteam", "kassenwart"];
@@ -70,6 +71,7 @@ export function FunktionenSheet({ open, onClose }: { open: boolean; onClose: () 
     zitate: [{ l: "Lehrerliste", f: "lehrer", darf: can("lehrer.verwalten") }],
     rankings: [{ l: "Ranking-Kategorien & Lehrer", f: "rankings", darf: can("rankings.verwalten") || can("lehrer.verwalten") }],
     spotify: [],
+    motto: [],
     umfragen: [{ l: "Umfragen verwalten", f: "umfragen", darf: can("umfragen.verwalten") || can("umfragen.ergebnisse") }],
   };
 
@@ -135,7 +137,7 @@ export function FunktionenSheet({ open, onClose }: { open: boolean; onClose: () 
           })}
         </div>
         <p className="mt-3 px-1 text-[12px] leading-snug text-tinte-leise">
-          Ausgeschaltetes siehst nur du (mit Hinweis). Feinere Rechte (z. B. wer Zitate prüft) stehen unter Rollen &amp; Rechte → Abizeitung.
+          Ausgeschaltetes siehst nur du (mit Hinweis). Wer verwaltet (z. B. Komitee Abizeitung prüft Zitate, Motto &amp; Pullis das Abimotto), steht unter Rollen &amp; Rechte → Rechte → Komitee-Rechte.
         </p>
       </Sheet>
 

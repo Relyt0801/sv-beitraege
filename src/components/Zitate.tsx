@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Sheet, SheetKopf } from "./Sheet";
 import { useRole } from "../auth/RoleProvider";
 import { useFunktionen } from "../lib/funktionen";
@@ -7,17 +7,31 @@ import { AusHinweis } from "./Funktionen";
 import { frage, meldeFehler } from "../lib/melder";
 import { useLehrer, useStufePersonen } from "../lib/rankings";
 import { LehrerListe, ZahnradKnopf } from "./Rankings";
+import { GesperrtZeile, GESPERRT_TEXT } from "./Gesperrt";
 
 /**
  * Zitatwand im Profil: dunkle Karte mit dem „Zitat des Tages“, darunter
  * Einreichen und Alle ansehen. Wer prüfen darf, sieht, wie viele warten.
  */
 export function ZitateKarte({ className = "" }: { className?: string }) {
-  const { can, isEltern, uid } = useRole();
+  const { can, isEltern, uid, banned } = useRole();
   const { sichtbar } = useFunktionen();
   const darf = !isEltern && sichtbar("zitate") && (can("zitate.nutzen") || can("zitate.pruefen"));
   const wand = useZitate(darf, uid);
   const [offen, setOffen] = useState<null | "liste" | "neu" | "pruefen">(null);
+  const darfPruefen = can("zitate.pruefen");
+  // Aus der Benachrichtigung „Neues Zitat zum Prüfen“ (./#zitate)
+  useEffect(() => {
+    if (!darf) return;
+    const pruefe = () => {
+      if (window.location.hash !== "#zitate") return;
+      history.replaceState(null, "", window.location.pathname + window.location.search);
+      setOffen(darfPruefen ? "pruefen" : "liste");
+    };
+    pruefe();
+    window.addEventListener("hashchange", pruefe);
+    return () => window.removeEventListener("hashchange", pruefe);
+  }, [darf, darfPruefen]);
   if (!darf) return null;
 
   const frei = wand.zitate.filter((z) => z.status === "frei");
@@ -47,10 +61,13 @@ export function ZitateKarte({ className = "" }: { className?: string }) {
         ) : (
           <p className="mt-2 font-buch text-[1.2rem] italic leading-snug text-white/85">Wer hat diesen einen Satz gesagt, den niemand vergisst?</p>
         )}
+        <GesperrtZeile hell className="mt-3" />
         <div className="mt-4 flex flex-wrap items-center gap-2">
-          <button onClick={() => setOffen("neu")} className="rounded-full bg-[#E9C460] px-4 py-2 text-[14px] font-semibold text-[#1C1C1E] transition active:scale-95">
-            Zitat einreichen
-          </button>
+          {!banned && (
+            <button onClick={() => setOffen("neu")} className="rounded-full bg-[#E9C460] px-4 py-2 text-[14px] font-semibold text-[#1C1C1E] transition active:scale-95">
+              Zitat einreichen
+            </button>
+          )}
           <button onClick={() => setOffen("liste")} className="rounded-full bg-white/15 px-4 py-2 text-[14px] font-semibold transition active:scale-95">
             Alle {frei.length ? `(${frei.length})` : ""}
           </button>
@@ -75,7 +92,7 @@ function ZitateSheet({
   ansicht: null | "liste" | "neu" | "pruefen";
   setAnsicht: (a: null | "liste" | "neu" | "pruefen") => void;
 }) {
-  const { can } = useRole();
+  const { can, banned } = useRole();
   const [lehrerOffen, setLehrerOffen] = useState(false);
   const schliessen = () => setAnsicht(null);
   const warten = wand.zitate.filter((z) => z.status === "offen");
@@ -98,14 +115,14 @@ function ZitateSheet({
             extra={
               <>
               {can("lehrer.verwalten") && <ZahnradKnopf label="Lehrerliste pflegen" onClick={() => setLehrerOffen(true)} />}
-              <button
+              {!banned && <button
                 type="button"
                 onClick={() => setAnsicht("neu")}
                 aria-label="Zitat einreichen"
                 className="-my-1.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition active:scale-90"
               >
                 <span className="flex h-[30px] w-[30px] items-center justify-center rounded-full bg-brand text-[18px] font-bold leading-none text-white">+</span>
-              </button>
+              </button>}
               </>
             }
           />
@@ -119,6 +136,7 @@ function ZitateSheet({
               </button>
             </div>
           )}
+          <GesperrtZeile className="mb-3" />
           {ansicht === "pruefen" ? <Pruefen wand={wand} /> : <Wand wand={wand} />}
         </>
       )}
@@ -182,7 +200,7 @@ function Wand({ wand }: { wand: Zitatwand }) {
 }
 
 function ZitatZeile({ z, platz, wand }: { z: Zitat; platz: number; wand: Zitatwand }) {
-  const { can } = useRole();
+  const { can, banned: gesperrt } = useRole();
   const an = wand.meineStimme(z.id);
   const n = wand.stimmenVon(z.id);
   const [tick, setTick] = useState(0);
@@ -245,6 +263,7 @@ function ZitatZeile({ z, platz, wand }: { z: Zitat; platz: number; wand: Zitatwa
       </div>
       <button
         onClick={() => {
+          if (gesperrt) return meldeFehler(GESPERRT_TEXT);
           setTick((t) => t + 1);
           void wand.abstimmen(z.id);
         }}

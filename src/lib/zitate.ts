@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { hasSupabase, supabase } from "./supabase";
 import { abonniere } from "./realtime";
+import { pushZitat } from "./push";
 
 /**
  * Zitatwand (supabase/funktionen-zitate.sql)
@@ -138,8 +139,10 @@ export function useZitate(aktiv: boolean, uid: string | null) {
         await laden();
         return null;
       }
-      const { error } = await supabase!.from("zitate").insert(sauber);
+      const { data, error } = await supabase!.from("zitate").insert(sauber).select("id").single();
       if (error) return error.message;
+      // Bestätigungsanfrage an alle, die prüfen (z. B. Komitee Abizeitung)
+      if (data?.id) void pushZitat(String(data.id));
       await laden();
       return null;
     },

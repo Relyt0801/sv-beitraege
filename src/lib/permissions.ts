@@ -28,7 +28,9 @@ export type PermKey =
   | "funktionen.verwalten"
   | "rankings.nutzen"
   | "rankings.verwalten"
-  | "lehrer.verwalten";
+  | "lehrer.verwalten"
+  | "motto.nutzen"
+  | "motto.verwalten";
 
 /** eltern: Das Recht lässt sich auch Elternzugängen geben (eigene Schaltfläche im Rechte-Reiter). */
 export interface PermDef { key: PermKey; label: string; desc: string; eltern?: boolean }
@@ -92,6 +94,12 @@ export const PERM_CATEGORIES: PermCategory[] = [
     ],
   },
   {
+    label: "Abimotto", icon: "✨", perms: [
+      { key: "motto.nutzen", label: "Abimotto nutzen", desc: "Mottos vorschlagen und mit 👍 und 🔥 (dein Favorit) abstimmen." },
+      { key: "motto.verwalten", label: "Abimotto verwalten", desc: "Vorschläge ändern, ausblenden und das Motto festlegen." },
+    ],
+  },
+  {
     label: "Umfragen", icon: "📊", perms: [
       { key: "umfragen.verwalten", label: "Umfragen verwalten", desc: "Pop-up-Umfragen anlegen, starten und beenden. Sie erscheinen beim nächsten Öffnen der App." },
       { key: "umfragen.ergebnisse", label: "Ergebnisse sehen", desc: "Gezählte Ergebnisse ansehen – auch während eine Umfrage läuft. Einzelne Antworten sieht niemand." },
@@ -101,7 +109,7 @@ export const PERM_CATEGORIES: PermCategory[] = [
     label: "Rollen & Rechte", icon: "👑", perms: [
       { key: "roles.manage", label: "Rollen ändern", desc: "Rollen anderer Personen setzen." },
       { key: "perms.manage", label: "Berechtigungen vergeben", desc: "Diesen Rechte-Reiter benutzen." },
-      { key: "funktionen.verwalten", label: "Funktionen an/aus", desc: "Ganze Bereiche für alle ein- oder ausschalten (Abiball-Tickets, Abi-Album, Zitate, Rankings, Umfragen) – im Profil." },
+      { key: "funktionen.verwalten", label: "Funktionen an/aus", desc: "Ganze Bereiche für alle ein- oder ausschalten (Abiball-Tickets, Abi-Album, Zitate, Rankings, Abimotto, Umfragen) – im Profil." },
     ],
   },
 ];
@@ -168,7 +176,23 @@ const TEAM_STANDARD: PermKey[] = ["chats.view_all", "chats.delete_messages", "ch
 
 // Abizeitung nutzen: alle Schüler und das Team (sichtbar erst, wenn die
 // Funktion im Profil eingeschaltet ist). Verwalten bleibt beim Admin.
-const ABIZEITUNG: PermKey[] = ["album.nutzen", "zitate.nutzen", "rankings.nutzen"];
+const ABIZEITUNG: PermKey[] = ["album.nutzen", "zitate.nutzen", "rankings.nutzen", "motto.nutzen"];
+
+/**
+ * Rechte, die sich ganzen Komitees geben lassen (Rechte → Komitee-Rechte,
+ * Tabelle komitee_rechte). Startwerte: Abizeitung prüft Zitate und verwaltet
+ * Rankings + Lehrerliste, Motto & Pullis verwaltet das Abimotto.
+ */
+export const KOMITEE_PERMS: PermKey[] = [
+  "zitate.pruefen",
+  "rankings.verwalten",
+  "lehrer.verwalten",
+  "album.kategorien",
+  "album.moderieren",
+  "motto.verwalten",
+  "umfragen.verwalten",
+  "umfragen.ergebnisse",
+];
 
 export const ROLE_DEFAULTS: Record<string, PermKey[]> = {
   schueler: ["finanzen.basis", ...ABIZEITUNG],

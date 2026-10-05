@@ -104,12 +104,23 @@ export function RoleProvider({ children }: { children: ReactNode }) {
     if (error || !rp) for (const p of ROLE_DEFAULTS[r] || []) base[p] = true; // Fallback vor Migration
     else for (const row of rp as { perm: string; allowed: boolean }[]) base[row.perm] = row.allowed;
     const over: Record<string, boolean> = {};
+    // Rechte über Komitees (z. B. Abizeitung prüft Zitate) – wie has_perm():
+    // persönliche Ausnahme > Komitee > Rolle
+    const kom = new Set<string>();
     if (id) {
-      const { data: up } = await supabase!.from("user_permissions").select("perm, allowed").eq("user_id", id);
+      const [{ data: up }, { data: tm }] = await Promise.all([
+        supabase!.from("user_permissions").select("perm, allowed").eq("user_id", id),
+        r === "eltern" ? Promise.resolve({ data: [] as { tag: string }[] }) : supabase!.from("tag_members").select("tag").eq("user_id", id),
+      ]);
       if (up) for (const row of up as { perm: string; allowed: boolean }[]) over[row.perm] = row.allowed;
+      const tags = ((tm as { tag: string }[] | null) || []).map((t) => t.tag);
+      if (tags.length) {
+        const { data: kr } = await supabase!.from("komitee_rechte").select("perm").in("tag", tags).eq("allowed", true);
+        for (const row of (kr as { perm: string }[] | null) || []) kom.add(row.perm);
+      }
     }
     const set = new Set<string>();
-    for (const p of ALL_PERMS) if (over[p] ?? base[p] ?? false) set.add(p);
+    for (const p of ALL_PERMS) if (over[p] ?? (kom.has(p) || (base[p] ?? false))) set.add(p);
     setPerms(set);
   }, []);
 
@@ -118,7 +129,7 @@ export function RoleProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (hasSupabase) return;
     // Demo: Abi-Album und Zitate zum Ausprobieren für alle außer Eltern (in echt nur mit Recht)
-    const demoAlbum: PermKey[] = role === "eltern" ? [] : ["album.nutzen", "zitate.nutzen", "rankings.nutzen"];
+    const demoAlbum: PermKey[] = role === "eltern" ? [] : ["album.nutzen", "zitate.nutzen", "rankings.nutzen", "motto.nutzen"];
     setPerms(new Set(role === "admin" ? ALL_PERMS : [...(ROLE_DEFAULTS[role] || []), ...demoAlbum]));
   }, [role]);
   useEffect(() => {
@@ -170,7 +181,9 @@ export function RoleProvider({ children }: { children: ReactNode }) {
           });
         })
         .on("postgres_changes", { event: "*", schema: "public", table: "role_permissions" }, () => void loadPerms(roleRef.current, uidRef.current))
-        .on("postgres_changes", { event: "*", schema: "public", table: "user_permissions" }, () => void loadPerms(roleRef.current, uidRef.current)),
+        .on("postgres_changes", { event: "*", schema: "public", table: "user_permissions" }, () => void loadPerms(roleRef.current, uidRef.current))
+        .on("postgres_changes", { event: "*", schema: "public", table: "komitee_rechte" }, () => void loadPerms(roleRef.current, uidRef.current))
+        .on("postgres_changes", { event: "*", schema: "public", table: "tag_members" }, () => void loadPerms(roleRef.current, uidRef.current)),
       });
     };
 
