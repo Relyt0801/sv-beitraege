@@ -13,6 +13,11 @@ import { abonniere } from "./realtime";
  *                 ändern, ausblenden, als Motto festlegen
  *
  * Reihenfolge: 🔥 zählen doppelt, dann 👍. Ohne Datenbank liegt alles im Browser.
+ *
+ * Zwei Phasen (app_settings.motto_abstimmung, setzt motto.verwalten):
+ *   Vorschläge   alle reichen ein, abstimmen geht noch nicht
+ *   Abstimmung   👍/🔥 offen, neue Vorschläge nur noch vom Komitee
+ * Die Datenbank prüft beides (Policies auf motto_vorschlaege/motto_stimmen).
  */
 export type MottoArt = "like" | "feuer";
 
@@ -34,6 +39,7 @@ interface Stimme {
 }
 
 const DEMO = "sv-motto-demo";
+const DEMO_PHASE = "sv-motto-abstimmung-demo";
 interface DemoDaten {
   mottos: Motto[];
   stimmen: Stimme[];
@@ -83,6 +89,7 @@ export function useMotto(aktiv: boolean, uid: string | null) {
   const [mottos, setMottos] = useState<Motto[]>([]);
   const [stimmen, setStimmen] = useState<Stimme[]>([]);
   const [bereit, setBereit] = useState(false);
+  const [abstimmung, setAbstimmung] = useState(false);
   const zeit = useRef<ReturnType<typeof setTimeout> | null>(null);
   const me = uid || "local-user";
 
@@ -91,13 +98,20 @@ export function useMotto(aktiv: boolean, uid: string | null) {
       const d = demoLesen();
       setMottos(d.mottos);
       setStimmen(d.stimmen);
+      try {
+        setAbstimmung(localStorage.getItem(DEMO_PHASE) === "1");
+      } catch {
+        /* privater Modus */
+      }
       setBereit(true);
       return;
     }
-    const [m, s] = await Promise.all([
+    const [m, s, a] = await Promise.all([
       supabase!.from("motto_vorschlaege").select("*").order("created_at", { ascending: false }).limit(500),
       supabase!.from("motto_stimmen").select("vorschlag_id, user_id, art").eq("an", true),
+      supabase!.from("app_settings").select("motto_abstimmung").eq("id", 1).maybeSingle(),
     ]);
+    if (!a.error) setAbstimmung(Boolean((a.data as { motto_abstimmung?: boolean } | null)?.motto_abstimmung));
     if (!m.error) setMottos((m.data as Motto[]) || []);
     if (!s.error) setStimmen((s.data as Stimme[]) || []);
     setBereit(true);
@@ -117,7 +131,11 @@ export function useMotto(aktiv: boolean, uid: string | null) {
       aufbauen: (k) =>
         k
           .on("postgres_changes", { event: "*", schema: "public", table: "motto_vorschlaege" }, bald)
-          .on("postgres_changes", { event: "*", schema: "public", table: "motto_stimmen" }, bald),
+          .on("postgres_changes", { event: "*", schema: "public", table: "motto_stimmen" }, bald)
+          .on("postgres_changes", { event: "UPDATE", schema: "public", table: "app_settings" }, (p) => {
+            const v = (p.new as { motto_abstimmung?: boolean }).motto_abstimmung;
+            if (typeof v === "boolean") setAbstimmung(v);
+          }),
     });
   }, [aktiv, laden]);
 
@@ -194,12 +212,31 @@ export function useMotto(aktiv: boolean, uid: string | null) {
     [stimmen_, me, laden],
   );
 
+  /** Abstimmung freigeben / zurück zu Vorschlägen (motto.verwalten) */
+  const abstimmungSetzen = useCallback(async (an: boolean): Promise<string | null> => {
+    setAbstimmung(an);
+    if (!hasSupabase) {
+      try {
+        localStorage.setItem(DEMO_PHASE, an ? "1" : "0");
+      } catch {
+        /* privater Modus */
+      }
+      return null;
+    }
+    const { error } = await supabase!.rpc("motto_abstimmung_setzen", { p_an: an });
+    if (error) {
+      setAbstimmung(!an);
+      return error.message;
+    }
+    return null;
+  }, []);
+
   const zahl = useCallback((id: string, art: MottoArt) => stimmen.filter((s) => s.vorschlag_id === id && s.art === art).length, [stimmen]);
   const meine = useCallback((id: string, art: MottoArt) => stimmen.some((s) => s.vorschlag_id === id && s.user_id === me && s.art === art), [stimmen, me]);
   const punkte = useCallback((id: string) => 2 * zahl(id, "feuer") + zahl(id, "like"), [zahl]);
   const meinFavorit = mottos.find((m) => meine(m.id, "feuer")) || null;
 
-  return { bereit, mottos, me, vorschlagen, aendern, abstimmen, zahl, meine, punkte, meinFavorit };
+  return { bereit, mottos, me, abstimmung, abstimmungSetzen, vorschlagen, aendern, abstimmen, zahl, meine, punkte, meinFavorit };
 }
 
 export type MottoWahl = ReturnType<typeof useMotto>;

@@ -199,3 +199,38 @@ create or replace trigger gesperrt_blocken before insert or update on public.mot
 create or replace trigger gesperrt_blocken before insert on public.mithilfe_nachtraege for each row execute function public.gesperrt_blocken();
 create or replace trigger gesperrt_blocken before insert on public.komitee_requests for each row execute function public.gesperrt_blocken();
 alter publication supabase_realtime add table public.komitee_rechte;
+
+-- ------------------------------------------------------------ 4. Motto-Phasen
+-- Vorschläge (Standard) → Abstimmung, umschalten mit motto.verwalten
+-- (Komitee Motto & Pullis). In der Abstimmung reicht nur noch das Komitee ein;
+-- vorher kann niemand abstimmen.
+alter table public.app_settings add column if not exists motto_abstimmung boolean not null default false;
+
+create or replace function public.motto_abstimmung_an()
+returns boolean language sql stable security definer set search_path = public as $$
+  select coalesce((select motto_abstimmung from public.app_settings where id = 1), false)
+$$;
+revoke all on function public.motto_abstimmung_an() from public, anon;
+grant execute on function public.motto_abstimmung_an() to authenticated;
+
+create or replace function public.motto_abstimmung_setzen(p_an boolean)
+returns boolean language plpgsql security definer set search_path = public as $$
+begin
+  if not public.has_perm('motto.verwalten') then raise exception 'Keine Berechtigung'; end if;
+  update public.app_settings set motto_abstimmung = p_an where id = 1;
+  return p_an;
+end $$;
+revoke all on function public.motto_abstimmung_setzen(boolean) from public, anon;
+grant execute on function public.motto_abstimmung_setzen(boolean) to authenticated;
+
+alter policy "motto vorschlagen" on public.motto_vorschlaege
+  with check ((select has_perm('motto.nutzen') or has_perm('motto.verwalten')) and not (select ist_eltern())
+              and not (select is_banned()) and (select funktion_an('motto') or has_perm('funktionen.verwalten'))
+              and (not (select motto_abstimmung_an()) or (select has_perm('motto.verwalten'))));
+alter policy "motto stimme setzen" on public.motto_stimmen
+  with check (user_id = (select auth.uid()) and (select has_perm('motto.nutzen')) and not (select ist_eltern())
+              and (select funktion_an('motto') or has_perm('funktionen.verwalten'))
+              and (select motto_abstimmung_an()));
+alter policy "motto stimme umschalten" on public.motto_stimmen
+  using (user_id = (select auth.uid()))
+  with check (user_id = (select auth.uid()) and (select has_perm('motto.nutzen')) and (select motto_abstimmung_an()));

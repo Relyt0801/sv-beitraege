@@ -12,6 +12,15 @@ ausführlich (auf Deutsch); hier steht der Überblick dazu.
 ---
 
 
+## 05.10.2026 (4): Abimotto in zwei Phasen
+
+- **Vorschläge → Abstimmung** (`app_settings.motto_abstimmung`, RPC
+  `motto_abstimmung_setzen`, Recht `motto.verwalten` = Komitee Motto & Pullis):
+  Zuerst steht auf der Karte „Reiche Vorschläge für unser Abimotto ein“,
+  abstimmen geht noch nicht. Gibt das Komitee über das Zahnrad die
+  Abstimmung frei, steht dort „Abstimmen …“, 👍/🔥 sind offen und neue
+  Vorschläge kommen nur noch vom Komitee. Die Datenbank prüft beides.
+
 ## 05.10.2026 (3): Rankings getrennt, Abimotto, Komitee-Rechte, Sperre überall
 
 - **Rankings getrennt** (`components/Rankings.tsx` → `RankingKarten`): zwei

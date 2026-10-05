@@ -33,12 +33,14 @@ export function MottoKarte({ className = "" }: { className?: string }) {
         <span aria-hidden className="pointer-events-none absolute -right-3 -top-4 text-[6.5rem] leading-none opacity-20">
           ✨
         </span>
-        <div className="text-[12px] font-semibold uppercase tracking-[0.14em] text-white/80">{gewaehlt ? "Unser Abimotto" : "Abimotto"}</div>
+        <div className="text-[12px] font-semibold uppercase tracking-[0.14em] text-white/80">
+          {gewaehlt ? "Unser Abimotto" : m.abstimmung ? "Abimotto · Abstimmung läuft" : "Abimotto · Vorschläge"}
+        </div>
         {gewaehlt ? (
           <button onClick={() => setAnsicht("liste")} className="mt-1.5 block max-w-[85%] text-left text-[1.45rem] font-extrabold leading-tight tracking-[-0.01em]">
             {gewaehlt.text}
           </button>
-        ) : vorne && m.punkte(vorne.id) > 0 ? (
+        ) : m.abstimmung && vorne && m.punkte(vorne.id) > 0 ? (
           <button onClick={() => setAnsicht("liste")} className="mt-1.5 block max-w-[85%] text-left">
             <span className="block text-[12px] font-semibold text-white/75">Gerade vorne</span>
             <span className="block text-[1.3rem] font-extrabold leading-tight">{vorne.text}</span>
@@ -47,21 +49,31 @@ export function MottoKarte({ className = "" }: { className?: string }) {
             </span>
           </button>
         ) : (
-          <p className="mt-1.5 max-w-[85%] text-[1.2rem] font-bold leading-snug">Welches Motto soll auf unseren Pullis stehen?</p>
+          <p className="mt-1.5 max-w-[85%] text-[1.2rem] font-bold leading-snug">
+            {m.abstimmung ? "Abstimmen: Welches Motto soll auf unsere Pullis?" : "Reiche Vorschläge für unser Abimotto ein"}
+          </p>
         )}
         <div className="mt-1.5 text-[13px] text-white/80">
           {sichtbare.length} {sichtbare.length === 1 ? "Vorschlag" : "Vorschläge"}
-          {m.meinFavorit ? ` · Dein 🔥: ${m.meinFavorit.text}` : ""}
+          {m.abstimmung && m.meinFavorit ? ` · Dein 🔥: ${m.meinFavorit.text}` : !m.abstimmung && !gewaehlt ? " · Abstimmung startet, sobald das Komitee sie freigibt" : ""}
         </div>
         <GesperrtZeile hell className="mt-3" />
         <div className="mt-4 flex flex-wrap items-center gap-2">
-          <button onClick={() => setAnsicht("liste")} className="rounded-full bg-white px-4 py-2 text-[14px] font-semibold text-[#5E2BFF] transition active:scale-95">
-            {gewaehlt ? "Alle ansehen" : "Abstimmen"}
-          </button>
-          {!banned && !gewaehlt && (
-            <button onClick={() => setAnsicht("neu")} className="rounded-full bg-white/20 px-4 py-2 text-[14px] font-semibold transition active:scale-95">
-              Vorschlagen
+          {m.abstimmung || gewaehlt ? (
+            <button onClick={() => setAnsicht("liste")} className="rounded-full bg-white px-4 py-2 text-[14px] font-semibold text-[#5E2BFF] transition active:scale-95">
+              {gewaehlt ? "Alle ansehen" : "Abstimmen"}
             </button>
+          ) : (
+            <>
+              {!banned && (
+                <button onClick={() => setAnsicht("neu")} className="rounded-full bg-white px-4 py-2 text-[14px] font-semibold text-[#5E2BFF] transition active:scale-95">
+                  Vorschlag einreichen
+                </button>
+              )}
+              <button onClick={() => setAnsicht("liste")} className="rounded-full bg-white/20 px-4 py-2 text-[14px] font-semibold transition active:scale-95">
+                Alle ansehen
+              </button>
+            </>
           )}
         </div>
       </section>
@@ -92,7 +104,7 @@ function MottoSheet({
   };
   const liste = m.mottos
     .filter((x) => verwalten || !x.ausgeblendet)
-    .sort((a, b) => (sort === "top" ? m.punkte(b.id) - m.punkte(a.id) || b.created_at.localeCompare(a.created_at) : b.created_at.localeCompare(a.created_at)));
+    .sort((a, b) => (m.abstimmung && sort === "top" ? m.punkte(b.id) - m.punkte(a.id) || b.created_at.localeCompare(a.created_at) : b.created_at.localeCompare(a.created_at)));
   const rang = [...m.mottos.filter((x) => !x.ausgeblendet)].sort((a, b) => m.punkte(b.id) - m.punkte(a.id)).map((x) => x.id);
 
   return (
@@ -103,12 +115,18 @@ function MottoSheet({
         <>
           <SheetKopf
             titel="Abimotto"
-            unter={verwalten ? "Verwalten: ändern, ausblenden, festlegen" : "🔥 = dein Favorit (nur einer) · 👍 so viele du willst"}
+            unter={
+              verwalten
+                ? "Verwalten: Abstimmung freigeben, ändern, ausblenden, festlegen"
+                : m.abstimmung
+                  ? "🔥 = dein Favorit (nur einer) · 👍 so viele du willst"
+                  : "Reiche Vorschläge ein – abgestimmt wird, sobald das Komitee die Abstimmung freigibt."
+            }
             onClose={schliessen}
             extra={
               <>
                 {darfVerwalten && <ZahnradKnopf label={verwalten ? "Verwalten beenden" : "Abimotto verwalten"} onClick={() => setVerwalten((v) => !v)} />}
-                {!banned && (
+                {!banned && (!m.abstimmung || darfVerwalten) && (
                   <button
                     type="button"
                     onClick={() => setAnsicht("neu")}
@@ -123,6 +141,34 @@ function MottoSheet({
           />
           <AusHinweis funktion="motto" className="-mt-2 mb-3" />
           <GesperrtZeile className="-mt-1 mb-3" />
+          {verwalten && (
+            <label className="mb-3 flex items-center gap-3 rounded-2xl bg-gradient-to-br from-[#5E2BFF]/10 to-[#D9480F]/10 px-4 py-3">
+              <span className="min-w-0 flex-1">
+                <span className="block text-[15px] font-semibold">Abstimmung freigeben</span>
+                <span className="block text-[12.5px] leading-snug text-tinte-leise">
+                  {m.abstimmung ? "Läuft: alle stimmen mit 👍 und 🔥 ab, neue Vorschläge nur noch vom Komitee." : "Aus: alle können Vorschläge einreichen, abstimmen geht noch nicht."}
+                </span>
+              </span>
+              <Schalter
+                an={m.abstimmung}
+                label="Abstimmung freigeben"
+                onChange={async (v) => {
+                  const f = await m.abstimmungSetzen(v);
+                  if (f) meldeFehler("Ging nicht: " + f);
+                  else melde(v ? "Abstimmung ist freigegeben" : "Zurück zu Vorschlägen", "erfolg");
+                }}
+              />
+            </label>
+          )}
+          {!m.abstimmung && !verwalten && !banned && (
+            <button
+              onClick={() => setAnsicht("neu")}
+              className="mb-3 w-full rounded-2xl bg-gradient-to-br from-[#5E2BFF] via-[#A3148F] to-[#D9480F] px-4 py-3 text-left text-[15px] font-semibold text-white transition active:scale-[.99]"
+            >
+              ✨ Vorschlag einreichen
+            </button>
+          )}
+          {m.abstimmung && (
           <div className="seg mb-3">
             <button className={`seg-item ${sort === "top" ? "seg-aktiv" : ""}`} onClick={() => setSort("top")}>
               Beliebteste
@@ -131,12 +177,13 @@ function MottoSheet({
               Neueste
             </button>
           </div>
+          )}
           <div className="space-y-2.5">
             {liste.map((x) =>
               verwalten ? (
                 <VerwaltenZeile key={x.id} x={x} m={m} />
               ) : (
-                <MottoZeile key={x.id} x={x} m={m} platz={sort === "top" ? rang.indexOf(x.id) : -1} gesperrt={banned} />
+                <MottoZeile key={x.id} x={x} m={m} platz={m.abstimmung && sort === "top" ? rang.indexOf(x.id) : -1} gesperrt={banned} />
               ),
             )}
             {liste.length === 0 && (
@@ -180,10 +227,12 @@ function MottoZeile({ x, m, platz, gesperrt }: { x: Motto; m: MottoWahl; platz: 
           {x.von === m.me && <div className="mt-1 text-[11.5px] text-tinte-leise">Dein Vorschlag</div>}
         </div>
       </div>
+      {m.abstimmung && (
       <div className="mt-2.5 flex gap-2">
         <StimmKnopf zeichen="👍" n={m.zahl(x.id, "like")} an={m.meine(x.id, "like")} label="Gefällt mir" onClick={() => void tippen("like")} />
         <StimmKnopf zeichen="🔥" n={m.zahl(x.id, "feuer")} an={m.meine(x.id, "feuer")} label="Mein Favorit" onClick={() => void tippen("feuer")} feuer />
       </div>
+      )}
     </div>
   );
 }
@@ -290,7 +339,7 @@ function Vorschlagen({ m, fertig, schliessen }: { m: MottoWahl; fertig: () => vo
         </button>
       </div>
       <h2 className="text-[1.375rem] font-bold leading-tight tracking-[-0.02em]">Motto vorschlagen</h2>
-      <p className="mt-0.5 text-[13px] text-tinte-leise">Alle sehen den Vorschlag sofort und können abstimmen.</p>
+      <p className="mt-0.5 text-[13px] text-tinte-leise">Alle sehen den Vorschlag sofort. Abgestimmt wird, sobald das Komitee die Abstimmung freigibt.</p>
       <div className="mt-4 rounded-2xl bg-gradient-to-br from-[#5E2BFF] via-[#A3148F] to-[#D9480F] p-4 text-white">
         <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-white/75">Vorschau</div>
         <div className="mt-1 min-h-[1.8rem] text-[1.3rem] font-extrabold leading-tight">{text.trim() || "Dein Motto"}</div>
