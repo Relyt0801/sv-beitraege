@@ -6,6 +6,7 @@ import { useRole } from "../auth/RoleProvider";
 import { heuteKey, tagLang } from "../lib/termine";
 import { useNachtraege, type Nachtrag } from "../lib/nachtrag";
 import { frage } from "../lib/melder";
+import { normalize } from "../lib/logic";
 
 const SONSTIGES = "__sonstiges__";
 
@@ -28,6 +29,9 @@ export function NachtragSheet({ open, onClose }: { open: boolean; onClose: () =>
   const [sendet, setSendet] = useState(false);
   const [fertig, setFertig] = useState(false);
   const [fehler, setFehler] = useState("");
+  // Aktionen stehen nicht alle offen herum: „Aktion ›“ öffnet die Auswahl mit Suche
+  const [waehlen, setWaehlen] = useState(false);
+  const [suche, setSuche] = useState("");
 
   const vorlage = vorlagen.find((v) => v.id === wahl) || null;
   const sonstiges = wahl === SONSTIGES;
@@ -43,7 +47,17 @@ export function NachtragSheet({ open, onClose }: { open: boolean; onClose: () =>
     setDatum(heuteKey());
     setFehler("");
     setFertig(false);
+    setWaehlen(false);
+    setSuche("");
   }
+
+  function nimm(id: string) {
+    setWahl(id);
+    setWaehlen(false);
+    setSuche("");
+  }
+
+  const treffer = suche.trim() ? vorlagen.filter((v) => normalize(v.titel).includes(normalize(suche))) : vorlagen;
 
   async function senden() {
     if (!ich || !geht) return;
@@ -73,6 +87,18 @@ export function NachtragSheet({ open, onClose }: { open: boolean; onClose: () =>
       }}
     >
       <div className="mx-auto max-w-md">
+        {waehlen ? (
+          <AktionWahl
+            vorlagen={treffer}
+            leer={vorlagen.length === 0}
+            wahl={wahl}
+            suche={suche}
+            setSuche={setSuche}
+            onNimm={nimm}
+            onZurueck={() => setWaehlen(false)}
+          />
+        ) : (
+        <>
         {/* ------------------------------------------------ Kopf wie eine Rechnung */}
         <div className="flex flex-col items-center pt-1 text-center">
           <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-400 to-emerald-600 text-2xl shadow-sm">
@@ -109,41 +135,18 @@ export function NachtragSheet({ open, onClose }: { open: boolean; onClose: () =>
           <>
             {/* ------------------------------------------------ Wofür */}
             <Gruppe titel="Wofür">
-              <div className="flex flex-wrap gap-1.5 p-3">
-                {vorlagen.map((v) => {
-                  const an = wahl === v.id;
-                  return (
-                    <button
-                      key={v.id}
-                      onClick={() => setWahl(v.id)}
-                      aria-pressed={an}
-                      className={`flex items-center gap-1.5 rounded-xl border px-2.5 py-2 text-[12.5px] font-semibold transition active:scale-[.97] ${
-                        an
-                          ? "border-brand bg-brand text-white"
-                          : "border-black/[0.06] bg-white dark:border-white/10 dark:bg-slate-800"
-                      }`}
-                    >
-                      {v.titel}
-                      <span className={`zahl font-bold ${an ? "text-white" : "text-brand"}`}>
-                        {v.variabel ? "% frei" : `+${v.punkte} %`}
-                      </span>
-                    </button>
-                  );
-                })}
-                <button
-                  onClick={() => setWahl(SONSTIGES)}
-                  aria-pressed={sonstiges}
-                  className={`rounded-xl border px-2.5 py-2 text-[12.5px] font-semibold transition active:scale-[.97] ${
-                    sonstiges
-                      ? "border-brand bg-brand text-white"
-                      : "border-dashed border-tinte-leise/50 text-tinte-matt dark:text-slate-300"
-                  }`}
-                >
-                  Sonstiges …
-                </button>
-              </div>
+              <button
+                onClick={() => setWaehlen(true)}
+                className="flex min-h-[48px] w-full items-center gap-3 px-4 py-2 text-left transition active:bg-black/[0.04] dark:active:bg-white/[0.06]"
+              >
+                <span className="shrink-0 text-[15px]">Aktion</span>
+                <span className={`min-w-0 flex-1 truncate text-right text-[15px] ${wahl ? "text-tinte-matt dark:text-slate-300" : "text-brand"}`}>
+                  {sonstiges ? "Sonstiges" : vorlage?.titel || "Auswählen"}
+                </span>
+                <span className="text-tinte-leise">›</span>
+              </button>
               {sonstiges && (
-                <Zeile label="Aktion">
+                <Zeile label="Name">
                   <input
                     autoFocus
                     className="w-full bg-transparent text-right text-[15px] outline-none placeholder:text-tinte-leise"
@@ -207,8 +210,67 @@ export function NachtragSheet({ open, onClose }: { open: boolean; onClose: () =>
             ))}
           </Gruppe>
         )}
+        </>
+        )}
       </div>
     </Sheet>
+  );
+}
+
+function AktionWahl({
+  vorlagen,
+  leer,
+  wahl,
+  suche,
+  setSuche,
+  onNimm,
+  onZurueck,
+}: {
+  vorlagen: { id: string; titel: string; punkte: number; variabel?: boolean }[];
+  leer: boolean;
+  wahl: string | null;
+  suche: string;
+  setSuche: (s: string) => void;
+  onNimm: (id: string) => void;
+  onZurueck: () => void;
+}) {
+  const zeile = "flex min-h-[48px] w-full items-center gap-3 px-4 py-2 text-left transition active:bg-black/[0.04] dark:active:bg-white/[0.06]";
+  return (
+    <>
+      <div className="mb-2 flex items-center gap-2">
+        <button onClick={onZurueck} className="-ml-1 rounded-full px-2 py-1.5 text-[15px] font-semibold text-brand-dark dark:text-brand">
+          ‹ Zurück
+        </button>
+        <div className="flex-1 text-center text-[15px] font-semibold">Aktion wählen</div>
+        <span className="w-16" />
+      </div>
+      <input
+        type="search"
+        placeholder="Suchen"
+        value={suche}
+        onChange={(e) => setSuche(e.target.value)}
+        className="w-full rounded-xl bg-[rgb(118_118_128/0.12)] px-3 py-2 text-[15px] outline-none placeholder:text-tinte-leise dark:bg-[rgb(118_118_128/0.24)]"
+      />
+      <div className="mt-3 divide-y divide-black/[0.06] overflow-hidden rounded-2xl bg-[rgb(118_118_128/0.08)] dark:divide-white/[0.08] dark:bg-[rgb(118_118_128/0.18)]">
+        {vorlagen.length === 0 && (
+          <div className="px-4 py-4 text-center text-[13px] text-tinte-leise">{leer ? "Noch keine Aktionen angelegt." : "Nichts gefunden."}</div>
+        )}
+        {vorlagen.map((v) => (
+          <button key={v.id} onClick={() => onNimm(v.id)} className={zeile}>
+            <span className="min-w-0 flex-1 truncate text-[15px]">{v.titel}</span>
+            <span className="zahl w-[4.5rem] shrink-0 text-right text-[14px] font-bold text-brand">{v.variabel ? "% frei" : `+${v.punkte} %`}</span>
+            <span className={`w-4 shrink-0 text-brand ${wahl === v.id ? "" : "invisible"}`}>✓</span>
+          </button>
+        ))}
+      </div>
+      <div className="mt-3 overflow-hidden rounded-2xl bg-[rgb(118_118_128/0.08)] dark:bg-[rgb(118_118_128/0.18)]">
+        <button onClick={() => onNimm(SONSTIGES)} className={zeile}>
+          <span className="min-w-0 flex-1 truncate text-[15px]">Sonstiges …</span>
+          <span className="shrink-0 text-[13px] text-tinte-leise">eigene Aktion</span>
+          <span className={`w-4 shrink-0 text-brand ${wahl === SONSTIGES ? "" : "invisible"}`}>✓</span>
+        </button>
+      </div>
+    </>
   );
 }
 

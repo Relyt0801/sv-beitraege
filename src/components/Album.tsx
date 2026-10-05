@@ -16,7 +16,7 @@ import {
 } from "../lib/album";
 import { frage, melde, meldeFehler } from "../lib/melder";
 import { useFunktionen } from "../lib/funktionen";
-import { SpotifyKarte, ohneLink, spotifyAus } from "./Spotify";
+import { LiedSuche, SpotifyKarte, ohneLink, spotifyAus } from "./Spotify";
 import { AusHinweis } from "./Funktionen";
 
 /* ====================================================================== */
@@ -634,7 +634,8 @@ function MeinSteckbrief({ album, vorschau }: { album: Album; vorschau: () => voi
 
       <Gruppe titel="Stammdaten · nur du" fuss="Diese Felder kannst nur du ausfüllen – auch wenn du den Text freigibst.">
         {kat.map((k) => (
-          <label key={k.id} className="block px-4 py-2.5">
+          <div key={k.id} className="block px-4 py-2.5">
+            <label className="block">
             <span className="text-[12px] font-semibold text-tinte-leise">{k.titel}</span>
             <input
               value={daten[k.id] || ""}
@@ -643,13 +644,12 @@ function MeinSteckbrief({ album, vorschau }: { album: Album; vorschau: () => voi
               onChange={(e) => setDaten((d) => ({ ...d, [k.id]: e.target.value }))}
               className="mt-0.5 block w-full bg-transparent text-[15px] outline-none placeholder:text-tinte-leise/70"
             />
-            {spotifyAn && /lied|song|musik/i.test(k.titel) && (
-              <span className="mt-1 block text-[11.5px] leading-snug text-tinte-leise">
-                {spotifyAus(daten[k.id] || "") ? "✓ Spotify-Link erkannt – so sieht es im Steckbrief aus:" : "Tipp: In Spotify beim Lied auf Teilen → Link kopieren und hier einfügen. Dann gibt es im Steckbrief Cover und Hörprobe."}
-              </span>
-            )}
+            </label>
             {spotifyAus(daten[k.id] || "") && <SpotifyKarte wert={daten[k.id]} fallbackTitel={ohneLink(daten[k.id])} />}
-          </label>
+            {spotifyAn && /lied|song|musik/i.test(k.titel) && (
+              <LiedSuche wert={daten[k.id] || ""} setzen={(v) => setDaten((d) => ({ ...d, [k.id]: v.slice(0, 200) }))} />
+            )}
+          </div>
         ))}
         {kat.length === 0 && <p className="px-4 py-3 text-[13px] text-tinte-leise">Das Team hat noch keine Kategorien angelegt.</p>}
       </Gruppe>

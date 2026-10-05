@@ -12,6 +12,29 @@ ausführlich (auf Deutsch); hier steht der Überblick dazu.
 ---
 
 
+## 05.10.2026 (2): Lehrerliste gefüllt, Lied suchen, Nachtragen, Reaktionen
+
+- **Lehrerliste**: Die Lehrkräfte von der Schul-Webseite stehen jetzt in der
+  Tabelle `lehrer` (nur in der Datenbank, nicht im Repo), mit Kürzel und
+  Fächern. Pflege wie bisher über Profil → Funktionen → Lehrerliste.
+- **Lied suchen** (`components/Spotify.tsx` → `LiedSuche`, Edge Function
+  `spotify-info` Modus `suche`): Im Steckbrief beim Lied-Feld „Lied auf
+  Spotify suchen“ – Treffer mit Cover, antippen übernimmt Titel, Künstler und
+  Link. Die Suche in der App braucht die Supabase-Secrets
+  `SPOTIFY_CLIENT_ID`/`SPOTIFY_CLIENT_SECRET` (eigene Spotify-Developer-App,
+  Client-Credentials). Ohne sie: „In Spotify suchen“ öffnet Spotify mit der
+  Suche, dort Teilen → Link kopieren, zurück und „Kopierten Link einfügen“.
+  Ein Zurückspringen aus Spotify mit dem gewählten Lied gibt es ohne
+  Spotify-Login nicht.
+- **Nachtragen** (`components/NachtragSheet.tsx`): Aktionen stehen nicht mehr
+  alle als unterschiedlich breite Kacheln da. „Aktion ›“ öffnet eine Liste
+  mit Suche (einzeilig, Werte rechtsbündig), „Sonstiges …“ darunter.
+- **Chat-Reaktionen wie WhatsApp** (`components/ChatBlasen.tsx`): ein
+  Schildchen mit bis zu drei Emojis und Gesamtzahl ragt unten über den Rand
+  der Blase (nicht über den Text), Rand in Hintergrundfarbe, kein blauer
+  Kreis mehr. Antippen zeigt, wer wie reagiert hat; die eigene Reaktion lässt
+  sich dort antippen und entfernen.
+
 ## 05.10.2026: Sichtbarkeit für alle, Funktionen-Zentrale, Spotify-Karte
 
 - **Warum andere nichts sahen:** Album, Zitate und Rankings brauchen neben

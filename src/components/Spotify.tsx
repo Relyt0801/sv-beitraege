@@ -174,3 +174,185 @@ export function SpotifyKarte({ wert, fallbackTitel }: { wert: string; fallbackTi
     </div>
   );
 }
+
+/* ------------------------------------------------------------------ Lied suchen */
+
+interface Treffer {
+  id: string;
+  titel: string;
+  kuenstler: string;
+  cover: string;
+}
+
+const DEMO_TREFFER: Treffer[] = [
+  { id: "003vvx7Niy0yvhvHt4a68B", titel: "Mr. Brightside", kuenstler: "The Killers", cover: "" },
+  { id: "4u7EnebtmKWzUH433cf5Qv", titel: "Bohemian Rhapsody", kuenstler: "Queen", cover: "" },
+  { id: "0VjIjW4GlUZAMYd2vXMi3b", titel: "Blinding Lights", kuenstler: "The Weeknd", cover: "" },
+];
+
+/** null = Suche in der App geht (noch) nicht – dann nur „In Spotify suchen“ */
+let suchePerApp: boolean | null = hasSupabase ? null : true;
+
+async function suchenLaden(q: string): Promise<{ treffer: Treffer[] | null; fehler?: string }> {
+  if (!hasSupabase) {
+    const n = q.toLowerCase();
+    return { treffer: DEMO_TREFFER.filter((t) => `${t.titel} ${t.kuenstler}`.toLowerCase().includes(n)).concat(n.length > 2 ? [] : DEMO_TREFFER).slice(0, 8) };
+  }
+  const { data, error } = await supabase!.functions.invoke("spotify-info", { body: { suche: q } });
+  const d = (data || {}) as { treffer?: Treffer[]; ohneSchluessel?: boolean; error?: string };
+  if (d.ohneSchluessel) {
+    suchePerApp = false;
+    return { treffer: null };
+  }
+  if (error || d.error) return { treffer: [], fehler: d.error || "Suche ging gerade nicht" };
+  suchePerApp = true;
+  return { treffer: d.treffer || [] };
+}
+
+/**
+ * Lied für den Steckbrief finden – ohne die App zu verlassen: Suchfeld mit
+ * Treffern aus Spotify (Cover, Titel, Künstler), antippen übernimmt den Link.
+ * Ist die Suche serverseitig nicht eingerichtet, öffnet „In Spotify suchen“
+ * die Spotify-App mit der Suche; dort Teilen → Link kopieren, zurück in die
+ * App und „Kopierten Link einfügen“ tippen.
+ */
+export function LiedSuche({ wert, setzen }: { wert: string; setzen: (v: string) => void }) {
+  const [offen, setOffen] = useState(false);
+  const [q, setQ] = useState("");
+  const [treffer, setTreffer] = useState<Treffer[] | null | undefined>(undefined);
+  const [laedt, setLaedt] = useState(false);
+  const [fehler, setFehler] = useState("");
+  const [perApp, setPerApp] = useState<boolean | null>(suchePerApp);
+  const hatLink = Boolean(spotifyAus(wert));
+
+  // Beim Tippen suchen (kurz warten, damit nicht jeder Buchstabe eine Anfrage ist)
+  useEffect(() => {
+    if (!offen || perApp === false) return;
+    const text = q.trim();
+    if (text.length < 2) {
+      setTreffer(undefined);
+      return;
+    }
+    let aktiv = true;
+    const t = setTimeout(() => {
+      setLaedt(true);
+      void suchenLaden(text).then((r) => {
+        if (!aktiv) return;
+        setLaedt(false);
+        setFehler(r.fehler || "");
+        if (r.treffer === null) setPerApp(false);
+        else setPerApp(true);
+        setTreffer(r.treffer);
+      });
+    }, 350);
+    return () => {
+      aktiv = false;
+      clearTimeout(t);
+    };
+  }, [q, offen, perApp]);
+
+  function oeffnen() {
+    setQ(ohneLink(wert));
+    setOffen(true);
+  }
+
+  async function einfuegen() {
+    try {
+      const text = await navigator.clipboard.readText();
+      const s = spotifyAus(text);
+      if (!s) {
+        setFehler("In der Zwischenablage ist kein Spotify-Link. In Spotify beim Lied: Teilen → Link kopieren.");
+        return;
+      }
+      setzen(`${ohneLink(wert) || ""} https://open.spotify.com/${s.art}/${s.id}`.trim());
+      setOffen(false);
+      setFehler("");
+    } catch {
+      setFehler("Einfügen ging nicht – halte das Feld oben gedrückt und wähle „Einfügen“.");
+    }
+  }
+
+  const spotifySuche = `https://open.spotify.com/search/${encodeURIComponent(q.trim() || ohneLink(wert))}`;
+  const knopf =
+    "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[13px] font-semibold transition active:scale-95";
+
+  if (!offen)
+    return (
+      <span className="mt-2 flex flex-wrap gap-2">
+        <button type="button" onClick={oeffnen} className={`${knopf} bg-[#1ED760] text-black`}>
+          <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" aria-hidden>
+            <circle cx="10.5" cy="10.5" r="6.5" stroke="currentColor" strokeWidth="2.4" fill="none" />
+            <path d="M15.5 15.5 21 21" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
+          </svg>
+          {hatLink ? "Anderes Lied suchen" : "Lied auf Spotify suchen"}
+        </button>
+        {hatLink && (
+          <button type="button" onClick={() => setzen(ohneLink(wert))} className={`${knopf} bg-[rgb(118_118_128/0.12)] text-tinte-matt dark:text-slate-300`}>
+            Lied entfernen
+          </button>
+        )}
+      </span>
+    );
+
+  return (
+    <span className="mt-2 block overflow-hidden rounded-2xl bg-[rgb(118_118_128/0.08)] dark:bg-[rgb(118_118_128/0.18)]">
+      <span className="flex items-center gap-2 px-3 pt-3">
+        <input
+          type="search"
+          autoFocus
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Titel oder Künstler"
+          aria-label="Lied suchen"
+          className="min-w-0 flex-1 rounded-xl bg-white px-3 py-2 text-[15px] outline-none placeholder:text-tinte-leise dark:bg-slate-800"
+        />
+        <button type="button" onClick={() => setOffen(false)} className="shrink-0 px-1 text-[14px] font-semibold text-brand-dark dark:text-brand">
+          Fertig
+        </button>
+      </span>
+
+      {perApp !== false && (
+        <span className="mt-2 block">
+          {laedt && treffer === undefined && <span className="block px-4 py-3 text-[13px] text-tinte-leise">Sucht …</span>}
+          {treffer?.length === 0 && !laedt && <span className="block px-4 py-3 text-[13px] text-tinte-leise">Nichts gefunden.</span>}
+          {treffer?.map((t) => (
+            <button
+              type="button"
+              key={t.id}
+              onClick={() => {
+                setzen(`${t.titel} – ${t.kuenstler} https://open.spotify.com/track/${t.id}`);
+                setOffen(false);
+              }}
+              className="flex w-full items-center gap-3 px-3 py-2 text-left transition active:bg-black/[0.05] dark:active:bg-white/[0.06]"
+            >
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-[#1E1E1E] text-[18px] text-white">
+                {t.cover ? <img src={t.cover} alt="" className="h-full w-full object-cover" /> : "♪"}
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-[15px] font-semibold">{t.titel}</span>
+                <span className="block truncate text-[13px] text-tinte-leise">{t.kuenstler}</span>
+              </span>
+              <span className="shrink-0 text-[13px] font-semibold text-brand">Wählen</span>
+            </button>
+          ))}
+        </span>
+      )}
+
+      {fehler && <span className="block px-4 pt-2 text-[12.5px] text-red-600 dark:text-red-400">{fehler}</span>}
+
+      <span className="mt-1 flex flex-wrap items-center gap-2 border-t border-black/[0.06] px-3 py-2.5 dark:border-white/[0.08]">
+        <span className="w-full text-[11.5px] leading-snug text-tinte-leise">
+          {perApp === false
+            ? "Öffnet Spotify mit deiner Suche. Beim Lied auf Teilen → Link kopieren, dann hier einfügen."
+            : "Nicht dabei? In Spotify suchen, Link kopieren und hier einfügen."}
+        </span>
+        <a href={spotifySuche} target="_blank" rel="noopener noreferrer" className={`${knopf} bg-[#1E1E1E] text-white`}>
+          In Spotify suchen ↗
+        </a>
+        <button type="button" onClick={() => void einfuegen()} className={`${knopf} bg-white text-brand-dark shadow-sm dark:bg-slate-800 dark:text-brand`}>
+          Kopierten Link einfügen
+        </button>
+      </span>
+    </span>
+  );
+}

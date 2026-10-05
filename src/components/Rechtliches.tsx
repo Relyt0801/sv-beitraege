@@ -148,6 +148,9 @@ function Datenschutz() {
         <b>Spotify:</b> Steht im Steckbrief ein Spotify-Link, holt unser Server einmal Titel, Künstler und Cover von
         Spotify und speichert sie bei uns – beim Ansehen geht dadurch nichts an Spotify. Erst wenn du auf
         „Abspielen“ oder „In Spotify öffnen“ tippst, verbindet sich dein Gerät mit Spotify (u. a. deine IP-Adresse).
+        Bei „Lied auf Spotify suchen“ schickt unser Server nur deinen Suchbegriff an Spotify (ohne deinen Namen) und
+        zeigt die Treffer; „In Spotify suchen“ öffnet Spotify direkt. „Kopierten Link einfügen“ liest einmalig deine
+        Zwischenablage – nur nach deinem Tippen und mit Nachfrage deines Geräts.
       </P>
       <P>
         <b>Umfragen:</b> Deine Antworten und ob du fertig bist. Ausgewertet wird nur gezählt – einzelne Antworten
@@ -262,7 +265,7 @@ function Datenschutz() {
       </P>
 
       <p className="mt-4 text-[12px] text-tinte-leise">
-        Stand: 03.10.2026
+        Stand: 05.10.2026
       </p>
     </>
   );

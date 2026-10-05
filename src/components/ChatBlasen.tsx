@@ -4,6 +4,8 @@ import { useChatEnde } from "../lib/gescrollt";
 import { REAKTIONEN, useTopicsOptional, type Reaktion, type TopicItem } from "../topics-store";
 import { Avatar, PersonName } from "./Avatar";
 import { MuteKnopf } from "./MuteKnopf";
+import { useProfiles } from "../profiles-store";
+import { lesbarerName } from "../lib/profil";
 
 import { frage, melde } from "../lib/melder";
 /**
@@ -32,6 +34,8 @@ export function ChatBlase({
   const topics = useTopicsOptional();
   const blase = useRef<HTMLDivElement>(null);
   const [menue, setMenue] = useState<DOMRect | null>(null);
+  // true = über das Reaktions-Schildchen geöffnet: zeigt, wer wie reagiert hat
+  const [werListe, setWerListe] = useState(false);
   const halten = useLangDruck(() => {
     if (!blase.current || m.nicht_gesendet) return;
     try {
@@ -39,6 +43,7 @@ export function ChatBlase({
     } catch {
       /* nicht überall erlaubt */
     }
+    setWerListe(false);
     setMenue(blase.current.getBoundingClientRect());
   });
   const reaktionen = topics?.reaktionen[m.id] || [];
@@ -49,6 +54,7 @@ export function ChatBlase({
     <div className={`flex items-start gap-2 ${meins ? "justify-end" : "justify-start"}`}>
       {!meins && kreis}
       <div className={`flex max-w-[78%] flex-col sm:max-w-[65%] lg:max-w-[50%] ${meins ? "items-end" : "items-start"}`}>
+      <div className={`relative ${reaktionen.length > 0 ? "mb-[18px]" : ""}`}>
       <div
         ref={blase}
         {...halten}
@@ -89,8 +95,17 @@ export function ChatBlase({
         </div>
       </div>
       {reaktionen.length > 0 && (
-        <ReaktionsChips liste={reaktionen} meine={meine} onTippen={(e) => reagieren(meine === e ? null : e)} />
+        <ReaktionsSchild
+          liste={reaktionen}
+          rechts={meins}
+          onTippen={() => {
+            if (!blase.current) return;
+            setWerListe(true);
+            setMenue(blase.current.getBoundingClientRect());
+          }}
+        />
       )}
+      </div>
       </div>
       {meins && kreis}
       {menue &&
@@ -99,6 +114,8 @@ export function ChatBlase({
             rect={menue}
             rechts={meins}
             meine={meine}
+            liste={werListe ? reaktionen : null}
+            uid={topics?.uid ?? null}
             onWahl={(e) => {
               reagieren(meine === e ? null : e);
               setMenue(null);
@@ -153,34 +170,74 @@ function useLangDruck(los: () => void) {
   };
 }
 
-/** Kleine Schildchen unter der Blase: 👍 2  🔥 1 – die eigene ist blau umrandet. */
-function ReaktionsChips({
-  liste, meine, onTippen,
+/**
+ * Reaktionen wie bei WhatsApp: ein kleines Schildchen, das unten über den Rand
+ * der Blase ragt (nicht über den Text), mit bis zu drei Emojis und der Zahl.
+ * Der Rand in Hintergrundfarbe trennt es sauber von der Blase. Antippen zeigt,
+ * wer wie reagiert hat.
+ */
+function ReaktionsSchild({
+  liste, rechts, onTippen,
 }: {
   liste: { user_id: string; emoji: string }[];
-  meine: string | null;
-  onTippen: (e: Reaktion) => void;
+  rechts: boolean;
+  onTippen: () => void;
 }) {
   const zahl = new Map<string, number>();
   for (const r of liste) zahl.set(r.emoji, (zahl.get(r.emoji) || 0) + 1);
-  const reihe = REAKTIONEN.filter((e) => zahl.has(e));
+  // Häufigste zuerst, bei Gleichstand in der Reihenfolge der Leiste
+  const reihe = REAKTIONEN.filter((e) => zahl.has(e)).sort((x, y) => (zahl.get(y) || 0) - (zahl.get(x) || 0));
   return (
-    <div className="-mt-1.5 flex flex-wrap gap-1 px-1.5">
-      {reihe.map((e) => (
-        <button
-          key={e}
-          onClick={() => onTippen(e)}
-          aria-label={`${e} ${zahl.get(e)}${meine === e ? ", deine Reaktion – antippen zum Zurücknehmen" : ""}`}
-          className={`flex items-center gap-0.5 rounded-full border px-1.5 py-[1px] text-[12px] leading-5 shadow-sm transition active:scale-90 ${
-            meine === e
-              ? "border-brand/60 bg-brand/10 dark:bg-brand/25"
-              : "border-black/[0.06] bg-white dark:border-white/10 dark:bg-slate-800"
-          }`}
-        >
-          <span>{e}</span>
-          {(zahl.get(e) || 0) > 1 && <span className="zahl text-[11px] font-bold text-tinte-matt dark:text-slate-300">{zahl.get(e)}</span>}
-        </button>
+    <button
+      type="button"
+      onClick={onTippen}
+      aria-label={`Reaktionen: ${reihe.map((e) => `${e} ${zahl.get(e)}`).join(", ")} – antippen für Details`}
+      className={`absolute -bottom-[16px] flex h-[24px] items-center gap-[1px] rounded-full bg-white px-1.5 text-[13px] leading-none shadow-[0_1px_2px_rgba(0,0,0,.18)] ring-2 ring-papier transition active:scale-90 dark:bg-slate-800 dark:ring-slate-950 ${
+        rechts ? "right-2" : "left-2"
+      }`}
+    >
+      {reihe.slice(0, 3).map((e) => (
+        <span key={e}>{e}</span>
       ))}
+      {liste.length > 1 && <span className="zahl ml-0.5 text-[11.5px] font-semibold text-tinte-matt dark:text-slate-300">{liste.length}</span>}
+    </button>
+  );
+}
+
+/** Wer hat wie reagiert – die eigene Zeile lässt sich antippen zum Entfernen. */
+function WerReagiert({
+  liste, uid, onEntfernen,
+}: {
+  liste: { user_id: string; emoji: string }[];
+  uid: string | null;
+  onEntfernen: () => void;
+}) {
+  const { profile } = useProfiles();
+  const sortiert = [...liste].sort((a, b) => (a.user_id === uid ? -1 : b.user_id === uid ? 1 : 0));
+  return (
+    <div className="max-h-[40vh] overflow-y-auto">
+      <div className="px-4 pb-1 pt-3 text-[12px] font-semibold text-tinte-leise">
+        {liste.length} {liste.length === 1 ? "Reaktion" : "Reaktionen"}
+      </div>
+      {sortiert.map((r) => {
+        const ich = r.user_id === uid;
+        const name = ich ? "Du" : lesbarerName(profile[r.user_id]?.anzeigename || "Jemand");
+        const Tag = ich ? "button" : "div";
+        return (
+          <Tag
+            key={r.user_id}
+            onClick={ich ? onEntfernen : undefined}
+            className="flex w-full items-center gap-3 px-4 py-2 text-left hover:bg-black/[0.04] dark:hover:bg-white/[0.06]"
+          >
+            <Avatar userId={r.user_id} size={30} />
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-[15px] font-medium">{name}</span>
+              {ich && <span className="block text-[12px] text-tinte-leise">Zum Entfernen tippen</span>}
+            </span>
+            <span className="text-[20px]">{r.emoji}</span>
+          </Tag>
+        );
+      })}
     </div>
   );
 }
@@ -190,11 +247,14 @@ function ReaktionsChips({
  * über der Nachricht die Leiste mit den Reaktionen, darunter „Kopieren“.
  */
 function ReaktionsMenue({
-  rect, rechts, meine, onWahl, onKopieren, onSchliessen,
+  rect, rechts, meine, liste, uid, onWahl, onKopieren, onSchliessen,
 }: {
   rect: DOMRect;
   rechts: boolean;
   meine: string | null;
+  /** gesetzt = über das Schildchen geöffnet: Liste „wer hat reagiert“ statt „Kopieren“ */
+  liste: { user_id: string; emoji: string }[] | null;
+  uid: string | null;
   onWahl: (e: Reaktion) => void;
   onKopieren: () => void;
   onSchliessen: () => void;
@@ -228,24 +288,42 @@ function ReaktionsMenue({
             aria-label={meine === e ? `${e} zurücknehmen` : `Mit ${e} reagieren`}
             aria-pressed={meine === e}
             className={`flex h-10 w-10 items-center justify-center rounded-full text-[22px] transition active:scale-90 ${
-              meine === e ? "bg-brand/15 dark:bg-brand/30" : "hover:bg-black/[0.05] dark:hover:bg-white/10"
+              meine === e ? "bg-black/[0.09] dark:bg-white/[0.16]" : "hover:bg-black/[0.05] dark:hover:bg-white/10"
             }`}
           >
             {e}
           </button>
         ))}
       </div>
-      <div
-        className="absolute w-44 animate-popIn overflow-hidden rounded-2xl bg-white/95 shadow-glas backdrop-blur-xl dark:bg-slate-800/95"
-        style={{ left: Math.max(8, Math.min(vw - 184, rechts ? rect.right - 176 : rect.left)), top: Math.min(menueOben, window.innerHeight - 60) }}
-      >
-        <button
-          onClick={onKopieren}
-          className="flex w-full items-center justify-between px-4 py-3 text-left text-[15px] font-medium hover:bg-black/[0.04] dark:hover:bg-white/[0.06]"
+      {liste ? (
+        <div
+          className="absolute w-72 animate-popIn overflow-hidden rounded-2xl bg-white/95 pb-1 shadow-glas backdrop-blur-xl dark:bg-slate-800/95"
+          style={{
+            left: Math.max(8, Math.min(vw - 296, rechts ? rect.right - 288 : rect.left)),
+            top: Math.max(8, Math.min(menueOben, window.innerHeight - Math.min(window.innerHeight * 0.4 + 40, 64 + liste.length * 46) - 16)),
+          }}
         >
-          Kopieren <span aria-hidden>⧉</span>
-        </button>
-      </div>
+          <WerReagiert
+            liste={liste}
+            uid={uid}
+            onEntfernen={() => {
+              if (meine) onWahl(meine as Reaktion);
+            }}
+          />
+        </div>
+      ) : (
+        <div
+          className="absolute w-44 animate-popIn overflow-hidden rounded-2xl bg-white/95 shadow-glas backdrop-blur-xl dark:bg-slate-800/95"
+          style={{ left: Math.max(8, Math.min(vw - 184, rechts ? rect.right - 176 : rect.left)), top: Math.min(menueOben, window.innerHeight - 60) }}
+        >
+          <button
+            onClick={onKopieren}
+            className="flex w-full items-center justify-between px-4 py-3 text-left text-[15px] font-medium hover:bg-black/[0.04] dark:hover:bg-white/[0.06]"
+          >
+            Kopieren <span aria-hidden>⧉</span>
+          </button>
+        </div>
+      )}
     </div>
   );
 }
