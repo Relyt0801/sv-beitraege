@@ -38,7 +38,7 @@ export function AlbumProvider({ children }: { children: ReactNode }) {
     const neinStill = async () => {
       meldeFehler(GESPERRT_TEXT);
     };
-    return { ...roh, stammdatenSpeichern: nein, textSchreiben: nein, freigabeSetzen: nein, kommentieren: nein, liken: neinStill, kommentarLiken: neinStill };
+    return { ...roh, stammdatenSpeichern: nein, textSchreiben: nein, redigieren: nein, freigabeSetzen: nein, kommentieren: nein, liken: neinStill, kommentarLiken: neinStill };
   }, [roh, banned]);
   return (
     <AlbumCtx.Provider value={darf ? album : null}>
@@ -203,7 +203,7 @@ export function AlbumKarte({ className = "" }: { className?: string }) {
 /* ====================================================================== */
 /* Das Blatt                                                              */
 /* ====================================================================== */
-type Ansicht = { art: "alle" } | { art: "mein" } | { art: "person"; id: string } | { art: "schreiben"; id: string };
+type Ansicht = { art: "alle" } | { art: "mein" } | { art: "person"; id: string } | { art: "schreiben"; id: string } | { art: "korrigieren"; id: string };
 
 export function AlbumSheet({ open, start, album, onClose }: { open: boolean; start: string | null; album: Album; onClose: () => void }) {
   const { studentId, can } = useRole();
@@ -229,8 +229,11 @@ export function AlbumSheet({ open, start, album, onClose }: { open: boolean; sta
             zurueck={() => setAnsicht({ art: "alle" })}
             schreiben={() => setAnsicht({ art: "schreiben", id: ansicht.id })}
             bearbeiten={() => setAnsicht({ art: "mein" })}
+            korrigieren={() => setAnsicht({ art: "korrigieren", id: ansicht.id })}
             onClose={onClose}
           />
+        ) : ansicht.art === "korrigieren" ? (
+          <KorrigierenAnsicht album={album} id={ansicht.id} fertig={() => setAnsicht({ art: "person", id: ansicht.id })} />
         ) : ansicht.art === "schreiben" ? (
           <TextFuerAndere album={album} id={ansicht.id} fertig={() => setAnsicht({ art: "person", id: ansicht.id })} />
         ) : (
@@ -292,16 +295,57 @@ export function AlbumSheet({ open, start, album, onClose }: { open: boolean; sta
 function AlleSteckbriefe({ album, oeffnen }: { album: Album; oeffnen: (id: string) => void }) {
   const [suche, setSuche] = useState("");
   const { studentId } = useRole();
+  // Sortierung: A–Z nach Nachname oder nach Fortschritt (fertige zuerst).
+  // Gemerkt pro Gerät – rein Bequemlichkeit.
+  const [sortierung, setSortierungRoh] = useState<"name" | "fortschritt">(() => {
+    try {
+      return localStorage.getItem("sv:album:sortierung") === "fortschritt" ? "fortschritt" : "name";
+    } catch {
+      return "name";
+    }
+  });
+  const setSortierung = (v: "name" | "fortschritt") => {
+    setSortierungRoh(v);
+    try {
+      localStorage.setItem("sv:album:sortierung", v);
+    } catch {
+      /* privater Modus */
+    }
+  };
   const liste = useMemo(() => {
     const q = suche.trim().toLowerCase();
-    return album.personen.filter((p) => !q || `${p.vorname} ${p.nachname}`.toLowerCase().includes(q));
-  }, [album.personen, suche]);
+    const nachName = (a: AlbumPerson, b: AlbumPerson) =>
+      a.nachname.localeCompare(b.nachname, "de", { sensitivity: "base" }) || a.vorname.localeCompare(b.vorname, "de", { sensitivity: "base" });
+    const pr = (x: AlbumPerson) => fortschritt(album.steckbriefVon(x.id), album.kategorien);
+    return album.personen
+      .filter((p) => !q || `${p.vorname} ${p.nachname}`.toLowerCase().includes(q))
+      .sort((a, b) => (sortierung === "fortschritt" ? pr(b) - pr(a) || nachName(a, b) : nachName(a, b)));
+  }, [album, suche, sortierung]);
+  const fertig = album.personen.filter((x) => fortschritt(album.steckbriefVon(x.id), album.kategorien) >= 100).length;
 
   if (!album.bereit) return <p className="py-10 text-center text-[14px] text-tinte-leise">Lädt …</p>;
 
   return (
     <>
-      <input className="field mb-4" placeholder="Name suchen" value={suche} onChange={(e) => setSuche(e.target.value)} />
+      <input className="field mb-3" placeholder="Name suchen" value={suche} onChange={(e) => setSuche(e.target.value)} />
+      <div className="mb-4 flex items-center gap-2">
+        <div className="seg flex-1" role="tablist" aria-label="Sortieren">
+          <button role="tab" aria-selected={sortierung === "name"} className={`seg-item ${sortierung === "name" ? "seg-aktiv" : ""}`} onClick={() => setSortierung("name")}>
+            A–Z
+          </button>
+          <button
+            role="tab"
+            aria-selected={sortierung === "fortschritt"}
+            className={`seg-item ${sortierung === "fortschritt" ? "seg-aktiv" : ""}`}
+            onClick={() => setSortierung("fortschritt")}
+          >
+            Fortschritt
+          </button>
+        </div>
+        <span className="shrink-0 text-[12.5px] font-semibold text-tinte-leise">
+          {fertig}/{album.personen.length} fertig
+        </span>
+      </div>
       <div className="grid grid-cols-2 gap-x-3 gap-y-5 sm:grid-cols-3">
         {liste.map((p, i) => {
           const s = album.steckbriefVon(p.id);
@@ -327,7 +371,19 @@ function AlleSteckbriefe({ album, oeffnen }: { album: Album; oeffnen: (id: strin
               <span className="mt-2 block truncate font-buch text-[15px] font-semibold italic leading-tight">
                 {p.vorname} {p.nachname}
               </span>
-              <span className="mt-0.5 block truncate text-[12px] text-tinte-leise">{spitz ? `„${spitz}“` : pr ? `${pr} % ausgefüllt` : "noch leer"}</span>
+              <span className="mt-0.5 block truncate text-[12px] text-tinte-leise">
+                {sortierung === "fortschritt"
+                  ? pr >= 100
+                    ? <span className="font-semibold text-[#248A3D] dark:text-[#30D158]">✓ fertig</span>
+                    : pr
+                      ? `${pr} % ausgefüllt`
+                      : "noch leer"
+                  : spitz
+                    ? `„${spitz}“`
+                    : pr
+                      ? `${pr} % ausgefüllt`
+                      : "noch leer"}
+              </span>
               <span className="mt-1 flex gap-3 text-[12px] font-semibold text-tinte-leise">
                 <span className={likes ? "text-[#FF2D55]" : ""}>❤ {likes}</span>
                 <span>💬 {komm}</span>
@@ -348,6 +404,7 @@ function SteckbriefAnsicht({
   zurueck,
   schreiben,
   bearbeiten,
+  korrigieren,
   onClose,
 }: {
   album: Album;
@@ -355,6 +412,7 @@ function SteckbriefAnsicht({
   zurueck: () => void;
   schreiben: () => void;
   bearbeiten: () => void;
+  korrigieren: () => void;
   onClose: () => void;
 }) {
   const { studentId, can } = useRole();
@@ -412,6 +470,11 @@ function SteckbriefAnsicht({
               Bearbeiten
             </button>
           )}
+          {!ich && can("album.redigieren") && (
+            <button onClick={korrigieren} className="rounded-full bg-brand/10 px-3 py-1 text-[13px] font-semibold text-brand-dark dark:text-brand">
+              ✏️ Korrigieren
+            </button>
+          )}
         </div>
       </div>
 
@@ -450,6 +513,9 @@ function SteckbriefAnsicht({
           </span>
           <blockquote className="whitespace-pre-wrap font-buch text-[16.5px] leading-[1.55]">{s.text}</blockquote>
           {s.text_von_name && <figcaption className="mt-3 text-right text-[12.5px] font-semibold opacity-70">— geschrieben von {s.text_von_name}</figcaption>}
+          {s.korrigiert_at && (ich || can("album.redigieren")) && (
+            <div className="mt-1 text-right text-[11.5px] opacity-60">✏️ korrigiert von {s.korrigiert_von_name || "der Abizeitung"}</div>
+          )}
           {!ich && can("album.moderieren") && (
             <button
               onClick={() =>
@@ -567,6 +633,62 @@ function TextFuerAndere({ album, id, fertig }: { album: Album; id: string; ferti
         }}
       >
         {busy ? "…" : "Speichern"}
+      </button>
+    </div>
+  );
+}
+
+/* ---------------------------------------------------------------- Korrigieren (Abizeitung) */
+function KorrigierenAnsicht({ album, id, fertig }: { album: Album; id: string; fertig: () => void }) {
+  const p = album.personen.find((x) => x.id === id);
+  const s = album.steckbriefVon(id);
+  const kat = album.kategorien.filter((k) => k.aktiv);
+  const [daten, setDaten] = useState<Record<string, string>>(() => ({ ...(s?.stammdaten || {}) }));
+  const [text, setText] = useState(s?.text || "");
+  const [sendet, setSendet] = useState(false);
+  const geaendert = text !== (s?.text || "") || kat.some((k) => (daten[k.id] || "") !== (s?.stammdaten[k.id] || ""));
+
+  return (
+    <div className="animate-vonRechts">
+      <div className="mb-3 flex items-center justify-between">
+        <button onClick={fertig} className="py-1 text-[16px] font-semibold text-brand">
+          ‹ Zurück
+        </button>
+      </div>
+      <h2 className="text-[1.375rem] font-bold leading-tight tracking-[-0.02em]">
+        {p ? `${p.vorname} ${p.nachname}` : "Steckbrief"} korrigieren
+      </h2>
+      <p className="mt-1 text-[13px] leading-snug text-tinte-leise">
+        Für Rechtschreibung und Ähnliches. Die Person sieht „korrigiert von {"…"}“ mit deinem Namen. Bitte nichts inhaltlich umschreiben.
+      </p>
+      <Gruppe titel="Stammdaten">
+        {kat.map((k) => (
+          <label key={k.id} className="block px-4 py-2.5">
+            <span className="text-[12px] font-semibold text-tinte-leise">{k.titel}</span>
+            <input
+              value={daten[k.id] || ""}
+              maxLength={200}
+              onChange={(e) => setDaten((d) => ({ ...d, [k.id]: e.target.value }))}
+              className="mt-0.5 block w-full bg-transparent text-[15px] outline-none"
+            />
+          </label>
+        ))}
+      </Gruppe>
+      <h3 className="mb-1.5 mt-5 px-4 text-[12px] font-semibold uppercase tracking-[0.04em] text-tinte-leise">Text</h3>
+      <TextFeld wert={text} setzen={setText} platzhalter="Noch kein Text" />
+      <button
+        className="btn-primary mt-4 w-full disabled:opacity-40"
+        disabled={!geaendert || sendet}
+        onClick={async () => {
+          setSendet(true);
+          const f = await album.redigieren(id, daten, text);
+          setSendet(false);
+          if (f) return meldeFehler("Ging nicht: " + f);
+          melde("Korrektur gespeichert", "erfolg");
+          fertig();
+        }}
+      >
+        {sendet ? "Wird gespeichert …" : "Korrektur speichern"}
       </button>
     </div>
   );

@@ -12,6 +12,17 @@ ausführlich (auf Deutsch); hier steht der Überblick dazu.
 ---
 
 
+## 05.10.2026 (5): Steckbriefe korrigieren, Album sortieren
+
+- **Korrigieren** (Recht `album.redigieren`, RPC `album_redigieren`,
+  Spalten `korrigiert_von_name`/`korrigiert_at`): Komitee Abizeitung und
+  Admin sehen bei jedem fremden Steckbrief „✏️ Korrigieren“ und können
+  Stammdaten und Text ändern (Rechtschreibung o. Ä.). „Geschrieben von“
+  bleibt, die Person sieht zusätzlich „korrigiert von …“.
+- **Sortieren** im Album: „A–Z“ (Nachname, dann Vorname) oder
+  „Fortschritt“ (fertige zuerst, mit „✓ fertig“), daneben „x/y fertig“.
+  Die Wahl merkt sich das Gerät.
+
 ## 05.10.2026 (4): Abimotto in zwei Phasen
 
 - **Vorschläge → Abstimmung** (`app_settings.motto_abstimmung`, RPC

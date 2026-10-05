@@ -135,7 +135,8 @@ function Datenschutz() {
         <b>Abi-Album:</b> Wer mitmacht, speichert im eigenen Steckbrief die Felder, die das Stufenteam festlegt (z. B.
         „Nach dem Abi“, Lieblingslied), einen freien Text, wer den Text geschrieben hat, und wen man dafür freigibt.
         Dazu Kommentare (mit Namen) und „Gefällt mir“. Das sehen alle, die das Album nutzen dürfen – keine Eltern.
-        Gelöschte Kommentare werden geleert. Stammdaten kann nur die Person selbst ändern.
+        Gelöschte Kommentare werden geleert. Stammdaten kann nur die Person selbst ändern – und wer Steckbriefe korrigieren darf
+        (z. B. Komitee Abizeitung, für Rechtschreibung); dann steht „korrigiert von …“ dabei.
       </P>
       <P>
         <b>Zitatwand:</b> eingereichte Zitate (Text, wer es gesagt hat, wann/wo), wer sie eingereicht hat und die

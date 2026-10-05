@@ -234,3 +234,41 @@ alter policy "motto stimme setzen" on public.motto_stimmen
 alter policy "motto stimme umschalten" on public.motto_stimmen
   using (user_id = (select auth.uid()))
   with check (user_id = (select auth.uid()) and (select has_perm('motto.nutzen')) and (select motto_abstimmung_an()));
+
+-- ------------------------------------------------------------ 5. Steckbriefe korrigieren
+-- Recht album.redigieren (Start: Komitee Abizeitung; Admin hat alles):
+-- Stammdaten und Text jedes Steckbriefs ändern, z. B. Rechtschreibung.
+-- „geschrieben von“ bleibt, dazu „korrigiert von …“.
+alter table public.album_steckbriefe add column if not exists korrigiert_von_name text not null default '';
+alter table public.album_steckbriefe add column if not exists korrigiert_at timestamptz;
+
+create or replace function public.album_redigieren(p_student uuid, p_daten jsonb, p_text text)
+returns void language plpgsql security definer set search_path = public as $$
+declare
+  sauber jsonb := '{}'::jsonb;
+  k record;
+begin
+  if not public.has_perm('album.redigieren') or public.ist_eltern() or public.is_banned() then
+    raise exception 'Keine Berechtigung';
+  end if;
+  if not exists (select 1 from public.students where id = p_student) then raise exception 'Unbekannte Person'; end if;
+  if char_length(coalesce(p_text, '')) > 3000 then raise exception 'Text zu lang'; end if;
+  for k in select id from public.album_kategorien where aktiv loop
+    if p_daten ? k.id::text and char_length(btrim(p_daten ->> k.id::text)) > 0 then
+      sauber := sauber || jsonb_build_object(k.id::text, left(btrim(p_daten ->> k.id::text), 200));
+    end if;
+  end loop;
+  insert into public.album_steckbriefe (student_id, stammdaten, text, korrigiert_von_name, korrigiert_at, updated_at)
+  values (p_student, sauber, coalesce(p_text, ''), public.mein_anzeigename(), now(), now())
+  on conflict (student_id) do update set
+    stammdaten = excluded.stammdaten,
+    text = coalesce(p_text, public.album_steckbriefe.text),
+    korrigiert_von_name = excluded.korrigiert_von_name,
+    korrigiert_at = now(),
+    updated_at = now();
+end $$;
+revoke all on function public.album_redigieren(uuid, jsonb, text) from public, anon;
+grant execute on function public.album_redigieren(uuid, jsonb, text) to authenticated;
+
+insert into public.komitee_rechte (tag, perm, allowed) values ('abizeitung', 'album.redigieren', true)
+on conflict (tag, perm) do nothing;

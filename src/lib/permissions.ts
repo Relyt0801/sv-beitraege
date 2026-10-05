@@ -29,6 +29,7 @@ export type PermKey =
   | "rankings.nutzen"
   | "rankings.verwalten"
   | "lehrer.verwalten"
+  | "album.redigieren"
   | "motto.nutzen"
   | "motto.verwalten";
 
@@ -86,6 +87,7 @@ export const PERM_CATEGORIES: PermCategory[] = [
       { key: "album.nutzen", label: "Abi-Album nutzen", desc: "Eigenen Steckbrief ausfüllen, die anderen ansehen, kommentieren und liken." },
       { key: "album.kategorien", label: "Steckbrief-Kategorien", desc: "Die Stammdaten-Felder festlegen (z. B. Nach dem Abi, Lieblingslied)." },
       { key: "album.moderieren", label: "Album moderieren", desc: "Kommentare und Texte anderer entfernen." },
+      { key: "album.redigieren", label: "Steckbriefe korrigieren", desc: "Stammdaten und Texte aller Steckbriefe bearbeiten, z. B. Rechtschreibfehler." },
       { key: "zitate.nutzen", label: "Zitatwand nutzen", desc: "Zitate einreichen, die freigegebenen ansehen und mit 🔥 abstimmen." },
       { key: "zitate.pruefen", label: "Zitate prüfen", desc: "Eingereichte Zitate freigeben, ablehnen, nachträglich ändern oder löschen." },
       { key: "rankings.nutzen", label: "Rankings nutzen", desc: "In den Schüler- und Lehrer-Rankings abstimmen und die Top 3 sehen." },
@@ -187,6 +189,7 @@ export const KOMITEE_PERMS: PermKey[] = [
   "zitate.pruefen",
   "rankings.verwalten",
   "lehrer.verwalten",
+  "album.redigieren",
   "album.kategorien",
   "album.moderieren",
   "motto.verwalten",

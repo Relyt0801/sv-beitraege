@@ -33,6 +33,9 @@ export interface Steckbrief {
   freigabe: Freigabe;
   freigabe_an: string[];
   updated_at: string;
+  /** Korrigiert durch die Abizeitung (Recht album.redigieren) */
+  korrigiert_von_name?: string;
+  korrigiert_at?: string | null;
 }
 
 export interface AlbumKommentar {
@@ -259,6 +262,36 @@ export function useAlbum(aktiv: boolean, uid: string | null, meineStudentId: str
     [meineStudentId, laden],
   );
 
+  /**
+   * Korrigieren (Recht album.redigieren, Standard: Komitee Abizeitung und
+   * Admin): Stammdaten und Text eines beliebigen Steckbriefs, z. B. für
+   * Rechtschreibung. Wer den Text geschrieben hat, bleibt stehen; dazu
+   * „korrigiert von …“.
+   */
+  const redigieren = useCallback(
+    async (studentId: string, daten: Record<string, string>, text: string): Promise<string | null> => {
+      if (!hasSupabase) {
+        demoAendern((d) => {
+          const alt = d.steckbriefe.find((s) => s.student_id === studentId) || leer(studentId);
+          const neu = {
+            ...alt,
+            stammdaten: Object.fromEntries(Object.entries(daten).filter(([, v]) => v.trim())),
+            text,
+            korrigiert_von_name: "Abizeitung",
+            korrigiert_at: new Date().toISOString(),
+          };
+          d.steckbriefe = [...d.steckbriefe.filter((s) => s.student_id !== studentId), neu];
+        });
+        return null;
+      }
+      const { error } = await supabase!.rpc("album_redigieren", { p_student: studentId, p_daten: daten, p_text: text });
+      if (error) return error.message;
+      await laden();
+      return null;
+    },
+    [laden],
+  );
+
   const freigabeSetzen = useCallback(
     async (modus: Freigabe, an: string[]): Promise<string | null> => {
       if (!meineStudentId) return "Kein eigener Eintrag";
@@ -441,6 +474,7 @@ export function useAlbum(aktiv: boolean, uid: string | null, meineStudentId: str
     steckbriefVon,
     stammdatenSpeichern,
     textSchreiben,
+    redigieren,
     freigabeSetzen,
     kommentieren,
     kommentarEntfernen,
