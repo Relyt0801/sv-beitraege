@@ -12,6 +12,16 @@ ausführlich (auf Deutsch); hier steht der Überblick dazu.
 ---
 
 
+## 05.10.2026 (7): Abimotto – Likes, Ergebnisse nur fürs Komitee
+
+- Abstimmen = 👍 bei allen Mottos, die einem gefallen (🔥 entfällt). Keine
+  Zahlen und keine Rangliste für Schüler; die Datenbank gibt jedem nur die
+  eigenen Stimmen heraus.
+- Komitee Motto & Pullis und Admin (Recht `motto.verwalten`): Zahnrad →
+  „Ergebnisse“ mit Rangliste, Balken, Anzahl Abstimmender, Abstimmung
+  freigeben und „Als Motto festlegen“. Das festgelegte Motto steht groß auf
+  der Karte; der Admin kann es jederzeit ändern.
+
 ## 05.10.2026 (6): Keine Namen an Texten, direkt zum Ziel springen
 
 - **Keine Verfasser mehr sichtbar**: „geschrieben von“/„korrigiert von“ am

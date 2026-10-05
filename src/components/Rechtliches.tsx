@@ -145,8 +145,8 @@ function Datenschutz() {
         bekommt); Abgelehntes wird geleert. Keine Eltern.
       </P>
       <P>
-        <b>Abimotto:</b> Vorschläge (Text, optionale Erklärung, wer vorgeschlagen hat) und deine 👍/🔥-Stimmen. Andere
-        sehen nur die Zahlen. Wer vorgeschlagen hat, wird gespeichert (für die Prüfung), aber in der App nicht angezeigt.
+        <b>Abimotto:</b> Vorschläge (Text, optionale Erklärung, wer vorgeschlagen hat) und deine 👍-Stimmen. Die
+        Ergebnisse sieht nur, wer das Motto verwaltet (z. B. Komitee Motto &amp; Pullis) – andere sehen nur ihre eigenen 👍. Wer vorgeschlagen hat, wird gespeichert (für die Prüfung), aber in der App nicht angezeigt.
       </P>
       <P>
         <b>Sperre:</b> Wer gesperrt ist, kann in dieser Zeit nirgends etwas einreichen, kommentieren, liken oder abstimmen.

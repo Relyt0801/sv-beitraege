@@ -6,7 +6,7 @@ import { GesperrtZeile, GESPERRT_TEXT } from "./Gesperrt";
 import { ZahnradKnopf } from "./Rankings";
 import { useRole } from "../auth/RoleProvider";
 import { useFunktionen } from "../lib/funktionen";
-import { useMotto, type Motto, type MottoArt, type MottoWahl } from "../lib/motto";
+import { useMotto, type Motto, type MottoWahl } from "../lib/motto";
 import { frage, melde, meldeFehler } from "../lib/melder";
 
 const MEDAILLE = ["#E9C460", "#C0C4CC", "#D4A373"];
@@ -24,7 +24,7 @@ export function MottoKarte({ className = "" }: { className?: string }) {
 
   const sichtbare = m.mottos.filter((x) => !x.ausgeblendet);
   const gewaehlt = sichtbare.find((x) => x.gewaehlt) || null;
-  const vorne = [...sichtbare].sort((a, b) => m.punkte(b.id) - m.punkte(a.id))[0] || null;
+  const meineLikes = sichtbare.filter((x) => m.meine(x.id, "like")).length;
 
   return (
     <div className={className}>
@@ -40,14 +40,6 @@ export function MottoKarte({ className = "" }: { className?: string }) {
           <button onClick={() => setAnsicht("liste")} className="mt-1.5 block max-w-[85%] text-left text-[1.45rem] font-extrabold leading-tight tracking-[-0.01em]">
             {gewaehlt.text}
           </button>
-        ) : m.abstimmung && vorne && m.punkte(vorne.id) > 0 ? (
-          <button onClick={() => setAnsicht("liste")} className="mt-1.5 block max-w-[85%] text-left">
-            <span className="block text-[12px] font-semibold text-white/75">Gerade vorne</span>
-            <span className="block text-[1.3rem] font-extrabold leading-tight">{vorne.text}</span>
-            <span className="mt-1 block text-[13px] text-white/80">
-              🔥 {m.zahl(vorne.id, "feuer")} · 👍 {m.zahl(vorne.id, "like")}
-            </span>
-          </button>
         ) : (
           <p className="mt-1.5 max-w-[85%] text-[1.2rem] font-bold leading-snug">
             {m.abstimmung ? "Abstimmen: Welches Motto soll auf unsere Pullis?" : "Reiche Vorschläge für unser Abimotto ein"}
@@ -55,7 +47,11 @@ export function MottoKarte({ className = "" }: { className?: string }) {
         )}
         <div className="mt-1.5 text-[13px] text-white/80">
           {sichtbare.length} {sichtbare.length === 1 ? "Vorschlag" : "Vorschläge"}
-          {m.abstimmung && m.meinFavorit ? ` · Dein 🔥: ${m.meinFavorit.text}` : !m.abstimmung && !gewaehlt ? " · Abstimmung startet, sobald das Komitee sie freigibt" : ""}
+          {gewaehlt
+            ? ""
+            : m.abstimmung
+              ? ` · ${meineLikes ? `du hast ${meineLikes} gelikt` : "like alle, die dir gefallen"}`
+              : " · Abstimmung startet, sobald das Komitee sie freigibt"}
         </div>
         <GesperrtZeile hell className="mt-3" />
         <div className="mt-4 flex flex-wrap items-center gap-2">
@@ -96,16 +92,20 @@ function MottoSheet({
 }) {
   const { can, banned } = useRole();
   const [verwalten, setVerwalten] = useState(false);
-  const [sort, setSort] = useState<"top" | "neu">("top");
   const darfVerwalten = can("motto.verwalten");
   const schliessen = () => {
     setAnsicht(null);
     setVerwalten(false);
   };
+  // Für alle: neueste zuerst, ohne Zahlen. Ergebnisse (sortiert nach 👍) sieht
+  // nur, wer das Motto verwaltet (Komitee Motto & Pullis, Admin).
   const liste = m.mottos
     .filter((x) => verwalten || !x.ausgeblendet)
-    .sort((a, b) => (m.abstimmung && sort === "top" ? m.punkte(b.id) - m.punkte(a.id) || b.created_at.localeCompare(a.created_at) : b.created_at.localeCompare(a.created_at)));
-  const rang = [...m.mottos.filter((x) => !x.ausgeblendet)].sort((a, b) => m.punkte(b.id) - m.punkte(a.id)).map((x) => x.id);
+    .sort((a, b) =>
+      verwalten ? m.zahl(b.id, "like") - m.zahl(a.id, "like") || b.created_at.localeCompare(a.created_at) : b.created_at.localeCompare(a.created_at),
+    );
+  const hoechste = Math.max(1, ...liste.map((x) => m.zahl(x.id, "like")));
+  const stimmende = m.waehlende;
 
   return (
     <Sheet open={ansicht !== null} onClose={schliessen}>
@@ -114,19 +114,21 @@ function MottoSheet({
       ) : (
         <>
           <SheetKopf
-            titel="Abimotto"
+            titel={verwalten ? "Ergebnisse" : "Abimotto"}
             unter={
               verwalten
-                ? "Verwalten: Abstimmung freigeben, ändern, ausblenden, festlegen"
+                ? `Nur für das Komitee sichtbar · ${stimmende} ${stimmende === 1 ? "Person hat" : "Personen haben"} abgestimmt`
                 : m.abstimmung
-                  ? "🔥 = dein Favorit (nur einer) · 👍 so viele du willst"
+                  ? "Gib allen Mottos ein 👍, die dir gefallen. Die Ergebnisse sieht nur das Komitee."
                   : "Reiche Vorschläge ein – abgestimmt wird, sobald das Komitee die Abstimmung freigibt."
             }
             onClose={schliessen}
             extra={
               <>
-                {darfVerwalten && <ZahnradKnopf label={verwalten ? "Verwalten beenden" : "Abimotto verwalten"} onClick={() => setVerwalten((v) => !v)} />}
-                {!banned && (!m.abstimmung || darfVerwalten) && (
+                {darfVerwalten && (
+                  <ZahnradKnopf label={verwalten ? "Zurück zur Abstimmung" : "Ergebnisse und Verwalten"} onClick={() => setVerwalten((v) => !v)} />
+                )}
+                {!banned && !verwalten && (!m.abstimmung || darfVerwalten) && (
                   <button
                     type="button"
                     onClick={() => setAnsicht("neu")}
@@ -146,7 +148,9 @@ function MottoSheet({
               <span className="min-w-0 flex-1">
                 <span className="block text-[15px] font-semibold">Abstimmung freigeben</span>
                 <span className="block text-[12.5px] leading-snug text-tinte-leise">
-                  {m.abstimmung ? "Läuft: alle stimmen mit 👍 und 🔥 ab, neue Vorschläge nur noch vom Komitee." : "Aus: alle können Vorschläge einreichen, abstimmen geht noch nicht."}
+                  {m.abstimmung
+                    ? "Läuft: alle liken Mottos, neue Vorschläge nur noch vom Komitee."
+                    : "Aus: alle können Vorschläge einreichen, abstimmen geht noch nicht."}
                 </span>
               </span>
               <Schalter
@@ -168,22 +172,12 @@ function MottoSheet({
               ✨ Vorschlag einreichen
             </button>
           )}
-          {m.abstimmung && (
-          <div className="seg mb-3">
-            <button className={`seg-item ${sort === "top" ? "seg-aktiv" : ""}`} onClick={() => setSort("top")}>
-              Beliebteste
-            </button>
-            <button className={`seg-item ${sort === "neu" ? "seg-aktiv" : ""}`} onClick={() => setSort("neu")}>
-              Neueste
-            </button>
-          </div>
-          )}
           <div className="space-y-2.5">
-            {liste.map((x) =>
+            {liste.map((x, i) =>
               verwalten ? (
-                <VerwaltenZeile key={x.id} x={x} m={m} />
+                <VerwaltenZeile key={x.id} x={x} m={m} platz={i} anteil={m.zahl(x.id, "like") / hoechste} />
               ) : (
-                <MottoZeile key={x.id} x={x} m={m} platz={m.abstimmung && sort === "top" ? rang.indexOf(x.id) : -1} gesperrt={banned} />
+                <MottoZeile key={x.id} x={x} m={m} gesperrt={banned} />
               ),
             )}
             {liste.length === 0 && (
@@ -199,11 +193,11 @@ function MottoSheet({
   );
 }
 
-function MottoZeile({ x, m, platz, gesperrt }: { x: Motto; m: MottoWahl; platz: number; gesperrt: boolean }) {
-  const top = platz >= 0 && platz < 3 && m.punkte(x.id) > 0;
-  const tippen = async (art: MottoArt) => {
+function MottoZeile({ x, m, gesperrt }: { x: Motto; m: MottoWahl; gesperrt: boolean }) {
+  const an = m.meine(x.id, "like");
+  const tippen = async () => {
     if (gesperrt) return meldeFehler(GESPERRT_TEXT);
-    const f = await m.abstimmen(x.id, art);
+    const f = await m.abstimmen(x.id, "like");
     if (f) meldeFehler("Ging nicht: " + f);
   };
   return (
@@ -214,50 +208,37 @@ function MottoZeile({ x, m, platz, gesperrt }: { x: Motto; m: MottoWahl; platz: 
           : "bg-[rgb(118_118_128/0.08)] dark:bg-[rgb(118_118_128/0.18)]"
       }`}
     >
-      <div className="flex items-start gap-2.5">
-        {top && (
-          <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[12px] font-bold text-[#1C1C1E]" style={{ background: MEDAILLE[platz] }}>
-            {platz + 1}
-          </span>
-        )}
+      <div className="flex items-center gap-3">
         <div className="min-w-0 flex-1">
-          {x.gewaehlt && <div className="mb-0.5 text-[11px] font-bold uppercase tracking-[0.1em] text-[#B5179E]">Festgelegt ✓</div>}
+          {x.gewaehlt && <div className="mb-0.5 text-[11px] font-bold uppercase tracking-[0.1em] text-[#B5179E]">Unser Motto ✓</div>}
           <div className="text-[16px] font-bold leading-snug">{x.text}</div>
           {x.erklaerung && <div className="mt-0.5 text-[13px] leading-snug text-tinte-matt dark:text-slate-300">{x.erklaerung}</div>}
           {x.von === m.me && <div className="mt-1 text-[11.5px] text-tinte-leise">Dein Vorschlag</div>}
         </div>
+        {m.abstimmung && <StimmKnopf an={an} onClick={() => void tippen()} />}
       </div>
-      {m.abstimmung && (
-      <div className="mt-2.5 flex gap-2">
-        <StimmKnopf zeichen="👍" n={m.zahl(x.id, "like")} an={m.meine(x.id, "like")} label="Gefällt mir" onClick={() => void tippen("like")} />
-        <StimmKnopf zeichen="🔥" n={m.zahl(x.id, "feuer")} an={m.meine(x.id, "feuer")} label="Mein Favorit" onClick={() => void tippen("feuer")} feuer />
-      </div>
-      )}
     </div>
   );
 }
 
-function StimmKnopf({ zeichen, n, an, label, onClick, feuer }: { zeichen: string; n: number; an: boolean; label: string; onClick: () => void; feuer?: boolean }) {
+function StimmKnopf({ an, onClick }: { an: boolean; onClick: () => void }) {
   return (
     <button
       onClick={onClick}
       aria-pressed={an}
-      aria-label={`${label}: ${n}`}
-      className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[14px] font-semibold transition active:scale-90 ${
-        an
-          ? feuer
-            ? "bg-[#FF6B3D] text-white shadow-[0_4px_12px_-4px_rgba(255,107,61,.8)]"
-            : "bg-brand text-white"
-          : "bg-white text-tinte-matt shadow-sm dark:bg-slate-800 dark:text-slate-200"
+      aria-label={an ? "Gefällt mir – zurücknehmen" : "Gefällt mir"}
+      className={`flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-2 text-[14px] font-semibold transition active:scale-90 ${
+        an ? "bg-brand text-white shadow-[0_4px_12px_-4px_rgb(var(--brand)/.8)]" : "bg-white text-tinte-matt shadow-sm dark:bg-slate-800 dark:text-slate-200"
       }`}
     >
-      <span className={an ? "animate-herz" : ""}>{zeichen}</span>
-      <span className="zahl">{n}</span>
+      <span className={an ? "animate-herz" : ""}>👍</span>
+      {an ? "Gefällt mir" : "Like"}
     </button>
   );
 }
 
-function VerwaltenZeile({ x, m }: { x: Motto; m: MottoWahl }) {
+function VerwaltenZeile({ x, m, platz, anteil }: { x: Motto; m: MottoWahl; platz: number; anteil: number }) {
+  const n = m.zahl(x.id, "like");
   const [bearbeite, setBearbeite] = useState(false);
   const [text, setText] = useState(x.text);
   const [erkl, setErkl] = useState(x.erklaerung);
@@ -289,11 +270,23 @@ function VerwaltenZeile({ x, m }: { x: Motto; m: MottoWahl }) {
         </div>
       ) : (
         <>
-          <button className="block w-full text-left" onClick={() => setBearbeite(true)}>
-            <span className="block text-[15px] font-bold leading-snug">{x.text}</span>
-            {x.erklaerung && <span className="block text-[12.5px] text-tinte-leise">{x.erklaerung}</span>}
-            <span className="mt-0.5 block text-[12px] text-tinte-leise">
-              🔥 {m.zahl(x.id, "feuer")} · 👍 {m.zahl(x.id, "like")} · antippen zum Ändern
+          <button className="flex w-full items-start gap-2.5 text-left" onClick={() => setBearbeite(true)}>
+            <span
+              className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[12px] font-bold text-[#1C1C1E]"
+              style={{ background: n > 0 && platz < 3 ? MEDAILLE[platz] : "rgb(118 118 128 / .18)" }}
+            >
+              {platz + 1}
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[15px] font-bold leading-snug">{x.text}</span>
+              {x.erklaerung && <span className="block text-[12.5px] text-tinte-leise">{x.erklaerung}</span>}
+              <span className="mt-1.5 flex items-center gap-2">
+                <span className="h-2 flex-1 overflow-hidden rounded-full bg-black/[0.07] dark:bg-white/10">
+                  <span className="block h-full rounded-full bg-gradient-to-r from-[#5E2BFF] to-[#D9480F]" style={{ width: `${Math.round(anteil * 100)}%` }} />
+                </span>
+                <span className="zahl w-12 shrink-0 text-right text-[13px] font-bold">👍 {n}</span>
+              </span>
+              <span className="mt-0.5 block text-[11.5px] text-tinte-leise">antippen zum Ändern</span>
             </span>
           </button>
           <div className="mt-2.5 flex flex-wrap items-center gap-2">

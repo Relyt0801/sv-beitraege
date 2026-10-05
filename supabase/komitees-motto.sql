@@ -272,3 +272,14 @@ grant execute on function public.album_redigieren(uuid, jsonb, text) to authenti
 
 insert into public.komitee_rechte (tag, perm, allowed) values ('abizeitung', 'album.redigieren', true)
 on conflict (tag, perm) do nothing;
+
+-- ------------------------------------------------------------ 6. Motto: nur 👍, Ergebnisse nur fürs Komitee
+-- Jede Person sieht nur ihre eigenen Stimmen; die Zahlen sieht nur, wer
+-- motto.verwalten hat (Komitee Motto & Pullis, Admin). 🔥 gibt es nicht mehr.
+alter policy "motto stimmen lesen" on public.motto_stimmen
+  using ((select has_perm('motto.nutzen') or has_perm('motto.verwalten')) and not (select ist_eltern())
+         and (user_id = (select auth.uid()) or (select has_perm('motto.verwalten'))));
+alter policy "motto stimme setzen" on public.motto_stimmen
+  with check (user_id = (select auth.uid()) and art = 'like' and (select has_perm('motto.nutzen')) and not (select ist_eltern())
+              and (select funktion_an('motto') or has_perm('funktionen.verwalten'))
+              and (select motto_abstimmung_an()));

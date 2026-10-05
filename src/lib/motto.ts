@@ -6,9 +6,10 @@ import { abonniere } from "./realtime";
  * Abimotto (supabase/komitees-motto.sql)
  *
  *   vorschlagen   wer motto.nutzen hat – sofort sichtbar
- *   👍            beliebig vielen Mottos, umschaltbar
- *   🔥            nur einem Motto je Person (dein Favorit) – ein neues 🔥
- *                 nimmt das alte zurück (macht die Datenbank)
+ *   👍            beliebig vielen Mottos, umschaltbar. Zahlen sieht nur, wer
+ *                 das Motto verwaltet – alle anderen lesen nur ihre eigenen
+ *                 Stimmen (Policy „motto stimmen lesen“).
+ *   (🔥 gibt es nicht mehr; die Datenbank nimmt nur noch 'like' an)
  *   verwalten     motto.verwalten (Standard: Komitee Motto & Pullis):
  *                 ändern, ausblenden, als Motto festlegen
  *
@@ -235,8 +236,10 @@ export function useMotto(aktiv: boolean, uid: string | null) {
   const meine = useCallback((id: string, art: MottoArt) => stimmen.some((s) => s.vorschlag_id === id && s.user_id === me && s.art === art), [stimmen, me]);
   const punkte = useCallback((id: string) => 2 * zahl(id, "feuer") + zahl(id, "like"), [zahl]);
   const meinFavorit = mottos.find((m) => meine(m.id, "feuer")) || null;
+  /** Wie viele Personen mindestens ein 👍 gegeben haben (nur fürs Komitee sichtbar) */
+  const waehlende = new Set(stimmen.filter((s) => s.art === "like").map((s) => s.user_id)).size;
 
-  return { bereit, mottos, me, abstimmung, abstimmungSetzen, vorschlagen, aendern, abstimmen, zahl, meine, punkte, meinFavorit };
+  return { bereit, mottos, me, abstimmung, abstimmungSetzen, vorschlagen, aendern, abstimmen, zahl, meine, punkte, meinFavorit, waehlende };
 }
 
 export type MottoWahl = ReturnType<typeof useMotto>;
