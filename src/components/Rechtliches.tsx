@@ -136,16 +136,17 @@ function Datenschutz() {
         „Nach dem Abi“, Lieblingslied), einen freien Text, wer den Text geschrieben hat, und wen man dafür freigibt.
         Dazu Kommentare (mit Namen) und „Gefällt mir“. Das sehen alle, die das Album nutzen dürfen – keine Eltern.
         Gelöschte Kommentare werden geleert. Stammdaten kann nur die Person selbst ändern – und wer Steckbriefe korrigieren darf
-        (z. B. Komitee Abizeitung, für Rechtschreibung); dann steht „korrigiert von …“ dabei.
+        (z. B. Komitee Abizeitung, für Rechtschreibung). Wer einen Text geschrieben oder korrigiert hat, steht nirgends
+        öffentlich – nur die Person selbst sieht es einmal über ein kleines Info-Symbol.
       </P>
       <P>
-        <b>Zitatwand:</b> eingereichte Zitate (Text, wer es gesagt hat, wann/wo), wer sie eingereicht hat und die
+        <b>Zitatwand:</b> eingereichte Zitate (Text, wer es gesagt hat, wann/wo), wer sie eingereicht hat (wird nicht angezeigt) und die
         🔥-Stimmen. Sichtbar erst nach der Prüfung (z. B. durch das Komitee Abizeitung, das dazu eine Benachrichtigung
         bekommt); Abgelehntes wird geleert. Keine Eltern.
       </P>
       <P>
         <b>Abimotto:</b> Vorschläge (Text, optionale Erklärung, wer vorgeschlagen hat) und deine 👍/🔥-Stimmen. Andere
-        sehen nur die Zahlen; wer vorgeschlagen hat, sieht nur, wer das Motto verwaltet (z. B. Komitee Motto &amp; Pullis).
+        sehen nur die Zahlen. Wer vorgeschlagen hat, wird gespeichert (für die Prüfung), aber in der App nicht angezeigt.
       </P>
       <P>
         <b>Sperre:</b> Wer gesperrt ist, kann in dieser Zeit nirgends etwas einreichen, kommentieren, liken oder abstimmen.

@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { hinScrollen, useSprungziel } from "../lib/sprung";
 import { useTermine } from "../termine-store";
 import { useProfiles } from "../profiles-store";
 import { useRole } from "../auth/RoleProvider";
@@ -30,10 +31,11 @@ export function AnfragenFuerTeam({ onUebernehmen }: { onUebernehmen: (a: TerminA
   const [busy, setBusy] = useState<string | null>(null);
 
   const offen = useMemo(() => anfragen.filter((a) => a.status === "offen"), [anfragen]);
+  useSprungziel("termin", (isStaff || can("termine.manage")) && offen.length > 0, () => hinScrollen("sprung-termin"));
   if (!(isStaff || can("termine.manage")) || offen.length === 0) return null;
 
   return (
-    <div className="mb-4 grid gap-2.5">
+    <div id="sprung-termin" className="mb-4 grid gap-2.5">
       {offen.map((a) => (
         <div key={a.id} className="card border-brand/40 p-4">
           <div className="flex items-start gap-2.5">

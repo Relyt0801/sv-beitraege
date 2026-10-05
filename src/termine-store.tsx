@@ -623,7 +623,7 @@ export function TermineProvider({ children }: { children: ReactNode }) {
       void pushAnTeam(
         `Terminanfrage ${committeeIcon(a.tag)} ${committeeLabel(a.tag)}`,
         `${a.titel.trim()} · ${kurzDatum(a.datum)}${a.von ? ` ${a.von}` : ""}`,
-        "./#events",
+        "./#anfrage-termin",
         { art: "anfrage" },
       );
       return null;

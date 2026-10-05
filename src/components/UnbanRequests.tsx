@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { hinScrollen, useSprungziel } from "../lib/sprung";
 import { hasSupabase, supabase } from "../lib/supabase";
 import { abonniere } from "../lib/realtime";
 import { useRole } from "../auth/RoleProvider";
@@ -32,6 +33,7 @@ export function UnbanRequests() {
     };
   }, []);
 
+  useSprungziel("entsperren", can("mod.timeout") && liste.length > 0, () => hinScrollen("sprung-entsperren"));
   if (!can("mod.timeout") || liste.length === 0) return null;
 
   const nameVon = (userId: string) => {
@@ -41,7 +43,7 @@ export function UnbanRequests() {
   };
 
   return (
-    <div className="mb-4 grid gap-2.5">
+    <div id="sprung-entsperren" className="mb-4 grid gap-2.5">
       {liste.map((r) => (
         <div key={r.id} className="card border-amber-300 p-4 dark:border-amber-500/40">
           <div className="flex items-start gap-2">

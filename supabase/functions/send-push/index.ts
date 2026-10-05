@@ -188,7 +188,8 @@ Deno.serve(async (req) => {
       const { data: pr } = await supabase.rpc("perm_empfaenger", { p: "zitate.pruefen" });
       userIds = ((Array.isArray(pr) ? pr : []) as unknown[]).map((x) => String(x));
       title = "💬 Neues Zitat zum Prüfen";
-      body = kurz(`${z.eingereicht_name || "Jemand"} hat ein Zitat von ${z.wer} eingereicht.`, 200);
+      // Ohne Namen der einreichenden Person – Zitate bleiben anonym
+      body = kurz(`Ein neues Zitat von ${z.wer} wartet auf die Prüfung.`, 200);
       ziel = "./#zitate";
       pushTag = "zitate-pruefen";
     } else if (album && typeof album === "object") {
@@ -235,7 +236,8 @@ Deno.serve(async (req) => {
       } else {
         return json({ error: "unbekannt" }, 400);
       }
-      ziel = "./#album";
+      // Einladung zum Schreiben: gleich die Steckbriefe, die auf mich warten
+      ziel = album.art === "freigabe" ? "./#album-fuer-mich" : "./#album";
       pushTag = `album-${album.art}`;
     } else if (Array.isArray(user_ids) && user_ids.length) {
       // Direkt-Modus (z. B. Themen-Benachrichtigungen, Schicht-Zuteilung).

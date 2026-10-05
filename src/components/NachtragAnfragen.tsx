@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { hinScrollen, useSprungziel } from "../lib/sprung";
 import { useRole } from "../auth/RoleProvider";
 import { useStore } from "../store";
 import { useProfiles } from "../profiles-store";
@@ -18,11 +19,18 @@ export function NachtragAnfragen() {
   const { liste } = useNachtraege(darf);
   const [auf, setAuf] = useState<Nachtrag | null>(null);
   const offen = liste.filter((n) => n.status === "offen");
+  // Aus der Benachrichtigung: eine Anfrage → gleich öffnen, mehrere → hinscrollen
+  useSprungziel("nachtrag", darf && offen.length > 0, () => {
+    if (offen.length === 1) setAuf(offen[0]);
+    else hinScrollen("sprung-nachtrag");
+  });
   if (!darf || offen.length === 0) return null;
   return (
     <>
-      {offen.map((n) => (
-        <NachtragKarte key={n.id} n={n} onOpen={() => setAuf(n)} />
+      {offen.map((n, i) => (
+        <div key={n.id} id={i === 0 ? "sprung-nachtrag" : undefined}>
+          <NachtragKarte n={n} onOpen={() => setAuf(n)} />
+        </div>
       ))}
       {auf && <NachtragEntscheiden n={auf} onClose={() => setAuf(null)} />}
     </>

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { hinScrollen, useSprungziel } from "../lib/sprung";
 import { hasSupabase, supabase } from "../lib/supabase";
 import { abonniere } from "../lib/realtime";
 import { useRole } from "../auth/RoleProvider";
@@ -34,10 +35,11 @@ export function KomiteeRequests() {
     };
   }, []);
 
+  useSprungziel("komitee", can("komitees.assign") && liste.length > 0, () => hinScrollen("sprung-komitee"));
   if (!can("komitees.assign") || liste.length === 0) return null;
 
   return (
-    <div className="mb-4 grid gap-2.5">
+    <div id="sprung-komitee" className="mb-4 grid gap-2.5">
       {liste.map((r) => (
         <div key={r.id} className="card border-brand/40 p-4">
           <div className="flex items-start gap-2.5">

@@ -60,11 +60,20 @@ function AlbumWurzel({ album }: { album: Album }) {
       setOffen(true);
     };
     window.addEventListener("sv:album", auf);
-    if (window.location.hash === "#album") {
+    const ausAdresse = () => {
+      const h = window.location.hash;
+      if (h !== "#album" && h !== "#album-fuer-mich") return;
+      // Aus „Steckbrief freigegeben“: gleich die Steckbriefe, die auf mich warten
+      setPerson(h === "#album-fuer-mich" ? "__fuer_mich__" : null);
       history.replaceState(null, "", window.location.pathname + window.location.search);
       setOffen(true);
-    }
-    return () => window.removeEventListener("sv:album", auf);
+    };
+    ausAdresse();
+    window.addEventListener("hashchange", ausAdresse);
+    return () => {
+      window.removeEventListener("sv:album", auf);
+      window.removeEventListener("hashchange", ausAdresse);
+    };
   }, []);
   return <AlbumSheet open={offen} start={person} album={album} onClose={() => setOffen(false)} />;
 }
@@ -136,9 +145,10 @@ export function AlbumKarte({ className = "" }: { className?: string }) {
   const fertige = album.steckbriefe.filter((s) => fortschritt(s, album.kategorien) >= 50).length;
   const meineLikes = studentId ? album.likes.filter((l) => l.student_id === studentId).length : 0;
   const meineKommentare = studentId ? album.kommentare.filter((k) => k.student_id === studentId).length : 0;
-  const offeneFreigaben = album.steckbriefe.filter(
+  const wartend = album.steckbriefe.filter(
     (s) => s.student_id !== studentId && (s.freigabe === "alle" ? false : s.freigabe === "gezielt" && studentId && s.freigabe_an.includes(studentId)) && !s.text.trim(),
-  ).length;
+  );
+  const offeneFreigaben = wartend.length;
   const vorschau = album.personen.slice(0, 5);
 
   return (
@@ -190,9 +200,14 @@ export function AlbumKarte({ className = "" }: { className?: string }) {
           Alle ansehen
         </button>
         {offeneFreigaben > 0 && (
-          <span className="flex items-center rounded-full bg-black/20 px-3 py-2 text-[12.5px] font-semibold">
-            ✍️ {offeneFreigaben} {offeneFreigaben === 1 ? "Text wartet" : "Texte warten"} auf dich
-          </span>
+          <button
+            onClick={() =>
+              window.dispatchEvent(new CustomEvent("sv:album", { detail: offeneFreigaben === 1 ? `__schreiben__:${wartend[0].student_id}` : "__fuer_mich__" }))
+            }
+            className="flex items-center rounded-full bg-black/25 px-3 py-2 text-[12.5px] font-semibold transition active:scale-95"
+          >
+            ✍️ {offeneFreigaben} {offeneFreigaben === 1 ? "Text wartet" : "Texte warten"} auf dich ›
+          </button>
         )}
       </div>
     </section>
@@ -209,10 +224,16 @@ export function AlbumSheet({ open, start, album, onClose }: { open: boolean; sta
   const { studentId, can } = useRole();
   const [ansicht, setAnsicht] = useState<Ansicht>({ art: "alle" });
   const [kategorienOffen, setKategorienOffen] = useState(false);
+  const [nurFuerMich, setNurFuerMich] = useState(false);
 
   useEffect(() => {
     if (!open) return;
+    setNurFuerMich(false);
     if (start === "__mein__" && studentId) setAnsicht({ art: "mein" });
+    else if (start === "__fuer_mich__") {
+      setNurFuerMich(true);
+      setAnsicht({ art: "alle" });
+    } else if (start?.startsWith("__schreiben__:")) setAnsicht({ art: "person", id: start.slice("__schreiben__:".length) });
     else if (start && start !== "__mein__") setAnsicht({ art: "person", id: start });
     else setAnsicht({ art: "alle" });
   }, [open, start, studentId]);
@@ -276,7 +297,7 @@ export function AlbumSheet({ open, start, album, onClose }: { open: boolean; sta
             {ansicht.art === "mein" && studentId ? (
               <MeinSteckbrief album={album} vorschau={() => setAnsicht({ art: "person", id: studentId })} />
             ) : nutzen ? (
-              <AlleSteckbriefe album={album} oeffnen={(id) => setAnsicht({ art: "person", id })} />
+              <AlleSteckbriefe album={album} oeffnen={(id) => setAnsicht({ art: "person", id })} nurFuerMich={nurFuerMich} setNurFuerMich={setNurFuerMich} />
             ) : null}
             {!nutzen && can("album.kategorien") && (
               <button className="btn-primary w-full" onClick={() => setKategorienOffen(true)}>
@@ -292,7 +313,17 @@ export function AlbumSheet({ open, start, album, onClose }: { open: boolean; sta
 }
 
 /* ---------------------------------------------------------------- Alle */
-function AlleSteckbriefe({ album, oeffnen }: { album: Album; oeffnen: (id: string) => void }) {
+function AlleSteckbriefe({
+  album,
+  oeffnen,
+  nurFuerMich,
+  setNurFuerMich,
+}: {
+  album: Album;
+  oeffnen: (id: string) => void;
+  nurFuerMich: boolean;
+  setNurFuerMich: (v: boolean) => void;
+}) {
   const [suche, setSuche] = useState("");
   const { studentId } = useRole();
   // Sortierung: A–Z nach Nachname oder nach Fortschritt (fertige zuerst).
@@ -317,10 +348,15 @@ function AlleSteckbriefe({ album, oeffnen }: { album: Album; oeffnen: (id: strin
     const nachName = (a: AlbumPerson, b: AlbumPerson) =>
       a.nachname.localeCompare(b.nachname, "de", { sensitivity: "base" }) || a.vorname.localeCompare(b.vorname, "de", { sensitivity: "base" });
     const pr = (x: AlbumPerson) => fortschritt(album.steckbriefVon(x.id), album.kategorien);
+    const fuerMichId = (id: string) => {
+      const s = album.steckbriefVon(id);
+      return Boolean(s && studentId && s.student_id !== studentId && (s.freigabe === "alle" || (s.freigabe === "gezielt" && s.freigabe_an.includes(studentId))));
+    };
     return album.personen
       .filter((p) => !q || `${p.vorname} ${p.nachname}`.toLowerCase().includes(q))
+      .filter((p) => !nurFuerMich || fuerMichId(p.id))
       .sort((a, b) => (sortierung === "fortschritt" ? pr(b) - pr(a) || nachName(a, b) : nachName(a, b)));
-  }, [album, suche, sortierung]);
+  }, [album, suche, sortierung, nurFuerMich, studentId]);
   const fertig = album.personen.filter((x) => fortschritt(album.steckbriefVon(x.id), album.kategorien) >= 100).length;
 
   if (!album.bereit) return <p className="py-10 text-center text-[14px] text-tinte-leise">Lädt …</p>;
@@ -328,6 +364,15 @@ function AlleSteckbriefe({ album, oeffnen }: { album: Album; oeffnen: (id: strin
   return (
     <>
       <input className="field mb-3" placeholder="Name suchen" value={suche} onChange={(e) => setSuche(e.target.value)} />
+      {nurFuerMich && (
+        <button
+          onClick={() => setNurFuerMich(false)}
+          className="mb-3 flex w-full items-center justify-between rounded-2xl bg-[#FF375F]/10 px-4 py-2.5 text-left text-[14px] font-semibold text-[#D70040] dark:text-[#FF6482]"
+        >
+          ✍️ Nur Steckbriefe, die auf deinen Text warten
+          <span className="text-[13px] font-semibold opacity-80">Alle zeigen ✕</span>
+        </button>
+      )}
       <div className="mb-4 flex items-center gap-2">
         <div className="seg flex-1" role="tablist" aria-label="Sortieren">
           <button role="tab" aria-selected={sortierung === "name"} className={`seg-item ${sortierung === "name" ? "seg-aktiv" : ""}`} onClick={() => setSortierung("name")}>
@@ -392,7 +437,7 @@ function AlleSteckbriefe({ album, oeffnen }: { album: Album; oeffnen: (id: strin
           );
         })}
       </div>
-      {liste.length === 0 && <p className="py-10 text-center text-[14px] text-tinte-leise">Niemand gefunden.</p>}
+      {liste.length === 0 && <p className="py-10 text-center text-[14px] text-tinte-leise">{nurFuerMich ? "Gerade wartet kein Text auf dich." : "Niemand gefunden."}</p>}
     </>
   );
 }
@@ -470,6 +515,9 @@ function SteckbriefAnsicht({
               Bearbeiten
             </button>
           )}
+          {/* Wer geschrieben oder korrigiert hat, steht nirgends öffentlich –
+              nur die Person selbst sieht es einmal (Info-Symbol). */}
+          {ich && s && <BearbeitetInfo s={s} className="text-tinte-matt dark:text-slate-300" />}
           {!ich && can("album.redigieren") && (
             <button onClick={korrigieren} className="rounded-full bg-brand/10 px-3 py-1 text-[13px] font-semibold text-brand-dark dark:text-brand">
               ✏️ Korrigieren
@@ -512,10 +560,6 @@ function SteckbriefAnsicht({
             “
           </span>
           <blockquote className="whitespace-pre-wrap font-buch text-[16.5px] leading-[1.55]">{s.text}</blockquote>
-          {s.text_von_name && <figcaption className="mt-3 text-right text-[12.5px] font-semibold opacity-70">— geschrieben von {s.text_von_name}</figcaption>}
-          {s.korrigiert_at && (ich || can("album.redigieren")) && (
-            <div className="mt-1 text-right text-[11.5px] opacity-60">✏️ korrigiert von {s.korrigiert_von_name || "der Abizeitung"}</div>
-          )}
           {!ich && can("album.moderieren") && (
             <button
               onClick={() =>
@@ -638,6 +682,52 @@ function TextFuerAndere({ album, id, fertig }: { album: Album; id: string; ferti
   );
 }
 
+/**
+ * Nur für die Person selbst und nur beim ersten Mal: ein kleines ⓘ,
+ * antippen zeigt „Bearbeitet von …“. Danach (beim nächsten Öffnen) ist es
+ * weg – bis wieder jemand etwas ändert. Gemerkt auf dem Gerät.
+ */
+function BearbeitetInfo({ s, className = "" }: { s: Steckbrief; className?: string }) {
+  const namen = [...new Set([s.text_von_name, s.korrigiert_von_name].filter((x): x is string => Boolean(x && x.trim())))];
+  const stempel = `${s.text_at || ""}|${s.korrigiert_at || ""}|${namen.join(",")}`;
+  const schluessel = `sv:album:bearbeitet-gesehen:${s.student_id}`;
+  const [zeigen] = useState(() => {
+    try {
+      return namen.length > 0 && localStorage.getItem(schluessel) !== stempel;
+    } catch {
+      return false;
+    }
+  });
+  const [auf, setAuf] = useState(false);
+  useEffect(() => {
+    if (!zeigen) return;
+    try {
+      localStorage.setItem(schluessel, stempel);
+    } catch {
+      /* privater Modus */
+    }
+  }, [zeigen, schluessel, stempel]);
+  if (!zeigen) return null;
+  return (
+    <span className={`relative inline-flex ${className}`}>
+      <button
+        type="button"
+        onClick={() => setAuf((a) => !a)}
+        aria-label="Wer hat bearbeitet?"
+        aria-expanded={auf}
+        className="flex h-6 w-6 items-center justify-center rounded-full bg-black/10 text-[12px] font-bold italic text-current dark:bg-white/15"
+      >
+        i
+      </button>
+      {auf && (
+        <span role="status" className="absolute right-0 top-7 z-10 w-max max-w-[220px] rounded-xl bg-[#1C1C1E] px-3 py-2 text-left font-sans text-[12.5px] not-italic leading-snug text-white shadow-lg">
+          Bearbeitet von {namen.join(" und ")}
+        </span>
+      )}
+    </span>
+  );
+}
+
 /* ---------------------------------------------------------------- Korrigieren (Abizeitung) */
 function KorrigierenAnsicht({ album, id, fertig }: { album: Album; id: string; fertig: () => void }) {
   const p = album.personen.find((x) => x.id === id);
@@ -659,7 +749,7 @@ function KorrigierenAnsicht({ album, id, fertig }: { album: Album; id: string; f
         {p ? `${p.vorname} ${p.nachname}` : "Steckbrief"} korrigieren
       </h2>
       <p className="mt-1 text-[13px] leading-snug text-tinte-leise">
-        Für Rechtschreibung und Ähnliches. Die Person sieht „korrigiert von {"…"}“ mit deinem Namen. Bitte nichts inhaltlich umschreiben.
+        Für Rechtschreibung und Ähnliches. Andere sehen nicht, wer korrigiert hat – nur die Person selbst einmal. Bitte nichts inhaltlich umschreiben.
       </p>
       <Gruppe titel="Stammdaten">
         {kat.map((k) => (
@@ -740,7 +830,7 @@ function MeinSteckbrief({ album, vorschau }: { album: Album; vorschau: () => voi
   const meinName = ich ? kurzName(ich) : "";
   const voll = kat.filter((k) => (daten[k.id] || "").trim()).length + (text.trim() ? 1 : 0);
   const prozent = Math.round((voll / (kat.length + 1)) * 100);
-  const textVonAnderen = Boolean(s?.text_von_name);
+  const textVonAnderen = Boolean(s?.text_von_name || s?.korrigiert_at);
 
   async function speichern() {
     setBusy(true);
@@ -790,8 +880,11 @@ function MeinSteckbrief({ album, vorschau }: { album: Album; vorschau: () => voi
 
       <h3 className="mb-1.5 mt-5 px-4 text-[12px] font-semibold uppercase tracking-[0.04em] text-tinte-leise">Über mich</h3>
       <TextFeld wert={text} setzen={setText} platzhalter="Ein längerer Text über dich – oder lass ihn von Freunden schreiben (unten freigeben)." />
-      {textVonAnderen && (
-        <p className="mt-1.5 px-4 text-[12px] text-tinte-leise">Zuletzt geschrieben von {s!.text_von_name}. Du kannst ihn jederzeit ändern.</p>
+      {textVonAnderen && s && (
+        <div className="mt-1.5 flex items-center gap-1.5 px-4 text-[12px] text-tinte-leise">
+          <span>Jemand anderes hat deinen Text geschrieben – du kannst ihn jederzeit ändern.</span>
+          <BearbeitetInfo s={s} />
+        </div>
       )}
 
       <Gruppe titel="Wer darf den Text schreiben?" fuss={freigabe === "niemand" ? "Nur du." : freigabe === "alle" ? "Alle im Album können den Text schreiben oder überarbeiten." : `${an.length} ausgewählt – sie sehen bei dir „✍️ für dich“.`}>

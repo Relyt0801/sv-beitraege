@@ -76,7 +76,7 @@ export function useNachtraege(aktiv = true) {
       });
       if (error) return error.message;
       void laden();
-      void pushAnTeam("🙌 Mithilfe nachtragen", `${a.titel.trim()} – bitte prüfen.`, "./#chats", { art: "anfrage" });
+      void pushAnTeam("🙌 Mithilfe nachtragen", `${a.titel.trim()} – bitte prüfen.`, "./#anfrage-nachtrag", { art: "anfrage" });
       return null;
     },
     [laden],

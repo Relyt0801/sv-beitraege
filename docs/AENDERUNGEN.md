@@ -12,6 +12,23 @@ ausführlich (auf Deutsch); hier steht der Überblick dazu.
 ---
 
 
+## 05.10.2026 (6): Keine Namen an Texten, direkt zum Ziel springen
+
+- **Keine Verfasser mehr sichtbar**: „geschrieben von“/„korrigiert von“ am
+  Steckbrief-Text, „von …“ bei Zitaten (auch beim Prüfen) und beim Abimotto
+  sind weg; die Zitat-Benachrichtigung nennt niemanden mehr. Nur die Person
+  selbst sieht bei ihrem Steckbrief einmal ein kleines ⓘ („Bearbeitet von …“,
+  `BearbeitetInfo` in `components/Album.tsx`) – beim nächsten Öffnen ist es
+  weg, bis wieder jemand etwas ändert (gemerkt auf dem Gerät).
+- **„✍️ Text wartet auf dich“** ist ein Knopf: bei einem Steckbrief geht er
+  direkt dorthin, bei mehreren öffnet das Album gefiltert auf „wartet auf
+  deinen Text“. Die Einladungs-Benachrichtigung führt ebenfalls dorthin
+  (`./#album-fuer-mich`).
+- **Anfragen-Benachrichtigungen** (`lib/sprung.ts`): Nachtrag, Komitee-Wunsch,
+  Entsperr- und Terminanfrage öffnen `./#anfrage-…`. Die App geht in den
+  richtigen Reiter; eine einzelne Mithilfe-Anfrage öffnet sich sofort, sonst
+  wird die Anfrage in die Mitte gescrollt und kurz blau umrandet.
+
 ## 05.10.2026 (5): Steckbriefe korrigieren, Album sortieren
 
 - **Korrigieren** (Recht `album.redigieren`, RPC `album_redigieren`,

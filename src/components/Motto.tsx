@@ -293,7 +293,7 @@ function VerwaltenZeile({ x, m }: { x: Motto; m: MottoWahl }) {
             <span className="block text-[15px] font-bold leading-snug">{x.text}</span>
             {x.erklaerung && <span className="block text-[12.5px] text-tinte-leise">{x.erklaerung}</span>}
             <span className="mt-0.5 block text-[12px] text-tinte-leise">
-              🔥 {m.zahl(x.id, "feuer")} · 👍 {m.zahl(x.id, "like")} · von {x.von_name || "?"} · antippen zum Ändern
+              🔥 {m.zahl(x.id, "feuer")} · 👍 {m.zahl(x.id, "like")} · antippen zum Ändern
             </span>
           </button>
           <div className="mt-2.5 flex flex-wrap items-center gap-2">

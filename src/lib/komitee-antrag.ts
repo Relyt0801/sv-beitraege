@@ -36,7 +36,7 @@ export async function stelleKomiteeAntrag(tag: string, nachricht: string): Promi
         ? "Du hast schon einen offenen Antrag."
         : error.message,
     };
-  void pushAnTeam("Komitee-Wunsch", `Jemand möchte zu ${committeeLabel(tag)}. Tippen zum Entscheiden.`, "./#chats", { art: "anfrage" });
+  void pushAnTeam("Komitee-Wunsch", `Jemand möchte zu ${committeeLabel(tag)}. Tippen zum Entscheiden.`, "./#anfrage-komitee", { art: "anfrage" });
   return { ok: true };
 }
 

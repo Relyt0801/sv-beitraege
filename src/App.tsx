@@ -32,6 +32,7 @@ import { EventsTab } from "./components/EventsTab";
 import { BeitraegeTab } from "./components/BeitraegeTab";
 import { FinanzenTab } from "./components/FinanzenTab";
 import { useKostenAnfragen } from "./lib/kosten";
+import { SPRUNG_TAB, sprungAusHash } from "./lib/sprung";
 import { KassenKopf } from "./components/KassenKopf";
 import { EventComposer } from "./components/EventComposer";
 import { AktionSheet } from "./components/AktionSheet";
@@ -113,6 +114,10 @@ type Tab = "profil" | "kasse" | "events" | "themen" | "beitraege" | "finanzen" |
 /** "#events" -> Events, "#chats" -> Chats. Danach wird die Marke entfernt,
  *  damit ein Neuladen nicht wieder dorthin springt. */
 function tabAusAdresse(entfernen = true): Tab | null {
+  // Anfrage aus einer Benachrichtigung: Reiter öffnen, die Marke räumt die
+  // Anfrage-Komponente selbst weg, wenn sie hingesprungen ist (lib/sprung.ts)
+  const sprung = sprungAusHash(window.location.hash);
+  if (sprung) return SPRUNG_TAB[sprung];
   const h = window.location.hash.replace("#", "");
   const t: Tab | null =
     h === "events" ? "events" : h === "chats" ? "themen" : h === "kasse" ? "kasse" : h === "finanzen" ? "finanzen" : h === "profil" ? "profil" : null;
@@ -205,10 +210,17 @@ function Main() {
   useEffect(() => {
     if (!roleReady || startGewaehlt.current) return;
     startGewaehlt.current = true;
-    if (hatProfilReiter) setTab("profil");
+    // Kommt man aus einer Anfrage-Benachrichtigung, bleibt deren Reiter
+    const sprung = sprungAusHash(window.location.hash);
+    if (sprung) setTab(SPRUNG_TAB[sprung]);
+    else if (hatProfilReiter) setTab("profil");
   }, [roleReady, hatProfilReiter, setTab]);
   useEffect(() => {
-    tabAusAdresse(true);
+    // Start aus einer Anfrage-Benachrichtigung: gleich in den richtigen Reiter
+    const sprung = sprungAusHash(window.location.hash);
+    if (sprung) setTab(SPRUNG_TAB[sprung]);
+    else tabAusAdresse(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   // „Neues Zitat zum Prüfen“ (./#zitate): zur eigenen Ansicht mit den Karten.
   // Die Marke entfernt die Zitat-Karte selbst, wenn sie das Blatt öffnet.

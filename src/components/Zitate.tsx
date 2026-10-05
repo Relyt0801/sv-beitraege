@@ -409,7 +409,7 @@ function Pruefen({ wand }: { wand: Zitatwand }) {
           <div className="mt-2 flex items-center gap-2">
             <span className="min-w-0 flex-1 text-[12.5px] text-tinte-leise">
               — {z.wer}
-              {z.kontext ? `, ${z.kontext}` : ""} · von {z.eingereicht_name || "?"}
+              {z.kontext ? `, ${z.kontext}` : ""}
             </span>
             <button
               aria-label="Ablehnen"
