@@ -39,7 +39,8 @@ export const BEREICHE: { key: string; label: string; icon: string }[] = [
   { key: "rechte", label: "Rechte", icon: "🔐" },
   { key: "komitees", label: "Komitees", icon: "🏷️" },
   { key: "beitraege", label: "Beiträge", icon: "💶" },
-  { key: "mithilfe", label: "Mithilfe", icon: "🙌" },
+  { key: "mithilfe", label: "Mithilfe & Schichten", icon: "🙌" },
+  { key: "anfragen", label: "Anfragen", icon: "📨" },
   { key: "kasse", label: "Kasse", icon: "💰" },
   { key: "sicherung", label: "Sicherung", icon: "🗄️" },
 ];

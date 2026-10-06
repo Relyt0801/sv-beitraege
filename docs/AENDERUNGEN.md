@@ -12,6 +12,17 @@ ausführlich (auf Deutsch); hier steht der Überblick dazu.
 ---
 
 
+## 06.10.2026: Protokoll zeigt Mithilfe, Anfragen und Schichten
+
+- Eingetragene Mithilfe stand nicht mehr im Protokoll (beim Verschlanken
+  am 04.10. bewusst herausgenommen). Jetzt wieder – zusammengefasst je
+  Aktion, mit Herkunft: „Schicht abgeschlossen – …“ / „Nachtrag angenommen – …“.
+- Neu im Bereich „Anfragen“: Nachtrag abgelehnt, Komitee-Wunsch,
+  Entsperr-, Termin- und Kostenanfrage angenommen/abgelehnt.
+- Neu: Schicht-Einteilung (Termine mit Plätzen), zusammengefasst je Schicht.
+- SQL: `supabase/protokoll-mehr.sql` (schon eingespielt). Filter in der App:
+  „Mithilfe & Schichten“, „Anfragen“ (`lib/protokoll.ts`).
+
 ## 05.10.2026 (7): Abimotto – Likes, Ergebnisse nur fürs Komitee
 
 - Abstimmen = 👍 bei allen Mottos, die einem gefallen (🔥 entfällt). Keine
