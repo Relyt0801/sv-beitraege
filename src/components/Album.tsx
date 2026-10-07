@@ -19,6 +19,8 @@ import { useFunktionen } from "../lib/funktionen";
 import { LiedSuche, SpotifyKarte, ohneLink, spotifyAus } from "./Spotify";
 import { AusHinweis } from "./Funktionen";
 import { GesperrtZeile, GESPERRT_TEXT } from "./Gesperrt";
+import { MeldenKnopf } from "./Melden";
+import { melden } from "../lib/melden";
 
 /* ====================================================================== */
 /* Gemeinsamer Zustand: einmal laden, Karte und Blatt teilen ihn          */
@@ -580,6 +582,11 @@ function SteckbriefAnsicht({
           {ich ? "Noch kein Text. Schreib ihn selbst oder gib ihn für andere frei." : "Hier steht noch kein Text."}
         </p>
       )}
+      {!ich && s && (s.text.trim() || Object.keys(s.stammdaten || {}).length > 0) && (
+        <div className="mt-2 text-right">
+          <MeldenKnopf label="Steckbrief melden" onClick={() => melden("steckbrief", id)} />
+        </div>
+      )}
       {darfSchreiben && (
         <button onClick={schreiben} className="btn-primary mt-3 w-full bg-gradient-to-r from-[#FF375F] to-[#BF5AF2]">
           ✍️ {s?.text.trim() ? "Text überarbeiten" : "Text schreiben"}
@@ -604,6 +611,7 @@ function SteckbriefAnsicht({
                 <div className="mt-0.5 flex gap-3 text-[12px] text-tinte-leise">
                   <span>{vorWann(k.created_at)}</span>
                   {n > 0 && <span className="font-semibold">{n} „Gefällt mir“</span>}
+                  {k.user_id !== album.me && <MeldenKnopf onClick={() => melden("kommentar", k.id)} />}
                   {darfEntfernen(k) && (
                     <button
                       className="font-semibold"

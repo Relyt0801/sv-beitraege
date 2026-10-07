@@ -3,6 +3,8 @@ import { Sheet, SheetKopf } from "./Sheet";
 import { Schalter } from "./Schalter";
 import { AusHinweis } from "./Funktionen";
 import { GesperrtZeile, GESPERRT_TEXT } from "./Gesperrt";
+import { MeldenKnopf } from "./Melden";
+import { melden } from "../lib/melden";
 import { ZahnradKnopf } from "./Rankings";
 import { useRole } from "../auth/RoleProvider";
 import { useFunktionen } from "../lib/funktionen";
@@ -213,7 +215,11 @@ function MottoZeile({ x, m, gesperrt }: { x: Motto; m: MottoWahl; gesperrt: bool
           {x.gewaehlt && <div className="mb-0.5 text-[11px] font-bold uppercase tracking-[0.1em] text-[#B5179E]">Unser Motto ✓</div>}
           <div className="text-[16px] font-bold leading-snug">{x.text}</div>
           {x.erklaerung && <div className="mt-0.5 text-[13px] leading-snug text-tinte-matt dark:text-slate-300">{x.erklaerung}</div>}
-          {x.von === m.me && <div className="mt-1 text-[11.5px] text-tinte-leise">Dein Vorschlag</div>}
+          {x.von === m.me ? (
+            <div className="mt-1 text-[11.5px] text-tinte-leise">Dein Vorschlag</div>
+          ) : (
+            <MeldenKnopf className="mt-1" onClick={() => melden("motto", x.id)} />
+          )}
         </div>
         {m.abstimmung && <StimmKnopf an={an} onClick={() => void tippen()} />}
       </div>

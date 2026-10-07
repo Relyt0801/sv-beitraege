@@ -152,6 +152,16 @@ function Datenschutz() {
         <b>Sperre:</b> Wer gesperrt ist, kann in dieser Zeit nirgends etwas einreichen, kommentieren, liken oder abstimmen.
       </P>
       <P>
+        <b>Wortfilter:</b> Texte (Chats, Kommentare, Steckbriefe, Umfragen, Motto, Anfragen) werden vor dem Speichern auf
+        beleidigende Wörter geprüft – nur auf unserem Server, an niemanden sonst. Geblockte Texte werden nicht gespeichert;
+        gezählt wird nur, wie oft jemand geblockt wurde (ab 3 Versuchen in 10 Minuten ein Eintrag im Protokoll, ohne Text).
+      </P>
+      <P>
+        <b>Melden:</b> Wer etwas meldet, speichert Art, Grund, optional eine kurze Notiz und einen Auszug des gemeldeten
+        Inhalts samt betroffener Person. Sehen kann das nur, wer Meldungen bearbeitet (Stufenteam); wer gemeldet hat,
+        erfahren andere Schüler nicht. Erledigte Meldungen werden mit den Anfragen automatisch gelöscht.
+      </P>
+      <P>
         <b>Abi-Rankings und Lehrerliste:</b> deine Stimme je Ranking (wen du gewählt hast). Sichtbar ist nur die
         gezählte Top 3, nie wer wen gewählt hat. Die Lehrerliste enthält Namen und Fächer von Lehrkräften.
       </P>

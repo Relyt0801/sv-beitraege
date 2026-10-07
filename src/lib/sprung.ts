@@ -7,20 +7,21 @@ import { useEffect, useRef, useState } from "react";
  * oder in die Mitte gescrollt und kurz hervorgehoben – kein Suchen, kein
  * Scrollen.
  */
-export type Sprungziel = "nachtrag" | "komitee" | "entsperren" | "termin";
+export type Sprungziel = "nachtrag" | "komitee" | "entsperren" | "termin" | "meldung";
 
 export const SPRUNG_TAB: Record<Sprungziel, "themen" | "events"> = {
   nachtrag: "themen",
   komitee: "themen",
   entsperren: "themen",
   termin: "events",
+  meldung: "themen",
 };
 
 export const sprungUrl = (z: Sprungziel) => `./#anfrage-${z}`;
 
 /** "#anfrage-nachtrag" -> "nachtrag" */
 export function sprungAusHash(hash: string): Sprungziel | null {
-  const m = hash.match(/^#anfrage-(nachtrag|komitee|entsperren|termin)$/);
+  const m = hash.match(/^#anfrage-(nachtrag|komitee|entsperren|termin|meldung)$/);
   return m ? (m[1] as Sprungziel) : null;
 }
 

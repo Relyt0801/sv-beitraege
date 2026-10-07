@@ -33,6 +33,7 @@ import { BeitraegeTab } from "./components/BeitraegeTab";
 import { FinanzenTab } from "./components/FinanzenTab";
 import { useKostenAnfragen } from "./lib/kosten";
 import { SPRUNG_TAB, sprungAusHash } from "./lib/sprung";
+import { MeldenWurzel } from "./components/Melden";
 import { KassenKopf } from "./components/KassenKopf";
 import { EventComposer } from "./components/EventComposer";
 import { AktionSheet } from "./components/AktionSheet";
@@ -100,6 +101,7 @@ function NachRolle() {
             <ElternProvider>
               <AlbumProvider>
                 <Main />
+                <MeldenWurzel />
               </AlbumProvider>
             </ElternProvider>
           </TopicsProvider>

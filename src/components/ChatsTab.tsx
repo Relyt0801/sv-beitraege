@@ -18,6 +18,7 @@ import { normalize } from "../lib/logic";
 
 import { frage } from "../lib/melder";
 import { NachtragAnfragen } from "./NachtragAnfragen";
+import { MeldungenAnfragen } from "./Melden";
 import { NachtragSheet } from "./NachtragSheet";
 import { Schalter } from "./Schalter";
 import { kategorieAn, komiteeAn, useMitteilungen, type Kategorie } from "../lib/mitteilungen";
@@ -201,6 +202,7 @@ export function ChatsTab() {
             {/* Offene Anfragen stehen als Karten darüber; darunter ein Feld mit
                 dem Hinweis (wenn nichts offen ist) und dem Mitteilungs-Schalter. */}
             <div className="peer grid grid-cols-1 gap-2.5 empty:hidden">
+              <MeldungenAnfragen />
               <NachtragAnfragen />
               <KomiteeRequests />
               <UnbanRequests />

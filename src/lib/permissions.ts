@@ -7,6 +7,8 @@ export type PermKey =
   | "komitees.assign"
   | "komitees.access"
   | "mod.timeout"
+  | "meldungen.bearbeiten"
+  | "wortfilter.verwalten"
   | "kasse.edit"
   | "data.edit"
   | "hilfen.edit"
@@ -55,6 +57,8 @@ export const PERM_CATEGORIES: PermCategory[] = [
   {
     label: "Moderation", icon: "🛡️", perms: [
       { key: "mod.timeout", label: "Timeout / Chat-Sperre", desc: "Personen vom Schreiben sperren oder wieder entsperren." },
+      { key: "meldungen.bearbeiten", label: "Meldungen bearbeiten", desc: "Gemeldete Inhalte ansehen, entfernen oder als in Ordnung markieren (Chats → Anfragen)." },
+      { key: "wortfilter.verwalten", label: "Wortfilter pflegen", desc: "Blockierte Wörter und Ausnahmen bearbeiten (Profil → Wortfilter)." },
     ],
   },
   {
@@ -195,14 +199,15 @@ export const KOMITEE_PERMS: PermKey[] = [
   "motto.verwalten",
   "umfragen.verwalten",
   "umfragen.ergebnisse",
+  "meldungen.bearbeiten",
 ];
 
 export const ROLE_DEFAULTS: Record<string, PermKey[]> = {
   schueler: ["finanzen.basis", ...ABIZEITUNG],
   eltern: ["finanzen.basis"], // Elternzugang: nur die Standard-Ansicht der Finanzen
-  sprecher: [...TEAM_STANDARD, ...ABIZEITUNG],
-  stv_sprecher: [...TEAM_STANDARD, ...ABIZEITUNG],
-  stufenteam: [...TEAM_STANDARD, ...ABIZEITUNG],
+  sprecher: [...TEAM_STANDARD, "meldungen.bearbeiten", ...ABIZEITUNG],
+  stv_sprecher: [...TEAM_STANDARD, "meldungen.bearbeiten", ...ABIZEITUNG],
+  stufenteam: [...TEAM_STANDARD, "meldungen.bearbeiten", ...ABIZEITUNG],
   kassenwart: [...TEAM_STANDARD, "kasse.edit", "beitraege.manage", "finanzen.manage", ...ABIZEITUNG],
   admin: [...ALL_PERMS],
 };

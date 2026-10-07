@@ -19,6 +19,8 @@
  * Meldung als gar keine.
  */
 
+import { hasSupabase, supabase } from "./supabase";
+
 export type MeldeArt = "info" | "fehler" | "erfolg";
 
 type ToastFn = (text: string, art: MeldeArt) => void;
@@ -45,8 +47,19 @@ export function melde(text: string, art: MeldeArt = "info"): void {
 
 /** Wie melde(), nur als Fehler eingefärbt und länger sichtbar. */
 export function meldeFehler(text: string): void {
+  // Wortfilter (Datenbank): Meldung ohne „Ging nicht:“ davor, und den
+  // Versuch zählen – ab 3 in 10 Minuten steht es im Protokoll.
+  const i = text.indexOf("Bitte ohne beleidigende Wörter");
+  if (i >= 0) {
+    const nur = text.slice(i);
+    melde(nur, "fehler");
+    const wort = (nur.match(/„([^“]+)“/) || [])[1] || "";
+    if (hasSupabase) void supabase!.rpc("wortfilter_versuch", { p_wort: wort });
+    return;
+  }
   melde(text, "fehler");
 }
+
 
 /**
  * Rückfrage mit Abbrechen/Ja. Gibt true zurück, wenn bestätigt wurde.

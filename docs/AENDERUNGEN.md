@@ -12,6 +12,34 @@ ausführlich (auf Deutsch); hier steht der Überblick dazu.
 ---
 
 
+## 07.10.2026: Wortfilter und Melden
+
+- **Wortfilter** (SQL `supabase/wortfilter-melden.sql`, Funktionen
+  `wf_norm`, `wf_kand`, `wortfilter_treffer`, Trigger `wortfilter` auf allen
+  Text-Tabellen außer Zitaten): Die Datenbank prüft vor dem Speichern und
+  lehnt ab mit „Bitte ohne beleidigende Wörter formulieren („a***h“).“
+  Erkennt Umgehungen: Groß/klein, Umlaute/ae, Akzente, kyrillische
+  Doppelgänger, unsichtbare Zeichen, Leetspeak (4rsch, w1chser, $),
+  Zeichen im Wort (A.r.s.c.h), Einzelbuchstaben (a r s c h), getrennt
+  (Ar sch, Sieg Heil), Wiederholungen (Arrrsch), ph/ck, Sternchen (f*ck,
+  a**loch). Links/IDs zählen nicht. Modi je Wort: nur als Wort / Wortanfang /
+  überall, dazu Ausnahmen (z. B. „idiotensicher“). 68 Testfälle geprüft.
+- Die **Liste selbst steht nur in der Datenbank** (nicht im Repo). Pflege:
+  Profil → Wortfilter (Recht `wortfilter.verwalten`, Standard Admin) mit
+  Test-Feld. Namen aus der Stufe, die zufällig treffen, sind als Ausnahme
+  eingetragen.
+- Geblockte Versuche: `wortfilter_versuch()` zählt; ab 3 in 10 Minuten ein
+  Protokoll-Eintrag (Bereich „Wortfilter“), ohne Text.
+- **Zitate** laufen nicht durch den Filter; beim Prüfen steht
+  „⚠ enthält ein Wort aus dem Wortfilter“.
+- **Melden** (`lib/melden.ts`, `components/Melden.tsx`, Tabelle `meldungen`):
+  Chat-Nachricht (gedrückt halten → Melden), Album-Kommentar, Steckbrief,
+  Motto-Vorschlag, Zitat. Grund + Notiz; Auszug und Person füllt die
+  Datenbank. Eigenes kann man nicht melden, höchstens 10 pro Stunde. Das
+  Team (Recht `meldungen.bearbeiten`) bekommt eine Mitteilung und sieht die
+  Meldung unter Chats → Anfragen: Entfernen, „Ist in Ordnung“ oder sperren.
+  Bearbeitete Meldungen stehen im Protokoll.
+
 ## 06.10.2026: Protokoll zeigt Mithilfe, Anfragen und Schichten
 
 - Eingetragene Mithilfe stand nicht mehr im Protokoll (beim Verschlanken

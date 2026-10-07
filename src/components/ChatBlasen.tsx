@@ -6,6 +6,7 @@ import { Avatar, PersonName } from "./Avatar";
 import { MuteKnopf } from "./MuteKnopf";
 import { useProfiles } from "../profiles-store";
 import { lesbarerName } from "../lib/profil";
+import { melden } from "../lib/melden";
 
 import { frage, melde } from "../lib/melder";
 /**
@@ -120,6 +121,14 @@ export function ChatBlase({
               reagieren(meine === e ? null : e);
               setMenue(null);
             }}
+            onMelden={
+              meins || !m.created_by
+                ? undefined
+                : () => {
+                    setMenue(null);
+                    melden("chat", m.id);
+                  }
+            }
             onKopieren={() => {
               void navigator.clipboard?.writeText(m.body).then(() => melde("Kopiert"), () => undefined);
               setMenue(null);
@@ -247,7 +256,7 @@ function WerReagiert({
  * über der Nachricht die Leiste mit den Reaktionen, darunter „Kopieren“.
  */
 function ReaktionsMenue({
-  rect, rechts, meine, liste, uid, onWahl, onKopieren, onSchliessen,
+  rect, rechts, meine, liste, uid, onWahl, onKopieren, onMelden, onSchliessen,
 }: {
   rect: DOMRect;
   rechts: boolean;
@@ -257,6 +266,8 @@ function ReaktionsMenue({
   uid: string | null;
   onWahl: (e: Reaktion) => void;
   onKopieren: () => void;
+  /** nur bei fremden Nachrichten */
+  onMelden?: () => void;
   onSchliessen: () => void;
 }) {
   useEffect(() => {
@@ -314,7 +325,7 @@ function ReaktionsMenue({
       ) : (
         <div
           className="absolute w-44 animate-popIn overflow-hidden rounded-2xl bg-white/95 shadow-glas backdrop-blur-xl dark:bg-slate-800/95"
-          style={{ left: Math.max(8, Math.min(vw - 184, rechts ? rect.right - 176 : rect.left)), top: Math.min(menueOben, window.innerHeight - 60) }}
+          style={{ left: Math.max(8, Math.min(vw - 184, rechts ? rect.right - 176 : rect.left)), top: Math.min(menueOben, window.innerHeight - (onMelden ? 112 : 60)) }}
         >
           <button
             onClick={onKopieren}
@@ -322,6 +333,14 @@ function ReaktionsMenue({
           >
             Kopieren <span aria-hidden>⧉</span>
           </button>
+          {onMelden && (
+            <button
+              onClick={onMelden}
+              className="flex w-full items-center justify-between border-t border-black/[0.06] px-4 py-3 text-left text-[15px] font-medium text-red-600 hover:bg-black/[0.04] dark:border-white/[0.08] dark:text-red-400 dark:hover:bg-white/[0.06]"
+            >
+              Melden <span aria-hidden>⚑</span>
+            </button>
+          )}
         </div>
       )}
     </div>

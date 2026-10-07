@@ -8,6 +8,8 @@ import { frage, meldeFehler } from "../lib/melder";
 import { useLehrer, useStufePersonen } from "../lib/rankings";
 import { LehrerListe, ZahnradKnopf } from "./Rankings";
 import { GesperrtZeile, GESPERRT_TEXT } from "./Gesperrt";
+import { MeldenKnopf } from "./Melden";
+import { melden, wortfilterFinden } from "../lib/melden";
 
 /**
  * Zitatwand im Profil: dunkle Karte mit dem „Zitat des Tages“, darunter
@@ -255,11 +257,14 @@ function ZitatZeile({ z, platz, wand }: { z: Zitat; platz: number; wand: Zitatwa
           — {z.wer}
           {z.kontext ? `, ${z.kontext}` : ""}
         </div>
-        {can("zitate.pruefen") && (
-          <button className="mt-1.5 text-[12.5px] font-semibold text-brand-dark dark:text-brand" onClick={() => setEdit({ text: z.text, wer: z.wer, kontext: z.kontext })}>
-            Bearbeiten
-          </button>
-        )}
+        <div className="mt-1.5 flex items-center gap-3">
+          {can("zitate.pruefen") && (
+            <button className="text-[12.5px] font-semibold text-brand-dark dark:text-brand" onClick={() => setEdit({ text: z.text, wer: z.wer, kontext: z.kontext })}>
+              Bearbeiten
+            </button>
+          )}
+          {z.eingereicht_von !== wand.me && <MeldenKnopf onClick={() => melden("zitat", z.id)} />}
+        </div>
       </div>
       <button
         onClick={() => {
@@ -406,6 +411,7 @@ function Pruefen({ wand }: { wand: Zitatwand }) {
       {offen.map((z) => (
         <div key={z.id} className="animate-aufsteigen rounded-2xl bg-[rgb(118_118_128/0.08)] p-4 dark:bg-[rgb(118_118_128/0.18)]">
           <div className="font-buch text-[16.5px] leading-snug">„{z.text}“</div>
+          <WortfilterHinweis text={`${z.text} ${z.wer} ${z.kontext}`} />
           <div className="mt-2 flex items-center gap-2">
             <span className="min-w-0 flex-1 text-[12.5px] text-tinte-leise">
               — {z.wer}
@@ -434,6 +440,24 @@ function Pruefen({ wand }: { wand: Zitatwand }) {
           </div>
         </div>
       ))}
+    </div>
+  );
+}
+
+/** Beim Prüfen: Zitate laufen nicht durch den Wortfilter – hier nur ein Hinweis */
+function WortfilterHinweis({ text }: { text: string }) {
+  const [treffer, setTreffer] = useState<string | null>(null);
+  useEffect(() => {
+    let aktiv = true;
+    void wortfilterFinden(text).then((t) => aktiv && setTreffer(t));
+    return () => {
+      aktiv = false;
+    };
+  }, [text]);
+  if (!treffer) return null;
+  return (
+    <div className="mt-1.5 inline-flex rounded-full bg-[#FFF4E5] px-2.5 py-1 text-[12px] font-semibold text-[#B25000] dark:bg-[#FF9F0A]/15 dark:text-[#FF9F0A]">
+      ⚠ enthält ein Wort aus dem Wortfilter („{treffer}“)
     </div>
   );
 }

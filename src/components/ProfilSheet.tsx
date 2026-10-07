@@ -17,6 +17,7 @@ import { abmelden, enablePush, pushConfigured, pushDiagnose, pushPermission } fr
 import { ProtokollSheet } from "./ProtokollSheet";
 import { RechtLinks } from "./Rechtliches";
 import { FunktionenSheet } from "./FunktionenSheet";
+import { WortfilterSheet } from "./Melden";
 
 import { frage, melde, meldeFehler } from "../lib/melder";
 /** Das eigene Profil: Bild, Namensfarbe, Passwort, Komitee-Wechsel, Hilfe. */
@@ -53,6 +54,7 @@ export function ProfilSheet({
   // Protokoll und Sicherung. Den ganzen Bereich gibt es NUR hier im eigenen
   // Profil – und nur beim Admin (Kassenwart: nur die Sicherheitskopie).
   const [protokollOffen, setProtokollOffen] = useState(false);
+  const [wortfilterOffen, setWortfilterOffen] = useState(false);
   const [loeschOffen, setLoeschOffen] = useState(false);
   const [funktionenOffen, setFunktionenOffen] = useState(false);
 
@@ -358,6 +360,12 @@ export function ProfilSheet({
             <span>🧩</span> Funktionen
           </button>
         )}
+        {/* Wortfilter: blockierte Wörter und Ausnahmen */}
+        {hasSupabase && can("wortfilter.verwalten") && (
+          <button className={row} onClick={() => setWortfilterOffen(true)}>
+            <span>🚫</span> Wortfilter
+          </button>
+        )}
         {/* Nur der Admin. Steht bewusst hier und in keinem Reiter: so taucht der
             Bereich bei niemandem sonst auch nur als leere Kachel auf. */}
         {hasSupabase && istAdmin && (
@@ -418,6 +426,7 @@ export function ProfilSheet({
 
       <LoeschfristenSheet open={loeschOffen} onClose={() => setLoeschOffen(false)} />
       <FunktionenSheet open={funktionenOffen} onClose={() => setFunktionenOffen(false)} />
+      <WortfilterSheet open={wortfilterOffen} onClose={() => setWortfilterOffen(false)} />
       {(istAdmin || istKassenwart) && (
         <ProtokollSheet
           open={protokollOffen}
