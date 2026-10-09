@@ -8,7 +8,7 @@ import { frage, melde, meldeFehler } from "../lib/melder";
 import { useRunden, type RundenStand } from "../lib/runden";
 import { RundenAbschnitt, RundenMarke, SichtbarkeitWahl } from "./Runden";
 import { useErgebnisSichtbarkeit } from "../lib/ergebnisse";
-import { Kachel } from "./Kachel";
+import { FarbKarte, KnopfGlas, KnopfHell } from "./Kachel";
 import { AutorInfo, WortfilterSchalter } from "./AutorInfo";
 import { useZustimmungen, zustimmungText } from "../lib/zustimmung";
 import { useLehrer, useStufePersonen } from "../lib/rankings";
@@ -54,45 +54,62 @@ export function ZitateKarte({ className = "" }: { className?: string }) {
   return (
     <div className={`flex flex-col ${className}`}>
       <AusHinweis funktion="zitate" className="mb-1.5 px-1" />
-      <Kachel
-        icon="zitat"
-        farbe="bg-[#A2845E]"
-        marke={runde ? <RundenMarke runde={runde} /> : undefined}
-        titel={runde ? "Zitate: engere Auswahl" : "Zitatwand"}
+      <FarbKarte
+        verlauf="from-[#2C2C2E] to-[#1C1C1E]"
+        schatten="shadow-[0_12px_30px_-14px_rgba(0,0,0,.75)]"
+        className="dark:ring-1 dark:ring-white/10"
+        marke={
+          runde ? (
+            <span className="flex flex-wrap gap-1.5">
+              <RundenMarke runde={runde} hell />
+              {runde.hm_aktiv && <span className="inline-flex items-center rounded-full bg-white/15 px-2.5 py-1 text-[12px] font-semibold">♥ Sieger der Herzen</span>}
+            </span>
+          ) : undefined
+        }
+        oben={<span className="text-[#E9C460]">{runde ? "Zitate · Engere Auswahl" : heute ? "Neuestes Zitat" : "Zitatwand"}</span>}
+        titel={
+          runde ? (
+            "Welche Zitate kommen in die Abizeitung?"
+          ) : heute ? (
+            <button onClick={() => setOffen("liste")} className="block text-left font-buch text-[1.3rem] font-normal italic leading-snug">
+              „{heute.text}“
+            </button>
+          ) : (
+            <span className="font-buch text-[1.2rem] font-normal italic leading-snug text-white/85">Wer hat diesen einen Satz gesagt, den niemand vergisst?</span>
+          )
+        }
         unter={
           runde
             ? `${r.meineIn(runde.id).length} von ${runde.stimmen} ${runde.stimmen === 1 ? "Stimme" : "Stimmen"} vergeben`
-            : `${frei.length} ${frei.length === 1 ? "Zitat" : "Zitate"}${can("zitate.pruefen") && warten ? ` · ${warten} warten auf Prüfung` : ""}`
+            : heute
+              ? `— ${heute.wer}${heute.kontext ? `, ${heute.kontext}` : ""}`
+              : undefined
         }
+        deko={<span className="-mt-7 mr-1 block font-buch text-[9rem] leading-none text-[#E9C460]/15">”</span>}
         knoepfe={
           <>
             {!banned && !runde && (
-              <button onClick={() => setOffen("neu")} className="btn-klein">
-                Einreichen
-              </button>
+              <KnopfHell onClick={() => setOffen("neu")} text="text-[#1C1C1E] !bg-[#E9C460]">
+                Zitat einreichen
+              </KnopfHell>
             )}
-            <button onClick={() => setOffen("liste")} className={runde ? "btn-klein" : "btn-klein-grau"}>
-              {runde ? "Abstimmen" : "Alle ansehen"}
-            </button>
+            {runde ? (
+              <KnopfHell onClick={() => setOffen("liste")} text="text-[#1C1C1E] !bg-[#E9C460]">
+                Abstimmen
+              </KnopfHell>
+            ) : (
+              <KnopfGlas onClick={() => setOffen("liste")}>Alle {frei.length ? `(${frei.length})` : ""}</KnopfGlas>
+            )}
             {can("zitate.pruefen") && warten > 0 && (
-              <button onClick={() => setOffen("pruefen")} className="btn-klein-grau">
+              <button onClick={() => setOffen("pruefen")} className="rounded-full bg-[#FF9F0A] px-3 py-2 text-[13px] font-bold text-[#1C1C1E] transition active:scale-95">
                 {warten} prüfen
               </button>
             )}
           </>
         }
       >
-        {heute && !runde && (
-          <button onClick={() => setOffen("liste")} className="feld-grau mt-3 block w-full px-4 py-3 text-left">
-            <span className="block font-buch text-[16px] italic leading-snug">„{heute.text}“</span>
-            <span className="mt-1 block text-[12.5px] text-tinte-leise">
-              — {heute.wer}
-              {heute.kontext ? `, ${heute.kontext}` : ""}
-            </span>
-          </button>
-        )}
-        <GesperrtZeile className="mt-3" />
-      </Kachel>
+        <GesperrtZeile hell className="mt-3" />
+      </FarbKarte>
       <ZitateSheet wand={wand} r={r} ansicht={offen} setAnsicht={setOffen} />
     </div>
   );

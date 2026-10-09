@@ -17,7 +17,7 @@ import {
 import { frage, melde, meldeFehler } from "../lib/melder";
 import { useFunktionen } from "../lib/funktionen";
 import { LiedSuche, SpotifyKarte, ohneLink, spotifyAus } from "./Spotify";
-import { Kachel, KleinerRing } from "./Kachel";
+import { FarbKarte, KleinerRing, KnopfGlas, KnopfHell } from "./Kachel";
 import { WortfilterSchalter } from "./AutorInfo";
 import { AusHinweis } from "./Funktionen";
 import { GesperrtZeile, GESPERRT_TEXT } from "./Gesperrt";
@@ -154,40 +154,60 @@ export function AlbumKarte({ className = "" }: { className?: string }) {
   );
   const offeneFreigaben = wartend.length;
 
+  const vorschau = album.personen.slice(0, 5);
+  const oeffne = (detail: string | null) => window.dispatchEvent(new CustomEvent("sv:album", { detail }));
+
   return (
     <div className={`flex flex-col ${className}`}>
       <AusHinweis funktion="album" className="mb-1.5 px-1" />
-      <Kachel
-        icon="buch"
-        farbe="bg-[#FF2D55]"
-        titel="Abi-Album"
-        unter={
-          prozent >= 100
-            ? `Dein Steckbrief ist fertig · ❤ ${meineLikes} · 💬 ${meineKommentare}`
-            : `Dein Steckbrief ist zu ${prozent} % ausgefüllt · ${fertige} im Album`
+      <FarbKarte
+        verlauf="from-[#FF375F] to-[#E0164A]"
+        schatten="shadow-[0_12px_28px_-14px_rgba(224,22,74,.8)]"
+        oben="Abi-Album"
+        titel={<span className="font-buch text-[1.55rem] font-semibold italic">Dein Steckbrief</span>}
+        deko={
+          // Zwei schräg liegende Polaroids – weiß mit hellem Innenfeld, keine Fremdfarben
+          <div className="-mr-1 -mt-1 flex rotate-[8deg] gap-1.5 opacity-90">
+            {[0, 1].map((i) => (
+              <span key={i} className={`block h-12 w-10 rounded-[4px] bg-white p-1 pb-2.5 shadow-md ${i ? "-rotate-12 translate-y-2" : ""}`}>
+                <span className={`block h-full w-full rounded-[2px] ${i ? "bg-[#FF375F]/25" : "bg-[#FF375F]/45"}`} />
+              </span>
+            ))}
+          </div>
         }
-        rechts={<KleinerRing prozent={prozent} />}
         knoepfe={
           <>
-            <button onClick={() => window.dispatchEvent(new CustomEvent("sv:album", { detail: "__mein__" }))} className="btn-klein">
-              {prozent ? "Weiter ausfüllen" : "Ausfüllen"}
-            </button>
-            <button onClick={() => window.dispatchEvent(new CustomEvent("sv:album", { detail: null }))} className="btn-klein-grau">
-              Alle ansehen
-            </button>
+            <KnopfHell onClick={() => oeffne("__mein__")} text="text-[#D70040]">
+              {prozent ? "Weiter ausfüllen" : "Jetzt ausfüllen"}
+            </KnopfHell>
+            <KnopfGlas onClick={() => oeffne(null)}>Alle ansehen</KnopfGlas>
             {offeneFreigaben > 0 && (
-              <button
-                onClick={() =>
-                  window.dispatchEvent(new CustomEvent("sv:album", { detail: offeneFreigaben === 1 ? `__schreiben__:${wartend[0].student_id}` : "__fuer_mich__" }))
-                }
-                className="btn-klein-grau"
-              >
-                ✍️ {offeneFreigaben} {offeneFreigaben === 1 ? "Text wartet" : "Texte warten"}
-              </button>
+              <KnopfGlas dunkel onClick={() => oeffne(offeneFreigaben === 1 ? `__schreiben__:${wartend[0].student_id}` : "__fuer_mich__")}>
+                ✍️ {offeneFreigaben} {offeneFreigaben === 1 ? "Text wartet" : "Texte warten"} ›
+              </KnopfGlas>
             )}
           </>
         }
-      />
+      >
+        <div className="mt-3 flex items-center gap-3">
+          <div className="h-2 flex-1 overflow-hidden rounded-full bg-white/25">
+            <div className="h-full rounded-full bg-white transition-all duration-700 ease-ios" style={{ width: `${prozent}%` }} />
+          </div>
+          <span className="zahl text-[13px] font-bold">{prozent} %</span>
+        </div>
+        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-white/90">
+          <span>❤ {meineLikes}</span>
+          <span>💬 {meineKommentare}</span>
+          <span className="flex items-center">
+            <span className="mr-1.5 flex -space-x-2">
+              {vorschau.map((p) => (
+                <span key={p.id} className={`h-5 w-5 rounded-full bg-gradient-to-br ring-2 ring-[#E8264F] ${personVerlauf(p.id)}`} />
+              ))}
+            </span>
+            {fertige} {fertige === 1 ? "Steckbrief" : "Steckbriefe"}
+          </span>
+        </div>
+      </FarbKarte>
     </div>
   );
 }

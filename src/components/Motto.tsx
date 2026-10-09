@@ -13,7 +13,7 @@ import { frage, melde, meldeFehler } from "../lib/melder";
 import { useRunden, type RundenStand } from "../lib/runden";
 import { RundenAbschnitt, RundenMarke, SichtbarkeitWahl } from "./Runden";
 import { useErgebnisSichtbarkeit } from "../lib/ergebnisse";
-import { Kachel } from "./Kachel";
+import { FarbKarte, KnopfGlas, KnopfHell } from "./Kachel";
 import { AutorInfo, WortfilterSchalter } from "./AutorInfo";
 
 const MEDAILLE = ["#E9C460", "#C0C4CC", "#D4A373"];
@@ -38,35 +38,60 @@ export function MottoKarte({ className = "" }: { className?: string }) {
   return (
     <div className={`flex flex-col ${className}`}>
       <AusHinweis funktion="motto" className="mb-1.5 px-1" />
-      <Kachel
-        icon="funke"
-        farbe="bg-[#FF9500]"
-        marke={runde ? <RundenMarke runde={runde} /> : undefined}
-        titel={gewaehlt ? gewaehlt.text : runde ? "Abimotto: engere Auswahl" : m.abstimmung ? "Abstimmen: Welches Motto?" : "Abimotto"}
+      <FarbKarte
+        verlauf="from-[#FF9500] to-[#F26B00]"
+        schatten="shadow-[0_12px_28px_-14px_rgba(242,107,0,.8)]"
+        marke={
+          runde ? (
+            <span className="flex flex-wrap gap-1.5">
+              <RundenMarke runde={runde} hell />
+              {runde.hm_aktiv && <span className="inline-flex items-center rounded-full bg-white/20 px-2.5 py-1 text-[12px] font-semibold">♥ Sieger der Herzen</span>}
+            </span>
+          ) : undefined
+        }
+        oben={gewaehlt ? "Unser Abimotto" : runde ? "Abimotto · Engere Auswahl" : m.abstimmung ? "Abimotto · Abstimmung läuft" : "Abimotto · Vorschläge"}
+        titel={
+          gewaehlt ? (
+            <button onClick={() => setAnsicht("liste")} className="text-left text-[1.45rem] font-extrabold leading-tight">
+              {gewaehlt.text}
+            </button>
+          ) : runde ? (
+            "Welches Motto kommt auf die Pullis?"
+          ) : m.abstimmung ? (
+            "Abstimmen: Welches Motto soll es werden?"
+          ) : (
+            "Reiche Vorschläge für unser Abimotto ein"
+          )
+        }
         unter={
           gewaehlt
-            ? "Unser Abimotto steht fest."
+            ? `${sichtbare.length} ${sichtbare.length === 1 ? "Vorschlag" : "Vorschläge"} insgesamt`
             : runde
               ? `${r.meineIn(runde.id).length} von ${runde.stimmen} ${runde.stimmen === 1 ? "Stimme" : "Stimmen"} vergeben`
               : m.abstimmung
                 ? `${sichtbare.length} Vorschläge · ${meineLikes ? `du hast ${meineLikes} gelikt` : "like alle, die dir gefallen"}`
-                : `Reiche Vorschläge ein · ${sichtbare.length} bisher`
+                : `${sichtbare.length} ${sichtbare.length === 1 ? "Vorschlag" : "Vorschläge"} bisher`
         }
+        deko={<span className="-mr-2 -mt-3 block text-[6.5rem] leading-none opacity-25">✨</span>}
         knoepfe={
           <>
             {!gewaehlt && !runde && !m.abstimmung && !banned && (
-              <button onClick={() => setAnsicht("neu")} className="btn-klein">
-                Vorschlagen
-              </button>
+              <KnopfHell onClick={() => setAnsicht("neu")} text="text-[#C2410C]">
+                Vorschlag einreichen
+              </KnopfHell>
             )}
-            <button onClick={() => setAnsicht("liste")} className={gewaehlt || runde || m.abstimmung ? "btn-klein" : "btn-klein-grau"}>
-              {gewaehlt ? "Alle ansehen" : runde || m.abstimmung ? "Abstimmen" : "Alle ansehen"}
-            </button>
+            {gewaehlt || runde || m.abstimmung ? (
+              <KnopfHell onClick={() => setAnsicht("liste")} text="text-[#C2410C]">
+                {gewaehlt ? "Alle ansehen" : "Abstimmen"}
+              </KnopfHell>
+            ) : (
+              <KnopfGlas onClick={() => setAnsicht("liste")}>Alle ansehen</KnopfGlas>
+            )}
           </>
         }
       >
-        <GesperrtZeile className="mt-3" />
-      </Kachel>
+        <GesperrtZeile hell className="mt-3" />
+      </FarbKarte>
       <MottoSheet m={m} r={r} ansicht={ansicht} setAnsicht={setAnsicht} />
     </div>
   );

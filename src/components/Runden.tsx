@@ -29,9 +29,13 @@ export function Stepper({ wert, min = 1, max = 20, onChange, label }: { wert: nu
 }
 
 /** Kleine Marke „Runde 2 · Engere Auswahl“ */
-export function RundenMarke({ runde, className = "" }: { runde: Runde; className?: string }) {
+export function RundenMarke({ runde, className = "", hell = false }: { runde: Runde; className?: string; /** auf farbigem Grund */ hell?: boolean }) {
   return (
-    <span className={`inline-flex items-center gap-1 rounded-full bg-brand/10 px-2.5 py-1 text-[12px] font-semibold text-brand-dark dark:text-brand ${className}`}>
+    <span
+      className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[12px] font-semibold ${
+        hell ? "bg-white/20 text-white" : "bg-brand/10 text-brand-dark dark:text-brand"
+      } ${className}`}
+    >
       <Icon name="stimme" size={13} strich={2.4} />
       Runde {runde.nr}
       {runde.titel && runde.titel !== `Runde ${runde.nr}` ? ` · ${runde.titel}` : ""}
@@ -53,8 +57,8 @@ const HERZ = {
 export function SichtbarkeitWahl({ alle, onChange, className = "" }: { alle: boolean; onChange: (alle: boolean) => void; className?: string }) {
   return (
     <div className={`flex min-h-[44px] items-center gap-3 ${className}`}>
-      <span className="min-w-0 flex-1 text-[15px]">Ergebnisse sehen</span>
-      <div className="seg w-[200px] shrink-0" role="radiogroup" aria-label="Ergebnisse sehen">
+      <span className="min-w-0 flex-1 whitespace-nowrap text-[15px]">Ergebnisse sehen</span>
+      <div className="seg w-[168px] shrink-0" role="radiogroup" aria-label="Ergebnisse sehen">
         <button type="button" role="radio" aria-checked={!alle} className={`seg-item !px-2 ${!alle ? "seg-aktiv" : ""}`} onClick={() => onChange(false)}>
           Nur Komitee
         </button>
@@ -67,7 +71,7 @@ export function SichtbarkeitWahl({ alle, onChange, className = "" }: { alle: boo
 }
 
 /** Kopf eines Wahl-Abschnitts: Titel links, Stimmen-Chip rechts */
-function AbschnittKopf({ titel, chip, herz = false }: { titel: string; chip: string; herz?: boolean }) {
+function AbschnittKopf({ titel, chip, unter, herz = false }: { titel: string; chip: string; unter?: string; herz?: boolean }) {
   return (
     <div className="flex items-center gap-2">
       {herz && (
@@ -75,7 +79,10 @@ function AbschnittKopf({ titel, chip, herz = false }: { titel: string; chip: str
           <Icon name="herz" size={13} strich={2.4} />
         </span>
       )}
-      <span className={`min-w-0 flex-1 text-[16px] font-semibold leading-snug ${herz ? HERZ.text : ""}`}>{titel}</span>
+      <span className="min-w-0 flex-1">
+        <span className={`block text-[16px] font-semibold leading-snug ${herz ? HERZ.text : ""}`}>{titel}</span>
+        {unter && <span className={`block text-[12px] font-semibold uppercase tracking-[0.04em] opacity-80 ${herz ? HERZ.text : "text-tinte-leise"}`}>{unter}</span>}
+      </span>
       <span className={`shrink-0 rounded-full px-2.5 py-1 text-[12px] font-semibold ${herz ? HERZ.chip : "bg-brand/10 text-brand-dark dark:text-brand"}`}>{chip}</span>
     </div>
   );
@@ -219,7 +226,7 @@ function RundenKarte({
       {herzLaeuft && (
         <div className={`overflow-hidden rounded-2xl border ${HERZ.rahmen} ${HERZ.flaeche}`}>
           <div className="px-4 pb-2 pt-3.5">
-            <AbschnittKopf titel="Sieger der Herzen" chip="Honorable Mentions · 1 Stimme" herz />
+            <AbschnittKopf titel="Sieger der Herzen" unter="Honorable Mentions" chip="1 Stimme" herz />
           </div>
           <KandidatenListe stand={stand} runde={runde} ks={sortiere(herz)} zahlenDa={zahlenDa} onTippen={tippen} herz />
         </div>
@@ -500,7 +507,9 @@ export function RundeStartenSheet({
               label="Sieger der Herzen"
               onChange={(v) => {
                 setHerzAn(v);
-                if (v && herz.size === 0) herzAuffuellen(herzZahl);
+                const n = Math.max(2, Math.min(herzZahl, sortiert.length - wahl.size));
+                setHerzZahl(n);
+                if (v && herz.size === 0) herzAuffuellen(n);
                 if (!v) setHerz(new Set());
               }}
             />
@@ -582,6 +591,9 @@ export function RundeStartenSheet({
           );
         })}
       </div>
+      {herzAktiv && !herzOk && (
+        <p className={`mt-2 px-1 text-[13px] font-semibold ${HERZ.text}`}>Mindestens zwei Honorable Mentions mit ♥ auswählen.</p>
+      )}
       <button
         className="btn-primary mt-4"
         disabled={wahl.size < 2 || !herzOk || sendet}

@@ -21,7 +21,6 @@ import { GesperrtZeile, GESPERRT_TEXT } from "./Gesperrt";
 import { useRunden, type Runde, type RundenStand } from "../lib/runden";
 import { RundenAbschnitt, RundenMarke, SichtbarkeitWahl } from "./Runden";
 import { useErgebnisSichtbarkeit } from "../lib/ergebnisse";
-import { Kachel } from "./Kachel";
 import { Icon } from "./Icon";
 import { WortfilterSchalter } from "./AutorInfo";
 
@@ -41,6 +40,12 @@ function useNamen(personen: StufenPerson[], lehrer: Lehrer[]) {
 /* ====================================================================== */
 /* Eine Karte auf der Startseite: Schüler- und Lehrer-Ranking            */
 /* ====================================================================== */
+/** Startseite: je Ranking eine kräftige Farbe (Verlauf nur innerhalb der Farbe) */
+const KARTEN_STIL: Record<RankingArt, { verlauf: string; schatten: string; text: string }> = {
+  schueler: { verlauf: "from-[#0A84FF] to-[#0062CC]", schatten: "shadow-[0_12px_28px_-14px_rgba(0,98,204,.8)]", text: "text-[#0062CC]" },
+  lehrer: { verlauf: "from-[#30B85A] to-[#1E8C42]", schatten: "shadow-[0_12px_28px_-14px_rgba(30,140,66,.8)]", text: "text-[#1E7A3B]" },
+};
+
 const ART_STIL: Record<RankingArt, { titel: string; kurz: string }> = {
   schueler: { titel: "Schüler-Ranking", kurz: "Schüler" },
   lehrer: { titel: "Lehrer-Ranking", kurz: "Lehrer" },
@@ -59,33 +64,48 @@ export function RankingKarten({ className = "" }: { className?: string }) {
   return (
     <div className={`flex flex-col ${className}`}>
       <AusHinweis funktion="rankings" className="mb-1.5 px-1" />
-      <Kachel
-        icon="pokal"
-        farbe="bg-[#32ADE6]"
-        titel="Abi-Rankings"
-        unter={stichwahlen ? `${stichwahlen} ${stichwahlen === 1 ? "Stichwahl läuft" : "Stichwahlen laufen"}` : "Wer ist am ehesten …? Geheim abstimmen."}
-      >
-        <div className="liste mt-3 bg-[rgb(118_118_128/0.08)] dark:bg-[rgb(118_118_128/0.18)]">
-          {(["schueler", "lehrer"] as RankingArt[]).map((art) => {
-            const aktive = r.kategorien.filter((k) => k.aktiv && k.art === art);
-            const offenAnzahl = aktive.filter((k) => !(k.id in r.meine)).length;
-            return (
-              <button key={art} onClick={() => setOffen(art)} className="zeile w-full text-left transition active:bg-black/[0.04] dark:active:bg-white/[0.06]">
-                <span className="min-w-0 flex-1">
-                  <span className="block text-[15px] font-semibold">{ART_STIL[art].kurz}</span>
-                  <span className="block text-[12.5px] text-tinte-leise">
-                    {aktive.length ? (offenAnzahl ? `Noch ${offenAnzahl} von ${aktive.length} offen` : `Alle ${aktive.length} abgestimmt`) : "Noch keine Kategorien"}
-                  </span>
-                </span>
-                {offenAnzahl > 0 && <span className="rounded-full bg-brand px-2 py-0.5 text-[12px] font-semibold text-white">{offenAnzahl}</span>}
-                <span className="text-tinte-leise">
-                  <Icon name="chevron" size={16} />
-                </span>
+      <div className="grid flex-1 grid-cols-2 gap-3">
+        {(["schueler", "lehrer"] as RankingArt[]).map((art) => {
+          const stil = KARTEN_STIL[art];
+          const aktive = r.kategorien.filter((k) => k.aktiv && k.art === art);
+          const offenAnzahl = aktive.filter((k) => !(k.id in r.meine)).length;
+          const wahlen = runden.offene.filter((x) => aktive.some((k) => k.id === x.gruppe)).length;
+          return (
+            <section
+              key={art}
+              className={`relative flex min-h-[164px] flex-col overflow-hidden rounded-[1.4rem] bg-gradient-to-br p-3.5 text-white sm:p-5 ${stil.verlauf} ${stil.schatten}`}
+            >
+              {/* Kleines Siegertreppchen oben rechts */}
+              <div aria-hidden className="pointer-events-none absolute right-3.5 top-3.5 flex items-end gap-[2px] opacity-90 sm:right-5 sm:top-5">
+                {[
+                  { h: 15, f: MEDAILLE[1], n: 2 },
+                  { h: 22, f: MEDAILLE[0], n: 1 },
+                  { h: 10, f: MEDAILLE[2], n: 3 },
+                ].map((x) => (
+                  <span key={x.n} className="w-[14px] rounded-t-[3px] sm:w-5" style={{ height: x.h, background: x.f }} />
+                ))}
+              </div>
+              <div className="pr-14 text-[11px] font-semibold uppercase tracking-[0.12em] text-white/80">Abi-Ranking</div>
+              <div className="mt-0.5 text-[1.2rem] font-bold leading-tight">{ART_STIL[art].kurz}</div>
+              <div className="mt-1 text-[12.5px] leading-snug text-white/80">
+                {wahlen
+                  ? `${wahlen} ${wahlen === 1 ? "Stichwahl läuft" : "Stichwahlen laufen"}`
+                  : aktive.length
+                    ? offenAnzahl
+                      ? `Noch ${offenAnzahl} von ${aktive.length} offen`
+                      : `Alle ${aktive.length} abgestimmt`
+                    : "Noch keine Kategorien"}
+              </div>
+              <button
+                onClick={() => setOffen(art)}
+                className={`mt-auto self-start rounded-full bg-white px-3.5 py-2 text-[13.5px] font-semibold shadow-sm transition active:scale-95 ${stil.text}`}
+              >
+                {offenAnzahl > 0 || wahlen ? "Abstimmen" : "Ansehen"}
               </button>
-            );
-          })}
-        </div>
-      </Kachel>
+            </section>
+          );
+        })}
+      </div>
       <RankingSheet art={offen} onClose={() => setOffen(null)} r={r} runden={runden} />
     </div>
   );
