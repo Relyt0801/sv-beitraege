@@ -50,7 +50,7 @@ export function KomiteePage({ topic, onBack }: { topic: Topic; onBack: () => voi
 
   return (
     <div>
-      <div className="sticky top-[var(--kopf)] z-10 -mx-3 border-b border-papier-linie bg-papier-matt/95 px-3 py-2 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95 sm:-mx-5 sm:px-5">
+      <div className="sticky top-[var(--kopf)] z-10 -mx-3 border-b border-papier-linie bg-papier-matt px-3 py-2 dark:border-slate-800 dark:bg-slate-950 sm:-mx-5 sm:px-5 lg:mx-0 lg:rounded-2xl lg:border lg:bg-[rgb(var(--glas))] lg:px-4 lg:shadow-card lg:dark:border-white/10 lg:dark:bg-[rgb(var(--glas))]">
       <div className="flex items-center gap-2">
         <button className="iconbtn" onClick={onBack} aria-label="Zurück">‹</button>
         <span className="text-xl">{icon}</span>
