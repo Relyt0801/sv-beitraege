@@ -1,4 +1,4 @@
-# Übergabe für den nächsten Chat (Stand 09.10.2026)
+# Übergabe für den nächsten Chat (Stand 09.10.2026, abends)
 
 Diese Datei ist der Einstieg für eine neue Sitzung. Erst lesen, dann loslegen.
 
@@ -35,53 +35,31 @@ Diese Datei ist der Einstieg für eine neue Sitzung. Erst lesen, dann loslegen.
   - Bei `git add` einzelne Dateien angeben.
 - **Commits** mit `-c user.name=Relyt0801 -c user.email=tyleradams2910@gmail.com` und diesen Trailern:
   - `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`
-  - `Claude-Session: https://claude.ai/code/session_018XCxUj6kmssZhKshvRA49f`
+  - `Claude-Session: <aktuelle Session-URL>`
 
 ## Git-Stand
 
-- `origin/main`: cf8aff4 (Wortfilter + Melden).
-- `abi-album` lokal und auf dem Laptop:
-  - a7789ce Automatische Sperren
-  - 0eeb59c Update 1.3
-  - dazu dieser Fix-Commit (Kacheln überlappen, Übergabe)
-- **Update 1.3 soll NICHT live.** Der Nutzer will es erst als Vorschau für Admin und Testkonto: `git push origin abi-album:update-1-3`, dann die Vercel-Vorschau-URL nutzen.
+- `origin/main`: cf8aff4 (Wortfilter + Melden) – live.
+- `origin/update-1-3`: 0eeb59c (Vorschau, alter Stand).
+- `abi-album` (lokal, als Bundle auf dem Laptop): Update 1.3 plus das komplette Feedback vom 09.10. (siehe docs/AENDERUNGEN.md, Abschnitt „09.10.2026 (3)“).
+- **Update 1.3 soll NICHT live.** Vorschau: `git push -f origin abi-album:update-1-3`, dann die Vercel-Vorschau-URL.
 
 ## Offene ToDos beim Nutzer
 
-1. Im Supabase SQL Editor ausführen: `privat\inhalte-loeschen.sql` (26 ausgeblendete Mottos und 1 Zitat endgültig löschen).
-2. Im Supabase SQL Editor ausführen: `supabase/meldungen-aufraeumen.sql`.
-3. Erst nach dem Livegang auf `main`: `supabase/autor-spalten-schuetzen.sql` (Einreicher-Spalten sperren).
+1. Im Supabase SQL Editor ausführen: `supabase/reaktionen-frei.sql`. Ohne das gehen nur die alten 6 Reaktionen, die neuen melden „Datenbank kennt es noch nicht“.
+2. Im Supabase SQL Editor ausführen: `supabase/meldungen-aufraeumen.sql` (noch von vorher).
+3. Erst nach dem Livegang auf `main`: `supabase/autor-spalten-schuetzen.sql` und `supabase/stimmen-schuetzen.sql`.
 
-## Offenes Feedback zu Update 1.3 (aus der letzten Nachricht, noch NICHT erledigt)
+## Schon in der Datenbank (per MCP eingespielt)
 
-1. **Design „wirkt leblos“.**
-   - Die alten bunten Karten (Album, Motto, Zitate, Rankings) gefielen besser.
-   - Vorschlag: die alten Karten wiederherstellen (Stand vor 0eeb59c in `MyKasse`/`AlbumKarte`/`MottoKarte`/`ZitateKarte`/`RankingKarten`), aber ohne lila „AI slop“.
-   - Kräftige Einzelfarben, Verläufe höchstens innerhalb einer Farbe.
-   - Die neuen Funktionen (Runden-Marke, Zitat-Vorschau) einbauen.
-   - Überlappende Kacheln sind gefixt (Wrapper `flex flex-col`, Kachel `flex-1`).
-2. **Personen ausblenden, die die Schule verlassen haben.**
-   - Kriterium: `students.verlaesst_ab` liegt vor dem aktuellen Halbjahr.
-   - Betrifft: Album, Rankings-Auswahl, Zitat-Namensauswahl, Rollenliste, Kasse-Liste (prüfen, wo sinnvoll).
-3. **Neues Passwort: 8 Zeichen aus Buchstaben und Ziffern, keine Wort-Zusammensetzung.**
-   - Ort: `supabase/functions/person-anlegen/index.ts`, Modus `passwort_neu_fuer`.
-   - Mit `crypto.getRandomValues`, ohne verwechselbare Zeichen (0/O, 1/l/I).
-   - Danach neu deployen (`verify_jwt: true`).
-   - Der Nutzer erwähnte „Hat man ein Pop Up erhalten“ – nachfragen, was genau gemeint ist. Das Passwort erscheint bereits im Pop-up/Sheet `PasswortNeu.tsx`.
-4. **Hintergrundbild in schlechter Qualität.**
-   - In `lib/hintergrund.ts` steht aktuell 1600 px, JPEG 0,82, Cache als data-URL in localStorage (5-MB-Grenze).
-   - Besser: 2560 px (Retina), Qualität 0,9 bzw. WebP.
-   - Cache in IndexedDB oder der Cache API statt localStorage.
-   - `file_size_limit` im Bucket `hintergruende` liegt bei 2 MB; bei Bedarf erhöhen (`update storage.buckets`).
-5. **Reaktionen im Chat:**
-   - Neue Emojis: 😁 (sehr glücklich), 😭, ❤️.
-   - Dazu ein „+“-Knopf, der die Emoji-Tastatur des Geräts öffnet: unsichtbares Eingabefeld fokussieren und das erste eingegebene Emoji übernehmen.
-   - Prüfen, ob `topic_reaktionen.emoji` per Check-Constraint auf eine feste Liste begrenzt ist. Wenn ja, mit `alter table … drop constraint` per SQL-File für den Nutzer lösen oder durch einen Längen-Check ersetzen.
-   - Den Wortfilter für Emojis (`app_settings.wortfilter_zeichen`) beachten.
-6. **Chat-Kopf auf dem Laptop:**
-   - Der Blur bzw. Farbverlauf hinter der Leiste wirkt verwirrend (Screenshot: blauer Schein rechts oben im Kopf).
-   - Ursache vermutlich: Hintergrundbild plus `glas`-Klasse plus die Leiste in App.tsx bei `lg`.
-   - Den Kopf ruhig machen: deckender Hintergrund oder dezentes Glas ohne Farbschein.
+- `honorable-mentions.sql`: Runden mit Honorable Mentions, `stimmen_zahlen`, `ergebnisse_setzen`, `ranking_stand` mit Sichtbarkeit.
+- `ausgetretene-ausblenden.sql`: `noch_dabei()`, gefilterte `stufe_personen`, `album_personen` und `ranking_stand`.
+- Trigger `reaktion_pruefen` (Emoji-Filter für Reaktionen). Bucket `hintergruende` auf 6 MB.
+- Edge Function `person-anlegen` v6 (Zufallspasswort mit 8 Zeichen).
+
+## Feedback zu Update 1.3
+
+Alles erledigt (siehe docs/AENDERUNGEN.md, „09.10.2026 (3)“). Offen ist nur eine Rückfrage zum Passwort: „Hat man ein Pop Up erhalten“ – noch unklar, was gemeint ist. Das neue Passwort erscheint nach dem Erzeugen im Blatt „Neues Passwort“ (`PasswortNeu.tsx`).
 
 ## Was in Update 1.3 steckt (Kurzfassung, Details in docs/AENDERUNGEN.md)
 
