@@ -3,13 +3,16 @@ import { hasSupabase, supabase } from "./supabase";
 import { abonniere } from "./realtime";
 import { pushZitat } from "./push";
 import { nochFehlend, zustimmen } from "./zustimmung";
+import { useStimmenZahlen } from "./ergebnisse";
 
 /**
  * Zitatwand (supabase/funktionen-zitate.sql)
  *
  *   einreichen  wer zitate.nutzen hat – landet erst „offen“
  *   prüfen      wer zitate.pruefen hat – freigeben oder ablehnen (wird geleert)
- *   🔥          eine Stimme je Person und Zitat, umschaltbar
+ *   🔥          eine Stimme je Person und Zitat, umschaltbar. Gezählt wird in
+ *               der Datenbank (stimmen_zahlen); Zahlen gibt es nur, wenn das
+ *               Komitee sie für alle freigibt (oder man selbst Komitee ist).
  *
  * Ohne Datenbank (Demo) liegt alles im Browser.
  */
@@ -88,6 +91,11 @@ export function useZitate(aktiv: boolean, uid: string | null) {
   const [meineIds, setMeineIds] = useState<Set<string>>(new Set());
   const zeit = useRef<ReturnType<typeof setTimeout> | null>(null);
   const me = uid || "local-user";
+  const z = useStimmenZahlen("zitate", aktiv, () => ({}), true);
+  const zBald = z.bald;
+  // Eigene Stimme sofort mitzählen, bis die Datenbank neu gezählt hat
+  const [delta, setDelta] = useState<Record<string, number>>({});
+  useEffect(() => setDelta({}), [z.zahlen]);
 
   const laden = useCallback(async () => {
     if (!hasSupabase) {
@@ -113,7 +121,8 @@ export function useZitate(aktiv: boolean, uid: string | null) {
     if (!s.error) setStimmen((s.data as Stimme[]) || []);
     if (!mi.error) setMeineIds(new Set(((mi.data as { zitate?: string[] } | null)?.zitate) || []));
     setBereit(true);
-  }, [me]);
+    zBald();
+  }, [me, zBald]);
 
   useEffect(() => {
     if (!aktiv) return;
@@ -219,17 +228,25 @@ export function useZitate(aktiv: boolean, uid: string | null) {
         demoSchreiben(d);
         return;
       }
+      setDelta((d) => ({ ...d, [id]: (d[id] || 0) + (an ? 1 : -1) }));
       await supabase!.from("zitat_stimmen").upsert({ zitat_id: id, user_id: me, an }, { onConflict: "zitat_id,user_id" });
+      zBald();
     },
-    [stimmen, me],
+    [stimmen, me, zBald],
   );
 
-  const stimmenVon = useCallback((id: string) => stimmen.filter((s) => s.zitat_id === id).length, [stimmen]);
+  /** Zahlen: im Demo selbst gezählt, sonst aus der Datenbank (nur wenn sichtbar) */
+  const zahlenSichtbar = hasSupabase ? z.sichtbar : true;
+  const stimmenVon = useCallback(
+    (id: string) =>
+      hasSupabase ? Math.max(0, (z.zahlen[id] ?? 0) + (delta[id] || 0)) : stimmen.filter((s) => s.zitat_id === id).length,
+    [stimmen, z.zahlen, delta],
+  );
   const meineStimme = useCallback((id: string) => stimmen.some((s) => s.zitat_id === id && s.user_id === me), [stimmen, me]);
 
   const istMeins = useCallback((id: string) => meineIds.has(id), [meineIds]);
 
-  return { bereit, zitate, me, istMeins, einreichen, pruefen, bearbeiten, abstimmen, stimmenVon, meineStimme };
+  return { bereit, zitate, me, istMeins, zahlenSichtbar, neuZaehlen: z.laden, einreichen, pruefen, bearbeiten, abstimmen, stimmenVon, meineStimme };
 }
 
 export type Zitatwand = ReturnType<typeof useZitate>;

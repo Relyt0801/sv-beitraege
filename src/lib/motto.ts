@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { hasSupabase, supabase } from "./supabase";
 import { abonniere } from "./realtime";
+import { useStimmenZahlen } from "./ergebnisse";
 
 /**
  * Abimotto (supabase/komitees-motto.sql)
@@ -95,6 +96,20 @@ export function useMotto(aktiv: boolean, uid: string | null) {
   const [meineIds, setMeineIds] = useState<Set<string>>(new Set());
   const zeit = useRef<ReturnType<typeof setTimeout> | null>(null);
   const me = uid || "local-user";
+  // Gezählt wird in der Datenbank (stimmen_zahlen) – nur, wer darf, bekommt Zahlen
+  const stimmenRef = useRef<Stimme[]>([]);
+  stimmenRef.current = stimmen;
+  const z = useStimmenZahlen(
+    "motto",
+    aktiv,
+    () => {
+      const n: Record<string, number> = {};
+      for (const s of stimmenRef.current) if (s.art === "like") n[s.vorschlag_id] = (n[s.vorschlag_id] || 0) + 1;
+      return n;
+    },
+    true,
+  );
+  const zBald = z.bald;
 
   const laden = useCallback(async () => {
     if (!hasSupabase) {
@@ -123,7 +138,8 @@ export function useMotto(aktiv: boolean, uid: string | null) {
     if (!m.error) setMottos((m.data as Motto[]) || []);
     if (!s.error) setStimmen((s.data as Stimme[]) || []);
     setBereit(true);
-  }, [me]);
+    zBald();
+  }, [me, zBald]);
 
   useEffect(() => {
     if (!aktiv) return;
@@ -215,9 +231,10 @@ export function useMotto(aktiv: boolean, uid: string | null) {
         await laden();
         return error.message;
       }
+      zBald();
       return null;
     },
-    [stimmen_, me, laden],
+    [stimmen_, me, laden, zBald],
   );
 
   /** Abstimmung freigeben / zurück zu Vorschlägen (motto.verwalten) */
@@ -239,16 +256,22 @@ export function useMotto(aktiv: boolean, uid: string | null) {
     return null;
   }, []);
 
-  const zahl = useCallback((id: string, art: MottoArt) => stimmen.filter((s) => s.vorschlag_id === id && s.art === art).length, [stimmen]);
+  const zahl = useCallback(
+    (id: string, art: MottoArt) =>
+      hasSupabase && z.sichtbar && art === "like" ? z.zahlen[id] ?? 0 : stimmen.filter((s) => s.vorschlag_id === id && s.art === art).length,
+    [stimmen, z.sichtbar, z.zahlen],
+  );
   const meine = useCallback((id: string, art: MottoArt) => stimmen.some((s) => s.vorschlag_id === id && s.user_id === me && s.art === art), [stimmen, me]);
   const punkte = useCallback((id: string) => 2 * zahl(id, "feuer") + zahl(id, "like"), [zahl]);
   const meinFavorit = mottos.find((m) => meine(m.id, "feuer")) || null;
   /** Wie viele Personen mindestens ein 👍 gegeben haben (nur fürs Komitee sichtbar) */
-  const waehlende = new Set(stimmen.filter((s) => s.art === "like").map((s) => s.user_id)).size;
+  const waehlende = hasSupabase ? z.personen : new Set(stimmen.filter((s) => s.art === "like").map((s) => s.user_id)).size;
+  /** Darf ich die Zahlen sehen? (Komitee immer, alle nur, wenn freigegeben) */
+  const zahlenSichtbar = hasSupabase ? z.sichtbar : true;
 
   const istMeins = useCallback((id: string) => meineIds.has(id), [meineIds]);
 
-  return { bereit, mottos, me, istMeins, abstimmung, abstimmungSetzen, vorschlagen, aendern, abstimmen, zahl, meine, punkte, meinFavorit, waehlende };
+  return { bereit, mottos, me, istMeins, zahlenSichtbar, neuZaehlen: z.laden, abstimmung, abstimmungSetzen, vorschlagen, aendern, abstimmen, zahl, meine, punkte, meinFavorit, waehlende };
 }
 
 export type MottoWahl = ReturnType<typeof useMotto>;

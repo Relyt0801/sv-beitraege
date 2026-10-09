@@ -6,7 +6,8 @@ import { useZitate, type Zitat, type ZitatArt, type Zitatwand } from "../lib/zit
 import { AusHinweis } from "./Funktionen";
 import { frage, melde, meldeFehler } from "../lib/melder";
 import { useRunden, type RundenStand } from "../lib/runden";
-import { RundenAbschnitt, RundenMarke } from "./Runden";
+import { RundenAbschnitt, RundenMarke, SichtbarkeitWahl } from "./Runden";
+import { useErgebnisSichtbarkeit } from "../lib/ergebnisse";
 import { Kachel } from "./Kachel";
 import { AutorInfo, WortfilterSchalter } from "./AutorInfo";
 import { useZustimmungen, zustimmungText } from "../lib/zustimmung";
@@ -156,6 +157,7 @@ function ZitateSheet({
           {ansicht === "pruefen" ? (
             <>
               <WortfilterSchalter bereich="zitate" className="mb-3" />
+              <ZitateSichtbarkeit wand={wand} />
               <Pruefen wand={wand} />
             </>
           ) : (
@@ -168,6 +170,8 @@ function ZitateSheet({
                 leitet={can("zitate.runden")}
                 gesperrt={banned}
                 startText="Abstimmungsrunde starten"
+                wahlTitel="Zitate-Wahl"
+                mitHerz
               />
               <Wand wand={wand} />
             </>
@@ -179,10 +183,29 @@ function ZitateSheet({
   );
 }
 
+/** Komitee: Wer sieht die 🔥-Zahlen der Zitatwand? */
+function ZitateSichtbarkeit({ wand }: { wand: Zitatwand }) {
+  const e = useErgebnisSichtbarkeit(true);
+  return (
+    <div className="feld-grau mb-3 px-4 py-1">
+      <SichtbarkeitWahl
+        alle={e.alle.zitate}
+        onChange={async (v) => {
+          const f = await e.setzen("zitate", v);
+          if (f) meldeFehler("Ging nicht: " + f);
+          else void wand.neuZaehlen();
+        }}
+      />
+    </div>
+  );
+}
+
 /* ---------------------------------------------------------------- Wand */
 function Wand({ wand }: { wand: Zitatwand }) {
   const [filter, setFilter] = useState<"alle" | ZitatArt>("alle");
-  const [sort, setSort] = useState<"top" | "neu">("top");
+  const [sortWahl, setSort] = useState<"top" | "neu">("top");
+  // Ohne sichtbare Zahlen gibt es keine Rangliste
+  const sort = wand.zahlenSichtbar ? sortWahl : "neu";
   const frei = wand.zitate.filter((z) => z.status === "frei");
   const meineOffenen = wand.zitate.filter((z) => z.status === "offen" && wand.istMeins(z.id));
 
@@ -209,12 +232,12 @@ function Wand({ wand }: { wand: Zitatwand }) {
             </button>
           ))}
         </div>
-        <button
+        {wand.zahlenSichtbar && <button
           onClick={() => setSort((s) => (s === "top" ? "neu" : "top"))}
           className="rounded-[9px] bg-[rgb(118_118_128/0.12)] px-3 py-1.5 text-[13px] font-semibold dark:bg-[rgb(118_118_128/0.24)]"
         >
           {sort === "top" ? "🔥 Top" : "🕒 Neu"}
-        </button>
+        </button>}
       </div>
 
       {meineOffenen.length > 0 && (
@@ -314,7 +337,7 @@ function ZitatZeile({ z, platz, wand }: { z: Zitat; platz: number; wand: Zitatwa
         <span key={tick} className={`text-[19px] leading-none ${tick ? "animate-herz" : ""} ${an ? "" : "grayscale"}`}>
           🔥
         </span>
-        <span className="zahl text-[12px] font-bold">{n}</span>
+        {wand.zahlenSichtbar && <span className="zahl text-[12px] font-bold">{n}</span>}
       </button>
     </div>
   );

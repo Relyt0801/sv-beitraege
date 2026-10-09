@@ -19,7 +19,8 @@ import {
 import { frage, meldeFehler } from "../lib/melder";
 import { GesperrtZeile, GESPERRT_TEXT } from "./Gesperrt";
 import { useRunden, type Runde, type RundenStand } from "../lib/runden";
-import { RundenAbschnitt, RundenMarke } from "./Runden";
+import { RundenAbschnitt, RundenMarke, SichtbarkeitWahl } from "./Runden";
+import { useErgebnisSichtbarkeit } from "../lib/ergebnisse";
 import { Kachel } from "./Kachel";
 import { Icon } from "./Icon";
 import { WortfilterSchalter } from "./AutorInfo";
@@ -167,6 +168,7 @@ function KategorieKachel({
   const st = r.stand.find((s) => s.kategorie_id === k.id);
   const hat = k.id in r.meine;
   const meine = r.meine[k.id];
+  const topSichtbar = useTopSichtbar();
   return (
     <button
       onClick={onClick}
@@ -176,7 +178,7 @@ function KategorieKachel({
     >
       {offeneRunde && <RundenMarke runde={offeneRunde} className="mb-1.5 !px-2 !py-0.5 !text-[11px]" />}
       <div className="text-[13.5px] font-semibold leading-snug">{k.titel}</div>
-      <ol className="mt-2 space-y-1">
+      {topSichtbar ? <ol className="mt-2 space-y-1">
         {[0, 1, 2].map((i) => {
           const t = st?.top[i];
           return (
@@ -189,12 +191,19 @@ function KategorieKachel({
             </li>
           );
         })}
-      </ol>
+      </ol> : <div className="mt-2 text-[12.5px] text-tinte-leise">{st?.stimmen ? `${st.stimmen} ${st.stimmen === 1 ? "Stimme" : "Stimmen"}` : "Noch keine Stimmen"}</div>}
       <div className={`mt-2 truncate text-[12px] font-semibold ${hat ? "text-tinte-leise" : "text-brand-dark dark:text-brand"}`}>
         {hat ? (meine ? `Deine Stimme: ${name(meine)}` : "Weiß nicht") : "Abstimmen ›"}
       </div>
     </button>
   );
+}
+
+/** Dürfen die Top 3 gezeigt werden? (Komitee immer, sonst nur, wenn für alle freigegeben) */
+function useTopSichtbar(): boolean {
+  const { can } = useRole();
+  const { alle } = useErgebnisSichtbarkeit(true);
+  return alle.rankings || can("rankings.verwalten") || can("rankings.runden");
 }
 
 /* ---------------------------------------------------------------- Abstimmen */
@@ -225,6 +234,7 @@ function Abstimmen({
       ? lehrer.map((l) => ({ id: l.id, label: l.name, punkte: punkte.get(l.id) ?? 0 }))
       : personen.map((p) => ({ id: p.id, label: kurz(p), punkte: punkte.get(p.id) ?? 0 }));
   const st = r.stand.find((s) => s.kategorie_id === k.id);
+  const topSichtbar = useTopSichtbar();
   return (
     <div className="animate-vonRechts">
       <div className="mb-3 flex items-center justify-between">
@@ -238,7 +248,7 @@ function Abstimmen({
       <div className="feld-grau p-4">
         <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-tinte-leise">{k.art === "schueler" ? "Schüler-Ranking" : "Lehrer-Ranking"}</div>
         <div className="mt-1 text-[1.15rem] font-bold leading-snug">{k.titel}</div>
-        <div className="mt-3 flex items-end justify-center gap-2">
+        {topSichtbar && <div className="mt-3 flex items-end justify-center gap-2">
           {[1, 0, 2].map((i) => {
             const t = st?.top[i];
             return (
@@ -253,7 +263,7 @@ function Abstimmen({
               </div>
             );
           })}
-        </div>
+        </div>}
       </div>
       <GesperrtZeile className="mt-3" />
       <div className="mt-4">
@@ -265,6 +275,7 @@ function Abstimmen({
           leitet={can("rankings.runden")}
           gesperrt={banned}
           startText="Stichwahl starten"
+          wahlTitel="Stichwahl"
         />
       </div>
       {!stichwahl && (
@@ -381,13 +392,29 @@ export function RankingVerwaltungSheet({ open, onClose }: { open: boolean; onClo
   return <RankingVerwaltung open={open} onClose={onClose} r={r} />;
 }
 
+function RankingSichtbarkeit() {
+  const e = useErgebnisSichtbarkeit(true);
+  return (
+    <div className="feld-grau mb-4 px-4 py-1">
+      <SichtbarkeitWahl
+        alle={e.alle.rankings}
+        onChange={async (v) => {
+          const f = await e.setzen("rankings", v);
+          if (f) meldeFehler("Ging nicht: " + f);
+        }}
+      />
+    </div>
+  );
+}
+
 function RankingVerwaltung({ open, onClose, r, start }: { open: boolean; onClose: () => void; r: Rankings; start?: RankingArt }) {
   const { can } = useRole();
   const [teil, setTeil] = useState<"kategorien" | "lehrer">(can("rankings.verwalten") ? "kategorien" : "lehrer");
   return (
     <Sheet open={open} onClose={onClose}>
       <SheetKopf titel="Rankings verwalten" onClose={onClose} />
-      <WortfilterSchalter bereich="rankings" className="mb-4" />
+      <WortfilterSchalter bereich="rankings" className="mb-3" />
+      {(can("rankings.verwalten") || can("rankings.runden")) && <RankingSichtbarkeit />}
       {can("rankings.verwalten") && can("lehrer.verwalten") && (
         <div className="seg mb-4">
           <button className={`seg-item ${teil === "kategorien" ? "seg-aktiv" : ""}`} onClick={() => setTeil("kategorien")}>

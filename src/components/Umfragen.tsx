@@ -30,7 +30,7 @@ import { ZielWahl } from "./Rankings";
 import { pushAnPersonen, pushAnTeam } from "../lib/push";
 import { frage as fragen_, melde, meldeFehler } from "../lib/melder";
 import { useRunden } from "../lib/runden";
-import { RundenAbschnitt } from "./Runden";
+import { RundenAbschnitt, SichtbarkeitWahl } from "./Runden";
 import { Kachel } from "./Kachel";
 import { Icon } from "./Icon";
 import { WortfilterSchalter } from "./AutorInfo";
@@ -658,9 +658,9 @@ function UmfrageEditor({
         <Zeile label="Pflicht">
           <Schalter an={pflicht} onChange={setPflicht} label="Pflicht" />
         </Zeile>
-        <Zeile label="Ergebnis für Teilnehmende">
-          <Schalter an={sichtbar} onChange={setSichtbar} label="Ergebnis für Teilnehmende" />
-        </Zeile>
+        <div className="px-4 py-0.5">
+          <SichtbarkeitWahl alle={sichtbar} onChange={setSichtbar} />
+        </div>
         {(can("rankings.verwalten") || mitRankings) && (
           <Zeile label="Abi-Rankings abfragen">
             <Schalter an={mitRankings} onChange={setMitRankings} label="Abi-Rankings abfragen" />
@@ -934,6 +934,7 @@ function ErgebnisSheet({
                       leitet
                       gesperrt={false}
                       startText="Stichwahl starten"
+                      wahlTitel="Stichwahl"
                     />
                   </div>
                 )}

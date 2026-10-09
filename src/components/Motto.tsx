@@ -11,7 +11,8 @@ import { useFunktionen } from "../lib/funktionen";
 import { useMotto, type Motto, type MottoWahl } from "../lib/motto";
 import { frage, melde, meldeFehler } from "../lib/melder";
 import { useRunden, type RundenStand } from "../lib/runden";
-import { RundenAbschnitt, RundenMarke } from "./Runden";
+import { RundenAbschnitt, RundenMarke, SichtbarkeitWahl } from "./Runden";
+import { useErgebnisSichtbarkeit } from "../lib/ergebnisse";
 import { Kachel } from "./Kachel";
 import { AutorInfo, WortfilterSchalter } from "./AutorInfo";
 
@@ -89,6 +90,8 @@ function MottoSheet({
   const [verwalten, setVerwalten] = useState(false);
   const darfRunden = can("motto.runden");
   const darfVerwalten = can("motto.verwalten") || darfRunden;
+  const ergebnisse = useErgebnisSichtbarkeit(ansicht !== null);
+  const fuerAlle = ergebnisse.alle.motto;
   const schliessen = () => {
     setAnsicht(null);
     setVerwalten(false);
@@ -113,11 +116,11 @@ function MottoSheet({
             titel={verwalten ? "Ergebnisse" : "Abimotto"}
             unter={
               verwalten
-                ? `Nur für das Komitee sichtbar · ${stimmende} ${stimmende === 1 ? "Person hat" : "Personen haben"} abgestimmt`
+                ? `${fuerAlle ? "Für alle sichtbar" : "Nur für das Komitee sichtbar"} · ${stimmende} ${stimmende === 1 ? "Person hat" : "Personen haben"} abgestimmt`
                 : r.offeneVon("")
-                  ? "Engere Auswahl: Vergib oben deine Stimmen. Die Ergebnisse sieht das Komitee."
+                  ? "Engere Auswahl: Vergib oben deine Stimmen."
                   : m.abstimmung
-                  ? "Gib allen Mottos ein 👍, die dir gefallen. Die Ergebnisse sieht nur das Komitee."
+                  ? `Gib allen Mottos ein 👍, die dir gefallen.${m.zahlenSichtbar ? "" : " Die Ergebnisse sieht das Komitee."}`
                   : "Reiche Vorschläge ein – abgestimmt wird, sobald das Komitee die Abstimmung freigibt."
             }
             onClose={schliessen}
@@ -147,6 +150,8 @@ function MottoSheet({
             quellen={m.mottos.filter((x) => !x.ausgeblendet).map((x) => ({ id: x.id, label: x.text, unter: x.erklaerung, punkte: m.zahl(x.id, "like") }))}
             leitet={darfRunden && verwalten}
             gesperrt={banned}
+            wahlTitel="Abimotto-Wahl"
+            mitHerz
           />
           {verwalten && (
             <div className="mb-3 space-y-2">
@@ -171,6 +176,16 @@ function MottoSheet({
                   />
                 </label>
               )}
+              <div className="feld-grau px-4 py-1">
+                <SichtbarkeitWahl
+                  alle={fuerAlle}
+                  onChange={async (v) => {
+                    const f = await ergebnisse.setzen("motto", v);
+                    if (f) meldeFehler("Ging nicht: " + f);
+                    else void m.neuZaehlen();
+                  }}
+                />
+              </div>
               <WortfilterSchalter bereich="motto" />
             </div>
           )}
@@ -226,13 +241,13 @@ function MottoZeile({ x, m, gesperrt }: { x: Motto; m: MottoWahl; gesperrt: bool
             {darfAutor && <AutorInfo art="motto" id={x.id} />}
           </div>
         </div>
-        {m.abstimmung && <StimmKnopf an={an} onClick={() => void tippen()} />}
+        {m.abstimmung && <StimmKnopf an={an} zahl={m.zahlenSichtbar ? m.zahl(x.id, "like") : undefined} onClick={() => void tippen()} />}
       </div>
     </div>
   );
 }
 
-function StimmKnopf({ an, onClick }: { an: boolean; onClick: () => void }) {
+function StimmKnopf({ an, zahl, onClick }: { an: boolean; zahl?: number; onClick: () => void }) {
   return (
     <button
       onClick={onClick}
@@ -243,7 +258,7 @@ function StimmKnopf({ an, onClick }: { an: boolean; onClick: () => void }) {
       }`}
     >
       <span className={an ? "animate-herz" : ""}>👍</span>
-      {an ? "Gefällt mir" : "Like"}
+      {zahl !== undefined ? <span className="zahl">{zahl}</span> : an ? "Gefällt mir" : "Like"}
     </button>
   );
 }
