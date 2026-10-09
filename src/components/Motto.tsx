@@ -117,6 +117,9 @@ function MottoSheet({
   const darfVerwalten = can("motto.verwalten") || darfRunden;
   const ergebnisse = useErgebnisSichtbarkeit(ansicht !== null);
   const fuerAlle = ergebnisse.alle.motto;
+  // Sind die Zahlen für alle freigegeben, kann jede/r nach 👍 oder Neuheit sortieren
+  const [sortWahl, setSort] = useState<"top" | "neu">("top");
+  const nachLikes = verwalten || (m.zahlenSichtbar && m.abstimmung && sortWahl === "top");
   const schliessen = () => {
     setAnsicht(null);
     setVerwalten(false);
@@ -126,7 +129,7 @@ function MottoSheet({
   const liste = m.mottos
     .filter((x) => verwalten || !x.ausgeblendet)
     .sort((a, b) =>
-      verwalten ? m.zahl(b.id, "like") - m.zahl(a.id, "like") || b.created_at.localeCompare(a.created_at) : b.created_at.localeCompare(a.created_at),
+      nachLikes ? m.zahl(b.id, "like") - m.zahl(a.id, "like") || b.created_at.localeCompare(a.created_at) : b.created_at.localeCompare(a.created_at),
     );
   const hoechste = Math.max(1, ...liste.map((x) => m.zahl(x.id, "like")));
   const stimmende = m.waehlende;
@@ -214,8 +217,18 @@ function MottoSheet({
               <WortfilterSchalter bereich="motto" />
             </div>
           )}
-          {r.offeneVon("") && !verwalten && (
-            <div className="mb-2 mt-1 px-1 text-[12px] font-semibold uppercase tracking-[0.04em] text-tinte-leise">Alle Vorschläge</div>
+          {!verwalten && (r.offeneVon("") || (m.zahlenSichtbar && m.abstimmung)) && (
+            <div className="mb-2 mt-1 flex items-center gap-2 px-1">
+              <span className="min-w-0 flex-1 text-[12px] font-semibold uppercase tracking-[0.04em] text-tinte-leise">Alle Vorschläge</span>
+              {m.zahlenSichtbar && m.abstimmung && (
+                <button
+                  onClick={() => setSort((s) => (s === "top" ? "neu" : "top"))}
+                  className="rounded-[9px] bg-[rgb(118_118_128/0.12)] px-3 py-1.5 text-[13px] font-semibold dark:bg-[rgb(118_118_128/0.24)]"
+                >
+                  {sortWahl === "top" ? "👍 Top" : "🕒 Neu"}
+                </button>
+              )}
+            </div>
           )}
           <div className="space-y-2.5">
             {liste.map((x, i) =>

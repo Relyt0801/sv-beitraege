@@ -280,15 +280,16 @@ function ReaktionsMenue({
     return () => window.removeEventListener("keydown", esc);
   }, [onSchliessen]);
   const vw = window.innerWidth;
-  // Leiste: Schnellauswahl (scrollt, wenn das Handy schmal ist) und dahinter „+“
-  const breite = Math.min(REAKTIONEN.length * 44 + 16 + 48, vw - 16);
+  // Leiste in zwei Zeilen à 5 (Schnellauswahl + „+“) – passt auch aufs
+  // schmalste Handy und wird nicht zu breit
+  const breite = Math.min(5 * 44 + 16, vw - 16);
   const eigenes = useRef<HTMLInputElement>(null);
   // Ein eigenes Emoji, das nicht in der Schnellauswahl steht, vorn mit anzeigen
   const extra = meine && !(REAKTIONEN as readonly string[]).includes(meine) ? [meine] : [];
   const links = Math.max(8, Math.min(vw - breite - 8, rechts ? rect.right - breite : rect.left));
   // Leiste über der Nachricht – passt sie oben nicht hin, darunter
-  const oben = rect.top > 140 ? rect.top - 60 : rect.bottom + 10;
-  const menueOben = rect.top > 140 ? rect.bottom + 10 : oben + 62;
+  const oben = rect.top > 180 ? rect.top - 104 : rect.bottom + 10;
+  const menueOben = rect.top > 180 ? rect.bottom + 10 : oben + 106;
   return (
     <div className="fixed inset-0 z-[95]" role="dialog" aria-label="Reagieren">
       <button
@@ -297,11 +298,10 @@ function ReaktionsMenue({
         onClick={onSchliessen}
       />
       <div
-        className="absolute flex animate-popIn items-center rounded-full bg-white/95 p-2 shadow-glas backdrop-blur-xl dark:bg-slate-800/95"
+        className="absolute grid animate-popIn grid-cols-5 gap-1 rounded-[1.6rem] bg-white/95 p-2 shadow-glas backdrop-blur-xl dark:bg-slate-800/95"
         style={{ left: links, top: oben, width: breite }}
       >
-        <div className="flex min-w-0 flex-1 gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {[...extra, ...REAKTIONEN].map((e) => (
+        {[...extra, ...REAKTIONEN].slice(0, 9).map((e) => (
           <button
             key={e}
             onClick={() => onWahl(e)}
@@ -314,10 +314,9 @@ function ReaktionsMenue({
             {e}
           </button>
         ))}
-        </div>
         {/* „+“: öffnet die Tastatur – das erste Emoji, das man tippt, wird die Reaktion */}
         <label
-          className="relative ml-1 flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-full bg-black/[0.06] text-[22px] font-light text-tinte-matt transition active:scale-90 dark:bg-white/10 dark:text-slate-200"
+          className="relative flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-full bg-black/[0.06] text-[22px] font-light text-tinte-matt transition active:scale-90 dark:bg-white/10 dark:text-slate-200"
           aria-label="Anderes Emoji wählen"
           onClick={() => eigenes.current?.focus()}
         >
@@ -408,8 +407,9 @@ export function ChatBlasen({
       })}
       {/* Platz für Eingabezeile und Tab-Leiste. Die Marke fürs Scrollen steht
           dahinter – so landet die letzte Nachricht über der Eingabe statt
-          dahinter (vorher lag der Freiraum als padding hinter der Marke). */}
-      <div aria-hidden className="h-[calc(var(--leiste)+5rem)] lg:h-24" />
+          dahinter. Zusammen mit dem unteren Rand der Seite genau so hoch wie
+          Eingabe + Tab-Leiste – kein Leerraum mehr unter der letzten Nachricht. */}
+      <div aria-hidden className="h-8 lg:h-4" />
       <div ref={ende} />
     </div>
   );

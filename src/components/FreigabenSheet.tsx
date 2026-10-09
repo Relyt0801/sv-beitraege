@@ -13,15 +13,16 @@ import { rolleName } from "../lib/permissions";
  * Profil → Freigaben (nur Admin)
  *
  *  1. Wie viele Personen müssen zustimmen, bevor eine Anfrage durch ist?
- *     Termine, Kosten, Entsperren, Zitate – je 1 bis 10.
+ *     Termine, Kosten, Entsperren, Zitate, Steckbrief-Fotos – je 1 bis 10.
  *  2. Wer bearbeitet Mithilfe-Nachträge? Niemand ausgewählt = wie bisher
  *     alle aus dem Team und alle mit „Beteiligungen eintragen“.
  */
-const ARTEN: { key: "termin" | "kosten" | "entsperren" | "zitat"; titel: string; text: string }[] = [
+const ARTEN: { key: "termin" | "kosten" | "entsperren" | "zitat" | "foto"; titel: string; text: string; standard?: number }[] = [
   { key: "termin", titel: "Terminanfragen", text: "Vom Komitee-Vorsitz an das Team" },
   { key: "kosten", titel: "Kostenanfragen", text: "Ausgaben, die die Kasse übernimmt" },
   { key: "entsperren", titel: "Entsperr-Anfragen", text: "Wenn jemand eine Sperre anficht" },
   { key: "zitat", titel: "Zitate freigeben", text: "Bevor ein Zitat auf der Wand steht" },
+  { key: "foto", titel: "Steckbrief-Fotos", text: "Stufenteam, bevor andere das Foto sehen", standard: 3 },
 ];
 
 export function FreigabenSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -93,7 +94,7 @@ export function FreigabenSheet({ open, onClose }: { open: boolean; onClose: () =
               <span className="block text-[15px]">{a.titel}</span>
               <span className="block text-[12px] text-tinte-leise">{a.text}</span>
             </span>
-            <Stepper wert={Math.max(1, werte[a.key] || 1)} max={10} label={`Zustimmungen für ${a.titel}`} onChange={(n) => void setzeWert(a.key, n)} />
+            <Stepper wert={Math.max(1, werte[a.key] || a.standard || 1)} max={10} label={`Zustimmungen für ${a.titel}`} onChange={(n) => void setzeWert(a.key, n)} />
           </div>
         ))}
       </div>

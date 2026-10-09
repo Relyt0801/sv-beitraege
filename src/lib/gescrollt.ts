@@ -99,7 +99,10 @@ export function useChatEnde(anzahl: number, letzteIstMeine: boolean) {
   }, []);
   useEffect(() => {
     if (!ende.current) return;
-    if (erstes.current || warUnten.current || letzteIstMeine) ende.current.scrollIntoView({ block: "end" });
+    // Ganz nach unten: Der Platz unter der letzten Nachricht ist genau so hoch
+    // wie Eingabezeile + Tab-Leiste – darunter gibt es keinen Leerraum mehr.
+    if (erstes.current || warUnten.current || letzteIstMeine)
+      window.scrollTo({ top: document.documentElement.scrollHeight, behavior: "auto" });
     if (anzahl > 0) erstes.current = false;
   }, [anzahl, letzteIstMeine]);
   return ende;

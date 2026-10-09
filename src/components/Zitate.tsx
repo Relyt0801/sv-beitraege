@@ -175,7 +175,6 @@ function ZitateSheet({
           {ansicht === "pruefen" ? (
             <>
               <WortfilterSchalter bereich="zitate" className="mb-3" />
-              <ZitateSichtbarkeit wand={wand} />
               <Pruefen wand={wand} />
             </>
           ) : (
@@ -191,6 +190,7 @@ function ZitateSheet({
                 wahlTitel="Zitate-Wahl"
                 mitHerz
               />
+              {(can("zitate.pruefen") || can("zitate.runden")) && <ZitateSichtbarkeit wand={wand} />}
               <Wand wand={wand} />
             </>
           )}
@@ -207,6 +207,7 @@ function ZitateSichtbarkeit({ wand }: { wand: Zitatwand }) {
   return (
     <div className="feld-grau mb-3 px-4 py-1">
       <SichtbarkeitWahl
+        titel="🔥-Zahlen sehen"
         alle={e.alle.zitate}
         onChange={async (v) => {
           const f = await e.setzen("zitate", v);

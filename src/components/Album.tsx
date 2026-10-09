@@ -23,6 +23,7 @@ import { AusHinweis } from "./Funktionen";
 import { GesperrtZeile, GESPERRT_TEXT } from "./Gesperrt";
 import { MeldenKnopf } from "./Melden";
 import { melden } from "../lib/melden";
+import { fotoEntfernen, fotoHochladen, useAlbumFotos } from "../lib/album-fotos";
 
 /* ====================================================================== */
 /* Gemeinsamer Zustand: einmal laden, Karte und Blatt teilen ihn          */
@@ -88,15 +89,26 @@ function AlbumWurzel({ album }: { album: Album }) {
 const initialen = (p: { vorname: string; nachname: string }) => `${p.vorname[0] || ""}${p.nachname[0] || ""}`.toUpperCase();
 
 function Bild({ p, gross }: { p: AlbumPerson; gross?: boolean }) {
+  const { studentId } = useRole();
+  const { fotoVon } = useAlbumFotos(true);
+  // Freigegebenes Foto – das eigene sieht man schon vor der Freigabe
+  const foto = fotoVon(p.id, p.id === studentId);
+  const groesse = gross ? "h-20 w-20 text-[28px] shadow-lg ring-4 ring-white dark:ring-slate-900" : "h-8 w-8 text-[12px]";
+  if (foto) return <img src={foto} alt="" loading="lazy" className={`shrink-0 rounded-full object-cover ${groesse}`} />;
   return (
-    <span
-      className={`flex shrink-0 items-center justify-center rounded-full bg-gradient-to-br font-bold text-white ${personVerlauf(p.id)} ${
-        gross ? "h-20 w-20 text-[28px] shadow-lg ring-4 ring-white dark:ring-slate-900" : "h-8 w-8 text-[12px]"
-      }`}
-    >
+    <span className={`flex shrink-0 items-center justify-center rounded-full bg-gradient-to-br font-bold text-white ${personVerlauf(p.id)} ${groesse}`}>
       {initialen(p)}
     </span>
   );
+}
+
+/** Polaroid-Inhalt in der Übersicht: Foto (wenn freigegeben) oder Initialen */
+function PolaroidBild({ p }: { p: AlbumPerson }) {
+  const { studentId } = useRole();
+  const { fotoVon } = useAlbumFotos(true);
+  const foto = fotoVon(p.id, p.id === studentId);
+  if (foto) return <img src={foto} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />;
+  return <span className="font-buch text-[2.4rem] font-semibold italic text-white/95 drop-shadow-sm">{initialen(p)}</span>;
 }
 
 function Herz({ an, n, onClick, klein }: { an: boolean; n: number; onClick: () => void; klein?: boolean }) {
@@ -404,7 +416,7 @@ function AlleSteckbriefe({
               className="group relative rounded-[6px] bg-white p-2 pb-2.5 text-left shadow-[0_6px_18px_-6px_rgba(0,0,0,.28)] transition duration-300 ease-ios hover:rotate-0 active:scale-95 dark:bg-slate-800"
             >
               <span className={`relative flex aspect-square items-center justify-center overflow-hidden rounded-[3px] bg-gradient-to-br ${personVerlauf(p.id)}`}>
-                <span className="font-buch text-[2.4rem] font-semibold italic text-white/95 drop-shadow-sm">{initialen(p)}</span>
+                <PolaroidBild p={p} />
                 {pr === 0 && <span className="absolute inset-0 bg-white/45 dark:bg-slate-900/50" />}
                 {fuerMich && (
                   <span className="absolute left-1.5 top-1.5 rounded-full bg-white/95 px-2 py-0.5 text-[11px] font-bold text-[#D70040] shadow-sm">✍️ für dich</span>
@@ -795,6 +807,79 @@ function TextFeld({ wert, setzen, platzhalter }: { wert: string; setzen: (v: str
 }
 
 /* ---------------------------------------------------------------- Mein Steckbrief */
+/** Eigenes Foto im Steckbrief: hochladen, Stand der Freigabe, entfernen */
+function MeinFoto({ studentId }: { studentId: string }) {
+  const { banned } = useRole();
+  const fotos = useAlbumFotos(true);
+  const f = fotos.eintragVon(studentId);
+  const zeigen = f && (f.status === "offen" || f.status === "frei") ? fotos.urlVon(f.pfad) : null;
+  const [busy, setBusy] = useState(false);
+  const ref = useRef<HTMLInputElement>(null);
+  const stand =
+    !f || f.status === "entfernt"
+      ? "Andere sehen es erst, wenn das Stufenteam es freigegeben hat."
+      : f.status === "offen"
+        ? "Wartet auf die Freigabe durch das Stufenteam – bis dahin siehst nur du es."
+        : f.status === "frei"
+          ? "Freigegeben – alle im Album sehen es."
+          : "Nicht freigegeben. Du kannst ein anderes Foto hochladen.";
+  return (
+    <div className="feld-grau mt-3 flex items-center gap-3 px-4 py-3">
+      {zeigen ? (
+        <img src={zeigen} alt="Dein Foto" className="h-14 w-14 shrink-0 rounded-xl object-cover" />
+      ) : (
+        <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-black/[0.06] text-[22px] dark:bg-white/10">📷</span>
+      )}
+      <span className="min-w-0 flex-1">
+        <span className="block text-[15px] font-semibold">Foto</span>
+        <span className={`block text-[12.5px] leading-snug ${f?.status === "abgelehnt" ? "text-red-600 dark:text-red-400" : "text-tinte-leise"}`}>{stand}</span>
+        <span className="mt-2 flex flex-wrap gap-2">
+          <button
+            type="button"
+            disabled={busy || banned}
+            onClick={() => ref.current?.click()}
+            className="btn-klein-grau !min-h-[2rem] !px-3 !text-[13px]"
+          >
+            {busy ? "Lädt hoch …" : zeigen ? "Ändern" : "Foto hinzufügen"}
+          </button>
+          {zeigen && (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() =>
+                void frage("Dein Foto aus dem Steckbrief nehmen?", "Entfernen", true).then(async (ok) => {
+                  if (!ok) return;
+                  const e = await fotoEntfernen(studentId);
+                  if (e) meldeFehler("Ging nicht: " + e);
+                })
+              }
+              className="btn-klein-grau !min-h-[2rem] !px-3 !text-[13px] !text-red-600 dark:!text-red-400"
+            >
+              Entfernen
+            </button>
+          )}
+        </span>
+      </span>
+      <input
+        ref={ref}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={async (e) => {
+          const d = e.target.files?.[0];
+          e.target.value = "";
+          if (!d) return;
+          setBusy(true);
+          const fehler = await fotoHochladen(studentId, d);
+          setBusy(false);
+          if (fehler) meldeFehler("Ging nicht: " + fehler);
+          else melde("Foto hochgeladen – das Stufenteam prüft es", "erfolg");
+        }}
+      />
+    </div>
+  );
+}
+
 function MeinSteckbrief({ album, vorschau }: { album: Album; vorschau: () => void }) {
   const spotifyAn = useFunktionen().an.spotify;
   const { studentId } = useRole();
@@ -849,6 +934,8 @@ function MeinSteckbrief({ album, vorschau }: { album: Album; vorschau: () => voi
           {prozent >= 100 ? "Fertig! Du kannst trotzdem jederzeit ändern." : "Fülle aus, was du magst – alles lässt sich später ändern."}
         </span>
       </div>
+
+      {studentId && <MeinFoto studentId={studentId} />}
 
       <Gruppe titel="Stammdaten · nur du" fuss="Diese Felder kannst nur du ausfüllen – auch wenn du den Text freigibst.">
         {kat.map((k) => (

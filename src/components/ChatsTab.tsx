@@ -23,6 +23,7 @@ import { NachtragSheet } from "./NachtragSheet";
 import { Schalter } from "./Schalter";
 import { kategorieAn, komiteeAn, useMitteilungen, type Kategorie } from "../lib/mitteilungen";
 import { useZaehltMit } from "../lib/chat-zaehler";
+import { FotoFreigaben } from "./FotoFreigaben";
 const TEAM_CHAT_TITLE = "Stufenteam";
 
 /**
@@ -51,6 +52,25 @@ export function ChatsTab() {
 
   const chats = topics.filter((t) => t.kind === "chat");
   const teamChat = chats.find((t) => !t.tag) ?? null;
+
+  // Aus einer Benachrichtigung (#chat-<id>): genau diesen Chat öffnen
+  useEffect(() => {
+    if (!ready) return;
+    const oeffne = () => {
+      const m = window.location.hash.match(/^#chat-([0-9a-f-]{36})$/i);
+      if (!m) return;
+      history.replaceState(null, "", window.location.pathname + window.location.search);
+      const t = topics.find((x) => x.id === m[1]);
+      if (!t) return;
+      setTicketListe(false);
+      // Schüler sehen ihre Gespräche mit dem Team als einen durchgehenden Chat
+      if (t.kind === "ticket" && !isStaff) return setTeamOffen(true);
+      setOpenId(t.id);
+    };
+    oeffne();
+    window.addEventListener("hashchange", oeffne);
+    return () => window.removeEventListener("hashchange", oeffne);
+  }, [ready, topics, isStaff]);
   const meineKoms = committeesOf(uid);
 
   // Fehlende Chats einmalig anlegen – nur wer Chats verwalten darf, kann das.
@@ -206,6 +226,7 @@ export function ChatsTab() {
               <NachtragAnfragen />
               <KomiteeRequests />
               <UnbanRequests />
+              <FotoFreigaben />
             </div>
             <div className="card mt-2.5 overflow-hidden peer-empty:mt-0 [&>p]:hidden peer-empty:[&>p]:block [&>div]:border-t-0 peer-empty:[&>div]:border-t">
               <p className="px-4 py-3 text-[13px] text-tinte-leise">Gerade keine offenen Anfragen.</p>

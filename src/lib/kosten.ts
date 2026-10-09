@@ -100,7 +100,7 @@ export function useKostenAnfragen(aktiv: boolean): KostenValue {
         an,
         `Kostenanfrage: ${a.titel.trim()}`,
         `${committeeLabel(a.tag)} fragt ${euro(a.cent)} an. Tippen zum Entscheiden.`,
-        "./#finanzen",
+        "./#anfrage-kosten",
         { art: "anfrage" },
       );
       return null;

@@ -11,7 +11,7 @@ import { useRole } from "../auth/RoleProvider";
  * auf; erst wenn genug zusammen sind („fertig“), läuft das eigentliche
  * Annehmen. Die Datenbank prüft das zusätzlich (Trigger zustimmung).
  */
-export type ZustimmungsArt = "termin" | "kosten" | "entsperren" | "zitat";
+export type ZustimmungsArt = "termin" | "kosten" | "entsperren" | "zitat" | "foto";
 
 export interface ZustimmungErgebnis {
   stimmen: number;
@@ -49,7 +49,7 @@ export function useZustimmungen(art: ZustimmungsArt, aktiv: boolean, uid: string
     for (const r of (z as { anfrage_id: string; user_id: string }[]) || []) (m[r.anfrage_id] ||= []).push(r.user_id);
     setJe(m);
     const b = (a as { bestaetigungen?: Record<string, number> } | null)?.bestaetigungen || {};
-    setNoetig(Math.max(1, Number(b[art]) || 1));
+    setNoetig(Math.max(1, Number(b[art]) || (art === "foto" ? 3 : 1)));
   }, [art]);
 
   useEffect(() => {

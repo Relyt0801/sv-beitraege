@@ -68,7 +68,7 @@ Deno.serve(async (req) => {
       url?: string;
     };
     // Wohin ein Tippen auf die Meldung führt – nur Ziele innerhalb der App.
-    let ziel = typeof wunschUrl === "string" && /^\.\/(#[a-z-]+)?$/.test(wunschUrl) ? wunschUrl : "./";
+    let ziel = typeof wunschUrl === "string" && /^\.\/(#[a-z0-9-]+)?$/.test(wunschUrl) ? wunschUrl : "./";
     const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
     webpush.setVapidDetails(
       Deno.env.get("VAPID_SUBJECT") || "mailto:kasse@sv-beitraege.local",
@@ -373,7 +373,8 @@ Deno.serve(async (req) => {
       title = (wichtig && tp.kind !== "ticket" ? "📌 " : "💬 ") + raum;
       body = tp.kind === "ticket" && istTeam(it.created_by as string) ? text : `${von}: ${text}`;
       if (it.type === "umfrage") body = `${von} fragt: ${it.body || it.title}`;
-      if (ziel === "./") ziel = "./#chats";
+      // Tippen öffnet genau diesen Chat (ChatsTab liest #chat-<id>)
+      ziel = `./#chat-${tp.id}`;
       pushTag = `chat-${tp.id}`;
       gruppe = title;
     } else if (termin_id) {

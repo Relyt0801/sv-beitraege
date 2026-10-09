@@ -86,7 +86,7 @@ export function KomiteePage({ topic, onBack }: { topic: Topic; onBack: () => voi
       )}
 
       {tab === "uebersicht" ? (
-        <div className="mt-3 space-y-5 pb-[calc(var(--leiste)+5rem)] lg:pb-24">
+        <div className="mt-3 space-y-5 pb-8 lg:pb-4">
           {/* Wer hier den Vorsitz hat, darf Termine anfragen. */}
           {topic.tag && <VorsitzZeile tag={topic.tag} />}
 
@@ -358,7 +358,7 @@ function ChatBereich({
           return <ChatBlase key={m.id} m={m} meins={m.created_by === uid} darfLoeschen={darfLoeschen} onDelete={(id) => void deleteItem(id)} />;
         })}
         {/* Platz für Eingabezeile und Tab-Leiste, Scroll-Marke dahinter */}
-        <div aria-hidden className="h-[calc(var(--leiste)+5rem)] lg:h-24" />
+        <div aria-hidden className="h-8 lg:h-4" />
         <div ref={ende} />
       </div>
 

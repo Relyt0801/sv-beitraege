@@ -12,6 +12,21 @@ ausführlich (auf Deutsch); hier steht der Überblick dazu.
 ---
 
 
+## 10.10.2026: Fotos, Sprungziele, Scrollen
+
+- **Steckbrief-Fotos** (`supabase/album-fotos.sql`, `lib/album-fotos.ts`, `FotoFreigaben.tsx`):
+  - Jede Person kann ein Foto hochladen; es liegt im privaten Bucket `album-fotos`.
+  - Andere sehen es erst, wenn das Stufenteam es freigegeben hat (Freigabe-Art `foto`, Standard 3, im Profil → Freigaben einstellbar).
+  - Ein neues Hochladen ergibt eine neue Version, die erneut freigegeben werden muss.
+- **Mitteilung antippen → direkt hin**: Chat-Mitteilungen öffnen `#chat-<id>` (send-push v28), Kosten- und Foto-Anfragen springen direkt zur Prüfstelle.
+- **Scrollsperre am Handy behoben** (`lib/scrollsperre.ts`): Ein Zähler statt Speichern und Wiederherstellen pro Blatt. Bisher konnte ein Blatt, das sich überlappend schloss, die Sperre stehen lassen.
+- **Kopfzeile im Chat**: Das Band geht über die volle Breite, ohne Unschärfe, wenn ein Hintergrundbild gesetzt ist. Neben „Ändern“ gibt es keine Vorschau mehr.
+- **Chats**: Unter der letzten Nachricht entsteht kein Leerraum mehr. Die Reaktionsauswahl steht in 2 Zeilen zu je 5.
+- **ⓘ „Von wem“**: Das Fenster wird jetzt über den Body gelegt und an den Bildschirmrand angepasst, damit es nicht mehr abgeschnitten wird.
+- **🔥-Zahlen sehen** ist für Zitate und Motto direkt in der Wand einstellbar. Sind die Zahlen sichtbar, können alle nach Top/Neu sortieren.
+- **Zitate ohne doppelte Anführungszeichen**: Der Trigger `zitat_zeichen_weg` (`supabase/zitate-ohne-anfuehrungszeichen.sql`) entfernt sie; die bestehenden Zitate sind bereinigt.
+- **Steckbrief-Farben**: Es gibt 16 Verläufe, und der Hash wird besser gemischt, sodass die Farben wieder bunt sind.
+
 ## 09.10.2026 (3): Feedback zu Update 1.3
 
 - **Bunte Karten zurück** (`Kachel.tsx` → `FarbKarte`): Album rot-pink, Motto orange, Zitate dunkel mit Gold, Rankings blau/grün. Jede Karte hat eine kräftige Farbe, Verläufe gibt es nur innerhalb dieser Farbe, kein Lila. Runden-Marke und „♥ Sieger der Herzen“ stehen auf den Karten.

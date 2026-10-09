@@ -124,6 +124,8 @@ function tabAusAdresse(entfernen = true): Tab | null {
   const sprung = sprungAusHash(window.location.hash);
   if (sprung) return SPRUNG_TAB[sprung];
   const h = window.location.hash.replace("#", "");
+  // Ein bestimmter Chat (#chat-<id>): Reiter Chats, den Chat öffnet ChatsTab
+  if (h.startsWith("chat-")) return "themen";
   const t: Tab | null =
     h === "events" ? "events" : h === "chats" ? "themen" : h === "kasse" ? "kasse" : h === "finanzen" ? "finanzen" : h === "profil" ? "profil" : null;
   if (t && entfernen) history.replaceState(null, "", window.location.pathname + window.location.search);
@@ -442,7 +444,7 @@ function Main() {
       <header
         ref={kopfRef}
         className={`sticky top-0 z-20 -mx-3 px-3 pb-2 pt-[calc(env(safe-area-inset-top)+0.5rem)] transition-[background-color,box-shadow] duration-300 sm:-mx-5 sm:px-5 ${
-          gescrollt ? "glas shadow-[0_0.5px_0_rgba(0,0,0,.18)] dark:shadow-[0_0.5px_0_rgba(255,255,255,.15)]" : "kopf-grund bg-papier dark:bg-slate-950"
+          gescrollt ? "kopf-band" : "kopf-grund bg-papier dark:bg-slate-950"
         }`}
       >
         <div className="mx-auto flex max-w-5xl items-center gap-2.5">

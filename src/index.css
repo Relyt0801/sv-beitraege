@@ -320,3 +320,34 @@ html.mit-hintergrund {
 html.mit-hintergrund .kopf-grund {
   background-color: transparent;
 }
+/* Kopfleiste beim Scrollen: Glas über die GANZE Breite (vorher nur so breit
+   wie der Inhalt – am Laptop sah das Hintergrundbild abgeschnitten aus). */
+.kopf-band {
+  isolation: isolate;
+}
+.kopf-band::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 50%;
+  width: 100vw;
+  transform: translateX(-50%);
+  z-index: -1;
+  background-color: rgb(var(--glas) / 0.72);
+  -webkit-backdrop-filter: blur(40px) saturate(1.8);
+  backdrop-filter: blur(40px) saturate(1.8);
+  box-shadow: 0 0.5px 0 rgba(0, 0, 0, 0.18);
+}
+.dark .kopf-band::before {
+  box-shadow: 0 0.5px 0 rgba(255, 255, 255, 0.15);
+}
+/* Mit eigenem Hintergrundbild: ruhige, fast deckende Leiste ohne Weichzeichner
+   und ohne Farbschein aus dem Bild */
+html.mit-hintergrund .kopf-band::before {
+  background-color: rgb(var(--papier) / 0.94);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+/* Die breite Leiste darf keinen waagerechten Scrollbalken erzeugen */
+#root {
+  overflow-x: clip;
+}

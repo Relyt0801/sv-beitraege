@@ -1,5 +1,6 @@
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { scrollSperren } from "../lib/scrollsperre";
 
 /**
  * Ein Blatt, das von unten hochfaehrt – wie auf dem iPhone.
@@ -23,11 +24,7 @@ export function Sheet({ open, onClose, children }: { open: boolean; onClose: () 
   // Die Seite dahinter scrollt nicht mit.
   useEffect(() => {
     if (!open) return;
-    const alt = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = alt;
-    };
+    return scrollSperren();
   }, [open]);
 
   useEffect(() => {

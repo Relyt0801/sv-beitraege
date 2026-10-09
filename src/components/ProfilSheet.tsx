@@ -407,7 +407,6 @@ function HintergrundZeile({ row }: { row: string }) {
         <span className="block">Hintergrundbild</span>
         <span className="block text-[12px] text-tinte-leise">Nur für dich sichtbar</span>
       </span>
-      {bild && <span className="h-9 w-7 shrink-0 rounded-md bg-cover bg-center ring-1 ring-black/10" style={{ backgroundImage: `url(${bild})` }} />}
       <input
         ref={ref}
         type="file"

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { hinScrollen, useSprungziel } from "../lib/sprung";
 import { SkelettKarten } from "./Skelett";
 import { useStore } from "../store";
 import { useRole } from "../auth/RoleProvider";
@@ -587,9 +588,14 @@ function KostenKarte({
   const offene = kosten.anfragen.filter((a) => a.status === "offen");
   const erledigte = kosten.anfragen.filter((a) => a.status !== "offen");
   const sichtbarErledigt = alle ? erledigte : erledigte.slice(0, 3);
+  // Aus der Benachrichtigung „Kostenanfrage“: gleich die Anfrage öffnen
+  useSprungziel("kosten", darfEntscheiden && offene.length > 0, () => {
+    if (offene.length === 1) setAuswahl(offene[0]);
+    else hinScrollen("sprung-kosten");
+  });
 
   return (
-    <section className="card min-w-0 p-5">
+    <section id="sprung-kosten" className="card min-w-0 p-5">
       <div className="flex items-start gap-3">
         <div className="min-w-0 flex-1">
           <h2 className="text-[1.125rem] font-semibold tracking-[-0.01em]">Kostenanfragen</h2>
