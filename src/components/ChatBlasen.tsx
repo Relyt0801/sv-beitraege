@@ -1,14 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useChatEnde } from "../lib/gescrollt";
-import { REAKTIONEN, useTopicsOptional, type Reaktion, type TopicItem } from "../topics-store";
+import { REAKTIONEN, erstesEmoji, useTopicsOptional, type Reaktion, type TopicItem } from "../topics-store";
 import { Avatar, PersonName } from "./Avatar";
 import { MuteKnopf } from "./MuteKnopf";
 import { useProfiles } from "../profiles-store";
 import { lesbarerName } from "../lib/profil";
 import { melden } from "../lib/melden";
 
-import { frage, melde } from "../lib/melder";
+import { frage, melde, meldeFehler } from "../lib/melder";
 /**
  * Nachrichtenliste im WhatsApp-Stil: fremde Nachrichten links mit Kreis (oben, auf Höhe des Namens) und
  * farbigem Namen in der Blase, eigene rechts ohne Namen.
@@ -194,8 +194,12 @@ function ReaktionsSchild({
 }) {
   const zahl = new Map<string, number>();
   for (const r of liste) zahl.set(r.emoji, (zahl.get(r.emoji) || 0) + 1);
-  // Häufigste zuerst, bei Gleichstand in der Reihenfolge der Leiste
-  const reihe = REAKTIONEN.filter((e) => zahl.has(e)).sort((x, y) => (zahl.get(y) || 0) - (zahl.get(x) || 0));
+  // Häufigste zuerst, bei Gleichstand in der Reihenfolge der Leiste (eigene Emojis dahinter)
+  const rang = (e: string) => {
+    const i = (REAKTIONEN as readonly string[]).indexOf(e);
+    return i < 0 ? 99 : i;
+  };
+  const reihe = [...zahl.keys()].sort((x, y) => (zahl.get(y) || 0) - (zahl.get(x) || 0) || rang(x) - rang(y));
   return (
     <button
       type="button"
@@ -275,8 +279,12 @@ function ReaktionsMenue({
     window.addEventListener("keydown", esc);
     return () => window.removeEventListener("keydown", esc);
   }, [onSchliessen]);
-  const breite = 6 * 44 + 16;
   const vw = window.innerWidth;
+  // Leiste: Schnellauswahl (scrollt, wenn das Handy schmal ist) und dahinter „+“
+  const breite = Math.min(REAKTIONEN.length * 44 + 16 + 48, vw - 16);
+  const eigenes = useRef<HTMLInputElement>(null);
+  // Ein eigenes Emoji, das nicht in der Schnellauswahl steht, vorn mit anzeigen
+  const extra = meine && !(REAKTIONEN as readonly string[]).includes(meine) ? [meine] : [];
   const links = Math.max(8, Math.min(vw - breite - 8, rechts ? rect.right - breite : rect.left));
   // Leiste über der Nachricht – passt sie oben nicht hin, darunter
   const oben = rect.top > 140 ? rect.top - 60 : rect.bottom + 10;
@@ -289,10 +297,11 @@ function ReaktionsMenue({
         onClick={onSchliessen}
       />
       <div
-        className="absolute flex animate-popIn gap-1 rounded-full bg-white/95 p-2 shadow-glas backdrop-blur-xl dark:bg-slate-800/95"
-        style={{ left: links, top: oben }}
+        className="absolute flex animate-popIn items-center rounded-full bg-white/95 p-2 shadow-glas backdrop-blur-xl dark:bg-slate-800/95"
+        style={{ left: links, top: oben, width: breite }}
       >
-        {REAKTIONEN.map((e) => (
+        <div className="flex min-w-0 flex-1 gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {[...extra, ...REAKTIONEN].map((e) => (
           <button
             key={e}
             onClick={() => onWahl(e)}
@@ -305,6 +314,34 @@ function ReaktionsMenue({
             {e}
           </button>
         ))}
+        </div>
+        {/* „+“: öffnet die Tastatur – das erste Emoji, das man tippt, wird die Reaktion */}
+        <label
+          className="relative ml-1 flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-full bg-black/[0.06] text-[22px] font-light text-tinte-matt transition active:scale-90 dark:bg-white/10 dark:text-slate-200"
+          aria-label="Anderes Emoji wählen"
+          onClick={() => eigenes.current?.focus()}
+        >
+          +
+          <input
+            ref={eigenes}
+            type="text"
+            inputMode="text"
+            enterKeyHint="done"
+            autoComplete="off"
+            autoCorrect="off"
+            aria-label="Emoji eingeben"
+            className="absolute inset-0 h-full w-full cursor-pointer rounded-full bg-transparent text-center text-transparent caret-transparent outline-none"
+            onInput={(ev) => {
+              const feld = ev.currentTarget;
+              const e = erstesEmoji(feld.value);
+              if (!feld.value) return;
+              feld.value = "";
+              if (!e) return meldeFehler("Bitte ein Emoji wählen.");
+              feld.blur();
+              onWahl(e);
+            }}
+          />
+        </label>
       </div>
       {liste ? (
         <div

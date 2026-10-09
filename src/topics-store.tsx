@@ -69,9 +69,30 @@ export interface TopicItem {
 
 const LS = "sv-beitraege:topics";
 
-/** Reaktionen, die es gibt – dieselbe Liste prüft die Datenbank. */
-export const REAKTIONEN = ["👍", "👎", "🔥", "😢", "😂", "❓"] as const;
-export type Reaktion = (typeof REAKTIONEN)[number];
+/**
+ * Schnellauswahl der Reaktionen. Dazu kommt über „+“ jedes andere Emoji
+ * (genau eins). Die Datenbank prüft „ein Emoji“ und den Emoji-Filter
+ * (supabase/reaktionen-frei.sql).
+ */
+export const REAKTIONEN = ["👍", "❤️", "😂", "😁", "😭", "🔥", "👎", "😢", "❓"] as const;
+export type Reaktion = string;
+
+/** Erstes Zeichen (Graphem) eines Textes – aber nur, wenn es ein Emoji ist */
+export function erstesEmoji(text: string): string | null {
+  const t = (text || "").trim();
+  if (!t) return null;
+  let erstes = t;
+  try {
+    const seg = new Intl.Segmenter(undefined, { granularity: "grapheme" });
+    const it = seg.segment(t)[Symbol.iterator]().next();
+    erstes = it.done ? t : it.value.segment;
+  } catch {
+    erstes = Array.from(t)[0] || "";
+  }
+  if (!/\p{Extended_Pictographic}|\p{Regional_Indicator}/u.test(erstes)) return null;
+  if (/[\x01-\x7f]/.test(erstes) || erstes.length > 16) return null;
+  return erstes;
+}
 
 /**
  * Gehört ein Eintrag in die Übersicht (Angepinntes, Abstimmungen, To-dos)
@@ -635,7 +656,14 @@ export function TopicsProvider({ children }: { children: ReactNode }) {
       ? await supabase!.from("topic_reaktionen").upsert({ item_id: itemId, user_id: ich, emoji })
       : await supabase!.from("topic_reaktionen").delete().eq("item_id", itemId).eq("user_id", ich);
     if (error) {
-      meldeFehler("Reaktion ging nicht: " + error.message);
+      const m = error.message || "";
+      meldeFehler(
+        m.includes("gesperrt")
+          ? "Dieses Emoji ist gesperrt."
+          : m.includes("emoji_check") || m.includes("emoji_ein_zeichen")
+            ? "Dieses Emoji geht noch nicht – die Datenbank kennt es noch nicht."
+            : "Reaktion ging nicht: " + m,
+      );
       planeNachladen();
     }
   }, [planeNachladen]);
