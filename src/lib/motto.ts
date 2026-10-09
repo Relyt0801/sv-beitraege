@@ -26,8 +26,9 @@ export interface Motto {
   id: string;
   text: string;
   erklaerung: string;
-  von: string;
-  von_name: string;
+  /** Nur im Demo-Modus – die Datenbank gibt Einreicher nicht mehr heraus */
+  von?: string;
+  von_name?: string;
   created_at: string;
   ausgeblendet: boolean;
   gewaehlt: boolean;
@@ -91,6 +92,7 @@ export function useMotto(aktiv: boolean, uid: string | null) {
   const [stimmen, setStimmen] = useState<Stimme[]>([]);
   const [bereit, setBereit] = useState(false);
   const [abstimmung, setAbstimmung] = useState(false);
+  const [meineIds, setMeineIds] = useState<Set<string>>(new Set());
   const zeit = useRef<ReturnType<typeof setTimeout> | null>(null);
   const me = uid || "local-user";
 
@@ -99,6 +101,7 @@ export function useMotto(aktiv: boolean, uid: string | null) {
       const d = demoLesen();
       setMottos(d.mottos);
       setStimmen(d.stimmen);
+      setMeineIds(new Set(d.mottos.filter((x) => x.von === me).map((x) => x.id)));
       try {
         setAbstimmung(localStorage.getItem(DEMO_PHASE) === "1");
       } catch {
@@ -107,16 +110,20 @@ export function useMotto(aktiv: boolean, uid: string | null) {
       setBereit(true);
       return;
     }
-    const [m, s, a] = await Promise.all([
-      supabase!.from("motto_vorschlaege").select("*").order("created_at", { ascending: false }).limit(500),
+    // Einreicher stehen nicht in der Liste (Spalten sind gesperrt) – welche
+    // Vorschläge meine sind, sagt meine_eintraege().
+    const [m, s, a, mi] = await Promise.all([
+      supabase!.from("motto_vorschlaege").select("id, text, erklaerung, created_at, ausgeblendet, gewaehlt").order("created_at", { ascending: false }).limit(500),
       supabase!.from("motto_stimmen").select("vorschlag_id, user_id, art").eq("an", true),
       supabase!.from("app_settings").select("motto_abstimmung").eq("id", 1).maybeSingle(),
+      supabase!.rpc("meine_eintraege"),
     ]);
+    if (!mi.error) setMeineIds(new Set(((mi.data as { motto?: string[] } | null)?.motto) || []));
     if (!a.error) setAbstimmung(Boolean((a.data as { motto_abstimmung?: boolean } | null)?.motto_abstimmung));
     if (!m.error) setMottos((m.data as Motto[]) || []);
     if (!s.error) setStimmen((s.data as Stimme[]) || []);
     setBereit(true);
-  }, []);
+  }, [me]);
 
   useEffect(() => {
     if (!aktiv) return;
@@ -239,7 +246,9 @@ export function useMotto(aktiv: boolean, uid: string | null) {
   /** Wie viele Personen mindestens ein 👍 gegeben haben (nur fürs Komitee sichtbar) */
   const waehlende = new Set(stimmen.filter((s) => s.art === "like").map((s) => s.user_id)).size;
 
-  return { bereit, mottos, me, abstimmung, abstimmungSetzen, vorschlagen, aendern, abstimmen, zahl, meine, punkte, meinFavorit, waehlende };
+  const istMeins = useCallback((id: string) => meineIds.has(id), [meineIds]);
+
+  return { bereit, mottos, me, istMeins, abstimmung, abstimmungSetzen, vorschlagen, aendern, abstimmen, zahl, meine, punkte, meinFavorit, waehlende };
 }
 
 export type MottoWahl = ReturnType<typeof useMotto>;

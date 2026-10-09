@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { hasSupabase, supabase } from "../lib/supabase";
 import { hinScrollen, useSprungziel } from "../lib/sprung";
 import { useRole } from "../auth/RoleProvider";
 import { useStore } from "../store";
@@ -14,8 +15,17 @@ import { Gruppe, Zeile } from "./Liste";
  * Rechnung; Antippen öffnet das Blatt zum Annehmen oder Ablehnen.
  */
 export function NachtragAnfragen() {
-  const { isStaff, can } = useRole();
-  const darf = isStaff || can("hilfen.edit");
+  const { isStaff, can, isAdmin, uid } = useRole();
+  // Hat der Admin Bearbeiter festgelegt (Profil → Freigaben), dürfen nur sie
+  const [bearbeiter, setBearbeiter] = useState<string[] | null>(null);
+  useEffect(() => {
+    if (!hasSupabase || !(isStaff || can("hilfen.edit") || uid)) return;
+    void supabase!
+      .from("nachtrag_bearbeiter")
+      .select("user_id")
+      .then(({ data, error }) => setBearbeiter(error ? [] : ((data as { user_id: string }[]) || []).map((x) => x.user_id)));
+  }, [isStaff, can, uid]);
+  const darf = bearbeiter && bearbeiter.length ? isAdmin || Boolean(uid && bearbeiter.includes(uid)) : isStaff || can("hilfen.edit");
   const { liste } = useNachtraege(darf);
   const [auf, setAuf] = useState<Nachtrag | null>(null);
   const offen = liste.filter((n) => n.status === "offen");

@@ -157,9 +157,8 @@ button:not(:disabled) {
   }
   /* Die eine Zahl, auf die es ankommt. */
   .leitkarte {
-    @apply rounded-[1.25rem] bg-gradient-to-br from-[#1c1c1e] to-[#3a3a3c] p-5 text-white
-           shadow-[0_10px_30px_-12px_rgba(0,0,0,.45)]
-           dark:from-slate-900 dark:to-slate-800 dark:ring-1 dark:ring-white/[0.06];
+    @apply rounded-[1.25rem] bg-[#1C1C1E] p-5 text-white
+           dark:bg-slate-900 dark:ring-1 dark:ring-white/[0.06];
   }
   .leitwert {
     @apply zahl text-[2.75rem] font-bold leading-none tracking-[-0.03em];
@@ -200,6 +199,24 @@ button:not(:disabled) {
     @apply flex min-h-[3.125rem] w-full items-center justify-center rounded-full bg-[rgb(118_118_128/0.12)]
            px-5 text-[17px] font-semibold text-brand-dark transition duration-200 ease-ios
            active:scale-[.97] disabled:opacity-40 dark:bg-[rgb(118_118_128/0.24)] dark:text-brand;
+  }
+  /* Kleine Kapselknöpfe in Karten (wie „Öffnen“ im App Store) */
+  .btn-klein {
+    @apply inline-flex min-h-[2.25rem] items-center justify-center gap-1.5 rounded-full bg-brand px-4 text-[14px]
+           font-semibold text-white transition duration-200 ease-ios active:scale-95 disabled:opacity-40;
+  }
+  .btn-klein-grau {
+    @apply inline-flex min-h-[2.25rem] items-center justify-center gap-1.5 rounded-full bg-[rgb(118_118_128/0.12)] px-4
+           text-[14px] font-semibold text-brand-dark transition duration-200 ease-ios active:scale-95 disabled:opacity-40
+           dark:bg-[rgb(118_118_128/0.24)] dark:text-brand;
+  }
+  /* Farbiges Symbol-Kästchen wie in den iOS-Einstellungen */
+  .symbol {
+    @apply flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-[8px] text-white;
+  }
+  /* Graue Füllfläche innerhalb von Karten und Blättern */
+  .feld-grau {
+    @apply rounded-2xl bg-[rgb(118_118_128/0.08)] dark:bg-[rgb(118_118_128/0.18)];
   }
   /* Segmentierte Auswahl (Alle / Rein / Raus …) */
   .seg {
@@ -289,4 +306,17 @@ button:not(:disabled) {
 @keyframes sprung {
   0%, 60% { box-shadow: 0 0 0 3px rgb(var(--brand) / 0.6); }
   100% { box-shadow: 0 0 0 3px rgb(var(--brand) / 0); }
+}
+
+/* Eigenes Hintergrundbild (HintergrundEbene.tsx): der graue Grund wird
+   durchsichtig, Karten bleiben deckend. */
+html.mit-hintergrund body,
+html.mit-hintergrund.dark body {
+  background-color: transparent;
+}
+html.mit-hintergrund {
+  background-color: rgb(var(--papier));
+}
+html.mit-hintergrund .kopf-grund {
+  background-color: transparent;
 }

@@ -10,72 +10,63 @@ import { useRole } from "../auth/RoleProvider";
 import { useFunktionen } from "../lib/funktionen";
 import { useMotto, type Motto, type MottoWahl } from "../lib/motto";
 import { frage, melde, meldeFehler } from "../lib/melder";
+import { useRunden, type RundenStand } from "../lib/runden";
+import { RundenAbschnitt, RundenMarke } from "./Runden";
+import { Kachel } from "./Kachel";
+import { AutorInfo, WortfilterSchalter } from "./AutorInfo";
 
 const MEDAILLE = ["#E9C460", "#C0C4CC", "#D4A373"];
 
 /* ====================================================================== */
-/* Karte im Profil                                                        */
+/* Karte auf der Startseite                                               */
 /* ====================================================================== */
 export function MottoKarte({ className = "" }: { className?: string }) {
   const { can, isEltern, uid, banned } = useRole();
   const { sichtbar } = useFunktionen();
   const darf = !isEltern && sichtbar("motto") && (can("motto.nutzen") || can("motto.verwalten"));
   const m = useMotto(darf, uid);
+  const r = useRunden("motto", darf, uid, can("motto.runden"));
   const [ansicht, setAnsicht] = useState<null | "liste" | "neu">(null);
   if (!darf) return null;
 
   const sichtbare = m.mottos.filter((x) => !x.ausgeblendet);
   const gewaehlt = sichtbare.find((x) => x.gewaehlt) || null;
   const meineLikes = sichtbare.filter((x) => m.meine(x.id, "like")).length;
+  const runde = r.offeneVon("");
 
   return (
     <div className={className}>
       <AusHinweis funktion="motto" className="mb-1.5 px-1" />
-      <section className="relative overflow-hidden rounded-[1.4rem] bg-gradient-to-br from-[#5E2BFF] via-[#A3148F] to-[#D9480F] p-4 text-white shadow-[0_10px_30px_-14px_rgba(94,43,255,.8)] sm:p-5">
-        <span aria-hidden className="pointer-events-none absolute -right-3 -top-4 text-[6.5rem] leading-none opacity-20">
-          ✨
-        </span>
-        <div className="text-[12px] font-semibold uppercase tracking-[0.14em] text-white/80">
-          {gewaehlt ? "Unser Abimotto" : m.abstimmung ? "Abimotto · Abstimmung läuft" : "Abimotto · Vorschläge"}
-        </div>
-        {gewaehlt ? (
-          <button onClick={() => setAnsicht("liste")} className="mt-1.5 block max-w-[85%] text-left text-[1.45rem] font-extrabold leading-tight tracking-[-0.01em]">
-            {gewaehlt.text}
-          </button>
-        ) : (
-          <p className="mt-1.5 max-w-[85%] text-[1.2rem] font-bold leading-snug">
-            {m.abstimmung ? "Abstimmen: Welches Motto soll auf unsere Pullis?" : "Reiche Vorschläge für unser Abimotto ein"}
-          </p>
-        )}
-        <div className="mt-1.5 text-[13px] text-white/80">
-          {sichtbare.length} {sichtbare.length === 1 ? "Vorschlag" : "Vorschläge"}
-          {gewaehlt
-            ? ""
-            : m.abstimmung
-              ? ` · ${meineLikes ? `du hast ${meineLikes} gelikt` : "like alle, die dir gefallen"}`
-              : " · Abstimmung startet, sobald das Komitee sie freigibt"}
-        </div>
-        <GesperrtZeile hell className="mt-3" />
-        <div className="mt-4 flex flex-wrap items-center gap-2">
-          {m.abstimmung || gewaehlt ? (
-            <button onClick={() => setAnsicht("liste")} className="rounded-full bg-white px-4 py-2 text-[14px] font-semibold text-[#5E2BFF] transition active:scale-95">
-              {gewaehlt ? "Alle ansehen" : "Abstimmen"}
-            </button>
-          ) : (
-            <>
-              {!banned && (
-                <button onClick={() => setAnsicht("neu")} className="rounded-full bg-white px-4 py-2 text-[14px] font-semibold text-[#5E2BFF] transition active:scale-95">
-                  Vorschlag einreichen
-                </button>
-              )}
-              <button onClick={() => setAnsicht("liste")} className="rounded-full bg-white/20 px-4 py-2 text-[14px] font-semibold transition active:scale-95">
-                Alle ansehen
+      <Kachel
+        icon="funke"
+        farbe="bg-[#FF9500]"
+        marke={runde ? <RundenMarke runde={runde} /> : undefined}
+        titel={gewaehlt ? gewaehlt.text : runde ? "Abimotto: engere Auswahl" : m.abstimmung ? "Abstimmen: Welches Motto?" : "Abimotto"}
+        unter={
+          gewaehlt
+            ? "Unser Abimotto steht fest."
+            : runde
+              ? `${r.meineIn(runde.id).length} von ${runde.stimmen} ${runde.stimmen === 1 ? "Stimme" : "Stimmen"} vergeben`
+              : m.abstimmung
+                ? `${sichtbare.length} Vorschläge · ${meineLikes ? `du hast ${meineLikes} gelikt` : "like alle, die dir gefallen"}`
+                : `Reiche Vorschläge ein · ${sichtbare.length} bisher`
+        }
+        knoepfe={
+          <>
+            {!gewaehlt && !runde && !m.abstimmung && !banned && (
+              <button onClick={() => setAnsicht("neu")} className="btn-klein">
+                Vorschlagen
               </button>
-            </>
-          )}
-        </div>
-      </section>
-      <MottoSheet m={m} ansicht={ansicht} setAnsicht={setAnsicht} />
+            )}
+            <button onClick={() => setAnsicht("liste")} className={gewaehlt || runde || m.abstimmung ? "btn-klein" : "btn-klein-grau"}>
+              {gewaehlt ? "Alle ansehen" : runde || m.abstimmung ? "Abstimmen" : "Alle ansehen"}
+            </button>
+          </>
+        }
+      >
+        <GesperrtZeile className="mt-3" />
+      </Kachel>
+      <MottoSheet m={m} r={r} ansicht={ansicht} setAnsicht={setAnsicht} />
     </div>
   );
 }
@@ -85,16 +76,19 @@ export function MottoKarte({ className = "" }: { className?: string }) {
 /* ====================================================================== */
 function MottoSheet({
   m,
+  r,
   ansicht,
   setAnsicht,
 }: {
   m: MottoWahl;
+  r: RundenStand;
   ansicht: null | "liste" | "neu";
   setAnsicht: (a: null | "liste" | "neu") => void;
 }) {
   const { can, banned } = useRole();
   const [verwalten, setVerwalten] = useState(false);
-  const darfVerwalten = can("motto.verwalten");
+  const darfRunden = can("motto.runden");
+  const darfVerwalten = can("motto.verwalten") || darfRunden;
   const schliessen = () => {
     setAnsicht(null);
     setVerwalten(false);
@@ -120,7 +114,9 @@ function MottoSheet({
             unter={
               verwalten
                 ? `Nur für das Komitee sichtbar · ${stimmende} ${stimmende === 1 ? "Person hat" : "Personen haben"} abgestimmt`
-                : m.abstimmung
+                : r.offeneVon("")
+                  ? "Engere Auswahl: Vergib oben deine Stimmen. Die Ergebnisse sieht das Komitee."
+                  : m.abstimmung
                   ? "Gib allen Mottos ein 👍, die dir gefallen. Die Ergebnisse sieht nur das Komitee."
                   : "Reiche Vorschläge ein – abgestimmt wird, sobald das Komitee die Abstimmung freigibt."
             }
@@ -130,7 +126,7 @@ function MottoSheet({
                 {darfVerwalten && (
                   <ZahnradKnopf label={verwalten ? "Zurück zur Abstimmung" : "Ergebnisse und Verwalten"} onClick={() => setVerwalten((v) => !v)} />
                 )}
-                {!banned && !verwalten && (!m.abstimmung || darfVerwalten) && (
+                {!banned && !verwalten && ((!m.abstimmung && !r.offeneVon("")) || darfVerwalten) && (
                   <button
                     type="button"
                     onClick={() => setAnsicht("neu")}
@@ -145,34 +141,41 @@ function MottoSheet({
           />
           <AusHinweis funktion="motto" className="-mt-2 mb-3" />
           <GesperrtZeile className="-mt-1 mb-3" />
+          {/* Abstimmungsrunden: offen für alle sichtbar; Start nur, wer sie leitet */}
+          <RundenAbschnitt
+            stand={r}
+            quellen={m.mottos.filter((x) => !x.ausgeblendet).map((x) => ({ id: x.id, label: x.text, unter: x.erklaerung, punkte: m.zahl(x.id, "like") }))}
+            leitet={darfRunden && verwalten}
+            gesperrt={banned}
+          />
           {verwalten && (
-            <label className="mb-3 flex items-center gap-3 rounded-2xl bg-gradient-to-br from-[#5E2BFF]/10 to-[#D9480F]/10 px-4 py-3">
-              <span className="min-w-0 flex-1">
-                <span className="block text-[15px] font-semibold">Abstimmung freigeben</span>
-                <span className="block text-[12.5px] leading-snug text-tinte-leise">
-                  {m.abstimmung
-                    ? "Läuft: alle liken Mottos, neue Vorschläge nur noch vom Komitee."
-                    : "Aus: alle können Vorschläge einreichen, abstimmen geht noch nicht."}
-                </span>
-              </span>
-              <Schalter
-                an={m.abstimmung}
-                label="Abstimmung freigeben"
-                onChange={async (v) => {
-                  const f = await m.abstimmungSetzen(v);
-                  if (f) meldeFehler("Ging nicht: " + f);
-                  else melde(v ? "Abstimmung ist freigegeben" : "Zurück zu Vorschlägen", "erfolg");
-                }}
-              />
-            </label>
+            <div className="mb-3 space-y-2">
+              {can("motto.verwalten") && (
+                <label className="feld-grau flex min-h-[44px] items-center gap-3 px-4 py-2.5">
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[15px] font-semibold">Runde 1: Likes freigeben</span>
+                    <span className="block text-[12.5px] leading-snug text-tinte-leise">
+                      {m.abstimmung
+                        ? "Läuft: alle liken Mottos, neue Vorschläge nur noch vom Komitee."
+                        : "Aus: alle können Vorschläge einreichen, abstimmen geht noch nicht."}
+                    </span>
+                  </span>
+                  <Schalter
+                    an={m.abstimmung}
+                    label="Abstimmung freigeben"
+                    onChange={async (v) => {
+                      const f = await m.abstimmungSetzen(v);
+                      if (f) meldeFehler("Ging nicht: " + f);
+                      else melde(v ? "Abstimmung ist freigegeben" : "Zurück zu Vorschlägen", "erfolg");
+                    }}
+                  />
+                </label>
+              )}
+              <WortfilterSchalter bereich="motto" />
+            </div>
           )}
-          {!m.abstimmung && !verwalten && !banned && (
-            <button
-              onClick={() => setAnsicht("neu")}
-              className="mb-3 w-full rounded-2xl bg-gradient-to-br from-[#5E2BFF] via-[#A3148F] to-[#D9480F] px-4 py-3 text-left text-[15px] font-semibold text-white transition active:scale-[.99]"
-            >
-              ✨ Vorschlag einreichen
-            </button>
+          {r.offeneVon("") && !verwalten && (
+            <div className="mb-2 mt-1 px-1 text-[12px] font-semibold uppercase tracking-[0.04em] text-tinte-leise">Alle Vorschläge</div>
           )}
           <div className="space-y-2.5">
             {liste.map((x, i) =>
@@ -196,6 +199,7 @@ function MottoSheet({
 }
 
 function MottoZeile({ x, m, gesperrt }: { x: Motto; m: MottoWahl; gesperrt: boolean }) {
+  const darfAutor = useRole().can("motto.verwalten");
   const an = m.meine(x.id, "like");
   const tippen = async () => {
     if (gesperrt) return meldeFehler(GESPERRT_TEXT);
@@ -205,21 +209,22 @@ function MottoZeile({ x, m, gesperrt }: { x: Motto; m: MottoWahl; gesperrt: bool
   return (
     <div
       className={`rounded-2xl p-3.5 ${
-        x.gewaehlt
-          ? "bg-gradient-to-br from-[#5E2BFF]/15 to-[#FF6B3D]/15 ring-2 ring-[#B5179E]/50"
-          : "bg-[rgb(118_118_128/0.08)] dark:bg-[rgb(118_118_128/0.18)]"
+        x.gewaehlt ? "bg-brand/[0.06] ring-2 ring-brand/60" : "bg-[rgb(118_118_128/0.08)] dark:bg-[rgb(118_118_128/0.18)]"
       }`}
     >
       <div className="flex items-center gap-3">
         <div className="min-w-0 flex-1">
-          {x.gewaehlt && <div className="mb-0.5 text-[11px] font-bold uppercase tracking-[0.1em] text-[#B5179E]">Unser Motto ✓</div>}
+          {x.gewaehlt && <div className="mb-0.5 text-[11px] font-bold uppercase tracking-[0.1em] text-brand-dark dark:text-brand">Unser Motto ✓</div>}
           <div className="text-[16px] font-bold leading-snug">{x.text}</div>
           {x.erklaerung && <div className="mt-0.5 text-[13px] leading-snug text-tinte-matt dark:text-slate-300">{x.erklaerung}</div>}
-          {x.von === m.me ? (
-            <div className="mt-1 text-[11.5px] text-tinte-leise">Dein Vorschlag</div>
-          ) : (
-            <MeldenKnopf className="mt-1" onClick={() => melden("motto", x.id)} />
-          )}
+          <div className="mt-1 flex items-center gap-3">
+            {m.istMeins(x.id) ? (
+              <span className="text-[11.5px] text-tinte-leise">Dein Vorschlag</span>
+            ) : (
+              <MeldenKnopf onClick={() => melden("motto", x.id)} />
+            )}
+            {darfAutor && <AutorInfo art="motto" id={x.id} />}
+          </div>
         </div>
         {m.abstimmung && <StimmKnopf an={an} onClick={() => void tippen()} />}
       </div>
@@ -288,7 +293,7 @@ function VerwaltenZeile({ x, m, platz, anteil }: { x: Motto; m: MottoWahl; platz
               {x.erklaerung && <span className="block text-[12.5px] text-tinte-leise">{x.erklaerung}</span>}
               <span className="mt-1.5 flex items-center gap-2">
                 <span className="h-2 flex-1 overflow-hidden rounded-full bg-black/[0.07] dark:bg-white/10">
-                  <span className="block h-full rounded-full bg-gradient-to-r from-[#5E2BFF] to-[#D9480F]" style={{ width: `${Math.round(anteil * 100)}%` }} />
+                  <span className="block h-full rounded-full bg-brand" style={{ width: `${Math.round(anteil * 100)}%` }} />
                 </span>
                 <span className="zahl w-12 shrink-0 text-right text-[13px] font-bold">👍 {n}</span>
               </span>
@@ -296,6 +301,7 @@ function VerwaltenZeile({ x, m, platz, anteil }: { x: Motto; m: MottoWahl; platz
             </span>
           </button>
           <div className="mt-2.5 flex flex-wrap items-center gap-2">
+            <AutorInfo art="motto" id={x.id} className="mr-1" />
             <label className="flex items-center gap-2 text-[13px] font-semibold">
               <Schalter an={!x.ausgeblendet} label={`${x.text} sichtbar`} onChange={(v) => void speichern({ ausgeblendet: !v })} />
               Sichtbar
@@ -310,9 +316,7 @@ function VerwaltenZeile({ x, m, platz, anteil }: { x: Motto; m: MottoWahl; platz
                   if (ok && !(await speichern({ gewaehlt: !x.gewaehlt }))) melde(x.gewaehlt ? "Aufgehoben" : "Motto festgelegt", "erfolg");
                 })
               }
-              className={`ml-auto rounded-full px-3 py-1.5 text-[13px] font-semibold transition active:scale-95 disabled:opacity-40 ${
-                x.gewaehlt ? "bg-[#B5179E] text-white" : "bg-white text-[#B5179E] shadow-sm dark:bg-slate-800"
-              }`}
+              className={`ml-auto ${x.gewaehlt ? "btn-klein" : "btn-klein-grau"} !min-h-[2rem] !px-3 !text-[13px]`}
             >
               {x.gewaehlt ? "Festgelegt ✓" : "Als Motto festlegen"}
             </button>
@@ -339,8 +343,8 @@ function Vorschlagen({ m, fertig, schliessen }: { m: MottoWahl; fertig: () => vo
       </div>
       <h2 className="text-[1.375rem] font-bold leading-tight tracking-[-0.02em]">Motto vorschlagen</h2>
       <p className="mt-0.5 text-[13px] text-tinte-leise">Alle sehen den Vorschlag sofort. Abgestimmt wird, sobald das Komitee die Abstimmung freigibt.</p>
-      <div className="mt-4 rounded-2xl bg-gradient-to-br from-[#5E2BFF] via-[#A3148F] to-[#D9480F] p-4 text-white">
-        <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-white/75">Vorschau</div>
+      <div className="feld-grau mt-4 p-4">
+        <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-tinte-leise">Vorschau</div>
         <div className="mt-1 min-h-[1.8rem] text-[1.3rem] font-extrabold leading-tight">{text.trim() || "Dein Motto"}</div>
       </div>
       <input className="field mt-3" maxLength={80} placeholder="z. B. ABIgeschlossen" value={text} onChange={(e) => setText(e.target.value)} autoFocus />

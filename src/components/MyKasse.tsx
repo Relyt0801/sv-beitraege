@@ -14,6 +14,7 @@ import { AlbumKarte } from "./Album";
 import { ZitateKarte } from "./Zitate";
 import { RankingKarten } from "./Rankings";
 import { MottoKarte } from "./Motto";
+import { UmfrageStichwahlen } from "./Umfragen";
 
 /**
  * Die eigene Ansicht für alle, die nicht im Stufenteam sind.
@@ -109,10 +110,14 @@ export function MyKasse({
       </Sheet>
 
       {/* ------------------------------------------ Abi-Album (nur mit Recht) */}
-      <AlbumKarte className="lg:col-span-2" />
-      <MottoKarte className="lg:col-span-2" />
-      <ZitateKarte className="lg:col-span-2" />
-      <RankingKarten className="lg:col-span-2" />
+      {/* Abizeitung & Co. als ruhige Kacheln: Handy untereinander, ab iPad zwei nebeneinander */}
+      <div className="grid gap-3 sm:grid-cols-2 lg:col-span-2 [&:empty]:hidden">
+        <AlbumKarte />
+        <MottoKarte />
+        <ZitateKarte />
+        <RankingKarten />
+        <UmfrageStichwahlen />
+      </div>
 
       {/* ------------------------------------------ Halbjahre mit Preis */}
       <section className="card p-4 sm:p-5 lg:col-span-2">

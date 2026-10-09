@@ -3,6 +3,7 @@ import { useRole, type Profile } from "../auth/RoleProvider";
 import { hasSupabase, supabase } from "../lib/supabase";
 import { meldeFehler } from "../lib/melder";
 import { Sheet } from "./Sheet";
+import { PasswortNeuKnopf } from "./PasswortNeu";
 
 /** Wie lange eine Chat-Sperre laeuft. Rollen-Reiter und Chat teilen sich die Liste. */
 export const DAUERN: { label: string; ms: number | null }[] = [
@@ -109,6 +110,7 @@ export function MuteKnopf({
               ))
             )}
           </div>
+          <PasswortNeuKnopf userId={zielId} name={name || ziel.username || "Person"} className="mt-4" />
         </div>
       </Sheet>
     </>

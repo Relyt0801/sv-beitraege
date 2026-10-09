@@ -20,27 +20,43 @@ export interface PatchVersion {
 }
 
 export const PATCH: PatchVersion = {
-  version: "1.2",
-  datum: "3. Oktober 2026",
+  version: "1.3",
+  datum: "Oktober 2026",
   bereiche: [
     {
-      bereich: "Abiball-Ticket",
-      icon: "🎟️",
+      bereich: "Aufgeräumt",
+      icon: "✨",
       eintraege: [
-        { text: "Dein Abiball-Ticket mit deinem Namen: Der volle Preis steht durchgestrichen darauf, darunter, was es dich bei deinem Stand wirklich kostet. Daneben das Ticket für jedes weitere (Eltern und Gäste)." },
-        { text: "Ticket antippen: Die Ticket-Ansicht zeigt Zeile für Zeile, wie sich der Preis zusammensetzt." },
-        { text: "Sobald der Verkauf startet, bestellst du rechts neben dem Ticket und überweist mit eigenem Verwendungszweck. Vorher läuft dort ein Countdown." },
-        { text: "Wenn das Stufenteam es einschaltet, zählt Mithilfe auch über 100 %: Der Ring wird golden, und dein erstes Ticket wird noch günstiger." },
+        { text: "Ruhigeres Design: Abi-Album, Abimotto, Zitate und Rankings sind jetzt schlichte Karten – auf dem iPad und Laptop zwei nebeneinander." },
+        { text: "Dein Profil ist wie die iPhone-Einstellungen sortiert: Darstellung, Mitteilungen, Konto. Was du nicht brauchst, bleibt zugeklappt." },
+        { text: "Neu im Profil: ein eigenes Hintergrundbild. Es liegt privat – nur du siehst es." },
+        { text: "Steckbriefe zeigen alle Felder gleich breit, Spotify-Links stehen nicht mehr als Text da." },
       ],
     },
     {
-      bereich: "Beiträge",
-      icon: "💶",
+      bereich: "Abstimmen in Runden",
+      icon: "🗳️",
       eintraege: [
-        { text: "Beiträge → Ticket: Bonus über 100 % mit zwei Reglern (bis wie viel Prozent, wie viel Rabatt). Standardmäßig aus.", nur: "team" },
-        { text: "Ort und Datum des Abiballs eintragen. Beides erscheint erst dann auf den Tickets.", nur: "team" },
-        { text: "Ticketverkauf starten: Startzeit, höchstens Tickets je Person und Tickets insgesamt.", nur: "team" },
-        { text: "Bestellungen als bezahlt markieren oder stornieren. Oben siehst du, wie viel eingegangen und wie viel noch offen ist.", nur: "team" },
+        { text: "Abimotto, Zitate, Rankings und Umfragen können eine engere Auswahl bekommen: Runde 2, Finale … Du siehst oben, wie viele Stimmen du noch hast." },
+        { text: "Komitees starten Runden für ihre Bereiche, legen die Stimmen je Person fest und geben das Ergebnis frei, wann sie wollen.", nur: "team" },
+      ],
+    },
+    {
+      bereich: "Fair bleiben",
+      icon: "🛡️",
+      eintraege: [
+        { text: "Wer sehr viele Nachrichten in kurzer Zeit schickt oder mehrfach gesperrte Wörter benutzt, wird kurz automatisch gesperrt – mit Grund und Restzeit in der App." },
+        { text: "Wortfilter: Wörter löschen, Liste durchsuchen und je Bereich an- und ausschalten (auch direkt im Bereich, z. B. Zitate → Prüfen).", nur: "team" },
+        { text: "Wer ein Motto oder Zitat eingereicht hat, sehen die Verwaltenden über ein kleines ⓘ – alle anderen nicht.", nur: "team" },
+      ],
+    },
+    {
+      bereich: "Fürs Team",
+      icon: "🔑",
+      eintraege: [
+        { text: "Profil → Freigaben: festlegen, wie viele zustimmen müssen (Termine, Kosten, Entsperren, Zitate), und wer Nachträge bearbeitet.", nur: "team" },
+        { text: "Neues Passwort generieren: bei der Person (Stammdaten) oder im Sperr-Menü. Es wird einmal angezeigt.", nur: "team" },
+        { text: "Funktionen nach Thema zugeklappt; Komitees können einzelne Bereiche an- und ausschalten und Runden leiten.", nur: "team" },
       ],
     },
   ],

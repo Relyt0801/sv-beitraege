@@ -4,7 +4,12 @@ import { useRole } from "../auth/RoleProvider";
 import { useFunktionen } from "../lib/funktionen";
 import { useZitate, type Zitat, type ZitatArt, type Zitatwand } from "../lib/zitate";
 import { AusHinweis } from "./Funktionen";
-import { frage, meldeFehler } from "../lib/melder";
+import { frage, melde, meldeFehler } from "../lib/melder";
+import { useRunden, type RundenStand } from "../lib/runden";
+import { RundenAbschnitt, RundenMarke } from "./Runden";
+import { Kachel } from "./Kachel";
+import { AutorInfo, WortfilterSchalter } from "./AutorInfo";
+import { useZustimmungen, zustimmungText } from "../lib/zustimmung";
 import { useLehrer, useStufePersonen } from "../lib/rankings";
 import { LehrerListe, ZahnradKnopf } from "./Rankings";
 import { GesperrtZeile, GESPERRT_TEXT } from "./Gesperrt";
@@ -12,14 +17,16 @@ import { MeldenKnopf } from "./Melden";
 import { melden, wortfilterFinden } from "../lib/melden";
 
 /**
- * Zitatwand im Profil: dunkle Karte mit dem „Zitat des Tages“, darunter
- * Einreichen und Alle ansehen. Wer prüfen darf, sieht, wie viele warten.
+ * Zitatwand auf der Startseite: das neueste Zitat, Einreichen und Alle
+ * ansehen. Wer prüfen darf, sieht, wie viele warten. Läuft eine
+ * Abstimmungsrunde, steht sie vorn.
  */
 export function ZitateKarte({ className = "" }: { className?: string }) {
   const { can, isEltern, uid, banned } = useRole();
   const { sichtbar } = useFunktionen();
   const darf = !isEltern && sichtbar("zitate") && (can("zitate.nutzen") || can("zitate.pruefen"));
   const wand = useZitate(darf, uid);
+  const r = useRunden("zitate", darf, uid, can("zitate.runden"));
   const [offen, setOffen] = useState<null | "liste" | "neu" | "pruefen">(null);
   const darfPruefen = can("zitate.pruefen");
   // Aus der Benachrichtigung „Neues Zitat zum Prüfen“ (./#zitate)
@@ -42,55 +49,62 @@ export function ZitateKarte({ className = "" }: { className?: string }) {
   const zeit = (z: Zitat) => z.geprueft_at || z.created_at;
   const heute = frei.length ? [...frei].sort((a, b) => zeit(b).localeCompare(zeit(a)))[0] : null;
 
+  const runde = r.offeneVon("");
   return (
     <div className={className}>
       <AusHinweis funktion="zitate" className="mb-1.5 px-1" />
-      <section className="relative overflow-hidden rounded-[1.4rem] bg-[#1C1C1E] p-4 text-white shadow-[0_10px_30px_-14px_rgba(0,0,0,.7)] sm:p-5">
-        <span aria-hidden className="pointer-events-none absolute -right-2 -top-6 font-buch text-[9rem] leading-none text-[#E9C460]/15">
-          ”
-        </span>
-        <div className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[#E9C460]">
-          {heute ? "Neuestes Zitat" : "Zitatwand"}
-        </div>
-        {heute ? (
-          <button onClick={() => setOffen("liste")} className="mt-2 block text-left">
-            <span className="block font-buch text-[1.3rem] italic leading-snug">„{heute.text}“</span>
-            <span className="mt-1.5 block text-[13px] text-white/70">
+      <Kachel
+        icon="zitat"
+        farbe="bg-[#A2845E]"
+        marke={runde ? <RundenMarke runde={runde} /> : undefined}
+        titel={runde ? "Zitate: engere Auswahl" : "Zitatwand"}
+        unter={
+          runde
+            ? `${r.meineIn(runde.id).length} von ${runde.stimmen} ${runde.stimmen === 1 ? "Stimme" : "Stimmen"} vergeben`
+            : `${frei.length} ${frei.length === 1 ? "Zitat" : "Zitate"}${can("zitate.pruefen") && warten ? ` · ${warten} warten auf Prüfung` : ""}`
+        }
+        knoepfe={
+          <>
+            {!banned && !runde && (
+              <button onClick={() => setOffen("neu")} className="btn-klein">
+                Einreichen
+              </button>
+            )}
+            <button onClick={() => setOffen("liste")} className={runde ? "btn-klein" : "btn-klein-grau"}>
+              {runde ? "Abstimmen" : "Alle ansehen"}
+            </button>
+            {can("zitate.pruefen") && warten > 0 && (
+              <button onClick={() => setOffen("pruefen")} className="btn-klein-grau">
+                {warten} prüfen
+              </button>
+            )}
+          </>
+        }
+      >
+        {heute && !runde && (
+          <button onClick={() => setOffen("liste")} className="feld-grau mt-3 block w-full px-4 py-3 text-left">
+            <span className="block font-buch text-[16px] italic leading-snug">„{heute.text}“</span>
+            <span className="mt-1 block text-[12.5px] text-tinte-leise">
               — {heute.wer}
               {heute.kontext ? `, ${heute.kontext}` : ""}
             </span>
           </button>
-        ) : (
-          <p className="mt-2 font-buch text-[1.2rem] italic leading-snug text-white/85">Wer hat diesen einen Satz gesagt, den niemand vergisst?</p>
         )}
-        <GesperrtZeile hell className="mt-3" />
-        <div className="mt-4 flex flex-wrap items-center gap-2">
-          {!banned && (
-            <button onClick={() => setOffen("neu")} className="rounded-full bg-[#E9C460] px-4 py-2 text-[14px] font-semibold text-[#1C1C1E] transition active:scale-95">
-              Zitat einreichen
-            </button>
-          )}
-          <button onClick={() => setOffen("liste")} className="rounded-full bg-white/15 px-4 py-2 text-[14px] font-semibold transition active:scale-95">
-            Alle {frei.length ? `(${frei.length})` : ""}
-          </button>
-          {can("zitate.pruefen") && warten > 0 && (
-            <button onClick={() => setOffen("pruefen")} className="rounded-full bg-[#FF9F0A] px-3 py-2 text-[13px] font-bold text-[#1C1C1E] transition active:scale-95">
-              {warten} prüfen
-            </button>
-          )}
-        </div>
-      </section>
-      <ZitateSheet wand={wand} ansicht={offen} setAnsicht={setOffen} />
+        <GesperrtZeile className="mt-3" />
+      </Kachel>
+      <ZitateSheet wand={wand} r={r} ansicht={offen} setAnsicht={setOffen} />
     </div>
   );
 }
 
 function ZitateSheet({
   wand,
+  r,
   ansicht,
   setAnsicht,
 }: {
   wand: Zitatwand;
+  r: RundenStand;
   ansicht: null | "liste" | "neu" | "pruefen";
   setAnsicht: (a: null | "liste" | "neu" | "pruefen") => void;
 }) {
@@ -139,7 +153,25 @@ function ZitateSheet({
             </div>
           )}
           <GesperrtZeile className="mb-3" />
-          {ansicht === "pruefen" ? <Pruefen wand={wand} /> : <Wand wand={wand} />}
+          {ansicht === "pruefen" ? (
+            <>
+              <WortfilterSchalter bereich="zitate" className="mb-3" />
+              <Pruefen wand={wand} />
+            </>
+          ) : (
+            <>
+              <RundenAbschnitt
+                stand={r}
+                quellen={wand.zitate
+                  .filter((z) => z.status === "frei")
+                  .map((z) => ({ id: z.id, label: `„${z.text}“`, unter: `— ${z.wer}${z.kontext ? `, ${z.kontext}` : ""}`, punkte: wand.stimmenVon(z.id) }))}
+                leitet={can("zitate.runden")}
+                gesperrt={banned}
+                startText="Abstimmungsrunde starten"
+              />
+              <Wand wand={wand} />
+            </>
+          )}
         </>
       )}
     </Sheet>
@@ -152,7 +184,7 @@ function Wand({ wand }: { wand: Zitatwand }) {
   const [filter, setFilter] = useState<"alle" | ZitatArt>("alle");
   const [sort, setSort] = useState<"top" | "neu">("top");
   const frei = wand.zitate.filter((z) => z.status === "frei");
-  const meineOffenen = wand.zitate.filter((z) => z.status === "offen" && z.eingereicht_von === wand.me);
+  const meineOffenen = wand.zitate.filter((z) => z.status === "offen" && wand.istMeins(z.id));
 
   const rang = useMemo(() => [...frei].sort((a, b) => wand.stimmenVon(b.id) - wand.stimmenVon(a.id)).map((z) => z.id), [frei, wand]);
   const liste = frei
@@ -263,7 +295,8 @@ function ZitatZeile({ z, platz, wand }: { z: Zitat; platz: number; wand: Zitatwa
               Bearbeiten
             </button>
           )}
-          {z.eingereicht_von !== wand.me && <MeldenKnopf onClick={() => melden("zitat", z.id)} />}
+          {!wand.istMeins(z.id) && <MeldenKnopf onClick={() => melden("zitat", z.id)} />}
+          {can("zitate.pruefen") && <AutorInfo art="zitat" id={z.id} />}
         </div>
       </div>
       <button
@@ -404,7 +437,9 @@ function Einreichen({ wand, fertig, schliessen }: { wand: Zitatwand; fertig: () 
 
 /* ---------------------------------------------------------------- Prüfen */
 function Pruefen({ wand }: { wand: Zitatwand }) {
+  const { uid } = useRole();
   const offen = wand.zitate.filter((z) => z.status === "offen");
+  const zu = useZustimmungen("zitat", offen.length > 0, uid);
   if (!offen.length) return <p className="py-10 text-center text-[14px] text-tinte-leise">Alles geprüft.</p>;
   return (
     <div className="space-y-2.5">
@@ -416,7 +451,14 @@ function Pruefen({ wand }: { wand: Zitatwand }) {
             <span className="min-w-0 flex-1 text-[12.5px] text-tinte-leise">
               — {z.wer}
               {z.kontext ? `, ${z.kontext}` : ""}
+              {zustimmungText(zu.zahl(z.id), zu.noetig) && (
+                <span className="ml-1.5 rounded-full bg-brand/10 px-2 py-0.5 font-semibold text-brand-dark dark:text-brand">
+                  {zustimmungText(zu.zahl(z.id), zu.noetig)}
+                  {zu.ichSchon(z.id) ? " · deine ✓" : ""}
+                </span>
+              )}
             </span>
+            <AutorInfo art="zitat" id={z.id} />
             <button
               aria-label="Ablehnen"
               onClick={async () => {
@@ -431,7 +473,10 @@ function Pruefen({ wand }: { wand: Zitatwand }) {
               aria-label="Freigeben"
               onClick={async () => {
                 const f = await wand.pruefen(z.id, "frei");
-                if (f) meldeFehler(f);
+                if (f?.startsWith("Deine Zustimmung")) {
+                  melde(f);
+                  void zu.laden();
+                } else if (f) meldeFehler(f);
               }}
               className="flex h-10 w-10 items-center justify-center rounded-full bg-[#EAF6EC] text-[16px] font-bold text-[#248A3D] transition active:scale-90 dark:bg-green-500/15"
             >

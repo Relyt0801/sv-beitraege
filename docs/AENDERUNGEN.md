@@ -12,6 +12,42 @@ ausführlich (auf Deutsch); hier steht der Überblick dazu.
 ---
 
 
+## 09.10.2026 (2): Update 1.3 – Runden, Freigaben, Apple-Design
+
+Erst als Vorschau für Admin und Testkonto: Branch `update-1-3` → Vercel-Vorschau.
+Die Datenbank-Teile sind schon eingespielt und stören die alte Version nicht.
+
+- **Abstimmungsrunden:** Motto, Zitate, Rankings (je Kategorie) und Umfragen (je Frage).
+  - DB in `supabase/runden-und-freigaben.sql`: `abstimm_runden`, `runden_kandidaten`,
+    `runden_stimmen` und die RPCs `runde_starten`, `runde_aendern`, `runde_stimme`, `runde_zahlen`.
+  - App: `lib/runden.ts` und `components/Runden.tsx`.
+  - Neue Rechte `<bereich>.runden`, auch für Komitees.
+- **Freigaben:** Wie viele zustimmen müssen (Termine, Kosten, Entsperren, Zitate), mit
+  Trigger-Prüfung in der DB. Nachtrag-Bearbeiter in `nachtrag_bearbeiter`.
+  App: `lib/zustimmung.ts` und `components/FreigabenSheet.tsx`.
+- **Wortfilter:**
+  - Wörter löschen, Liste durchsuchen.
+  - Je Bereich an/aus (`app_settings.wortfilter_bereiche`); Zitate standardmäßig aus.
+  - Links und Spotify-IDs zählen nicht (`wf_ohne_links`).
+  - Schalter auch direkt in den Bereichen (`WortfilterSchalter`).
+- **ⓘ Einreicher:** `autor_info()` nur für Verwaltende. „Meine“ Einträge über `meine_eintraege()`.
+  `supabase/autor-spalten-schuetzen.sql` sperrt die Namensspalten – **erst nach dem Livegang** ausführen.
+- **Passwort zurücksetzen:** Edge Function `person-anlegen` mit `passwort_neu_fuer`.
+  Das Passwort wird einmal angezeigt; im Protokoll steht, wer es war.
+  App: `components/PasswortNeu.tsx`.
+- **Hintergrundbild:** privater Storage-Bucket `hintergruende` (nur eigener Ordner),
+  `profiles.hintergrund_at`.
+  App: `lib/hintergrund.ts` und `components/HintergrundEbene.tsx`.
+- **Funktionen/Rechte:** nach Thema zugeklappt. Neue Rechte `funktion.<name>`, damit Komitees
+  ihren Bereich selbst schalten.
+- **Design:**
+  - Startseiten-Kacheln (`components/Kachel.tsx`) statt Farbverläufen.
+  - Ab iPad stehen zwei Kacheln nebeneinander.
+  - Das Profil ist wie die iOS-Einstellungen aufgebaut.
+  - Steckbrief-Felder sind gleich breit.
+  - Kein Leuchten mehr um Weiß/Schwarz-Namen (`namensfarbe`).
+  - „Laufendes Halbjahr“ ist zugeklappt.
+
 ## 09.10.2026: Automatische Sperren, Emoji-Filter
 
 - **Datenbank:** `supabase/auto-sperre.sql`. Die Stufe je Person und Art steht in

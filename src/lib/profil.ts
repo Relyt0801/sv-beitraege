@@ -72,6 +72,18 @@ export function farbwert(key: string | null | undefined, dunkel: boolean): strin
 }
 
 /**
+ * Farbe für einen NAMEN als Schrift. Weiß auf hellem bzw. Schwarz auf dunklem
+ * Grund wäre unsichtbar – früher bekam der Name dann einen leuchtenden Rand.
+ * Jetzt wird er einfach in der Schriftfarbe gezeigt, ohne Schein.
+ */
+export function namensfarbe(key: string | null | undefined, dunkel: boolean): string {
+  const f = farbe(key);
+  if (f.key === "weiss" && !dunkel) return "#3A3A3C";
+  if (f.key === "schwarz" && dunkel) return "#E5E5EA";
+  return dunkel ? f.dunkel : f.hell;
+}
+
+/**
  * Lesbare Schriftfarbe auf einem Untergrund – rechnet die Helligkeit aus,
  * damit Initialen weder auf Schwarz noch auf Weiß untergehen.
  */
@@ -90,12 +102,9 @@ export function schriftAuf(hex: string): string {
   return gegenDunkel > gegenWeiss ? "#111827" : "#ffffff";
 }
 
-/** Kontur für Weiß auf Hell bzw. Schwarz auf Dunkel, sonst nichts. */
-export function farbKontur(key: string | null | undefined, dunkel: boolean): string | undefined {
-  const f = farbe(key);
-  if (!f.kontur) return undefined;
-  const unsichtbar = (f.key === "weiss" && !dunkel) || (f.key === "schwarz" && dunkel);
-  return unsichtbar ? (dunkel ? "0 0 3px rgba(255,255,255,.75)" : "0 0 3px rgba(15,23,42,.6)") : undefined;
+/** Früher: leuchtender Rand um Weiß/Schwarz. Gibt es nicht mehr (siehe namensfarbe). */
+export function farbKontur(_key: string | null | undefined, _dunkel: boolean): string | undefined {
+  return undefined;
 }
 
 /** Welche Farben darf diese Person wählen? */

@@ -29,6 +29,11 @@ import { useLehrer, useRankings, useStufePersonen, type Lehrer, type RankingArt,
 import { ZielWahl } from "./Rankings";
 import { pushAnPersonen, pushAnTeam } from "../lib/push";
 import { frage as fragen_, melde, meldeFehler } from "../lib/melder";
+import { useRunden } from "../lib/runden";
+import { RundenAbschnitt } from "./Runden";
+import { Kachel } from "./Kachel";
+import { Icon } from "./Icon";
+import { WortfilterSchalter } from "./AutorInfo";
 
 const name = (p: UPerson) => `${p.vorname} ${p.nachname}`;
 
@@ -172,9 +177,7 @@ function UmfrageLauf({
     <div className="fixed inset-0 z-[70] flex animate-fadeIn items-end justify-center bg-black/50 backdrop-blur-sm sm:items-center sm:p-6" role="dialog" aria-modal="true" aria-label={umfrage.titel}>
       <div className="relative flex max-h-[94dvh] w-full max-w-lg animate-sheetIn flex-col overflow-hidden rounded-t-[1.9rem] bg-white shadow-2xl dark:bg-slate-900 sm:animate-popIn sm:rounded-[1.9rem]">
         {/* Kopf: Farbverlauf, Fortschritt in Segmenten */}
-        <div className="relative shrink-0 overflow-hidden bg-gradient-to-br from-[#5E5CE6] via-[#7D4CDB] to-[#BF5AF2] px-5 pb-5 pt-4 text-white">
-          <span aria-hidden className="pointer-events-none absolute -right-6 -top-10 h-36 w-36 rounded-full bg-white/10" />
-          <span aria-hidden className="pointer-events-none absolute -bottom-16 left-10 h-28 w-28 rounded-full bg-[#FF9F0A]/25 blur-2xl" />
+        <div className="relative shrink-0 overflow-hidden bg-brand px-5 pb-5 pt-4 text-white">
           <div className="relative flex items-center gap-2">
             <span className="rounded-full bg-white/20 px-2.5 py-1 text-[11.5px] font-bold uppercase tracking-[0.08em]">
               {umfrage.pflicht ? "Kurze Umfrage" : "Umfrage"}
@@ -204,7 +207,7 @@ function UmfrageLauf({
         <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-3 pt-5">
           {danke ? (
             <div className="flex animate-popIn flex-col items-center py-8 text-center">
-              <span className="flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-[#30D158] to-[#0A84FF] text-[38px] shadow-lg">🎉</span>
+              <span className="flex h-20 w-20 items-center justify-center rounded-full bg-[#34C759] text-white"><Icon name="haken" size={40} strich={2.6} /></span>
               <div className="mt-4 text-[1.3rem] font-bold">Danke!</div>
               <p className="mt-1 max-w-xs text-[14px] text-tinte-leise">
                 {umfrage.ergebnis_sichtbar ? "Das Ergebnis siehst du, sobald das Team es auswertet." : "Deine Antworten sind gespeichert. Einzeln sieht sie niemand."}
@@ -337,7 +340,7 @@ function Antwort({ f, wert, personen, setzen }: { f: Frage; wert: Wert | undefin
               key={n}
               onClick={() => setzen(n, true)}
               className={`zahl aspect-square rounded-2xl text-[1.4rem] font-bold transition active:scale-90 ${
-                wert === n ? "bg-gradient-to-br from-[#5E5CE6] to-[#BF5AF2] text-white shadow-lg" : "bg-[rgb(118_118_128/0.1)] dark:bg-[rgb(118_118_128/0.22)]"
+                wert === n ? "bg-brand text-white" : "bg-[rgb(118_118_128/0.1)] dark:bg-[rgb(118_118_128/0.22)]"
               }`}
             >
               {n}
@@ -499,10 +502,11 @@ export function UmfragenSheet({ open, onClose }: { open: boolean; onClose: () =>
     <>
       <Sheet open={open && !bearbeite && !ergebnisVon} onClose={onClose}>
         <SheetKopf titel="Umfragen" unter="Erscheinen als Pop-up beim nächsten Öffnen der App. Fortschritt wird gespeichert." onClose={onClose} />
+        <WortfilterSchalter bereich="umfragen" className="mb-4" />
         <AusHinweis funktion="umfragen" className="-mt-2 mb-3" />
         {verwalten && (
           <>
-            <button className="btn-primary w-full !bg-gradient-to-r !from-[#5E5CE6] !to-[#BF5AF2]" onClick={() => (setVorlage(null), setBearbeite("neu"))}>
+            <button className="btn-primary w-full" onClick={() => (setVorlage(null), setBearbeite("neu"))}>
               + Neue Umfrage
             </button>
             <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
@@ -761,7 +765,7 @@ function UmfrageEditor({
           Entwurf
         </button>
         <button
-          className="btn-primary flex-[1.5] !bg-gradient-to-r !from-[#5E5CE6] !to-[#BF5AF2] disabled:opacity-40"
+          className="btn-primary flex-[1.5] disabled:opacity-40"
           disabled={busy || Boolean(fehler)}
           onClick={async () => {
             const ok = await fragen_(`„${titel}“ jetzt starten?\n\n${ZIEL_NAME[ziel]} sehen sie beim nächsten Öffnen der App. Danach lassen sich die Fragen nicht mehr ändern.`, "Starten");
@@ -819,6 +823,7 @@ function ErgebnisSheet({
 }) {
   const { can, uid } = useRole();
   const rk = useRankings(open && can("rankings.verwalten"), uid);
+  const runden = useRunden("umfragen", open && can("umfragen.runden"), uid, can("umfragen.runden"));
   const album = useAlbumOptional();
   const [erg, setErg] = useState<Ergebnis | null>(null);
   const [fehler, setFehler] = useState("");
@@ -842,11 +847,11 @@ function ErgebnisSheet({
       {fehler && <p className="text-[14px] text-red-600">{fehler.includes("Berechtigung") ? "Ergebnisse darfst du nicht sehen." : fehler}</p>}
       {erg && (
         <>
-          <div className="flex items-center gap-4 rounded-2xl bg-gradient-to-r from-[#5E5CE6]/10 to-[#BF5AF2]/10 px-4 py-3.5">
+          <div className="feld-grau flex items-center gap-4 px-4 py-3.5">
             <div className="relative h-14 w-14 shrink-0">
               <svg viewBox="0 0 36 36" className="h-14 w-14 -rotate-90">
                 <circle cx="18" cy="18" r="15.5" fill="none" strokeWidth="4" className="stroke-black/10 dark:stroke-white/15" />
-                <circle cx="18" cy="18" r="15.5" fill="none" strokeWidth="4" stroke="#5E5CE6" strokeLinecap="round" strokeDasharray={`${(quote / 100) * 97.4} 97.4`} />
+                <circle cx="18" cy="18" r="15.5" fill="none" strokeWidth="4" className="stroke-brand" strokeLinecap="round" strokeDasharray={`${(quote / 100) * 97.4} 97.4`} />
               </svg>
               <span className="zahl absolute inset-0 flex items-center justify-center text-[11px] font-bold">{quote}%</span>
             </div>
@@ -893,7 +898,7 @@ function ErgebnisSheet({
                     {eintraege.slice(0, f.typ === "person" ? 10 : 50).map(([k, v], i) => (
                       <div key={k} className="relative overflow-hidden rounded-xl bg-[rgb(118_118_128/0.08)] dark:bg-[rgb(118_118_128/0.18)]">
                         <div
-                          className={`absolute inset-y-0 left-0 rounded-xl ${i === 0 && f.typ !== "skala" ? "bg-gradient-to-r from-[#FF9F0A]/45 to-[#FFD60A]/45" : "bg-[#5E5CE6]/20"}`}
+                          className={`absolute inset-y-0 left-0 rounded-xl ${i === 0 && f.typ !== "skala" ? "bg-brand/30" : "bg-brand/15"}`}
                           style={{ width: `${(v / max) * 100}%` }}
                         />
                         <div className="relative flex items-center justify-between px-3 py-2 text-[14px]">
@@ -918,6 +923,19 @@ function ErgebnisSheet({
                     rk={can("rankings.verwalten") ? rk : null}
                     album={can("album.kategorien") ? album : null}
                   />
+                )}
+                {can("umfragen.runden") && (f.typ === "einfach" || f.typ === "mehrfach" || f.typ === "person") && (
+                  <div className="mt-3">
+                    <RundenAbschnitt
+                      stand={runden}
+                      gruppe={f.id}
+                      gruppeTitel={f.titel}
+                      quellen={Object.entries(e.zaehlung).map(([k, v]) => ({ id: k.slice(0, 100), label: f.typ === "person" ? pName[k] || "Unbekannt" : k, punkte: v }))}
+                      leitet
+                      gesperrt={false}
+                      startText="Stichwahl starten"
+                    />
+                  </div>
                 )}
               </section>
             );
@@ -960,6 +978,28 @@ function ErgebnisSheet({
 }
 
 /* ====================================================================== */
+/* Stichwahlen aus Umfragen – für alle auf der Startseite                 */
+/* ====================================================================== */
+export function UmfrageStichwahlen({ className = "" }: { className?: string }) {
+  const { uid, isEltern, banned, can } = useRole();
+  const { sichtbar } = useFunktionen();
+  const darf = !isEltern && sichtbar("umfragen");
+  const st = useRunden("umfragen", darf, uid, can("umfragen.runden"));
+  if (!darf || !st.offene.length) return null;
+  return (
+    <div className={className}>
+      <Kachel icon="umfrage" farbe="bg-brand" titel={st.offene.length === 1 ? "Stichwahl" : `${st.offene.length} Stichwahlen`} unter="Aus einer Umfrage – das Team hat eine engere Auswahl gestartet.">
+        {st.offene.map((r) => (
+          <div key={r.id} className="mt-3">
+            <RundenAbschnitt stand={st} gruppe={r.gruppe} gruppeTitel={r.gruppe_titel} quellen={[]} leitet={false} gesperrt={banned} />
+          </div>
+        ))}
+      </Kachel>
+    </div>
+  );
+}
+
+/* ====================================================================== */
 /* Karte im Reiter Events (Team mit Recht)                                */
 /* ====================================================================== */
 export function UmfragenKarte() {
@@ -975,12 +1015,14 @@ export function UmfragenKarte() {
     <>
       <button
         onClick={() => setOffen(true)}
-        className="mb-3 flex w-full items-center gap-3 overflow-hidden rounded-[1.25rem] bg-gradient-to-r from-[#5E5CE6] to-[#9B4DDB] px-4 py-3.5 text-left text-white shadow-[0_8px_22px_-12px_rgba(94,92,230,.8)] transition active:scale-[.99]"
+        className="card mb-3 flex w-full items-center gap-3 px-4 py-3.5 text-left transition active:scale-[.99]"
       >
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/20 text-[20px]">📊</span>
+        <span className="symbol bg-brand">
+          <Icon name="umfrage" size={17} strich={2.4} />
+        </span>
         <span className="min-w-0 flex-1">
           <span className="block text-[15px] font-semibold">Pop-up-Umfragen</span>
-          <span className="block truncate text-[12.5px] text-white/85">
+          <span className="block truncate text-[12.5px] text-tinte-leise">
             {laufen.length
               ? `${laufen.length} ${laufen.length === 1 ? "läuft" : "laufen"}: ${laufen.map((u) => u.titel).join(", ")}`
               : entwuerfe
@@ -989,7 +1031,7 @@ export function UmfragenKarte() {
           </span>
         </span>
         {laufen.length > 0 && <span className="h-2.5 w-2.5 shrink-0 animate-pulse rounded-full bg-[#30D158]" />}
-        <span aria-hidden className="text-[18px] text-white/80">›</span>
+        <span aria-hidden className="text-tinte-leise"><Icon name="chevron" size={16} /></span>
       </button>
       <UmfragenSheet open={offen} onClose={() => setOffen(false)} />
     </>

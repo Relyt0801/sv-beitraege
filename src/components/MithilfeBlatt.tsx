@@ -105,7 +105,7 @@ export function MithilfeBlatt({
           /* ------------------------------------------ Rechnung */
           <>
             <div className="flex flex-col items-center pt-1 text-center">
-              <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-[#3B82F6] to-[#0A58CA] text-2xl shadow-sm">
+              <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand text-2xl">
                 🙌
               </span>
               <div className="mt-2 text-[13px] font-semibold text-tinte-leise">Mithilfe eintragen</div>

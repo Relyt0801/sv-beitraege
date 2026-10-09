@@ -68,6 +68,12 @@ export function meldeFehler(text: string): void {
     if (hasSupabase) void supabase!.rpc("wortfilter_versuch", { p_wort: wort }).then(sperrePruefen);
     return;
   }
+  // Mehrere Zustimmungen nötig: das ist kein Fehler, sondern ein Zwischenstand
+  const z = text.indexOf("Deine Zustimmung ist gespeichert");
+  if (z >= 0) {
+    melde(text.slice(z), "info");
+    return;
+  }
   // Gesperrt (z. B. gerade automatisch wegen Spam): verständlich statt
   // „violates row-level security policy“
   if (/gerade gesperrt|row-level security/i.test(text)) {

@@ -32,9 +32,61 @@ export type IconName =
   | "info"
   | "herz"
   | "pfeile"
-  | "person";
+  | "person"
+  | "buch"
+  | "funke"
+  | "zitat"
+  | "pokal"
+  | "bild"
+  | "schluessel"
+  | "umfrage"
+  | "schild"
+  | "stimme"
+  | "x";
 
 const PFADE: Record<IconName, JSX.Element> = {
+  buch: (
+    <>
+      <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5z" />
+      <path d="M4 20.5A2.5 2.5 0 0 0 6.5 23H20v-5" />
+    </>
+  ),
+  funke: <path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8zM19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z" />,
+  zitat: (
+    <>
+      <path d="M7 7h4v4c0 3-1.5 5-4 6" />
+      <path d="M14 7h4v4c0 3-1.5 5-4 6" />
+    </>
+  ),
+  pokal: (
+    <>
+      <path d="M8 4h8v5a4 4 0 0 1-8 0z" />
+      <path d="M16 6h3a3 3 0 0 1-3 4M8 6H5a3 3 0 0 0 3 4" />
+      <path d="M12 13v4M8 21h8M9 17h6" />
+    </>
+  ),
+  bild: (
+    <>
+      <rect x="3" y="4" width="18" height="16" rx="3" />
+      <circle cx="9" cy="10" r="1.6" />
+      <path d="m21 16-5-5-9 9" />
+    </>
+  ),
+  schluessel: (
+    <>
+      <circle cx="8" cy="15" r="4" />
+      <path d="m11 12 9-9M17 6l3 3M14 9l2 2" />
+    </>
+  ),
+  umfrage: <path d="M5 20V10M12 20V4M19 20v-7" />,
+  schild: <path d="M12 3l7 3v5c0 4.4-2.9 8.3-7 10-4.1-1.7-7-5.6-7-10V6z" />,
+  stimme: (
+    <>
+      <path d="M4 13l4 4L20 5" />
+      <path d="M4 21h16" />
+    </>
+  ),
+  x: <path d="M6 6l12 12M18 6 6 18" />,
   kasse: (
     <>
       <rect x="2" y="6" width="20" height="13" rx="2" />

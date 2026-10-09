@@ -111,7 +111,7 @@ export function SpotifyKarte({ wert, fallbackTitel }: { wert: string; fallbackTi
   const umfang = 2 * Math.PI * r;
 
   return (
-    <div className="mt-2 overflow-hidden rounded-2xl bg-gradient-to-br from-[#1E1E1E] to-[#0E2A1A] text-white shadow-[0_8px_22px_-12px_rgba(0,0,0,.7)]">
+    <div className="mt-2 overflow-hidden rounded-2xl bg-[#1C1C1E] text-white">
       <div className="flex items-center gap-3 p-2.5">
         <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-white/10">
           {info?.cover ? (

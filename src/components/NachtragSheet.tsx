@@ -102,7 +102,7 @@ export function NachtragSheet({ open, onClose }: { open: boolean; onClose: () =>
         <>
         {/* ------------------------------------------------ Kopf wie eine Rechnung */}
         <div className="flex flex-col items-center pt-1 text-center">
-          <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-400 to-emerald-600 text-2xl shadow-sm">
+          <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#34C759] text-2xl">
             🙌
           </span>
           <div className="mt-2 text-[13px] font-semibold text-tinte-leise">Mithilfe nachtragen</div>

@@ -8,6 +8,7 @@ import { PunkteSheet } from "./PunkteSheet";
 import { Gruppe, KopfBild, RechnungKopf, Wert, Zeile, ZeileAuswahl } from "./Liste";
 
 import { frage } from "../lib/melder";
+import { usePasswortNeu } from "./PasswortNeu";
 /** Wie ein Halbjahr aussieht: Farbe der Kapsel rechts, aus der Palette. */
 const ART: Record<Status, { text: string; klasse: string }> = {
   bezahlt: { text: "✓ bezahlt", klasse: "bg-bezahlt-grund text-bezahlt dark:bg-emerald-500/20 dark:text-emerald-300" },
@@ -32,7 +33,8 @@ export function StudentSheet({
   onClose: () => void;
 }) {
   const { settings, setTerm, updateStudent, removeStudent } = useStore();
-  const { canEditBeitrag, canEditData, canEditHilfen } = useRole();
+  const { canEditBeitrag, canEditData, canEditHilfen, userByStudent } = useRole();
+  const pw = usePasswortNeu();
   const [showPunkte, setShowPunkte] = useState(false);
 
   if (!student) return <Sheet open={false} onClose={onClose}>{null}</Sheet>;
@@ -127,6 +129,9 @@ export function StudentSheet({
                 ))}
               </ZeileAuswahl>
             </Zeile>
+            {pw.darf && userByStudent[student.id] && (
+              <Zeile label={pw.busy ? "Neues Passwort wird erzeugt …" : "Neues Passwort generieren"} onClick={() => void pw.zuruecksetzen(userByStudent[student.id], `${student.vorname} ${student.nachname}`)} />
+            )}
             <Zeile
               label="Person löschen"
               rot
@@ -141,6 +146,7 @@ export function StudentSheet({
         )}
       </div>
 
+      {pw.anzeige}
       <PunkteSheet
         student={student}
         settings={settings}

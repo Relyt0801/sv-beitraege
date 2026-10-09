@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { hasSupabase, supabase } from "./supabase";
 import { abonniere } from "./realtime";
 import { pushZitat } from "./push";
+import { nochFehlend, zustimmen } from "./zustimmung";
 
 /**
  * Zitatwand (supabase/funktionen-zitate.sql)
@@ -22,8 +23,9 @@ export interface Zitat {
   art: ZitatArt;
   kontext: string;
   status: ZitatStatus;
-  eingereicht_von: string;
-  eingereicht_name: string;
+  /** Nur im Demo-Modus – die Datenbank gibt Einreicher nicht heraus */
+  eingereicht_von?: string;
+  eingereicht_name?: string;
   created_at: string;
   geprueft_at?: string | null;
 }
@@ -83,6 +85,7 @@ export function useZitate(aktiv: boolean, uid: string | null) {
   const [zitate, setZitate] = useState<Zitat[]>([]);
   const [stimmen, setStimmen] = useState<Stimme[]>([]);
   const [bereit, setBereit] = useState(false);
+  const [meineIds, setMeineIds] = useState<Set<string>>(new Set());
   const zeit = useRef<ReturnType<typeof setTimeout> | null>(null);
   const me = uid || "local-user";
 
@@ -91,17 +94,26 @@ export function useZitate(aktiv: boolean, uid: string | null) {
       const d = demoLesen();
       setZitate(d.zitate.filter((z) => z.status !== "abgelehnt"));
       setStimmen(d.stimmen);
+      setMeineIds(new Set(d.zitate.filter((z) => z.eingereicht_von === me).map((z) => z.id)));
       setBereit(true);
       return;
     }
-    const [z, s] = await Promise.all([
-      supabase!.from("zitate").select("*").neq("status", "abgelehnt").order("created_at", { ascending: false }).limit(1000),
+    // Einreicher sind für Schüler gesperrt – „meine“ kommen aus meine_eintraege()
+    const [z, s, mi] = await Promise.all([
+      supabase!
+        .from("zitate")
+        .select("id, text, wer, art, kontext, status, created_at, geprueft_at")
+        .neq("status", "abgelehnt")
+        .order("created_at", { ascending: false })
+        .limit(1000),
       supabase!.from("zitat_stimmen").select("zitat_id, user_id").eq("an", true),
+      supabase!.rpc("meine_eintraege"),
     ]);
     if (!z.error) setZitate((z.data as Zitat[]) || []);
     if (!s.error) setStimmen((s.data as Stimme[]) || []);
+    if (!mi.error) setMeineIds(new Set(((mi.data as { zitate?: string[] } | null)?.zitate) || []));
     setBereit(true);
-  }, []);
+  }, [me]);
 
   useEffect(() => {
     if (!aktiv) return;
@@ -151,6 +163,12 @@ export function useZitate(aktiv: boolean, uid: string | null) {
 
   const pruefen = useCallback(
     async (id: string, status: "frei" | "abgelehnt"): Promise<string | null> => {
+      // Freigeben braucht so viele Zustimmungen, wie der Admin festgelegt hat
+      if (status === "frei" && hasSupabase) {
+        const z = await zustimmen("zitat", id);
+        if ("error" in z) return z.error;
+        if (!z.fertig) return nochFehlend(z);
+      }
       setZitate((l) => (status === "abgelehnt" ? l.filter((z) => z.id !== id) : l.map((z) => (z.id === id ? { ...z, status } : z))));
       if (!hasSupabase) {
         const d = demoLesen();
@@ -209,7 +227,9 @@ export function useZitate(aktiv: boolean, uid: string | null) {
   const stimmenVon = useCallback((id: string) => stimmen.filter((s) => s.zitat_id === id).length, [stimmen]);
   const meineStimme = useCallback((id: string) => stimmen.some((s) => s.zitat_id === id && s.user_id === me), [stimmen, me]);
 
-  return { bereit, zitate, me, einreichen, pruefen, bearbeiten, abstimmen, stimmenVon, meineStimme };
+  const istMeins = useCallback((id: string) => meineIds.has(id), [meineIds]);
+
+  return { bereit, zitate, me, istMeins, einreichen, pruefen, bearbeiten, abstimmen, stimmenVon, meineStimme };
 }
 
 export type Zitatwand = ReturnType<typeof useZitate>;

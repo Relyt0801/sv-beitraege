@@ -2,6 +2,7 @@ import { createContext, createElement, useCallback, useContext, useEffect, useSt
 import { hasSupabase, supabase } from "./supabase";
 import { abonniere } from "./realtime";
 import { useRole } from "../auth/RoleProvider";
+import type { PermKey } from "./permissions";
 
 /**
  * Funktionen an/aus (Profil → Funktionen, Recht funktionen.verwalten).
@@ -14,12 +15,25 @@ import { useRole } from "../auth/RoleProvider";
  */
 export type FunktionKey = "abiball" | "album" | "zitate" | "rankings" | "umfragen" | "spotify" | "motto";
 
+/** Darf die Person diese Funktion an-/ausschalten? */
+export function darfSchalten(can: (p: PermKey) => boolean, k: FunktionKey): boolean {
+  return can("funktionen.verwalten") || can(`funktion.${k}` as PermKey);
+}
+
+/** Themen für das Funktionen-Fenster (zugeklappt, mit Unterfunktionen) */
+export const FUNKTION_THEMEN: { titel: string; text: string; funktionen: FunktionKey[] }[] = [
+  { titel: "Abizeitung", text: "Abi-Album, Zitatwand, Rankings, Spotify", funktionen: ["album", "spotify", "zitate", "rankings"] },
+  { titel: "Abimotto", text: "Vorschläge und Abstimmungsrunden", funktionen: ["motto"] },
+  { titel: "Umfragen", text: "Pop-ups mit Stichwahlen", funktionen: ["umfragen"] },
+  { titel: "Abiball", text: "Ticket-Bereich", funktionen: ["abiball"] },
+];
+
 export const FUNKTIONEN: { key: FunktionKey; titel: string; zeichen: string; text: string }[] = [
   { key: "abiball", titel: "Abiball-Tickets", zeichen: "🎟️", text: "Ticket-Bereich bei Schülern und Eltern." },
   { key: "album", titel: "Abi-Album", zeichen: "📖", text: "Steckbriefe mit Kommentaren und Likes." },
   { key: "zitate", titel: "Zitatwand", zeichen: "💬", text: "Zitate von Lehrern und Mitschülern sammeln und abstimmen." },
   { key: "rankings", titel: "Abi-Rankings", zeichen: "🏆", text: "Schüler- und Lehrer-Ranking mit Top 3." },
-  { key: "motto", titel: "Abimotto", zeichen: "✨", text: "Mottos vorschlagen, mit 👍 und 🔥 abstimmen." },
+  { key: "motto", titel: "Abimotto", zeichen: "✨", text: "Mottos vorschlagen und in Runden abstimmen." },
   { key: "spotify", titel: "Spotify im Steckbrief", zeichen: "🎵", text: "Lieder aus Spotify-Links mit Cover und 30-Sekunden-Hörprobe." },
   { key: "umfragen", titel: "Pop-up-Umfragen", zeichen: "📊", text: "Umfragen, die beim Öffnen der App erscheinen." },
 ];
@@ -72,7 +86,8 @@ export function FunktionenProvider({ children }: { children: ReactNode }) {
   }, [ready, laden]);
 
   const verwaltet = can("funktionen.verwalten");
-  const sichtbar = useCallback((k: FunktionKey) => an[k] || verwaltet, [an, verwaltet]);
+  // Wer einen Bereich schalten darf (z. B. Komitee Abizeitung die Zitate), sieht ihn auch ausgeschaltet
+  const sichtbar = useCallback((k: FunktionKey) => an[k] || verwaltet || can(`funktion.${k}` as PermKey), [an, verwaltet, can]);
 
   const setzen = useCallback(async (k: FunktionKey, wert: boolean) => {
     setAn((a) => ({ ...a, [k]: wert }));

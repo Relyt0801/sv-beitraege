@@ -140,21 +140,26 @@ function Datenschutz() {
         öffentlich – nur die Person selbst sieht es einmal über ein kleines Info-Symbol.
       </P>
       <P>
-        <b>Zitatwand:</b> eingereichte Zitate (Text, wer es gesagt hat, wann/wo), wer sie eingereicht hat (wird nicht angezeigt) und die
+        <b>Zitatwand:</b> eingereichte Zitate (Text, wer es gesagt hat, wann/wo), wer sie eingereicht hat und die
         🔥-Stimmen. Sichtbar erst nach der Prüfung (z. B. durch das Komitee Abizeitung, das dazu eine Benachrichtigung
-        bekommt); Abgelehntes wird geleert. Keine Eltern.
+        bekommt); Abgelehntes wird geleert. Keine Eltern. Wer ein Zitat eingereicht hat, sehen nur die Prüfenden (über ein
+        kleines Info-Symbol) – für alle anderen ist diese Angabe auch technisch gesperrt.
       </P>
       <P>
         <b>Abimotto:</b> Vorschläge (Text, optionale Erklärung, wer vorgeschlagen hat) und deine 👍-Stimmen. Die
-        Ergebnisse sieht nur, wer das Motto verwaltet (z. B. Komitee Motto &amp; Pullis) – andere sehen nur ihre eigenen 👍. Wer vorgeschlagen hat, wird gespeichert (für die Prüfung), aber in der App nicht angezeigt.
+        Ergebnisse sieht nur, wer das Motto verwaltet (z. B. Komitee Motto &amp; Pullis) – andere sehen nur ihre eigenen 👍. Wer vorgeschlagen hat, wird gespeichert und ist nur für die Verwaltenden über ein Info-Symbol sichtbar – für alle anderen auch technisch gesperrt.
       </P>
       <P>
         <b>Sperre:</b> Wer gesperrt ist, kann in dieser Zeit nirgends etwas einreichen, kommentieren, liken oder abstimmen.
+        Automatisch gesperrt wird bei Spam (10 Beiträge in 30 Sekunden: 1 Minute, dann 5 Minuten, dann 1 Stunde) und nach
+        3 vom Wortfilter geblockten Versuchen in 10 Minuten (5 Minuten, dann 1 Stunde, dann 1 Tag). Gespeichert werden dafür
+        nur die Stufe, das Ende der Sperre und der Grund; nach 24 Stunden ohne neue Sperre beginnt es wieder bei der ersten
+        Stufe. Jede automatische Sperre steht im Protokoll (ohne den Text).
       </P>
       <P>
-        <b>Wortfilter:</b> Texte (Chats, Kommentare, Steckbriefe, Umfragen, Motto, Anfragen) werden vor dem Speichern auf
-        beleidigende Wörter geprüft – nur auf unserem Server, an niemanden sonst. Geblockte Texte werden nicht gespeichert;
-        gezählt wird nur, wie oft jemand geblockt wurde (ab 3 Versuchen in 10 Minuten ein Eintrag im Protokoll, ohne Text).
+        <b>Wortfilter:</b> Texte (Chats, Kommentare, Steckbriefe, Umfragen, Motto, Anfragen; Zitate nur, wenn eingeschaltet) werden vor dem Speichern auf
+        beleidigende Wörter und bestimmte Emojis geprüft – nur auf unserem Server, an niemanden sonst. Links (z. B. Spotify) zählen nicht mit.
+        Geblockte Texte werden nicht gespeichert; gezählt wird nur, wie oft jemand geblockt wurde (siehe Sperre).
       </P>
       <P>
         <b>Melden:</b> Wer etwas meldet, speichert Art, Grund, optional eine kurze Notiz und einen Auszug des gemeldeten
@@ -164,6 +169,11 @@ function Datenschutz() {
       <P>
         <b>Abi-Rankings und Lehrerliste:</b> deine Stimme je Ranking (wen du gewählt hast). Sichtbar ist nur die
         gezählte Top 3, nie wer wen gewählt hat. Die Lehrerliste enthält Namen und Fächer von Lehrkräften.
+      </P>
+      <P>
+        <b>Abstimmungsrunden (Motto, Zitate, Rankings, Umfragen):</b> Startet das zuständige Komitee eine engere Auswahl,
+        wird gespeichert, wofür du deine Stimmen vergeben hast. Die Zahlen sehen nur die, die die Runde leiten – alle
+        anderen erst, wenn das Ergebnis freigegeben wird, und nie, wer wen gewählt hat.
       </P>
       <P>
         <b>Spotify:</b> Steht im Steckbrief ein Spotify-Link, holt unser Server einmal Titel, Künstler und Cover von
@@ -191,6 +201,20 @@ function Datenschutz() {
       <P>
         <b>Elternzugänge:</b> Benutzername und die Zuordnung zum eigenen Kind. Eltern sehen ausschließlich die
         Daten ihres Kindes, keine Chats und keine Daten anderer.
+      </P>
+      <P>
+        <b>Freigaben:</b> Muss mehr als eine Person zustimmen (Termin-, Kosten-, Entsperr-Anfragen, Zitate), wird gespeichert,
+        wer bereits zugestimmt hat. Das sehen nur die, die über diese Anfragen entscheiden.
+      </P>
+      <P>
+        <b>Hintergrundbild:</b> Wenn du eins setzt, wird es verkleinert in einem privaten Speicher abgelegt, den nur dein
+        eigener Zugang lesen kann – auch das Stufenteam und der Admin sehen es nicht. Entfernen löscht es dort sofort.
+        Auf deinem Gerät liegt zusätzlich eine Kopie im Browser, damit es schnell lädt.
+      </P>
+      <P>
+        <b>Passwort zurücksetzen:</b> Der Admin kann für einen Zugang ein neues Startpasswort erzeugen. Es wird einmal
+        angezeigt, nirgends lesbar gespeichert und muss beim nächsten Anmelden geändert werden. Im Protokoll steht nur, wer
+        es wann zurückgesetzt hat.
       </P>
       <P>
         <b>Protokoll:</b> wichtige Änderungen (Rollen, Rechte, Zugänge, Sperren, Zahlungen,
@@ -259,7 +283,7 @@ function Datenschutz() {
       <H>6. Was auf deinem Gerät bleibt</H>
       <P>
         Die App speichert im Browser: deine Anmeldung, ob du die Einführung schon gesehen hast, deine Auswahl
-        für hell/dunkel und den Programmcode selbst (damit sie offline startet). Das ist technisch nötig und
+        für hell/dunkel, ggf. eine Kopie deines Hintergrundbilds und den Programmcode selbst (damit sie offline startet). Das ist technisch nötig und
         deshalb nach § 25 Abs. 2 Nr. 2 TDDDG ohne Einwilligung erlaubt. Alles davon verschwindet, wenn du dich
         abmeldest oder die Websitedaten löschst.
       </P>
@@ -286,7 +310,7 @@ function Datenschutz() {
       </P>
 
       <p className="mt-4 text-[12px] text-tinte-leise">
-        Stand: 05.10.2026
+        Stand: 09.10.2026
       </p>
     </>
   );

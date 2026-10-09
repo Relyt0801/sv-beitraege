@@ -3,7 +3,30 @@ import { Sheet, SheetKopf } from "./Sheet";
 import { Schalter } from "./Schalter";
 import { useRole } from "../auth/RoleProvider";
 import { hasSupabase, supabase } from "../lib/supabase";
-import { FUNKTIONEN, useFunktionen, type FunktionKey } from "../lib/funktionen";
+import { FUNKTIONEN, FUNKTION_THEMEN, darfSchalten, useFunktionen, type FunktionKey } from "../lib/funktionen";
+import { Icon, type IconName } from "./Icon";
+import { WortfilterSchalter } from "./AutorInfo";
+import type { WfBereich } from "../lib/wortfilter-bereiche";
+
+const SYMBOL: Record<FunktionKey, { icon: IconName; farbe: string }> = {
+  album: { icon: "buch", farbe: "bg-[#FF2D55]" },
+  spotify: { icon: "events", farbe: "bg-[#34C759]" },
+  zitate: { icon: "zitat", farbe: "bg-[#A2845E]" },
+  rankings: { icon: "pokal", farbe: "bg-[#32ADE6]" },
+  motto: { icon: "funke", farbe: "bg-[#FF9500]" },
+  umfragen: { icon: "umfrage", farbe: "bg-brand" },
+  abiball: { icon: "kasse", farbe: "bg-[#8E8E93]" },
+};
+/** Welche Wortfilter-Bereiche gehören zur Funktion? */
+const WF: Record<FunktionKey, WfBereich[]> = {
+  album: ["steckbrief", "kommentare"],
+  spotify: [],
+  zitate: ["zitate"],
+  rankings: ["rankings"],
+  motto: ["motto"],
+  umfragen: ["umfragen"],
+  abiball: [],
+};
 import { rolleName, type PermKey } from "../lib/permissions";
 import { melde, meldeFehler } from "../lib/melder";
 import { KategorienSheet, useAlbumOptional } from "./Album";
@@ -75,69 +98,94 @@ export function FunktionenSheet({ open, onClose }: { open: boolean; onClose: () 
     umfragen: [{ l: "Umfragen verwalten", f: "umfragen", darf: can("umfragen.verwalten") || can("umfragen.ergebnisse") }],
   };
 
+  const sichtbareThemen = FUNKTION_THEMEN.map((t) => ({ ...t, funktionen: t.funktionen.filter((k) => darfSchalten(can, k)) })).filter((t) => t.funktionen.length > 0);
+
   return (
     <>
       <Sheet open={open && !fenster} onClose={onClose}>
-        <SheetKopf titel="Funktionen" unter="Schaltet Bereiche für alle an oder aus. Darunter: wer sie nutzen darf und die Einstellungen dazu." onClose={onClose} />
-        <div className="space-y-3">
-          {FUNKTIONEN.map((f) => {
-            const perm = NUTZEN[f.key];
-            const wer = perm ? rollen[perm] || [] : [];
-            const alleDa = perm ? ALLE.every((r) => wer.includes(r)) : false;
-            const verwalten = links[f.key].filter((x) => x.darf);
+        <SheetKopf titel="Funktionen" unter="Nach Thema sortiert. Antippen klappt auf: an/aus, wer es nutzen darf, Wortfilter und Einstellungen." onClose={onClose} />
+        <div className="space-y-2.5">
+          {sichtbareThemen.map((t) => {
+            const anZahl = t.funktionen.filter((k) => an[k]).length;
             return (
-              <div
-                key={f.key}
-                className={`overflow-hidden rounded-2xl transition ${
-                  an[f.key] ? "bg-[#34C759]/10 dark:bg-[#30D158]/15" : "bg-[rgb(118_118_128/0.08)] dark:bg-[rgb(118_118_128/0.18)]"
-                }`}
-              >
-                <label className="flex items-center gap-3 px-4 py-3.5">
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-[20px] shadow-sm dark:bg-slate-800">{f.zeichen}</span>
+              <details key={t.titel} className="card group overflow-hidden" open={sichtbareThemen.length === 1}>
+                <summary className="flex min-h-[56px] cursor-pointer list-none items-center gap-3 px-4 py-3 [&::-webkit-details-marker]:hidden">
                   <span className="min-w-0 flex-1">
-                    <span className="block text-[15px] font-semibold">{f.titel}</span>
-                    <span className="block text-[12.5px] leading-snug text-tinte-leise">{f.text}</span>
+                    <span className="block text-[16px] font-semibold">{t.titel}</span>
+                    <span className="block text-[12.5px] text-tinte-leise">{t.text}</span>
                   </span>
-                  <Schalter
-                    an={an[f.key]}
-                    label={f.titel}
-                    onChange={async (v) => {
-                      const fehler = await setzen(f.key, v);
-                      if (fehler) meldeFehler("Ging nicht: " + fehler);
-                      else melde(`${f.titel} ${v ? "an" : "aus"}`, "erfolg");
-                    }}
-                  />
-                </label>
-                {perm && (
-                  <div className="flex items-center gap-3 border-t border-black/[0.06] px-4 py-2.5 dark:border-white/[0.08]">
-                    <span className="min-w-0 flex-1 text-[13px] leading-snug">
-                      <span className="font-semibold">Nutzen dürfen: </span>
-                      <span className="text-tinte-matt dark:text-slate-300">
-                        {alleDa ? "alle Schüler und das Team" : wer.length ? wer.map(rolleName).join(", ") : "nur Admin"}
-                      </span>
-                    </span>
-                    {can("perms.manage") && <Schalter an={alleDa} label={`${f.titel}: alle Schüler und das Team`} onChange={(v) => void fuerAlle(perm, v)} />}
-                  </div>
-                )}
-                {verwalten.length > 0 && (
-                  <div className="flex flex-wrap gap-2 border-t border-black/[0.06] px-4 py-2.5 dark:border-white/[0.08]">
-                    {verwalten.map((x) => (
-                      <button
-                        key={x.l}
-                        onClick={() => setFenster(x.f)}
-                        className="rounded-full bg-white px-3 py-1.5 text-[13px] font-semibold text-brand-dark shadow-sm transition active:scale-95 dark:bg-slate-800 dark:text-brand"
-                      >
-                        {x.l} ›
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
+                  <span className="text-[13px] text-tinte-leise">
+                    {anZahl} von {t.funktionen.length} an
+                  </span>
+                  <span className="text-tinte-leise transition group-open:rotate-90" aria-hidden>
+                    <Icon name="chevron" size={16} />
+                  </span>
+                </summary>
+                <div className="divide-y divide-black/[0.06] border-t border-black/[0.06] dark:divide-white/[0.08] dark:border-white/[0.08]">
+                  {t.funktionen.map((k) => {
+                    const f = FUNKTIONEN.find((x) => x.key === k)!;
+                    const perm = NUTZEN[k];
+                    const wer = perm ? rollen[perm] || [] : [];
+                    const alleDa = perm ? ALLE.every((r) => wer.includes(r)) : false;
+                    const verwalten = links[k].filter((x) => x.darf);
+                    const sym = SYMBOL[k];
+                    return (
+                      <div key={k} className="px-4 py-3">
+                        <label className="flex items-center gap-3">
+                          <span aria-hidden className={`symbol ${sym.farbe}`}>
+                            <Icon name={sym.icon} size={17} strich={2.2} />
+                          </span>
+                          <span className="min-w-0 flex-1">
+                            <span className="block text-[15px] font-semibold">{f.titel}</span>
+                            <span className="block text-[12.5px] leading-snug text-tinte-leise">{f.text}</span>
+                          </span>
+                          <Schalter
+                            an={an[k]}
+                            label={f.titel}
+                            onChange={async (v) => {
+                              const fehler = await setzen(k, v);
+                              if (fehler) meldeFehler("Ging nicht: " + fehler);
+                              else melde(`${f.titel} ${v ? "an" : "aus"}`, "erfolg");
+                            }}
+                          />
+                        </label>
+                        {(perm || WF[k].length > 0 || verwalten.length > 0) && (
+                          <div className="ml-[42px] mt-2 space-y-2">
+                            {perm && (
+                              <div className="flex min-h-[36px] items-center gap-3">
+                                <span className="min-w-0 flex-1 text-[13px] leading-snug">
+                                  <span className="font-semibold">Nutzen dürfen: </span>
+                                  <span className="text-tinte-matt dark:text-slate-300">
+                                    {alleDa ? "alle Schüler und das Team" : wer.length ? wer.map(rolleName).join(", ") : "nur Admin"}
+                                  </span>
+                                </span>
+                                {can("perms.manage") && <Schalter an={alleDa} label={`${f.titel}: alle Schüler und das Team`} onChange={(v) => void fuerAlle(perm, v)} />}
+                              </div>
+                            )}
+                            {WF[k].map((b) => (
+                              <WortfilterSchalter key={b} bereich={b} kompakt />
+                            ))}
+                            {verwalten.length > 0 && (
+                              <div className="flex flex-wrap gap-2">
+                                {verwalten.map((x) => (
+                                  <button key={x.l} onClick={() => setFenster(x.f)} className="btn-klein-grau !min-h-[2rem] !px-3 !text-[13px]">
+                                    {x.l}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </details>
             );
           })}
         </div>
         <p className="mt-3 px-1 text-[12px] leading-snug text-tinte-leise">
-          Ausgeschaltetes siehst nur du (mit Hinweis). Wer verwaltet (z. B. Komitee Abizeitung prüft Zitate, Motto &amp; Pullis das Abimotto), steht unter Rollen &amp; Rechte → Rechte → Komitee-Rechte.
+          Ausgeschaltetes sehen nur, wer es schalten darf (mit Hinweis). Einzelne Bereiche lassen sich Komitees geben: Rollen &amp; Rechte → Rechte → Komitee-Rechte.
         </p>
       </Sheet>
 

@@ -33,10 +33,21 @@ export type PermKey =
   | "lehrer.verwalten"
   | "album.redigieren"
   | "motto.nutzen"
-  | "motto.verwalten";
+  | "motto.verwalten"
+  | "motto.runden"
+  | "zitate.runden"
+  | "rankings.runden"
+  | "umfragen.runden"
+  | "funktion.abiball"
+  | "funktion.album"
+  | "funktion.zitate"
+  | "funktion.rankings"
+  | "funktion.spotify"
+  | "funktion.motto"
+  | "funktion.umfragen";
 
 /** eltern: Das Recht lässt sich auch Elternzugängen geben (eigene Schaltfläche im Rechte-Reiter). */
-export interface PermDef { key: PermKey; label: string; desc: string; eltern?: boolean }
+export interface PermDef { key: PermKey; label: string; desc: string; eltern?: boolean; /** Unterpunkt innerhalb des Themas (z. B. „Zitate“) */ unter?: string }
 export interface PermCategory { label: string; icon: string; perms: PermDef[] }
 
 export const PERM_CATEGORIES: PermCategory[] = [
@@ -87,35 +98,50 @@ export const PERM_CATEGORIES: PermCategory[] = [
     ],
   },
   {
-    label: "Abizeitung (Album, Zitate, Rankings)", icon: "📖", perms: [
-      { key: "album.nutzen", label: "Abi-Album nutzen", desc: "Eigenen Steckbrief ausfüllen, die anderen ansehen, kommentieren und liken." },
-      { key: "album.kategorien", label: "Steckbrief-Kategorien", desc: "Die Stammdaten-Felder festlegen (z. B. Nach dem Abi, Lieblingslied)." },
-      { key: "album.moderieren", label: "Album moderieren", desc: "Kommentare und Texte anderer entfernen." },
-      { key: "album.redigieren", label: "Steckbriefe korrigieren", desc: "Stammdaten und Texte aller Steckbriefe bearbeiten, z. B. Rechtschreibfehler." },
-      { key: "zitate.nutzen", label: "Zitatwand nutzen", desc: "Zitate einreichen, die freigegebenen ansehen und mit 🔥 abstimmen." },
-      { key: "zitate.pruefen", label: "Zitate prüfen", desc: "Eingereichte Zitate freigeben, ablehnen, nachträglich ändern oder löschen." },
-      { key: "rankings.nutzen", label: "Rankings nutzen", desc: "In den Schüler- und Lehrer-Rankings abstimmen und die Top 3 sehen." },
-      { key: "rankings.verwalten", label: "Rankings verwalten", desc: "Ranking-Kategorien anlegen, ändern, löschen – auch direkt aus Umfrage-Ergebnissen." },
-      { key: "lehrer.verwalten", label: "Lehrerliste pflegen", desc: "Lehrkräfte für Lehrer-Rankings und Zitate eintragen, ändern, löschen." },
+    label: "Abizeitung", icon: "📖", perms: [
+      { unter: "Abi-Album", key: "album.nutzen", label: "Abi-Album nutzen", desc: "Eigenen Steckbrief ausfüllen, die anderen ansehen, kommentieren und liken." },
+      { unter: "Abi-Album", key: "album.kategorien", label: "Steckbrief-Kategorien", desc: "Die Stammdaten-Felder festlegen (z. B. Nach dem Abi, Lieblingslied)." },
+      { unter: "Abi-Album", key: "album.moderieren", label: "Album moderieren", desc: "Kommentare und Texte anderer entfernen, Wortfilter für Steckbriefe und Kommentare schalten." },
+      { unter: "Abi-Album", key: "album.redigieren", label: "Steckbriefe korrigieren", desc: "Stammdaten und Texte aller Steckbriefe bearbeiten, z. B. Rechtschreibfehler." },
+      { unter: "Abi-Album", key: "funktion.album", label: "Abi-Album an/aus", desc: "Den ganzen Bereich für alle ein- oder ausschalten." },
+      { unter: "Abi-Album", key: "funktion.spotify", label: "Spotify an/aus", desc: "Lieder mit Cover und Hörprobe im Steckbrief ein- oder ausschalten." },
+      { unter: "Zitatwand", key: "zitate.nutzen", label: "Zitatwand nutzen", desc: "Zitate einreichen, die freigegebenen ansehen und abstimmen." },
+      { unter: "Zitatwand", key: "zitate.pruefen", label: "Zitate prüfen", desc: "Eingereichte Zitate freigeben, ablehnen, ändern; sieht, wer sie eingereicht hat; Wortfilter für Zitate schalten." },
+      { unter: "Zitatwand", key: "zitate.runden", label: "Zitate-Abstimmungsrunden", desc: "Eine engere Auswahl starten, Stimmen je Person festlegen, Runden beenden." },
+      { unter: "Zitatwand", key: "funktion.zitate", label: "Zitatwand an/aus", desc: "Den ganzen Bereich für alle ein- oder ausschalten." },
+      { unter: "Rankings", key: "rankings.nutzen", label: "Rankings nutzen", desc: "In den Schüler- und Lehrer-Rankings abstimmen und die Top 3 sehen." },
+      { unter: "Rankings", key: "rankings.verwalten", label: "Rankings verwalten", desc: "Ranking-Kategorien anlegen, ändern, löschen – auch direkt aus Umfrage-Ergebnissen." },
+      { unter: "Rankings", key: "rankings.runden", label: "Ranking-Abstimmungsrunden", desc: "Stichwahlen je Kategorie starten, Stimmen je Person festlegen, beenden." },
+      { unter: "Rankings", key: "lehrer.verwalten", label: "Lehrerliste pflegen", desc: "Lehrkräfte für Lehrer-Rankings und Zitate eintragen, ändern, löschen." },
+      { unter: "Rankings", key: "funktion.rankings", label: "Rankings an/aus", desc: "Den ganzen Bereich für alle ein- oder ausschalten." },
     ],
   },
   {
     label: "Abimotto", icon: "✨", perms: [
-      { key: "motto.nutzen", label: "Abimotto nutzen", desc: "Mottos vorschlagen und mit 👍 und 🔥 (dein Favorit) abstimmen." },
-      { key: "motto.verwalten", label: "Abimotto verwalten", desc: "Vorschläge ändern, ausblenden und das Motto festlegen." },
+      { key: "motto.nutzen", label: "Abimotto nutzen", desc: "Mottos vorschlagen und abstimmen." },
+      { key: "motto.verwalten", label: "Abimotto verwalten", desc: "Vorschläge ändern, ausblenden, das Motto festlegen; sieht, wer etwas eingereicht hat." },
+      { key: "motto.runden", label: "Motto-Abstimmungsrunden", desc: "Eine engere Auswahl starten, Stimmen je Person festlegen, Runden beenden." },
+      { key: "funktion.motto", label: "Abimotto an/aus", desc: "Den ganzen Bereich für alle ein- oder ausschalten." },
     ],
   },
   {
     label: "Umfragen", icon: "📊", perms: [
       { key: "umfragen.verwalten", label: "Umfragen verwalten", desc: "Pop-up-Umfragen anlegen, starten und beenden. Sie erscheinen beim nächsten Öffnen der App." },
       { key: "umfragen.ergebnisse", label: "Ergebnisse sehen", desc: "Gezählte Ergebnisse ansehen – auch während eine Umfrage läuft. Einzelne Antworten sieht niemand." },
+      { key: "umfragen.runden", label: "Stichwahlen", desc: "Aus den Ergebnissen einer Frage eine Stichwahl mit engerer Auswahl starten." },
+      { key: "funktion.umfragen", label: "Umfragen an/aus", desc: "Pop-up-Umfragen für alle ein- oder ausschalten." },
+    ],
+  },
+  {
+    label: "Abiball", icon: "🎟️", perms: [
+      { key: "funktion.abiball", label: "Abiball-Tickets an/aus", desc: "Den Ticket-Bereich für Schüler und Eltern ein- oder ausschalten." },
     ],
   },
   {
     label: "Rollen & Rechte", icon: "👑", perms: [
       { key: "roles.manage", label: "Rollen ändern", desc: "Rollen anderer Personen setzen." },
       { key: "perms.manage", label: "Berechtigungen vergeben", desc: "Diesen Rechte-Reiter benutzen." },
-      { key: "funktionen.verwalten", label: "Funktionen an/aus", desc: "Ganze Bereiche für alle ein- oder ausschalten (Abiball-Tickets, Abi-Album, Zitate, Rankings, Abimotto, Umfragen) – im Profil." },
+      { key: "funktionen.verwalten", label: "Alle Funktionen an/aus", desc: "Jeden Bereich für alle ein- oder ausschalten (Profil → Funktionen). Einzelne Bereiche lassen sich auch Komitees geben." },
     ],
   },
 ];
@@ -190,17 +216,48 @@ const ABIZEITUNG: PermKey[] = ["album.nutzen", "zitate.nutzen", "rankings.nutzen
  * Rankings + Lehrerliste, Motto & Pullis verwaltet das Abimotto.
  */
 export const KOMITEE_PERMS: PermKey[] = [
-  "zitate.pruefen",
-  "rankings.verwalten",
-  "lehrer.verwalten",
-  "album.redigieren",
   "album.kategorien",
   "album.moderieren",
+  "album.redigieren",
+  "funktion.album",
+  "funktion.spotify",
+  "zitate.pruefen",
+  "zitate.runden",
+  "funktion.zitate",
+  "rankings.verwalten",
+  "rankings.runden",
+  "lehrer.verwalten",
+  "funktion.rankings",
   "motto.verwalten",
+  "motto.runden",
+  "funktion.motto",
   "umfragen.verwalten",
   "umfragen.ergebnisse",
+  "umfragen.runden",
+  "funktion.umfragen",
+  "funktion.abiball",
+  "termine.manage",
   "meldungen.bearbeiten",
 ];
+
+/** Rechte nach Thema (für zugeklappte Listen mit Unterpunkten) */
+export function permsNachThema(keys: PermKey[]): { label: string; icon: string; gruppen: { unter: string; perms: PermDef[] }[] }[] {
+  const set = new Set(keys);
+  return PERM_CATEGORIES.map((c) => {
+    const ps = c.perms.filter((p) => set.has(p.key));
+    const gruppen: { unter: string; perms: PermDef[] }[] = [];
+    for (const p of ps) {
+      const u = p.unter || "";
+      const g = gruppen.find((x) => x.unter === u);
+      if (g) g.perms.push(p);
+      else gruppen.push({ unter: u, perms: [p] });
+    }
+    return { label: c.label, icon: c.icon, gruppen };
+  }).filter((t) => t.gruppen.length > 0);
+}
+
+/** Wer darf einen Bereich (Runden, Wortfilter) steuern? */
+export const RUNDEN_PERM = { motto: "motto.runden", zitate: "zitate.runden", rankings: "rankings.runden", umfragen: "umfragen.runden" } as const;
 
 export const ROLE_DEFAULTS: Record<string, PermKey[]> = {
   schueler: ["finanzen.basis", ...ABIZEITUNG],

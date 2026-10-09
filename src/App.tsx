@@ -44,6 +44,7 @@ import { PATCH, PATCH_MERKER } from "./lib/patchnotes";
 import { ElternProvider, useEltern } from "./eltern-store";
 import { ElternApp } from "./components/ElternApp";
 import { Icon, type IconName } from "./components/Icon";
+import { HintergrundEbene } from "./components/HintergrundEbene";
 import { InstallKarte, InstallOverlay } from "./components/InstallHinweis";
 import { useGescrollt, useHoeheAlsVariable, useReiter } from "./lib/gescrollt";
 import { Schalter } from "./components/Schalter";
@@ -86,6 +87,7 @@ function NachRolle() {
     return (
       <ProfilesProvider>
         <ElternProvider>
+          <HintergrundEbene />
           <ElternApp />
           <InstallOverlay />
           <UmfragePopup bereitZumZeigen />
@@ -100,6 +102,7 @@ function NachRolle() {
           <TopicsProvider>
             <ElternProvider>
               <AlbumProvider>
+                <HintergrundEbene />
                 <Main />
                 <MeldenWurzel />
               </AlbumProvider>
@@ -439,7 +442,7 @@ function Main() {
       <header
         ref={kopfRef}
         className={`sticky top-0 z-20 -mx-3 px-3 pb-2 pt-[calc(env(safe-area-inset-top)+0.5rem)] transition-[background-color,box-shadow] duration-300 sm:-mx-5 sm:px-5 ${
-          gescrollt ? "glas shadow-[0_0.5px_0_rgba(0,0,0,.18)] dark:shadow-[0_0.5px_0_rgba(255,255,255,.15)]" : "bg-papier dark:bg-slate-950"
+          gescrollt ? "glas shadow-[0_0.5px_0_rgba(0,0,0,.18)] dark:shadow-[0_0.5px_0_rgba(255,255,255,.15)]" : "kopf-grund bg-papier dark:bg-slate-950"
         }`}
       >
         <div className="mx-auto flex max-w-5xl items-center gap-2.5">
@@ -489,11 +492,11 @@ function Main() {
               <button
                 data-tour="nachtragen"
                 onClick={() => setNachtragOffen(true)}
-                className="flex h-10 items-center gap-1 rounded-full bg-gradient-to-br from-[#34C759] to-[#0FA968] px-3 text-[13px] font-semibold text-white shadow-[0_4px_12px_-4px_rgba(16,169,104,.7)] transition active:scale-90"
+                className="flex h-10 items-center gap-1 rounded-full bg-[#248A3D] px-3.5 text-[14px] font-semibold text-white transition active:scale-90 dark:bg-[#30D158] dark:text-black"
                 aria-label="Mithilfe nachtragen"
                 title="Mithilfe nachtragen"
               >
-                <span aria-hidden className="text-[15px] leading-none">🙌</span>
+                <Icon name="plus" size={16} strich={2.6} />
                 <span className="hidden min-[380px]:inline">Nachtragen</span>
               </button>
             )}
@@ -576,9 +579,16 @@ function Main() {
         {tab === "kasse" && teamView && <KassenKopf students={students} settings={settings} punkte={punkte} />}
 
         {tab === "kasse" && teamView && canEditData && (
-          <div className="mx-auto mt-3 max-w-5xl">
-            <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-3">
-              <span className="shrink-0 px-1 text-[13px] text-tinte-leise">Laufendes Halbjahr</span>
+          <details className="group mx-auto mt-2 max-w-5xl">
+            {/* Selten gebraucht – deshalb zugeklappt statt dauerhaft als Leiste */}
+            <summary className="flex min-h-[40px] cursor-pointer list-none items-center gap-1.5 px-1 text-[13px] text-tinte-leise [&::-webkit-details-marker]:hidden">
+              Laufendes Halbjahr: <b className="font-semibold text-tinte dark:text-slate-100">{settings.aktuelles_halbjahr}</b>
+              <span className="font-semibold text-brand-dark dark:text-brand">· ändern</span>
+              <span className="transition group-open:rotate-90" aria-hidden>
+                <Icon name="chevron" size={13} />
+              </span>
+            </summary>
+            <div className="pb-1">
               <div className="seg min-w-0 flex-1" role="radiogroup" aria-label="Laufendes Halbjahr">
                 {HY.map((h) => (
                   <button
@@ -596,7 +606,7 @@ function Main() {
                 ))}
               </div>
             </div>
-          </div>
+          </details>
         )}
 
         {tab === "kasse" && teamView && showFilter && (

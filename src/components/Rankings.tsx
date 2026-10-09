@@ -18,6 +18,11 @@ import {
 } from "../lib/rankings";
 import { frage, meldeFehler } from "../lib/melder";
 import { GesperrtZeile, GESPERRT_TEXT } from "./Gesperrt";
+import { useRunden, type Runde, type RundenStand } from "../lib/runden";
+import { RundenAbschnitt, RundenMarke } from "./Runden";
+import { Kachel } from "./Kachel";
+import { Icon } from "./Icon";
+import { WortfilterSchalter } from "./AutorInfo";
 
 const MEDAILLE = ["#E9C460", "#C0C4CC", "#D4A373"];
 const kurz = (p: StufenPerson) => `${p.vorname} ${p.nachname ? p.nachname[0] + "." : ""}`.trim();
@@ -33,25 +38,11 @@ function useNamen(personen: StufenPerson[], lehrer: Lehrer[]) {
 }
 
 /* ====================================================================== */
-/* Zwei Karten im Profil: Schüler-Ranking | Lehrer-Ranking               */
+/* Eine Karte auf der Startseite: Schüler- und Lehrer-Ranking            */
 /* ====================================================================== */
-const ART_STIL: Record<RankingArt, { titel: string; kurz: string; verlauf: string; akzent: string; knopf: string; schatten: string }> = {
-  schueler: {
-    titel: "Schüler-Ranking",
-    kurz: "Schüler",
-    verlauf: "from-[#1E3A8A] to-[#0B1226]",
-    akzent: "text-[#8CB8FF]",
-    knopf: "bg-[#8CB8FF] text-[#0B1226]",
-    schatten: "shadow-[0_10px_30px_-14px_rgba(30,58,138,.9)]",
-  },
-  lehrer: {
-    titel: "Lehrer-Ranking",
-    kurz: "Lehrer",
-    verlauf: "from-[#7C2D12] to-[#1C0F08]",
-    akzent: "text-[#FDBA74]",
-    knopf: "bg-[#FDBA74] text-[#1C0F08]",
-    schatten: "shadow-[0_10px_30px_-14px_rgba(124,45,18,.9)]",
-  },
+const ART_STIL: Record<RankingArt, { titel: string; kurz: string }> = {
+  schueler: { titel: "Schüler-Ranking", kurz: "Schüler" },
+  lehrer: { titel: "Lehrer-Ranking", kurz: "Lehrer" },
 };
 
 export function RankingKarten({ className = "" }: { className?: string }) {
@@ -60,58 +51,49 @@ export function RankingKarten({ className = "" }: { className?: string }) {
   const darf = !isEltern && sichtbar("rankings") && (can("rankings.nutzen") || can("rankings.verwalten"));
   const [offen, setOffen] = useState<RankingArt | null>(null);
   const r = useRankings(darf, uid, offen !== null);
+  const runden = useRunden("rankings", darf, uid, can("rankings.runden"));
   if (!darf) return null;
+  const stichwahlen = runden.offene.length;
 
   return (
     <div className={className}>
       <AusHinweis funktion="rankings" className="mb-1.5 px-1" />
-      <div className="grid grid-cols-2 gap-3">
-        {(["schueler", "lehrer"] as RankingArt[]).map((art) => (
-          <RankingKarte key={art} art={art} r={r} oeffnen={() => setOffen(art)} />
-        ))}
-      </div>
-      <RankingSheet art={offen} onClose={() => setOffen(null)} r={r} />
-    </div>
-  );
-}
-
-function RankingKarte({ art, r, oeffnen }: { art: RankingArt; r: Rankings; oeffnen: () => void }) {
-  const stil = ART_STIL[art];
-  const aktive = r.kategorien.filter((k) => k.aktiv && k.art === art);
-  const offenAnzahl = aktive.filter((k) => !(k.id in r.meine)).length;
-  return (
-    <section
-      className={`relative flex min-h-[164px] flex-col overflow-hidden rounded-[1.4rem] bg-gradient-to-br p-3.5 text-white sm:p-5 ${stil.verlauf} ${stil.schatten}`}
-    >
-      {/* Kleines Siegertreppchen oben rechts – unten ist Platz für den Knopf */}
-      <div aria-hidden className="pointer-events-none absolute right-3.5 top-3.5 flex items-end gap-[2px] opacity-90 sm:right-5 sm:top-5">
-        {[
-          { h: 15, f: MEDAILLE[1], n: 2 },
-          { h: 22, f: MEDAILLE[0], n: 1 },
-          { h: 10, f: MEDAILLE[2], n: 3 },
-        ].map((s) => (
-          <span key={s.n} className="w-[14px] rounded-t-[3px] sm:w-5" style={{ height: s.h, background: s.f }} />
-        ))}
-      </div>
-      <div className={`pr-14 text-[11px] font-semibold uppercase tracking-[0.12em] ${stil.akzent}`}>Abi-Ranking</div>
-      <div className="mt-0.5 text-[1.2rem] font-bold leading-tight">{stil.kurz}</div>
-      <div className="mt-1 text-[12.5px] leading-snug text-white/75">
-        {aktive.length ? (offenAnzahl ? `Noch ${offenAnzahl} von ${aktive.length} offen` : `Alle ${aktive.length} abgestimmt`) : "Noch keine Kategorien"}
-      </div>
-      <button
-        onClick={oeffnen}
-        className={`mt-auto self-start rounded-full px-3.5 py-2 text-[13.5px] font-semibold transition active:scale-95 ${stil.knopf}`}
+      <Kachel
+        icon="pokal"
+        farbe="bg-[#32ADE6]"
+        titel="Abi-Rankings"
+        unter={stichwahlen ? `${stichwahlen} ${stichwahlen === 1 ? "Stichwahl läuft" : "Stichwahlen laufen"}` : "Wer ist am ehesten …? Geheim abstimmen."}
       >
-        {offenAnzahl > 0 ? "Abstimmen" : "Ansehen"}
-      </button>
-    </section>
+        <div className="liste mt-3 bg-[rgb(118_118_128/0.08)] dark:bg-[rgb(118_118_128/0.18)]">
+          {(["schueler", "lehrer"] as RankingArt[]).map((art) => {
+            const aktive = r.kategorien.filter((k) => k.aktiv && k.art === art);
+            const offenAnzahl = aktive.filter((k) => !(k.id in r.meine)).length;
+            return (
+              <button key={art} onClick={() => setOffen(art)} className="zeile w-full text-left transition active:bg-black/[0.04] dark:active:bg-white/[0.06]">
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[15px] font-semibold">{ART_STIL[art].kurz}</span>
+                  <span className="block text-[12.5px] text-tinte-leise">
+                    {aktive.length ? (offenAnzahl ? `Noch ${offenAnzahl} von ${aktive.length} offen` : `Alle ${aktive.length} abgestimmt`) : "Noch keine Kategorien"}
+                  </span>
+                </span>
+                {offenAnzahl > 0 && <span className="rounded-full bg-brand px-2 py-0.5 text-[12px] font-semibold text-white">{offenAnzahl}</span>}
+                <span className="text-tinte-leise">
+                  <Icon name="chevron" size={16} />
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </Kachel>
+      <RankingSheet art={offen} onClose={() => setOffen(null)} r={r} runden={runden} />
+    </div>
   );
 }
 
 /* ====================================================================== */
 /* Blatt je Ranking                                                       */
 /* ====================================================================== */
-function RankingSheet({ art, onClose, r }: { art: RankingArt | null; onClose: () => void; r: Rankings }) {
+function RankingSheet({ art, onClose, r, runden }: { art: RankingArt | null; onClose: () => void; r: Rankings; runden: RundenStand }) {
   const { can } = useRole();
   const open = art !== null;
   const personen = useStufePersonen(open);
@@ -134,6 +116,7 @@ function RankingSheet({ art, onClose, r }: { art: RankingArt | null; onClose: ()
           <Abstimmen
             k={wahl}
             r={r}
+            runden={runden}
             personen={personen}
             lehrer={lehrer.filter((l) => l.aktiv)}
             name={name}
@@ -152,7 +135,7 @@ function RankingSheet({ art, onClose, r }: { art: RankingArt | null; onClose: ()
             <GesperrtZeile className="-mt-1 mb-3" />
             <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3">
               {aktive.map((k) => (
-                <Kachel key={k.id} k={k} r={r} name={name} onClick={() => setWahl(k)} />
+                <KategorieKachel key={k.id} k={k} r={r} name={name} offeneRunde={runden.offeneVon(k.id)} onClick={() => setWahl(k)} />
               ))}
             </div>
             {aktive.length === 0 && (
@@ -168,7 +151,19 @@ function RankingSheet({ art, onClose, r }: { art: RankingArt | null; onClose: ()
   );
 }
 
-function Kachel({ k, r, name, onClick }: { k: RankingKategorie; r: Rankings; name: (id: string | null) => string; onClick: () => void }) {
+function KategorieKachel({
+  k,
+  r,
+  name,
+  offeneRunde,
+  onClick,
+}: {
+  k: RankingKategorie;
+  r: Rankings;
+  name: (id: string | null) => string;
+  offeneRunde: Runde | null;
+  onClick: () => void;
+}) {
   const st = r.stand.find((s) => s.kategorie_id === k.id);
   const hat = k.id in r.meine;
   const meine = r.meine[k.id];
@@ -176,9 +171,10 @@ function Kachel({ k, r, name, onClick }: { k: RankingKategorie; r: Rankings; nam
     <button
       onClick={onClick}
       className={`block w-full rounded-2xl p-3 text-left transition active:scale-[.98] ${
-        hat ? "bg-[rgb(118_118_128/0.08)] dark:bg-[rgb(118_118_128/0.18)]" : "bg-white shadow-[0_4px_14px_-6px_rgba(0,0,0,.25)] ring-1 ring-[#E9C460]/60 dark:bg-slate-800"
+        hat && !offeneRunde ? "bg-[rgb(118_118_128/0.08)] dark:bg-[rgb(118_118_128/0.18)]" : "bg-white shadow-card ring-1 ring-brand/40 dark:bg-slate-800"
       }`}
     >
+      {offeneRunde && <RundenMarke runde={offeneRunde} className="mb-1.5 !px-2 !py-0.5 !text-[11px]" />}
       <div className="text-[13.5px] font-semibold leading-snug">{k.titel}</div>
       <ol className="mt-2 space-y-1">
         {[0, 1, 2].map((i) => {
@@ -205,6 +201,7 @@ function Kachel({ k, r, name, onClick }: { k: RankingKategorie; r: Rankings; nam
 function Abstimmen({
   k,
   r,
+  runden,
   personen,
   lehrer,
   name,
@@ -213,13 +210,20 @@ function Abstimmen({
 }: {
   k: RankingKategorie;
   r: Rankings;
+  runden: RundenStand;
   personen: StufenPerson[];
   lehrer: Lehrer[];
   name: (id: string | null) => string;
   zurueck: () => void;
   onClose: () => void;
 }) {
-  const { banned } = useRole();
+  const { banned, can } = useRole();
+  const stichwahl = runden.offeneVon(k.id);
+  const punkte = new Map((r.stand.find((s) => s.kategorie_id === k.id)?.top || []).map((t) => [t.ziel, t.n]));
+  const quellen =
+    k.art === "lehrer"
+      ? lehrer.map((l) => ({ id: l.id, label: l.name, punkte: punkte.get(l.id) ?? 0 }))
+      : personen.map((p) => ({ id: p.id, label: kurz(p), punkte: punkte.get(p.id) ?? 0 }));
   const st = r.stand.find((s) => s.kategorie_id === k.id);
   return (
     <div className="animate-vonRechts">
@@ -231,8 +235,8 @@ function Abstimmen({
           ✕
         </button>
       </div>
-      <div className="rounded-2xl bg-gradient-to-br from-[#1E2A4A] to-[#0B1226] p-4 text-white">
-        <div className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#E9C460]">{k.art === "schueler" ? "Schüler-Ranking" : "Lehrer-Ranking"}</div>
+      <div className="feld-grau p-4">
+        <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-tinte-leise">{k.art === "schueler" ? "Schüler-Ranking" : "Lehrer-Ranking"}</div>
         <div className="mt-1 text-[1.15rem] font-bold leading-snug">{k.titel}</div>
         <div className="mt-3 flex items-end justify-center gap-2">
           {[1, 0, 2].map((i) => {
@@ -252,7 +256,20 @@ function Abstimmen({
         </div>
       </div>
       <GesperrtZeile className="mt-3" />
-      <p className="mb-2 mt-4 px-1 text-[13px] text-tinte-leise">
+      <div className="mt-4">
+        <RundenAbschnitt
+          stand={runden}
+          gruppe={k.id}
+          gruppeTitel={k.titel}
+          quellen={quellen}
+          leitet={can("rankings.runden")}
+          gesperrt={banned}
+          startText="Stichwahl starten"
+        />
+      </div>
+      {!stichwahl && (
+      <>
+      <p className="mb-2 mt-2 px-1 text-[13px] text-tinte-leise">
         {k.id in r.meine ? `Deine Stimme: ${r.meine[k.id] ? name(r.meine[k.id]) : "Weiß nicht"} – du kannst sie ändern.` : "Wähle aus:"}
       </p>
       <ZielWahl
@@ -267,6 +284,8 @@ function Abstimmen({
           if (f) meldeFehler("Ging nicht: " + f);
         }}
       />
+      </>
+      )}
     </div>
   );
 }
@@ -368,6 +387,7 @@ function RankingVerwaltung({ open, onClose, r, start }: { open: boolean; onClose
   return (
     <Sheet open={open} onClose={onClose}>
       <SheetKopf titel="Rankings verwalten" onClose={onClose} />
+      <WortfilterSchalter bereich="rankings" className="mb-4" />
       {can("rankings.verwalten") && can("lehrer.verwalten") && (
         <div className="seg mb-4">
           <button className={`seg-item ${teil === "kategorien" ? "seg-aktiv" : ""}`} onClick={() => setTeil("kategorien")}>

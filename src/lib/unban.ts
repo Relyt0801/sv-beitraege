@@ -1,4 +1,5 @@
 import { hasSupabase, supabase } from "./supabase";
+import { nochFehlend, zustimmen } from "./zustimmung";
 import { pushAnTeam, pushToUsers } from "./push";
 
 export interface UnbanRequest {
@@ -48,6 +49,10 @@ export async function entscheide(
   if (!hasSupabase) return { ok: true };
   const { data: s } = await supabase!.auth.getSession();
   if (annehmen) {
+    // Entsperren braucht ggf. mehrere Zustimmungen (Profil → Freigaben)
+    const z = await zustimmen("entsperren", req.id);
+    if ("error" in z) return { ok: false, error: z.error };
+    if (!z.fertig) return { ok: false, error: nochFehlend(z) };
     const { error } = await supabase!
       .from("profiles")
       .update({ chat_banned_until: null, chat_ban_permanent: false })

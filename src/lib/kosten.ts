@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { hasSupabase, supabase } from "./supabase";
+import { nochFehlend, zustimmen } from "./zustimmung";
 import { abonniere } from "./realtime";
 import { pushToUsers } from "./push";
 import { committeeLabel } from "./committees";
@@ -124,6 +125,12 @@ export function useKostenAnfragen(aktiv: boolean): KostenValue {
   const entscheiden = useCallback<KostenValue["entscheiden"]>(
     async (a, genehmigt, antwort, datum) => {
       if (!hasSupabase) return null;
+      // Genehmigen braucht ggf. mehrere Zustimmungen (Profil → Freigaben)
+      if (genehmigt) {
+        const z = await zustimmen("kosten", a.id);
+        if ("error" in z) return z.error;
+        if (!z.fertig) return nochFehlend(z);
+      }
       const { error } = await supabase!.rpc("kostenanfrage_entscheiden", {
         p_id: a.id,
         p_genehmigt: genehmigt,

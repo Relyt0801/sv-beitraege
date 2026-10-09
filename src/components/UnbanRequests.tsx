@@ -7,9 +7,11 @@ import { useStore } from "../store";
 import { entscheide, ladeAnfragen, type UnbanRequest } from "../lib/unban";
 
 import { meldeFehler } from "../lib/melder";
+import { useZustimmungen, zustimmungText } from "../lib/zustimmung";
 /** Entbannungsanfragen – erscheinen für die Moderation oben in den Events. */
 export function UnbanRequests() {
-  const { can, profiles } = useRole();
+  const { can, profiles, uid, isStaff } = useRole();
+  const zu = useZustimmungen("entsperren", isStaff || can("mod.timeout"), uid);
   const { students } = useStore();
   const [liste, setListe] = useState<UnbanRequest[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
@@ -53,6 +55,12 @@ export function UnbanRequests() {
               <div className="mt-0.5 text-[13px] text-tinte-matt dark:text-slate-300">{r.nachricht}</div>
               <div className="mt-1 text-[11px] text-tinte-leise">
                 {new Date(r.created_at).toLocaleString("de-DE")}
+                {zustimmungText(zu.zahl(r.id), zu.noetig) && (
+                  <span className="ml-1.5 rounded-full bg-brand/10 px-2 py-0.5 font-semibold text-brand-dark dark:text-brand">
+                    {zustimmungText(zu.zahl(r.id), zu.noetig)}
+                    {zu.ichSchon(r.id) ? " · deine ✓" : ""}
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -76,7 +84,8 @@ export function UnbanRequests() {
                 setBusy(r.id);
                 const res = await entscheide(r, true);
                 setBusy(null);
-                if (!res.ok) meldeFehler("Fehler: " + res.error);
+                if (!res.ok) meldeFehler(res.error?.startsWith("Deine Zustimmung") ? res.error : "Fehler: " + res.error);
+                void zu.laden();
                 laden();
               }}
               className="flex-1 rounded-xl bg-emerald-500 py-2 text-sm font-bold text-white"

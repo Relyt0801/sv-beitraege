@@ -5,7 +5,7 @@ import { KomiteeZugriff } from "./KomiteeZugriff";
 import { SkelettKarten } from "./Skelett";
 import { Sheet } from "./Sheet";
 import type { Profile } from "../auth/RoleProvider";
-import { PERM_CATEGORIES, PERM_ROLES, ALL_PERMS, ROLE_DEFAULTS, ROLLE_KURZ, KOMITEE_PERMS, rechteRolle, rollenDerZeile, type PermKey } from "../lib/permissions";
+import { PERM_CATEGORIES, PERM_ROLES, ALL_PERMS, ROLE_DEFAULTS, ROLLE_KURZ, KOMITEE_PERMS, permsNachThema, rechteRolle, rollenDerZeile, type PermKey } from "../lib/permissions";
 import { COMMITTEES } from "../lib/committees";
 import { Schalter } from "./Schalter";
 
@@ -99,8 +99,9 @@ export function PermissionsTab() {
           </button>
           {auf && (
           <div className="space-y-3.5 border-t border-papier-linie px-4 pb-4 pt-3 dark:border-slate-800">
-            {cat.perms.map((perm) => (
+            {cat.perms.map((perm, i) => (
               <div key={perm.key}>
+                {perm.unter && perm.unter !== cat.perms[i - 1]?.unter && <UnterKopf text={perm.unter} erstes={i === 0} />}
                 <div className="text-[15px] font-semibold">{perm.label}</div>
                 <div className="mb-1.5 text-[11px] leading-snug text-tinte-leise">{perm.desc}</div>
                 <div className={`grid grid-cols-3 gap-1.5 ${perm.eltern ? "sm:grid-cols-6" : "sm:grid-cols-5"}`}>
@@ -139,8 +140,8 @@ export function PermissionsTab() {
 
 /** Startwerte wie in supabase/komitees-motto.sql (für die Demo) */
 const KOMITEE_START: Record<string, PermKey[]> = {
-  abizeitung: ["zitate.pruefen", "rankings.verwalten", "lehrer.verwalten", "album.redigieren"],
-  "motto-pullis": ["motto.verwalten"],
+  abizeitung: ["zitate.pruefen", "zitate.runden", "rankings.verwalten", "rankings.runden", "lehrer.verwalten", "album.redigieren", "funktion.album", "funktion.zitate", "funktion.rankings"],
+  "motto-pullis": ["motto.verwalten", "motto.runden", "funktion.motto"],
 };
 const permLabel = (k: PermKey) => PERM_CATEGORIES.flatMap((c) => c.perms).find((p) => p.key === k)?.label ?? k;
 
@@ -188,8 +189,8 @@ function KomiteeRechte() {
           <span aria-hidden className="text-lg">🏷️</span> Komitee-Rechte
         </div>
         <p className="mt-1 text-[12px] leading-snug text-tinte-leise">
-          Ganze Komitees bekommen Verwaltungsrechte zusätzlich zur Rolle – z. B. die Abizeitung prüft Zitate. Wer im Komitee ist, hat sie
-          sofort. Ausnahmen für einzelne Personen gehen vor.
+          Ganze Komitees bekommen Rechte für ihre Themen – verwalten, Abstimmungsrunden starten, den Bereich an- und ausschalten. Wer im
+          Komitee ist, hat sie sofort. Ausnahmen für einzelne Personen gehen vor.
         </p>
       </div>
       <div className="divide-y divide-papier-linie dark:divide-slate-800">
@@ -209,12 +210,31 @@ function KomiteeRechte() {
                 <span className={`text-tinte-leise transition ${offen ? "rotate-90" : ""}`} aria-hidden>›</span>
               </button>
               {offen && (
-                <div className="space-y-1 px-4 pb-3">
-                  {KOMITEE_PERMS.map((p) => (
-                    <div key={p} className="flex min-h-[44px] items-center gap-3">
-                      <span className="min-w-0 flex-1 text-[14px]">{permLabel(p)}</span>
-                      <Schalter an={an.has(p)} label={`${permLabel(p)} für ${k.label}`} onChange={(v) => void setze(k.slug, p, v)} />
-                    </div>
+                <div className="space-y-2 px-4 pb-4">
+                  {permsNachThema(KOMITEE_PERMS).map((t) => (
+                    <details key={t.label} className="group overflow-hidden rounded-xl bg-[rgb(118_118_128/0.08)] dark:bg-[rgb(118_118_128/0.18)]">
+                      <summary className="flex min-h-[44px] cursor-pointer list-none items-center gap-2 px-3 text-[14px] font-semibold [&::-webkit-details-marker]:hidden">
+                        <span aria-hidden>{t.icon}</span>
+                        <span className="min-w-0 flex-1">{t.label}</span>
+                        <span className="text-[12px] font-medium text-tinte-leise">
+                          {t.gruppen.flatMap((g) => g.perms).filter((pp) => an.has(pp.key)).length}/{t.gruppen.flatMap((g) => g.perms).length}
+                        </span>
+                        <span className="text-tinte-leise transition group-open:rotate-90" aria-hidden>›</span>
+                      </summary>
+                      <div className="px-3 pb-2">
+                        {t.gruppen.map((g) => (
+                          <div key={g.unter}>
+                            {g.unter && <div className="mt-1 text-[11.5px] font-semibold uppercase tracking-[0.04em] text-tinte-leise">{g.unter}</div>}
+                            {g.perms.map((pp) => (
+                              <div key={pp.key} className="flex min-h-[44px] items-center gap-3">
+                                <span className="min-w-0 flex-1 text-[14px] leading-snug">{pp.label}</span>
+                                <Schalter an={an.has(pp.key)} label={`${pp.label} für ${k.label}`} onChange={(v) => void setze(k.slug, pp.key, v)} />
+                              </div>
+                            ))}
+                          </div>
+                        ))}
+                      </div>
+                    </details>
                   ))}
                 </div>
               )}
@@ -223,6 +243,15 @@ function KomiteeRechte() {
         })}
       </div>
     </section>
+  );
+}
+
+/** Zwischenüberschrift innerhalb eines Themas („Zitatwand“, „Rankings“) */
+function UnterKopf({ text, erstes }: { text: string; erstes: boolean }) {
+  return (
+    <div className={`mb-2 text-[12px] font-semibold uppercase tracking-[0.04em] text-tinte-leise ${erstes ? "" : "mt-5 border-t border-papier-linie pt-3 dark:border-slate-800"}`}>
+      {text}
+    </div>
   );
 }
 
@@ -337,11 +366,12 @@ export function PersonRechteSheet({ profil, name, onClose }: { profil: Profile; 
                 </button>
                 {auf && (
                   <div className={`space-y-3 px-4 pb-4 ${geschuetzt ? "pointer-events-none opacity-40" : ""}`}>
-                    {cat.perms.map((perm) => {
+                    {cat.perms.map((perm, i) => {
                       const val = ov[perm.key];
                       const standard = Boolean(rolle[perm.key]);
                       return (
                         <div key={perm.key}>
+                          {perm.unter && perm.unter !== cat.perms[i - 1]?.unter && <UnterKopf text={perm.unter} erstes={i === 0} />}
                           <div className="text-[14px] font-semibold leading-tight">{perm.label}</div>
                           <div className="mb-1.5 text-[11px] leading-snug text-tinte-leise">{perm.desc}</div>
                           <div className="grid grid-cols-3 gap-1.5">

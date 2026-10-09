@@ -8,6 +8,8 @@ import { useProfiles } from "../profiles-store";
 import { hasSupabase, supabase } from "../lib/supabase";
 import { frage, melde, meldeFehler } from "../lib/melder";
 import { hinScrollen, useSprungziel } from "../lib/sprung";
+import { Icon } from "./Icon";
+import { useWortfilterBereiche, WF_BEREICHE } from "../lib/wortfilter-bereiche";
 import { ART_TEXT, GRUENDE, meldungSenden, useMeldungen, type MeldeArt, type MeldeGrund, type Meldung } from "../lib/melden";
 
 /* ====================================================================== */
@@ -226,14 +228,15 @@ const MODI: { key: Eintrag["modus"]; text: string; hilfe: string }[] = [
 
 export function WortfilterSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [liste, setListe] = useState<Eintrag[]>([]);
-  const [teil, setTeil] = useState<"block" | "erlaubt">("block");
+  const [teil, setTeil] = useState<"block" | "erlaubt" | "bereiche">("block");
   const [neu, setNeu] = useState("");
   const [modus, setModus] = useState<Eintrag["modus"]>("anfang");
   const [probe, setProbe] = useState("");
   const [probeErg, setProbeErg] = useState<string | null | undefined>(undefined);
-  const [zeigen, setZeigen] = useState(false);
+  const [suche, setSuche] = useState("");
   const [zeichen, setZeichen] = useState("");
   const [zeichenAlt, setZeichenAlt] = useState("");
+  const bereiche = useWortfilterBereiche(open);
 
   const laden = async () => {
     if (!hasSupabase) return;
@@ -250,21 +253,50 @@ export function WortfilterSheet({ open, onClose }: { open: boolean; onClose: () 
     if (open) void laden();
   }, [open]);
 
-  const sichtbar = liste.filter((e) => e.stufe === teil);
+  const q = suche.trim().toLowerCase();
+  const sichtbar = liste.filter((e) => e.stufe === teil && (!q || e.wort.toLowerCase().includes(q)));
+
+  async function hinzufuegen() {
+    const w = neu.trim();
+    if (w.length < 2 || teil === "bereiche") return;
+    if (!hasSupabase) return;
+    const { error } = await supabase!.from("wortfilter").insert({ wort: w, stufe: teil, modus: teil === "block" ? modus : "wort" });
+    if (error) return meldeFehler(error.message.includes("duplicate") ? "Steht schon drin." : "Ging nicht: " + error.message);
+    setNeu("");
+    melde(`„${w}“ hinzugefügt`, "erfolg");
+    void laden();
+  }
+
+  async function loeschen(e: Eintrag) {
+    const ok = await frage(`„${e.wort}“ aus der Liste löschen?`, "Löschen", true);
+    if (!ok) return;
+    setListe((l) => l.filter((x) => x.id !== e.id));
+    const { error } = await supabase!.from("wortfilter").delete().eq("id", e.id);
+    if (error) {
+      meldeFehler("Ging nicht: " + error.message);
+      void laden();
+    }
+  }
 
   return (
     <Sheet open={open} onClose={onClose}>
-      <SheetKopf
-        titel="Wortfilter"
-        unter="Gilt für Chats, Kommentare, Steckbriefe, Umfragen, Motto und Anfragen – nicht für Zitate (die prüft das Team)."
-        onClose={onClose}
-      />
-      <div className="mb-3 rounded-2xl bg-[rgb(118_118_128/0.08)] p-3 dark:bg-[rgb(118_118_128/0.18)]">
-        <div className="text-[13px] font-semibold">Testen</div>
-        <div className="mt-1.5 flex gap-2">
-          <input className="field" placeholder="Text ausprobieren, z. B. „A.r.s.c.h“" value={probe} onChange={(e) => setProbe(e.target.value)} />
+      <SheetKopf titel="Wortfilter" unter="Blockt beleidigende Wörter – je Bereich an- und ausschaltbar." onClose={onClose} />
+
+      {/* Ausprobieren */}
+      <div className="feld-grau mb-4 p-3">
+        <div className="flex gap-2">
+          <input
+            className="field !bg-white dark:!bg-slate-800"
+            placeholder="Text ausprobieren, z. B. „A.r.s.c.h“"
+            value={probe}
+            onChange={(e) => {
+              setProbe(e.target.value);
+              setProbeErg(undefined);
+            }}
+            onKeyDown={(e) => e.key === "Enter" && probe.trim() && e.currentTarget.nextElementSibling instanceof HTMLButtonElement && e.currentTarget.nextElementSibling.click()}
+          />
           <button
-            className="btn-primary !min-h-[44px] !w-auto shrink-0 px-4 !text-[15px]"
+            className="btn-klein shrink-0"
             disabled={!probe.trim()}
             onClick={async () => {
               if (!hasSupabase) return setProbeErg(null);
@@ -276,135 +308,166 @@ export function WortfilterSheet({ open, onClose }: { open: boolean; onClose: () 
           </button>
         </div>
         {probeErg !== undefined && (
-          <div className={`mt-1.5 text-[13px] font-semibold ${probeErg ? "text-red-600 dark:text-red-400" : "text-[#248A3D] dark:text-[#30D158]"}`}>
+          <div className={`mt-1.5 px-1 text-[13px] font-semibold ${probeErg ? "text-red-600 dark:text-red-400" : "text-[#248A3D] dark:text-[#30D158]"}`}>
             {probeErg ? `Wird geblockt („${probeErg}“)` : "Geht durch"}
           </div>
         )}
       </div>
 
-      <div className="seg mb-3">
+      <div className="seg mb-4">
         <button className={`seg-item ${teil === "block" ? "seg-aktiv" : ""}`} onClick={() => setTeil("block")}>
           Blocken ({liste.filter((e) => e.stufe === "block").length})
         </button>
         <button className={`seg-item ${teil === "erlaubt" ? "seg-aktiv" : ""}`} onClick={() => setTeil("erlaubt")}>
           Ausnahmen ({liste.filter((e) => e.stufe === "erlaubt").length})
         </button>
-      </div>
-
-      <div className="mb-2 flex gap-2">
-        <input
-          className="field"
-          maxLength={40}
-          placeholder={teil === "block" ? "Neues Wort" : "Erlaubtes Wort, z. B. idiotensicher"}
-          value={neu}
-          onChange={(e) => setNeu(e.target.value)}
-        />
-        <button
-          className="btn-primary !min-h-[44px] !w-auto shrink-0 px-4 !text-[15px]"
-          disabled={neu.trim().length < 2}
-          onClick={async () => {
-            if (!hasSupabase) return;
-            const { error } = await supabase!.from("wortfilter").insert({ wort: neu.trim(), stufe: teil, modus: teil === "block" ? modus : "wort" });
-            if (error) return meldeFehler(error.message.includes("duplicate") ? "Steht schon drin." : "Ging nicht: " + error.message);
-            setNeu("");
-            void laden();
-          }}
-        >
-          Hinzufügen
+        <button className={`seg-item ${teil === "bereiche" ? "seg-aktiv" : ""}`} onClick={() => setTeil("bereiche")}>
+          Bereiche
         </button>
       </div>
-      {teil === "block" && (
-        <div className="mb-4 grid grid-cols-3 gap-1.5">
-          {MODI.map((x) => (
-            <button
-              key={x.key}
-              onClick={() => setModus(x.key)}
-              title={x.hilfe}
-              className={`rounded-xl px-2 py-2 text-[12.5px] font-semibold transition ${
-                modus === x.key ? "bg-brand text-white" : "bg-[rgb(118_118_128/0.1)] text-tinte-matt dark:text-slate-300"
-              }`}
-            >
-              {x.text}
-            </button>
-          ))}
-        </div>
-      )}
 
-      {teil === "block" && (
-        <div className="mb-4 rounded-2xl bg-[rgb(118_118_128/0.08)] p-3 dark:bg-[rgb(118_118_128/0.18)]">
-          <div className="text-[13px] font-semibold">Emojis blocken</div>
-          <p className="mt-0.5 text-[12px] leading-snug text-tinte-leise">Jedes Emoji hier blockt wie ein Wort – Hautfarben zählen mit.</p>
-          <div className="mt-1.5 flex gap-2">
-            <input
-              className="field text-[18px] tracking-wider"
-              aria-label="Geblockte Emojis"
-              maxLength={200}
-              placeholder="z. B. 🍆🍑💦"
-              value={zeichen}
-              onChange={(e) => setZeichen(e.target.value.replace(/[\sA-Za-z0-9]/g, ""))}
-            />
-            <button
-              className="btn-primary !min-h-[44px] !w-auto shrink-0 px-4 !text-[15px]"
-              disabled={zeichen === zeichenAlt}
-              onClick={async () => {
-                if (!hasSupabase) return;
-                const { error } = await supabase!.rpc("wortfilter_zeichen_setzen", { p: zeichen });
-                if (error) return meldeFehler("Ging nicht: " + error.message);
-                setZeichenAlt(zeichen);
-              }}
-            >
-              Speichern
-            </button>
+      {teil === "bereiche" ? (
+        <>
+          <div className="liste bg-[rgb(118_118_128/0.08)] dark:bg-[rgb(118_118_128/0.18)]">
+            {WF_BEREICHE.map((b) => (
+              <label key={b.key} className="zeile">
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[15px]">{b.titel}</span>
+                  <span className="block text-[12px] leading-snug text-tinte-leise">{b.text}</span>
+                </span>
+                <Schalter
+                  an={bereiche.an[b.key]}
+                  label={`Wortfilter für ${b.titel}`}
+                  onChange={async (v) => {
+                    const f = await bereiche.setzen(b.key, v);
+                    if (f) meldeFehler("Ging nicht: " + f);
+                  }}
+                />
+              </label>
+            ))}
           </div>
-        </div>
-      )}
+          <p className="mt-1.5 px-4 text-[12px] leading-snug text-tinte-leise">
+            Den Schalter für ihren Bereich finden Komitees auch direkt dort (z. B. Zitate → Prüfen). Links und Spotify-IDs zählen nie mit.
+          </p>
+        </>
+      ) : (
+        <>
+          {/* Hinzufügen */}
+          <h3 className="abschnitt">{teil === "block" ? "Neues Wort blocken" : "Neue Ausnahme"}</h3>
+          <div className="liste mb-1.5 bg-[rgb(118_118_128/0.08)] dark:bg-[rgb(118_118_128/0.18)]">
+            <div className="zeile">
+              <input
+                className="min-w-0 flex-1 bg-transparent text-[16px] outline-none placeholder:text-tinte-leise"
+                maxLength={40}
+                placeholder={teil === "block" ? "Wort eingeben" : "Erlaubtes Wort, z. B. idiotensicher"}
+                value={neu}
+                onChange={(e) => setNeu(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && void hinzufuegen()}
+              />
+              <button className="btn-klein shrink-0" disabled={neu.trim().length < 2} onClick={() => void hinzufuegen()}>
+                Hinzufügen
+              </button>
+            </div>
+            {teil === "block" && (
+              <div className="px-3 py-2">
+                <div className="seg">
+                  {MODI.map((x) => (
+                    <button key={x.key} className={`seg-item !px-1 ${modus === x.key ? "seg-aktiv" : ""}`} onClick={() => setModus(x.key)}>
+                      {x.text}
+                    </button>
+                  ))}
+                </div>
+                <p className="mt-1 px-1 text-[12px] text-tinte-leise">{MODI.find((x) => x.key === modus)?.hilfe}</p>
+              </div>
+            )}
+          </div>
 
-      {/* Die Liste selbst ist zugeklappt – niemand muss sie beim Öffnen lesen */}
-      <button onClick={() => setZeigen((z) => !z)} className="mb-2 w-full rounded-xl bg-[rgb(118_118_128/0.08)] px-4 py-2.5 text-left text-[14px] font-semibold dark:bg-[rgb(118_118_128/0.18)]">
-        {zeigen ? "Liste ausblenden" : `Liste anzeigen (${sichtbar.length})`}
-      </button>
-      {zeigen && (
-        <div className="divide-y divide-black/[0.06] overflow-hidden rounded-2xl bg-[rgb(118_118_128/0.08)] dark:divide-white/[0.08] dark:bg-[rgb(118_118_128/0.18)]">
-          {sichtbar.map((e) => (
-            <div key={e.id} className={`flex min-h-[48px] items-center gap-2 px-4 py-1.5 ${e.aktiv ? "" : "opacity-50"}`}>
-              <span className="min-w-0 flex-1 truncate text-[15px]">{e.wort}</span>
-              {e.stufe === "block" && (
-                <select
-                  aria-label={`Modus für ${e.wort}`}
-                  className="rounded-lg bg-white px-2 py-1 text-[12.5px] dark:bg-slate-800"
-                  value={e.modus}
-                  onChange={async (ev) => {
-                    const v = ev.target.value as Eintrag["modus"];
-                    setListe((l) => l.map((x) => (x.id === e.id ? { ...x, modus: v } : x)));
-                    const { error } = await supabase!.from("wortfilter").update({ modus: v }).eq("id", e.id);
+          {teil === "block" && (
+            <>
+              <h3 className="abschnitt mt-5">Emojis blocken</h3>
+              <div className="liste bg-[rgb(118_118_128/0.08)] dark:bg-[rgb(118_118_128/0.18)]">
+                <div className="zeile">
+                  <input
+                    className="min-w-0 flex-1 bg-transparent text-[20px] tracking-wider outline-none placeholder:text-[15px] placeholder:tracking-normal placeholder:text-tinte-leise"
+                    aria-label="Geblockte Emojis"
+                    maxLength={200}
+                    placeholder="z. B. 🍆🍑💦"
+                    value={zeichen}
+                    onChange={(e) => setZeichen(e.target.value.replace(/[\sA-Za-z0-9]/g, ""))}
+                  />
+                  <button
+                    className="btn-klein shrink-0"
+                    disabled={zeichen === zeichenAlt}
+                    onClick={async () => {
+                      if (!hasSupabase) return;
+                      const { error } = await supabase!.rpc("wortfilter_zeichen_setzen", { p: zeichen });
+                      if (error) return meldeFehler("Ging nicht: " + error.message);
+                      setZeichenAlt(zeichen);
+                      melde("Gespeichert", "erfolg");
+                    }}
+                  >
+                    Speichern
+                  </button>
+                </div>
+              </div>
+              <p className="mt-1.5 px-4 text-[12px] text-tinte-leise">Jedes Emoji hier blockt wie ein Wort – Hautfarben zählen mit.</p>
+            </>
+          )}
+
+          {/* Liste: durchsuchen, Modus ändern, aus-/einschalten, löschen */}
+          <div className="mb-1.5 mt-5 flex items-center gap-2 px-4">
+            <h3 className="kennlabel min-w-0 flex-1">{teil === "block" ? "Geblockte Wörter" : "Ausnahmen"}</h3>
+          </div>
+          <input className="field mb-2" placeholder="In der Liste suchen" value={suche} onChange={(e) => setSuche(e.target.value)} />
+          <div className="liste bg-[rgb(118_118_128/0.08)] dark:bg-[rgb(118_118_128/0.18)]">
+            {sichtbar.map((e) => (
+              <div key={e.id} className={`zeile !gap-2 ${e.aktiv ? "" : "opacity-55"}`}>
+                <span className="min-w-0 flex-1 truncate text-[15px]">{e.wort}</span>
+                {e.stufe === "block" && (
+                  <select
+                    aria-label={`Modus für ${e.wort}`}
+                    className="max-w-[7.5rem] rounded-lg bg-white px-2 py-1 text-[12.5px] dark:bg-slate-800"
+                    value={e.modus}
+                    onChange={async (ev) => {
+                      const v = ev.target.value as Eintrag["modus"];
+                      setListe((l) => l.map((x) => (x.id === e.id ? { ...x, modus: v } : x)));
+                      const { error } = await supabase!.from("wortfilter").update({ modus: v }).eq("id", e.id);
+                      if (error) meldeFehler("Ging nicht: " + error.message);
+                    }}
+                  >
+                    {MODI.map((x) => (
+                      <option key={x.key} value={x.key}>
+                        {x.text}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                <Schalter
+                  an={e.aktiv}
+                  label={`${e.wort} aktiv`}
+                  onChange={async (v) => {
+                    setListe((l) => l.map((x) => (x.id === e.id ? { ...x, aktiv: v } : x)));
+                    const { error } = await supabase!.from("wortfilter").update({ aktiv: v }).eq("id", e.id);
                     if (error) meldeFehler("Ging nicht: " + error.message);
                   }}
+                />
+                <button
+                  aria-label={`${e.wort} löschen`}
+                  onClick={() => void loeschen(e)}
+                  className="-mr-2 flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-red-600 transition active:scale-90 dark:text-red-400"
                 >
-                  {MODI.map((x) => (
-                    <option key={x.key} value={x.key}>
-                      {x.text}
-                    </option>
-                  ))}
-                </select>
-              )}
-              <Schalter
-                an={e.aktiv}
-                label={`${e.wort} aktiv`}
-                onChange={async (v) => {
-                  setListe((l) => l.map((x) => (x.id === e.id ? { ...x, aktiv: v } : x)));
-                  const { error } = await supabase!.from("wortfilter").update({ aktiv: v }).eq("id", e.id);
-                  if (error) meldeFehler("Ging nicht: " + error.message);
-                }}
-              />
-            </div>
-          ))}
-          {sichtbar.length === 0 && <p className="px-4 py-3 text-[13px] text-tinte-leise">Noch nichts eingetragen.</p>}
-        </div>
+                  <Icon name="muell" size={18} />
+                </button>
+              </div>
+            ))}
+            {sichtbar.length === 0 && <p className="px-4 py-3 text-[13px] text-tinte-leise">{q ? "Nichts gefunden." : "Noch nichts eingetragen."}</p>}
+          </div>
+          <p className="mt-2 px-4 text-[12px] leading-snug text-tinte-leise">
+            Erkennt auch Umgehungen: Groß/klein, Umlaute, Zahlen statt Buchstaben (4rsch), Zeichen dazwischen (A.r.s.c.h), Leerzeichen, Wiederholungen und Sternchen (f*ck).
+            Schalter aus = bleibt gespeichert, wirkt aber nicht; 🗑 löscht es ganz.
+          </p>
+        </>
       )}
-      <p className="mt-3 px-1 text-[12px] leading-snug text-tinte-leise">
-        Umgehungen werden mit erkannt: Groß/klein, Umlaute, Zahlen statt Buchstaben (4rsch), Zeichen dazwischen (A.r.s.c.h), Leerzeichen (A r s c h),
-        Wiederholungen (Arrrsch) und Sternchen (f*ck). Schalter aus = Wort bleibt gespeichert, wirkt aber nicht.
-      </p>
     </Sheet>
   );
 }

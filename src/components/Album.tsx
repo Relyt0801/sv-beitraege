@@ -17,6 +17,8 @@ import {
 import { frage, melde, meldeFehler } from "../lib/melder";
 import { useFunktionen } from "../lib/funktionen";
 import { LiedSuche, SpotifyKarte, ohneLink, spotifyAus } from "./Spotify";
+import { Kachel, KleinerRing } from "./Kachel";
+import { WortfilterSchalter } from "./AutorInfo";
 import { AusHinweis } from "./Funktionen";
 import { GesperrtZeile, GESPERRT_TEXT } from "./Gesperrt";
 import { MeldenKnopf } from "./Melden";
@@ -151,68 +153,41 @@ export function AlbumKarte({ className = "" }: { className?: string }) {
     (s) => s.student_id !== studentId && (s.freigabe === "alle" ? false : s.freigabe === "gezielt" && studentId && s.freigabe_an.includes(studentId)) && !s.text.trim(),
   );
   const offeneFreigaben = wartend.length;
-  const vorschau = album.personen.slice(0, 5);
 
   return (
     <div className={className}>
-    <AusHinweis funktion="album" className="mb-1.5 px-1" />
-    <section className={`relative overflow-hidden rounded-[1.4rem] bg-gradient-to-br from-[#D9480F] via-[#C2255C] to-[#6741D9] p-4 text-white shadow-[0_10px_30px_-12px_rgba(194,37,92,.6)] sm:p-5`}>
-      {/* Deko: schräg liegende Polaroids */}
-      <div aria-hidden className="pointer-events-none absolute -right-3 -top-2 flex rotate-[8deg] gap-1.5 opacity-90">
-        {[0, 1].map((i) => (
-          <span key={i} className={`block h-16 w-12 rounded-[4px] bg-white p-1 pb-3 shadow-md ${i ? "-rotate-12 translate-y-3" : ""}`}>
-            <span className={`block h-full w-full rounded-[2px] bg-gradient-to-br ${i ? "from-[#64D2FF] to-[#5E5CE6]" : "from-[#FFD60A] to-[#30D158]"}`} />
-          </span>
-        ))}
-      </div>
-      <div className="text-[12px] font-semibold uppercase tracking-[0.12em] text-white/90">Abi-Album</div>
-      <div className="mt-1 font-buch text-[1.6rem] font-semibold italic leading-tight">Dein Steckbrief</div>
-
-      <div className="mt-3 flex items-center gap-3">
-        <div className="h-2 flex-1 overflow-hidden rounded-full bg-white/25">
-          <div className="h-full rounded-full bg-white transition-all duration-700 ease-ios" style={{ width: `${prozent}%` }} />
-        </div>
-        <span className="zahl text-[13px] font-bold">{prozent} %</span>
-      </div>
-
-      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-white/90">
-        <span>❤ {meineLikes}</span>
-        <span>💬 {meineKommentare}</span>
-        <span className="flex items-center">
-          <span className="mr-1.5 flex -space-x-2">
-            {vorschau.map((p) => (
-              <span key={p.id} className={`h-5 w-5 rounded-full bg-gradient-to-br ring-2 ring-[#C2255C] ${personVerlauf(p.id)}`} />
-            ))}
-          </span>
-          {fertige} {fertige === 1 ? "Steckbrief" : "Steckbriefe"}
-        </span>
-      </div>
-
-      <div className="mt-4 flex flex-wrap gap-2">
-        <button
-          onClick={() => window.dispatchEvent(new CustomEvent("sv:album", { detail: "__mein__" }))}
-          className="rounded-full bg-white px-4 py-2 text-[14px] font-semibold text-[#D70040] shadow-sm transition active:scale-95"
-        >
-          {prozent ? "Weiter ausfüllen" : "Jetzt ausfüllen"}
-        </button>
-        <button
-          onClick={() => window.dispatchEvent(new CustomEvent("sv:album", { detail: null }))}
-          className="rounded-full bg-white/20 px-4 py-2 text-[14px] font-semibold text-white transition active:scale-95"
-        >
-          Alle ansehen
-        </button>
-        {offeneFreigaben > 0 && (
-          <button
-            onClick={() =>
-              window.dispatchEvent(new CustomEvent("sv:album", { detail: offeneFreigaben === 1 ? `__schreiben__:${wartend[0].student_id}` : "__fuer_mich__" }))
-            }
-            className="flex items-center rounded-full bg-black/25 px-3 py-2 text-[12.5px] font-semibold transition active:scale-95"
-          >
-            ✍️ {offeneFreigaben} {offeneFreigaben === 1 ? "Text wartet" : "Texte warten"} auf dich ›
-          </button>
-        )}
-      </div>
-    </section>
+      <AusHinweis funktion="album" className="mb-1.5 px-1" />
+      <Kachel
+        icon="buch"
+        farbe="bg-[#FF2D55]"
+        titel="Abi-Album"
+        unter={
+          prozent >= 100
+            ? `Dein Steckbrief ist fertig · ❤ ${meineLikes} · 💬 ${meineKommentare}`
+            : `Dein Steckbrief ist zu ${prozent} % ausgefüllt · ${fertige} im Album`
+        }
+        rechts={<KleinerRing prozent={prozent} />}
+        knoepfe={
+          <>
+            <button onClick={() => window.dispatchEvent(new CustomEvent("sv:album", { detail: "__mein__" }))} className="btn-klein">
+              {prozent ? "Weiter ausfüllen" : "Ausfüllen"}
+            </button>
+            <button onClick={() => window.dispatchEvent(new CustomEvent("sv:album", { detail: null }))} className="btn-klein-grau">
+              Alle ansehen
+            </button>
+            {offeneFreigaben > 0 && (
+              <button
+                onClick={() =>
+                  window.dispatchEvent(new CustomEvent("sv:album", { detail: offeneFreigaben === 1 ? `__schreiben__:${wartend[0].student_id}` : "__fuer_mich__" }))
+                }
+                className="btn-klein-grau"
+              >
+                ✍️ {offeneFreigaben} {offeneFreigaben === 1 ? "Text wartet" : "Texte warten"}
+              </button>
+            )}
+          </>
+        }
+      />
     </div>
   );
 }
@@ -494,17 +469,15 @@ function SteckbriefAnsicht({
   return (
     <div className="animate-vonRechts">
       {/* Kopf mit Farbe der Person */}
-      <div className={`-mx-5 -mt-8 mb-12 bg-gradient-to-br px-5 pb-12 pt-3 sm:-mt-5 sm:rounded-t-[1.75rem] ${personVerlauf(id)}`}>
-        <div className="flex items-center justify-between">
-          <button onClick={zurueck} className="rounded-full bg-black/25 px-3 py-1.5 text-[14px] font-semibold text-white active:scale-95">
-            ‹ Album
-          </button>
-          <button onClick={onClose} aria-label="Schließen" className="flex h-[30px] w-[30px] items-center justify-center rounded-full bg-black/25 text-[13px] font-bold text-white">
-            ✕
-          </button>
-        </div>
+      <div className="mb-3 flex items-center justify-between">
+        <button onClick={zurueck} className="py-1 text-[16px] font-semibold text-brand">
+          ‹ Album
+        </button>
+        <button onClick={onClose} aria-label="Schließen" className="flex h-[30px] w-[30px] items-center justify-center rounded-full bg-[rgb(118_118_128/0.12)] text-[13px] font-bold text-tinte-leise dark:bg-[rgb(118_118_128/0.24)]">
+          ✕
+        </button>
       </div>
-      <div className="-mt-24 flex flex-col items-center text-center">
+      <div className="flex flex-col items-center text-center">
         <Bild p={p} gross />
         <h2 className="mt-2 font-buch text-[1.7rem] font-semibold italic leading-tight">
           {p.vorname} {p.nachname}
@@ -528,30 +501,23 @@ function SteckbriefAnsicht({
         </div>
       </div>
 
-      {/* Stammdaten wie ein Ausweis */}
+      {/* Stammdaten: gleich breite Zeilen wie in den Kontakten */}
       {felder.length > 0 && (
-        <div className="mt-5 grid grid-cols-2 gap-2">
-          {felder.map((k, i) => (
-            <div
-              key={k.id}
-              className={`rounded-2xl bg-[rgb(118_118_128/0.08)] px-3.5 py-2.5 dark:bg-[rgb(118_118_128/0.18)] ${
-                (s!.stammdaten[k.id] || "").length > 22 || Boolean(spotifyAus(s!.stammdaten[k.id] || "")) || (felder.length % 2 === 1 && i === felder.length - 1) ? "col-span-2" : ""
-              }`}
-            >
-              <div className="text-[11px] font-semibold uppercase tracking-[0.06em] text-tinte-leise">{k.titel}</div>
-              {spotifyAus(s!.stammdaten[k.id]) ? (
-                <>
-                  {/* Mit Spotify-Funktion: Karte statt Link; sonst nur der Text ohne Link */}
-                  {(!an.spotify || ohneLink(s!.stammdaten[k.id])) && (
-                    <div className="mt-0.5 text-[15px] font-medium leading-snug">{ohneLink(s!.stammdaten[k.id]) || "Lied auf Spotify"}</div>
-                  )}
-                  <SpotifyKarte wert={s!.stammdaten[k.id]} fallbackTitel={ohneLink(s!.stammdaten[k.id])} />
-                </>
-              ) : (
-                <div className="mt-0.5 text-[15px] font-medium leading-snug">{s!.stammdaten[k.id]}</div>
-              )}
-            </div>
-          ))}
+        <div className="liste mt-5 bg-[rgb(118_118_128/0.08)] dark:bg-[rgb(118_118_128/0.18)]">
+          {felder.map((k) => {
+            const wert = s!.stammdaten[k.id] || "";
+            const lied = spotifyAus(wert);
+            return (
+              <div key={k.id} className="px-4 py-2.5">
+                <div className="text-[12px] font-medium text-tinte-leise">{k.titel}</div>
+                {/* Links stehen nie als Text da – mit Spotify als Karte, sonst nur der Titel */}
+                {(!lied || !an.spotify || ohneLink(wert)) && (
+                  <div className="mt-0.5 text-[15.5px] leading-snug">{(lied ? ohneLink(wert) : ohneLink(wert) || wert) || "Lied auf Spotify"}</div>
+                )}
+                {lied && <SpotifyKarte wert={wert} fallbackTitel={ohneLink(wert)} />}
+              </div>
+            );
+          })}
         </div>
       )}
 
@@ -588,7 +554,7 @@ function SteckbriefAnsicht({
         </div>
       )}
       {darfSchreiben && (
-        <button onClick={schreiben} className="btn-primary mt-3 w-full bg-gradient-to-r from-[#FF375F] to-[#BF5AF2]">
+        <button onClick={schreiben} className="btn-primary mt-3 w-full">
           ✍️ {s?.text.trim() ? "Text überarbeiten" : "Text schreiben"}
         </button>
       )}
@@ -857,8 +823,8 @@ function MeinSteckbrief({ album, vorschau }: { album: Album; vorschau: () => voi
   return (
     <div className="animate-fadeIn">
       {/* Fortschritt */}
-      <div className="flex items-center gap-3 rounded-2xl bg-gradient-to-r from-[#FF9F0A]/15 via-[#FF375F]/15 to-[#BF5AF2]/15 px-4 py-3">
-        <span className="zahl shrink-0 whitespace-nowrap bg-gradient-to-br from-[#FF9F0A] to-[#BF5AF2] bg-clip-text text-[1.9rem] font-extrabold text-transparent">{prozent} %</span>
+      <div className="feld-grau flex items-center gap-3 px-4 py-3">
+        <KleinerRing prozent={prozent} groesse={48} />
         <span className="text-[13px] leading-snug text-tinte-matt dark:text-slate-300">
           {prozent >= 100 ? "Fertig! Du kannst trotzdem jederzeit ändern." : "Fülle aus, was du magst – alles lässt sich später ändern."}
         </span>
@@ -870,14 +836,26 @@ function MeinSteckbrief({ album, vorschau }: { album: Album; vorschau: () => voi
             <label className="block">
             <span className="text-[12px] font-semibold text-tinte-leise">{k.titel}</span>
             <input
-              value={daten[k.id] || ""}
+              value={spotifyAus(daten[k.id] || "") ? ohneLink(daten[k.id] || "") : daten[k.id] || ""}
               maxLength={200}
-              placeholder={k.platzhalter}
-              onChange={(e) => setDaten((d) => ({ ...d, [k.id]: e.target.value }))}
+              placeholder={spotifyAus(daten[k.id] || "") ? "Titel – Künstler" : k.platzhalter}
+              onChange={(e) => {
+                // Ein Spotify-Link bleibt im Hintergrund erhalten, steht aber nicht im Feld
+                const link = ((daten[k.id] || "").match(/https?:\/\/\S+|spotify:\S+/) || [])[0];
+                const v = e.target.value;
+                setDaten((d) => ({ ...d, [k.id]: (link && !/https?:\/\/|spotify:/.test(v) ? `${v.trim()} ${link}` : v).slice(0, 200) }));
+              }}
               className="mt-0.5 block w-full bg-transparent text-[15px] outline-none placeholder:text-tinte-leise/70"
             />
             </label>
-            {spotifyAus(daten[k.id] || "") && <SpotifyKarte wert={daten[k.id]} fallbackTitel={ohneLink(daten[k.id])} />}
+            {spotifyAus(daten[k.id] || "") && (
+              <>
+                <SpotifyKarte wert={daten[k.id]} fallbackTitel={ohneLink(daten[k.id])} />
+                <button type="button" onClick={() => setDaten((d) => ({ ...d, [k.id]: ohneLink(d[k.id] || "") }))} className="mt-1.5 text-[12.5px] font-semibold text-red-600 dark:text-red-400">
+                  Spotify-Link entfernen
+                </button>
+              </>
+            )}
             {spotifyAn && /lied|song|musik/i.test(k.titel) && (
               <LiedSuche wert={daten[k.id] || ""} setzen={(v) => setDaten((d) => ({ ...d, [k.id]: v.slice(0, 200) }))} />
             )}
@@ -978,6 +956,10 @@ export function KategorienSheet({ open, album, onClose }: { open: boolean; album
   return (
     <Sheet open={open} onClose={onClose}>
       <SheetKopf titel="Steckbrief-Kategorien" unter="Die Stammdaten-Felder, die alle ausfüllen. Antippen zum Ändern, Schalter blendet aus, 🗑 löscht." onClose={onClose} />
+      <div className="mb-4 space-y-2">
+        <WortfilterSchalter bereich="steckbrief" />
+        <WortfilterSchalter bereich="kommentare" />
+      </div>
       <Gruppe>
         {album.kategorien.map((k, i) =>
           bearbeite === k.id ? (

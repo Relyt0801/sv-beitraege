@@ -5,6 +5,7 @@ import { useVerzoegert } from "../lib/entwurf";
 import { normalize } from "../lib/logic";
 import { useStore } from "../store";
 import { useRole, type Profile, type Role } from "../auth/RoleProvider";
+import { usePasswortNeu } from "./PasswortNeu";
 import { useTopics } from "../topics-store";
 import { useEltern } from "../eltern-store";
 import { COMMITTEES } from "../lib/committees";
@@ -41,6 +42,7 @@ const NUR_EINMAL: Role[] = ["sprecher", "stv_sprecher"];
 
 export function RolesTab() {
   const { profiles, setRole, setBan, can, isAdmin, isOp, opUserId, refreshProfiles } = useRole();
+  const pw = usePasswortNeu();
   const { zuordnung } = useEltern();
   const [anlegen, setAnlegen] = useState(false);
   const [zeigeEltern, setZeigeEltern] = useState(false);
@@ -107,6 +109,7 @@ export function RolesTab() {
 
   return (
     <div>
+      {pw.anzeige}
       {(isAdmin || isOp) && (
         <button
           onClick={() => setAnlegen(true)}
@@ -300,6 +303,20 @@ export function RolesTab() {
                               {d.label}
                             </button>
                           ))}
+                          {pw.darf && (
+                            <>
+                              <div className="mx-2.5 my-1 h-px bg-black/10 dark:bg-white/10" />
+                              <button
+                                onClick={() => {
+                                  setOpenBan(null);
+                                  void pw.zuruecksetzen(p.user_id, p.username || "diese Person");
+                                }}
+                                className="w-full rounded-xl px-2.5 py-2 text-left text-[15px] text-brand-dark hover:bg-black/[0.04] dark:text-brand dark:hover:bg-white/[0.06]"
+                              >
+                                Neues Passwort …
+                              </button>
+                            </>
+                          )}
                         </div>
                       </>
                     )}

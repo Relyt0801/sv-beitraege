@@ -162,7 +162,7 @@ export function ElternApp() {
     <div className="min-h-dvh bg-papier pb-32 dark:bg-slate-950 lg:pb-10">
       <header
         className={`sticky top-0 z-20 px-4 pb-2 pt-[calc(env(safe-area-inset-top)+0.5rem)] transition-[background-color,box-shadow] duration-300 ${
-          gescrollt ? "glas shadow-[0_0.5px_0_rgba(0,0,0,.18)] dark:shadow-[0_0.5px_0_rgba(255,255,255,.15)]" : "bg-papier dark:bg-slate-950"
+          gescrollt ? "glas shadow-[0_0.5px_0_rgba(0,0,0,.18)] dark:shadow-[0_0.5px_0_rgba(255,255,255,.15)]" : "kopf-grund bg-papier dark:bg-slate-950"
         }`}
       >
         <div className="mx-auto flex max-w-5xl items-center gap-2.5">
@@ -182,7 +182,7 @@ export function ElternApp() {
             onClick={() => setProfilOffen(true)}
             aria-label={`Ihr Zugang – ${familienName}`}
             title="Ihr Zugang"
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-slate-400 to-slate-500 text-[14px] font-semibold text-white ring-2 ring-white transition active:scale-90 dark:ring-slate-900"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-500 text-[14px] font-semibold text-white ring-2 ring-white transition active:scale-90 dark:ring-slate-900"
           >
             {familienKuerzel}
           </button>

@@ -300,7 +300,7 @@ function SchichtTicket({ schicht: t, aktion }: { schicht: Termin; aktion: Aktion
   const d = ausKey(t.datum);
   const icon = t.icon || aktion?.icon;
   return (
-    <div className="relative flex min-w-0 overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-700 text-white shadow-[0_6px_18px_-8px_rgb(31_127_56/0.7)] dark:from-emerald-600 dark:to-emerald-800">
+    <div className="relative flex min-w-0 overflow-hidden rounded-2xl bg-[#248A3D] text-white dark:bg-[#1E7B34]">
       <div className="flex w-[4.25rem] shrink-0 flex-col items-center justify-center py-2.5">
         <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-white/85">
           {MONATE[d.getMonth()].slice(0, 3)}

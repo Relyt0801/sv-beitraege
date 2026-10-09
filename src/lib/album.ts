@@ -121,15 +121,17 @@ export function fortschritt(s: Steckbrief | undefined, kategorien: AlbumKategori
 }
 
 /** Feste Farbe je Person – für Polaroid-Rahmen und Initialen. */
+// Einfarbig mit leichter Wölbung (wie die Monogramme in den iOS-Kontakten) –
+// keine Übergänge zwischen zwei Farben.
 const VERLAEUFE = [
-  "from-[#FF9F0A] to-[#FF375F]",
-  "from-[#5E5CE6] to-[#BF5AF2]",
-  "from-[#30D158] to-[#0A84FF]",
-  "from-[#FF375F] to-[#BF5AF2]",
-  "from-[#0A84FF] to-[#64D2FF]",
-  "from-[#FFD60A] to-[#FF9F0A]",
-  "from-[#64D2FF] to-[#30D158]",
-  "from-[#BF5AF2] to-[#FF9F0A]",
+  "from-[#FF9F0A] to-[#E08600]",
+  "from-[#5E5CE6] to-[#4B49C9]",
+  "from-[#34C759] to-[#28A745]",
+  "from-[#FF375F] to-[#E02D52]",
+  "from-[#0A84FF] to-[#0070DE]",
+  "from-[#A2845E] to-[#8A6F4E]",
+  "from-[#30B0C7] to-[#2797AB]",
+  "from-[#8E8E93] to-[#737378]",
 ];
 export function personVerlauf(id: string): string {
   let h = 0;

@@ -1,5 +1,5 @@
 import { useProfiles } from "../profiles-store";
-import { farbe as farbeVon, farbKontur, farbeAusName, farbwert, initialen as initialenVon, lesbarerName, schriftAuf } from "../lib/profil";
+import { farbe as farbeVon, farbeAusName, initialen as initialenVon, lesbarerName, namensfarbe, schriftAuf } from "../lib/profil";
 import { personIcon } from "../lib/committees";
 import { useTheme } from "../lib/theme";
 
@@ -82,7 +82,7 @@ export function PersonName({
       style={
         aufFarbig
           ? { color: "rgba(255,255,255,.85)" }
-          : { color: farbwert(key, dunkel), textShadow: farbKontur(key, dunkel) }
+          : { color: namensfarbe(key, dunkel) }
       }
     >
       {personIcon(role, koms)} | {anzeige}

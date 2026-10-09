@@ -1,4 +1,5 @@
-// Supabase Edge Function: legt eine neue Person an (Schüler-Datensatz + Login).
+// Supabase Edge Function: legt eine neue Person an (Schüler-Datensatz + Login)
+// – und setzt auf Wunsch das Passwort eines Kontos zurück (passwort_neu_fuer).
 //
 // Nur der Admin darf das. Der service_role-Key steckt automatisch in der
 // Function (SUPABASE_SERVICE_ROLE_KEY) und verlässt den Server nie.
@@ -62,7 +63,8 @@ function schlicht(s: string): string {
     .replace(/[^a-z0-9]+/g, "");
 }
 
-type Db = ReturnType<typeof createClient>;
+// deno-lint-ignore no-explicit-any
+type Db = any;
 
 /** Elternzugang für ein Kind: sieht nur dieses Kind (parent_children + RLS). */
 async function elternAnlegen(admin: Db, kind: { id: string; vorname: string; nachname: string }, wunschPw = "") {
@@ -120,6 +122,40 @@ Deno.serve(async (req) => {
 
   // ---- Eingaben prüfen -----------------------------------------------------
   const k = (await req.json().catch(() => ({}))) as Record<string, unknown>;
+
+  // Passwort zurücksetzen: neues Startpasswort, wird genau einmal angezeigt.
+  // Beim nächsten Login muss die Person es ändern (must_change_password).
+  if (typeof k.passwort_neu_fuer === "string") {
+    const ziel = k.passwort_neu_fuer;
+    if (ziel === wer.user.id) return json({ error: "Dein eigenes Passwort änderst du im Profil." }, 400);
+    const { data: zp } = await admin.from("profiles").select("user_id, username, is_op, must_change_password").eq("user_id", ziel).maybeSingle();
+    if (!zp) return json({ error: "Konto nicht gefunden." }, 404);
+    if (zp.is_op) return json({ error: "Dieses Konto ist geschützt." }, 403);
+    const np = pruefePw(k.passwort);
+    if (np.fehler) return json({ error: np.fehler }, 400);
+    const passwort = np.pw || startpasswort();
+    const { error: pwErr } = await admin.auth.admin.updateUserById(ziel, { password: passwort });
+    if (pwErr) return json({ error: "Passwort: " + pwErr.message }, 500);
+    // Als der Admin selbst markieren – so steht im Protokoll, wer es war
+    const alsIch = createClient(url, Deno.env.get("SUPABASE_ANON_KEY")!, {
+      global: { headers: { Authorization: `Bearer ${jwt}` } },
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+    const { error: mErr } = await alsIch.from("profiles").update({ must_change_password: true }).eq("user_id", ziel);
+    if (mErr) await admin.from("profiles").update({ must_change_password: true }).eq("user_id", ziel);
+    if (zp.must_change_password || mErr) {
+      // Kein Wechsel von false → true: der Trigger schreibt nichts, also selbst eintragen
+      const { data: an } = await admin.from("public_profiles").select("anzeigename").eq("user_id", wer.user.id).maybeSingle();
+      await admin.from("audit_log").insert({
+        aktion: "passwort.zurueckgesetzt", bereich: "konten",
+        akteur_id: wer.user.id, akteur_name: an?.anzeigename || "Admin",
+        ziel_id: ziel, ziel_name: zp.username || "",
+        klartext: `${zp.username}: Passwort zurückgesetzt (Startpasswort gesetzt)`,
+      });
+    }
+    console.log("Passwort zurückgesetzt für", zp.username, "von", wer.user.id);
+    return json({ ok: true, username: zp.username, passwort });
+  }
 
   // Nur einen Elternzugang zu einer schon vorhandenen Person anlegen
   if (typeof k.eltern_fuer === "string") {
