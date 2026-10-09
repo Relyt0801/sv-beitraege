@@ -27,9 +27,10 @@ export const PATCH: PatchVersion = {
       bereich: "Aufgeräumt",
       icon: "✨",
       eintraege: [
-        { text: "Ruhigeres Design: Abi-Album, Abimotto, Zitate und Rankings sind jetzt schlichte Karten – auf dem iPad und Laptop zwei nebeneinander." },
+        { text: "Abi-Album, Abimotto, Zitate und Rankings haben wieder ihre bunten Karten – jede in ihrer eigenen Farbe, auf dem iPad und Laptop zwei nebeneinander." },
         { text: "Dein Profil ist wie die iPhone-Einstellungen sortiert: Darstellung, Mitteilungen, Konto. Was du nicht brauchst, bleibt zugeklappt." },
-        { text: "Neu im Profil: ein eigenes Hintergrundbild. Es liegt privat – nur du siehst es." },
+        { text: "Neu im Profil: ein eigenes Hintergrundbild in voller Schärfe. Es liegt privat – nur du siehst es." },
+        { text: "Chats: Neue Reaktionen 😁 😭 ❤️ – und über „+“ jedes andere Emoji." },
         { text: "Steckbriefe zeigen alle Felder gleich breit, Spotify-Links stehen nicht mehr als Text da." },
       ],
     },
@@ -38,7 +39,10 @@ export const PATCH: PatchVersion = {
       icon: "🗳️",
       eintraege: [
         { text: "Abimotto, Zitate, Rankings und Umfragen können eine engere Auswahl bekommen: Runde 2, Finale … Du siehst oben, wie viele Stimmen du noch hast." },
+        { text: "Sieger der Herzen: Beim Abimotto und den Zitaten gibt es Honorable Mentions mit einer eigenen Herzstimme – getrennt von der echten Wahl." },
         { text: "Komitees starten Runden für ihre Bereiche, legen die Stimmen je Person fest und geben das Ergebnis frei, wann sie wollen.", nur: "team" },
+        { text: "Bei jeder Abstimmung wählbar: Ergebnisse sieht nur das Komitee oder alle – für Motto, Zitate, Rankings, Umfragen und jede Runde.", nur: "team" },
+        { text: "Wer die Stufe verlassen hat, steht nicht mehr im Album, in den Rankings und bei den Zitat-Namen; in der Rollenliste lässt er sich einblenden.", nur: "team" },
       ],
     },
     {

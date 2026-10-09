@@ -12,6 +12,26 @@ ausführlich (auf Deutsch); hier steht der Überblick dazu.
 ---
 
 
+## 09.10.2026 (3): Feedback zu Update 1.3
+
+- **Bunte Karten zurück** (`Kachel.tsx` → `FarbKarte`): Album rot-pink, Motto orange, Zitate dunkel mit Gold, Rankings blau/grün. Jede Karte hat eine kräftige Farbe, Verläufe gibt es nur innerhalb dieser Farbe, kein Lila. Runden-Marke und „♥ Sieger der Herzen“ stehen auf den Karten.
+- **Honorable Mentions / Sieger der Herzen** (`supabase/honorable-mentions.sql`, `Runden.tsx`):
+  - Beim Start einer Runde wählt das Komitee neben der Wahl auch Honorable Mentions aus (♥). Das geht beim Motto und bei den Zitaten; die Anzahl ist einstellbar (Top X).
+  - Die Honorable Mentions bekommen ein eigenes, inoffizielles Voting mit genau 1 Stimme. Eine neue Herzstimme ersetzt die alte.
+  - Sie zählen nicht zur Wahl und haben eigene Farbe, eigenen Zähler und eigenes Ergebnis.
+  - Je Runde abschaltbar (`runde_hm_setzen`).
+- **Ergebnisse sehen: Nur Komitee | Alle** – bei jeder Abstimmung:
+  - Runden: beim Start und laufend (`runde_starten` mit 7 Parametern).
+  - Motto, Zitate, Rankings: `app_settings.ergebnisse` und `ergebnisse_setzen`. Die Zahlen kommen aus `stimmen_zahlen()`, ohne zu verraten, wer was gewählt hat.
+  - Umfragen: wie bisher je Umfrage.
+  - Admins sehen immer alles.
+- **Ausgetretene ausblenden** (`supabase/ausgetretene-ausblenden.sql`, `noch_dabei()`): Wer im laufenden Halbjahr oder früher „verlässt“, fehlt in Album, Rankings (auch Top 3) und bei den Zitat-Namen. In der Rollenliste gibt es einen Schalter dafür; in der Kasse bleibt die Person.
+- **Neues Passwort**: 8 Zeichen aus Buchstaben und Ziffern, ohne 0/O/1/l/I (Edge Function `person-anlegen` v6).
+- **Hintergrundbild**: bis 2560 px, WebP/JPEG 90 %. Ist das Original klein genug, bleibt es unverändert. Gespeichert wird in der Cache API, das Bucket-Limit liegt jetzt bei 6 MB.
+- **Chat-Reaktionen**: 😁 😭 ❤️ sind neu dazugekommen. Über „+“ geht jedes Emoji, die Datenbank prüft den Emoji-Filter. Der Constraint-Tausch steht in `supabase/reaktionen-frei.sql` (läuft im SQL Editor).
+- **Chat-Kopf**: deckend statt Glas; am Laptop als Karte ohne Farbschein.
+- **Nach dem Livegang**: `supabase/stimmen-schuetzen.sql`. Danach liest jede/r nur noch die eigenen Zitat-Stimmen.
+
 ## 09.10.2026 (2): Update 1.3 – Runden, Freigaben, Apple-Design
 
 Erst als Vorschau für Admin und Testkonto: Branch `update-1-3` → Vercel-Vorschau.
