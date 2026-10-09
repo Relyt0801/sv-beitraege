@@ -43,6 +43,27 @@ function startpasswort(): string {
   return `${a}-${b}-${100 + zufall(900)}`;
 }
 
+// Neues Passwort beim Zurücksetzen: 8 Zeichen aus Buchstaben und Ziffern,
+// ohne Verwechsler (0/O/o, 1/l/I/i). Mindestens eine Ziffer und je ein
+// Groß- und Kleinbuchstabe. Gleichverteilt per Rejection Sampling.
+const KLEIN = "abcdefghjkmnpqrstuvwxyz";
+const GROSS = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+const ZIFFERN = "23456789";
+const ALLE = KLEIN + GROSS + ZIFFERN;
+function gleichverteilt(n: number): number {
+  const grenze = Math.floor(0x100000000 / n) * n;
+  const a = new Uint32Array(1);
+  do crypto.getRandomValues(a); while (a[0] >= grenze);
+  return a[0] % n;
+}
+function zufallspasswort(laenge = 8): string {
+  for (;;) {
+    let pw = "";
+    for (let i = 0; i < laenge; i++) pw += ALLE[gleichverteilt(ALLE.length)];
+    if (/[a-z]/.test(pw) && /[A-Z]/.test(pw) && /[0-9]/.test(pw)) return pw;
+  }
+}
+
 /** Vom Admin eingetipptes Passwort: leer = automatisch, sonst 8–72 Zeichen. */
 function pruefePw(p: unknown): { pw: string; fehler?: string } {
   const pw = typeof p === "string" ? p.trim() : "";
@@ -123,7 +144,7 @@ Deno.serve(async (req) => {
   // ---- Eingaben prüfen -----------------------------------------------------
   const k = (await req.json().catch(() => ({}))) as Record<string, unknown>;
 
-  // Passwort zurücksetzen: neues Startpasswort, wird genau einmal angezeigt.
+  // Passwort zurücksetzen: neues Zufallspasswort (8 Zeichen), wird genau einmal angezeigt.
   // Beim nächsten Login muss die Person es ändern (must_change_password).
   if (typeof k.passwort_neu_fuer === "string") {
     const ziel = k.passwort_neu_fuer;
@@ -133,7 +154,7 @@ Deno.serve(async (req) => {
     if (zp.is_op) return json({ error: "Dieses Konto ist geschützt." }, 403);
     const np = pruefePw(k.passwort);
     if (np.fehler) return json({ error: np.fehler }, 400);
-    const passwort = np.pw || startpasswort();
+    const passwort = np.pw || zufallspasswort();
     const { error: pwErr } = await admin.auth.admin.updateUserById(ziel, { password: passwort });
     if (pwErr) return json({ error: "Passwort: " + pwErr.message }, 500);
     // Als der Admin selbst markieren – so steht im Protokoll, wer es war
@@ -150,7 +171,7 @@ Deno.serve(async (req) => {
         aktion: "passwort.zurueckgesetzt", bereich: "konten",
         akteur_id: wer.user.id, akteur_name: an?.anzeigename || "Admin",
         ziel_id: ziel, ziel_name: zp.username || "",
-        klartext: `${zp.username}: Passwort zurückgesetzt (Startpasswort gesetzt)`,
+        klartext: `${zp.username}: Passwort zurückgesetzt (neues Passwort gesetzt)`,
       });
     }
     console.log("Passwort zurückgesetzt für", zp.username, "von", wer.user.id);
