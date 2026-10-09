@@ -35,7 +35,7 @@ export function MottoKarte({ className = "" }: { className?: string }) {
   const runde = r.offeneVon("");
 
   return (
-    <div className={className}>
+    <div className={`flex flex-col ${className}`}>
       <AusHinweis funktion="motto" className="mb-1.5 px-1" />
       <Kachel
         icon="funke"

@@ -987,7 +987,7 @@ export function UmfrageStichwahlen({ className = "" }: { className?: string }) {
   const st = useRunden("umfragen", darf, uid, can("umfragen.runden"));
   if (!darf || !st.offene.length) return null;
   return (
-    <div className={className}>
+    <div className={`flex flex-col ${className}`}>
       <Kachel icon="umfrage" farbe="bg-brand" titel={st.offene.length === 1 ? "Stichwahl" : `${st.offene.length} Stichwahlen`} unter="Aus einer Umfrage – das Team hat eine engere Auswahl gestartet.">
         {st.offene.map((r) => (
           <div key={r.id} className="mt-3">

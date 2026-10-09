@@ -51,7 +51,7 @@ export function ZitateKarte({ className = "" }: { className?: string }) {
 
   const runde = r.offeneVon("");
   return (
-    <div className={className}>
+    <div className={`flex flex-col ${className}`}>
       <AusHinweis funktion="zitate" className="mb-1.5 px-1" />
       <Kachel
         icon="zitat"

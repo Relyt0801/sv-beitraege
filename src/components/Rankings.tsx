@@ -56,7 +56,7 @@ export function RankingKarten({ className = "" }: { className?: string }) {
   const stichwahlen = runden.offene.length;
 
   return (
-    <div className={className}>
+    <div className={`flex flex-col ${className}`}>
       <AusHinweis funktion="rankings" className="mb-1.5 px-1" />
       <Kachel
         icon="pokal"

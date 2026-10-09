@@ -31,7 +31,7 @@ export function Kachel({
   className?: string;
 }) {
   return (
-    <section className={`card flex h-full flex-col p-4 ${className}`}>
+    <section className={`card flex flex-1 flex-col p-4 ${className}`}>
       <div className="flex items-start gap-3">
         <span aria-hidden className={`symbol ${farbe}`}>
           <Icon name={icon} size={17} strich={2.2} />

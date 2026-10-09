@@ -155,7 +155,7 @@ export function AlbumKarte({ className = "" }: { className?: string }) {
   const offeneFreigaben = wartend.length;
 
   return (
-    <div className={className}>
+    <div className={`flex flex-col ${className}`}>
       <AusHinweis funktion="album" className="mb-1.5 px-1" />
       <Kachel
         icon="buch"
