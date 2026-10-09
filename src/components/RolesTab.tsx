@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { PersonRechteSheet } from "./PermissionsTab";
 import { useNachschub } from "../lib/liste";
 import { useVerzoegert } from "../lib/entwurf";
-import { normalize } from "../lib/logic";
+import { hatVerlassen, normalize } from "../lib/logic";
 import { useStore } from "../store";
 import { useRole, type Profile, type Role } from "../auth/RoleProvider";
 import { usePasswortNeu } from "./PasswortNeu";
@@ -46,9 +46,11 @@ export function RolesTab() {
   const { zuordnung } = useEltern();
   const [anlegen, setAnlegen] = useState(false);
   const [zeigeEltern, setZeigeEltern] = useState(false);
+  // Wer die Stufe verlassen hat, steht standardmäßig nicht mehr in der Liste
+  const [zeigeWeg, setZeigeWeg] = useState(false);
   const canAssignKom = can("komitees.assign");
   const canTimeout = can("mod.timeout");
-  const { students, reload } = useStore();
+  const { students, reload, settings } = useStore();
   const { committeesOf, setUserCommittee } = useTopics();
   const [q, setQ] = useState("");
   const [openKom, setOpenKom] = useState<string | null>(null);
@@ -82,11 +84,17 @@ export function RolesTab() {
     });
 
   const elternAnzahl = useMemo(() => profiles.filter((p) => p.role === "eltern").length, [profiles]);
+  const weg = (p: Profile) => {
+    const s = p.student_id ? nachId.get(p.student_id) : undefined;
+    return !!s && hatVerlassen(s, settings.aktuelles_halbjahr);
+  };
+  const wegAnzahl = profiles.filter(weg).length;
 
   const rows = useMemo(() => {
     const norm = normalize(suche);
     return [...profiles]
       .filter((p) => zeigeEltern || !VERSTECKT.includes(p.role))
+      .filter((p) => zeigeWeg || !weg(p))
       .map((p) => {
         const s = p.student_id ? nachId.get(p.student_id) ?? null : null;
         const name = s ? `${s.nachname}, ${s.vorname}` : null;
@@ -103,7 +111,7 @@ export function RolesTab() {
       .sort((a, b) => a.sortier.localeCompare(b.sortier, "de"));
     // kinderVon haengt an zuordnung und nachId, beide stehen in der Liste.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profiles, suche, nachId, zeigeEltern, zuordnung]);
+  }, [profiles, suche, nachId, zeigeEltern, zeigeWeg, zuordnung, settings.aktuelles_halbjahr]);
 
   const { sichtbar, marke, rest } = useNachschub(rows.length, [suche, zeigeEltern]);
 
@@ -139,6 +147,15 @@ export function RolesTab() {
         </span>
         <Schalter an={zeigeEltern} onChange={setZeigeEltern} />
       </label>
+      {wegAnzahl > 0 && (
+        <label className="card -mt-1 mb-3 flex min-h-[2.75rem] cursor-pointer select-none items-center gap-3 px-4 py-2 text-[15px]">
+          <span className="min-w-0 flex-1">
+            Ausgetretene anzeigen
+            <span className="ml-1.5 text-tinte-leise">{wegAnzahl}</span>
+          </span>
+          <Schalter an={zeigeWeg} onChange={setZeigeWeg} />
+        </label>
+      )}
 
       <div className="grid gap-2.5 [&>*]:min-w-0">
         {rows.slice(0, sichtbar).map(({ p, kinder }) => {

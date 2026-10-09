@@ -242,3 +242,8 @@ export function sortStudents(list: Student[]): Student[] {
       a.nachname.localeCompare(b.nachname, "de") || a.vorname.localeCompare(b.vorname, "de"),
   );
 }
+
+/** Hat die Person die Stufe verlassen? (verlässt im laufenden Halbjahr oder früher) */
+export function hatVerlassen(st: Student, aktuell: Halbjahr): boolean {
+  return leftIdx(st) <= idx(aktuell);
+}

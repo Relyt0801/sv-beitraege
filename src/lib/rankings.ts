@@ -1,3 +1,4 @@
+import { hatVerlassen } from "./logic";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { hasSupabase, supabase } from "./supabase";
 import { useStore } from "../store";
@@ -86,7 +87,7 @@ const ME_DEMO = "local-user";
 
 /* ---------------------------------------------------------------- Personen der Stufe */
 export function useStufePersonen(aktiv: boolean): StufenPerson[] {
-  const { students } = useStore();
+  const { students, settings } = useStore();
   const [liste, setListe] = useState<StufenPerson[]>([]);
   useEffect(() => {
     if (!aktiv || !hasSupabase) return;
@@ -96,8 +97,11 @@ export function useStufePersonen(aktiv: boolean): StufenPerson[] {
     () =>
       hasSupabase
         ? liste
-        : [...students].sort((a, b) => a.vorname.localeCompare(b.vorname)).map((s) => ({ id: s.id, vorname: s.vorname, nachname: s.nachname })),
-    [liste, students],
+        : [...students]
+            .filter((s) => !hatVerlassen(s, settings.aktuelles_halbjahr))
+            .sort((a, b) => a.vorname.localeCompare(b.vorname))
+            .map((s) => ({ id: s.id, vorname: s.vorname, nachname: s.nachname })),
+    [liste, students, settings.aktuelles_halbjahr],
   );
 }
 

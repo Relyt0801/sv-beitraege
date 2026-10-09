@@ -1,3 +1,4 @@
+import { hatVerlassen } from "./logic";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { hasSupabase, supabase } from "./supabase";
 import { abonniere } from "./realtime";
@@ -140,7 +141,7 @@ export function personVerlauf(id: string): string {
 }
 
 export function useAlbum(aktiv: boolean, uid: string | null, meineStudentId: string | null) {
-  const { students } = useStore();
+  const { students, settings } = useStore();
   const [personen, setPersonen] = useState<AlbumPerson[]>([]);
   const [kategorien, setKategorien] = useState<AlbumKategorie[]>([]);
   const [steckbriefe, setSteckbriefe] = useState<Steckbrief[]>([]);
@@ -206,8 +207,11 @@ export function useAlbum(aktiv: boolean, uid: string | null, meineStudentId: str
     () =>
       hasSupabase
         ? personen
-        : [...students].sort((a, b) => a.vorname.localeCompare(b.vorname)).map((s) => ({ id: s.id, vorname: s.vorname, nachname: s.nachname })),
-    [personen, students],
+        : [...students]
+            .filter((s) => !hatVerlassen(s, settings.aktuelles_halbjahr))
+            .sort((a, b) => a.vorname.localeCompare(b.vorname))
+            .map((s) => ({ id: s.id, vorname: s.vorname, nachname: s.nachname })),
+    [personen, students, settings.aktuelles_halbjahr],
   );
 
   const demoAendern = (fn: (d: DemoDaten) => void) => {
