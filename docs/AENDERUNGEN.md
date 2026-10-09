@@ -12,6 +12,24 @@ ausführlich (auf Deutsch); hier steht der Überblick dazu.
 ---
 
 
+## 09.10.2026: Automatische Sperren, Emoji-Filter
+
+- **Datenbank:** `supabase/auto-sperre.sql`. Die Stufe je Person und Art steht in
+  `auto_sperren`. 24 Stunden nach dem Ende der letzten Sperre geht es wieder bei
+  Stufe 1 los.
+  - **Spam** (10 Beiträge in 30 Sekunden): 1 Minute → 5 Minuten → 1 Stunde.
+  - **Wortfilter** (3 geblockte Versuche in 10 Minuten): 5 Minuten → 1 Stunde → 1 Tag.
+  - Admins werden nie automatisch gesperrt, und eine längere Sperre vom Team wird
+    nie verkürzt.
+  - Jede automatische Sperre steht im Protokoll (Moderation).
+- **Grund:** `profiles.ban_grund`. Die App zeigt ihn in der Sperr-Zeile und im Chat.
+  Gesperrte bekommen sofort eine Meldung, und die App merkt das Ende der Sperre von
+  selbst (`RoleProvider`). Statt „row-level security“ steht eine verständliche
+  Meldung da (`melder.ts`).
+- **Emojis:** In `app_settings.wortfilter_zeichen` blockt jedes Zeichen wie ein Wort.
+  Gepflegt wird die Liste im Wortfilter-Fenster unter „Emojis blocken“.
+- **Wörter:** Die Liste steht nur in der Datenbank, nicht im Repo.
+
 ## 07.10.2026: Wortfilter und Melden
 
 - **Wortfilter** (SQL `supabase/wortfilter-melden.sql`, Funktionen

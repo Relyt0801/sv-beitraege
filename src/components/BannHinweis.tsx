@@ -4,7 +4,7 @@ import { ladeAnfragen, sperrText, stelleAnfrage } from "../lib/unban";
 
 /** Sperr-Hinweis mit der Möglichkeit, die Sperre einmal anzufechten. */
 export function BannHinweis() {
-  const { bannedUntil, bannPermanent } = useRole();
+  const { bannedUntil, bannPermanent, banGrund } = useRole();
   const [offen, setOffen] = useState(false);
   const [text, setText] = useState("");
   const [gesendet, setGesendet] = useState(false);
@@ -23,6 +23,11 @@ export function BannHinweis() {
       <p className="mt-1 text-[13px] text-tinte-matt dark:text-slate-300">
         Solange kannst du nichts schreiben und nicht abstimmen. Mitlesen geht weiter.
       </p>
+      {banGrund && (
+        <p className="mt-1 text-[12.5px] font-semibold text-red-600 dark:text-red-300">
+          Automatisch gesperrt: {banGrund}. Jede weitere automatische Sperre dauert länger.
+        </p>
+      )}
 
       {gesendet || schonGestellt ? (
         <div className="mt-3 rounded-xl bg-white/70 px-3 py-2 text-[13px] font-semibold text-tinte-matt dark:bg-slate-900/60 dark:text-slate-300">

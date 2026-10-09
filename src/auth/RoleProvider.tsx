@@ -5,7 +5,8 @@ import { ALL_PERMS, ROLE_DEFAULTS, rechteRolle, type PermKey } from "../lib/perm
 import { demoProfile, demoRolle, demoRolleAlsRolle, demoUid } from "../lib/demo";
 import { useStore } from "../store";
 
-import { meldeFehler } from "../lib/melder";
+import { meldeFehler, sperreMerken } from "../lib/melder";
+import { sperrText } from "../lib/unban";
 export type Role = "schueler" | "stufenteam" | "kassenwart" | "admin" | "sprecher" | "stv_sprecher" | "eltern";
 
 export interface Profile {
@@ -17,6 +18,8 @@ export interface Profile {
   must_change_password?: boolean;
   chat_banned_until: string | null;
   chat_ban_permanent?: boolean;
+  /** Warum die App jemanden automatisch gesperrt hat (Spam, Wortfilter). */
+  ban_grund?: string | null;
   is_op?: boolean;
   /** Wird gesetzt, wenn die Einführung erneut gezeigt werden soll. */
   tour_reset_at?: string | null;
@@ -42,6 +45,8 @@ interface RoleCtx {
   banned: boolean;
   bannedUntil: string | null;
   bannPermanent: boolean;
+  /** Grund einer automatischen Sperre („Zu viele Beiträge in kurzer Zeit“). */
+  banGrund: string | null;
   /** Eigene Anmelde-Kennung (null im lokalen Modus / vor dem Laden). */
   uid: string | null;
   /** Eigene Zeile in der Personenliste – damit "Meine Kasse" nicht die erste fremde Person zeigt. */
@@ -76,6 +81,10 @@ export function RoleProvider({ children }: { children: ReactNode }) {
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [bannedUntil, setBannedUntil] = useState<string | null>(null);
   const [bannPerm, setBannPerm] = useState(false);
+  const [banGrund, setBanGrund] = useState<string | null>(null);
+  const bisRef = useRef<string | null>(null);
+  // Läuft eine Sperre ab, muss die App das von selbst merken (1-Minuten-Sperre)
+  const [, setTick] = useState(0);
   const [isOp, setIsOp] = useState(false);
   const [uid, setUid] = useState<string | null>(null);
   const [studentId, setStudentId] = useState<string | null>(null);
@@ -84,6 +93,23 @@ export function RoleProvider({ children }: { children: ReactNode }) {
   const roleRef = useRef<Role>(role);
   const uidRef = useRef<string | undefined>(undefined);
   roleRef.current = role;
+
+  /** Eigene Sperre übernehmen. Ist sie neu und automatisch, kurz Bescheid geben. */
+  const eigeneSperre = useCallback((row: { chat_banned_until?: string | null; chat_ban_permanent?: boolean | null; ban_grund?: string | null }, melden: boolean) => {
+    const bis = row.chat_banned_until ?? null;
+    const perm = Boolean(row.chat_ban_permanent);
+    const grund = row.ban_grund ?? null;
+    const vorher = bisRef.current;
+    bisRef.current = bis;
+    setBannedUntil(bis);
+    setBannPerm(perm);
+    setBanGrund(grund);
+    if (
+      melden && grund && !perm && bis && new Date(bis) > new Date() &&
+      (!vorher || new Date(bis).getTime() > new Date(vorher).getTime() + 1000)
+    )
+      meldeFehler(`🚫 ${grund} – du bist ${sperrText(bis, false)}.`);
+  }, []);
 
   const loadProfiles = useCallback(async (asStaff: boolean) => {
     if (!hasSupabase || !asStaff) return;
@@ -165,8 +191,7 @@ export function RoleProvider({ children }: { children: ReactNode }) {
           const row = p.new as Profile;
           if (row.user_id === uidRef.current) {
             setRoleState(row.role); // eigene Rolle live
-            setBannedUntil(row.chat_banned_until ?? null); // Sperre live
-            setBannPerm(Boolean(row.chat_ban_permanent));
+            eigeneSperre(row, true); // Sperre live
             setIsOp(Boolean(row.is_op));
             setStudentId(row.student_id ?? null);
             setTourResetAt(row.tour_reset_at ?? null);
@@ -198,14 +223,13 @@ export function RoleProvider({ children }: { children: ReactNode }) {
       }
       const { data: me } = await supabase!
         .from("profiles")
-        .select("role, student_id, chat_banned_until, chat_ban_permanent, is_op, tour_reset_at, has_logged_in")
+        .select("role, student_id, chat_banned_until, chat_ban_permanent, ban_grund, is_op, tour_reset_at, has_logged_in")
         .eq("user_id", uid)
         .maybeSingle();
       const r = (me?.role as Role) || "schueler";
       if (!alive) return;
       setRoleState(r);
-      setBannedUntil((me?.chat_banned_until as string | null) ?? null);
-      setBannPerm(Boolean((me as { chat_ban_permanent?: boolean } | null)?.chat_ban_permanent));
+      eigeneSperre((me as Partial<Profile> | null) || {}, false);
       setIsOp(Boolean((me as { is_op?: boolean } | null)?.is_op));
       setStudentId(((me as { student_id?: string | null } | null)?.student_id) ?? null);
       setTourResetAt(((me as { tour_reset_at?: string | null } | null)?.tour_reset_at) ?? null);
@@ -237,7 +261,36 @@ export function RoleProvider({ children }: { children: ReactNode }) {
       sub.subscription.unsubscribe();
       abmelden?.();
     };
-  }, [loadProfiles, loadPerms]);
+  }, [loadProfiles, loadPerms, eigeneSperre]);
+
+  // Nach einem abgelehnten Beitrag (Wortfilter, Spam) die eigene Sperre
+  // nachsehen – falls die Live-Verbindung gerade hängt.
+  useEffect(() => {
+    if (!hasSupabase) return;
+    const pruefen = async () => {
+      const id = uidRef.current;
+      if (!id) return;
+      const { data } = await supabase!
+        .from("profiles")
+        .select("chat_banned_until, chat_ban_permanent, ban_grund")
+        .eq("user_id", id)
+        .maybeSingle();
+      if (data) eigeneSperre(data as Partial<Profile>, true);
+    };
+    const h = () => void pruefen();
+    window.addEventListener("sv:sperre-pruefen", h);
+    return () => window.removeEventListener("sv:sperre-pruefen", h);
+  }, [eigeneSperre]);
+
+  // Ablauf der Sperre: genau dann neu zeichnen
+  useEffect(() => {
+    if (bannPerm || !bannedUntil) return;
+    const ms = new Date(bannedUntil).getTime() - Date.now();
+    if (ms <= 0) return;
+    // Anzeige „noch X Minuten“ jede Minute auffrischen, am Ende genau
+    const t = setTimeout(() => setTick((x) => x + 1), Math.min(ms + 250, 60000));
+    return () => clearTimeout(t);
+  });
 
   const setRole = useCallback(
     async (userId: string, r: Role) => {
@@ -279,6 +332,7 @@ export function RoleProvider({ children }: { children: ReactNode }) {
   const isEltern = role === "eltern";
   const can = useCallback((perm: PermKey) => isAdmin || perms.has(perm), [isAdmin, perms]);
   const banned = bannPerm || (bannedUntil != null && new Date(bannedUntil) > new Date());
+  sperreMerken(banned);
   const opUserId = profiles.find((p) => p.is_op)?.user_id ?? (isOp ? (uidRef.current ?? null) : null);
   // Grüner Punkt = Konto wird wirklich genutzt (Startpasswort wurde geändert)
   const loginByStudent: Record<string, boolean> = {};
@@ -306,6 +360,7 @@ export function RoleProvider({ children }: { children: ReactNode }) {
     banned,
     bannedUntil,
     bannPermanent: bannPerm,
+    banGrund: banned ? banGrund : null,
     uid,
     studentId,
     tourResetAt,

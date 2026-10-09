@@ -1,4 +1,5 @@
 import { useRole } from "../auth/RoleProvider";
+import { sperrText } from "../lib/unban";
 
 /**
  * Wer gesperrt ist (Chat-Sperre), kann überall nur noch ansehen: nichts
@@ -6,7 +7,7 @@ import { useRole } from "../auth/RoleProvider";
  * ohnehin (Trigger gesperrt_blocken) – hier steht es vorher sichtbar da.
  */
 export function GesperrtZeile({ className = "", hell }: { className?: string; hell?: boolean }) {
-  const { banned } = useRole();
+  const { banned, bannedUntil, bannPermanent, banGrund } = useRole();
   if (!banned) return null;
   return (
     <p
@@ -15,7 +16,8 @@ export function GesperrtZeile({ className = "", hell }: { className?: string; he
         hell ? "bg-white/15 text-white" : "bg-red-500/10 text-red-700 dark:text-red-300"
       } ${className}`}
     >
-      🚫 Du bist gesperrt – du kannst gerade nur ansehen, nichts einreichen oder abstimmen.
+      🚫 Du bist {sperrText(bannedUntil, bannPermanent)} – du kannst gerade nur ansehen, nichts einreichen oder abstimmen.
+      {banGrund && <span className="mt-0.5 block font-medium opacity-80">Grund: {banGrund}</span>}
     </p>
   );
 }

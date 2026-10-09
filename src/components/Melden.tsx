@@ -232,11 +232,19 @@ export function WortfilterSheet({ open, onClose }: { open: boolean; onClose: () 
   const [probe, setProbe] = useState("");
   const [probeErg, setProbeErg] = useState<string | null | undefined>(undefined);
   const [zeigen, setZeigen] = useState(false);
+  const [zeichen, setZeichen] = useState("");
+  const [zeichenAlt, setZeichenAlt] = useState("");
 
   const laden = async () => {
     if (!hasSupabase) return;
-    const { data } = await supabase!.from("wortfilter").select("id, wort, stufe, modus, aktiv").order("wort");
+    const [{ data }, { data: z }] = await Promise.all([
+      supabase!.from("wortfilter").select("id, wort, stufe, modus, aktiv").order("wort"),
+      supabase!.from("app_settings").select("wortfilter_zeichen").eq("id", 1).maybeSingle(),
+    ]);
     setListe((data as Eintrag[]) || []);
+    const zz = (z as { wortfilter_zeichen?: string } | null)?.wortfilter_zeichen ?? "";
+    setZeichen(zz);
+    setZeichenAlt(zz);
   };
   useEffect(() => {
     if (open) void laden();
@@ -319,6 +327,35 @@ export function WortfilterSheet({ open, onClose }: { open: boolean; onClose: () 
               {x.text}
             </button>
           ))}
+        </div>
+      )}
+
+      {teil === "block" && (
+        <div className="mb-4 rounded-2xl bg-[rgb(118_118_128/0.08)] p-3 dark:bg-[rgb(118_118_128/0.18)]">
+          <div className="text-[13px] font-semibold">Emojis blocken</div>
+          <p className="mt-0.5 text-[12px] leading-snug text-tinte-leise">Jedes Emoji hier blockt wie ein Wort – Hautfarben zählen mit.</p>
+          <div className="mt-1.5 flex gap-2">
+            <input
+              className="field text-[18px] tracking-wider"
+              aria-label="Geblockte Emojis"
+              maxLength={200}
+              placeholder="z. B. 🍆🍑💦"
+              value={zeichen}
+              onChange={(e) => setZeichen(e.target.value.replace(/[\sA-Za-z0-9]/g, ""))}
+            />
+            <button
+              className="btn-primary !min-h-[44px] !w-auto shrink-0 px-4 !text-[15px]"
+              disabled={zeichen === zeichenAlt}
+              onClick={async () => {
+                if (!hasSupabase) return;
+                const { error } = await supabase!.rpc("wortfilter_zeichen_setzen", { p: zeichen });
+                if (error) return meldeFehler("Ging nicht: " + error.message);
+                setZeichenAlt(zeichen);
+              }}
+            >
+              Speichern
+            </button>
+          </div>
         </div>
       )}
 

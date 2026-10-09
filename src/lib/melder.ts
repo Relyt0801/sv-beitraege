@@ -46,16 +46,36 @@ export function melde(text: string, art: MeldeArt = "info"): void {
 }
 
 /** Wie melde(), nur als Fehler eingefärbt und länger sichtbar. */
+let gesperrt = false;
+/** Setzt der RoleProvider: ist die eigene Person gerade gesperrt? */
+export function sperreMerken(an: boolean): void {
+  gesperrt = an;
+}
+/** Die eigene Sperre neu laden (RoleProvider hört darauf). */
+function sperrePruefen(): void {
+  if (typeof window !== "undefined") window.dispatchEvent(new Event("sv:sperre-pruefen"));
+}
+
 export function meldeFehler(text: string): void {
   // Wortfilter (Datenbank): Meldung ohne „Ging nicht:“ davor, und den
-  // Versuch zählen – ab 3 in 10 Minuten steht es im Protokoll.
+  // Versuch zählen – 3 in 10 Minuten sperren automatisch
+  // (5 Minuten → 1 Stunde → 1 Tag, supabase/auto-sperre.sql).
   const i = text.indexOf("Bitte ohne beleidigende Wörter");
   if (i >= 0) {
     const nur = text.slice(i);
     melde(nur, "fehler");
     const wort = (nur.match(/„([^“]+)“/) || [])[1] || "";
-    if (hasSupabase) void supabase!.rpc("wortfilter_versuch", { p_wort: wort });
+    if (hasSupabase) void supabase!.rpc("wortfilter_versuch", { p_wort: wort }).then(sperrePruefen);
     return;
+  }
+  // Gesperrt (z. B. gerade automatisch wegen Spam): verständlich statt
+  // „violates row-level security policy“
+  if (/gerade gesperrt|row-level security/i.test(text)) {
+    sperrePruefen();
+    if (gesperrt || /gerade gesperrt/i.test(text)) {
+      melde("Du bist gerade gesperrt und kannst nichts schreiben, einreichen oder abstimmen.", "fehler");
+      return;
+    }
   }
   melde(text, "fehler");
 }
