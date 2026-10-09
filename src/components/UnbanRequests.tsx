@@ -7,7 +7,8 @@ import { useStore } from "../store";
 import { entscheide, ladeAnfragen, type UnbanRequest } from "../lib/unban";
 
 import { meldeFehler } from "../lib/melder";
-import { useZustimmungen, zustimmungText } from "../lib/zustimmung";
+import { useZustimmungen } from "../lib/zustimmung";
+import { ZustimmungsMarke } from "./ZustimmungsMarke";
 /** Entbannungsanfragen – erscheinen für die Moderation oben in den Events. */
 export function UnbanRequests() {
   const { can, profiles, uid, isStaff } = useRole();
@@ -55,13 +56,8 @@ export function UnbanRequests() {
               <div className="mt-0.5 text-[13px] text-tinte-matt dark:text-slate-300">{r.nachricht}</div>
               <div className="mt-1 text-[11px] text-tinte-leise">
                 {new Date(r.created_at).toLocaleString("de-DE")}
-                {zustimmungText(zu.zahl(r.id), zu.noetig) && (
-                  <span className="ml-1.5 rounded-full bg-brand/10 px-2 py-0.5 font-semibold text-brand-dark dark:text-brand">
-                    {zustimmungText(zu.zahl(r.id), zu.noetig)}
-                    {zu.ichSchon(r.id) ? " · deine ✓" : ""}
-                  </span>
-                )}
               </div>
+              <ZustimmungsMarke className="mt-1.5" zahl={zu.zahl(r.id)} noetig={zu.noetig} ichSchon={zu.ichSchon(r.id)} />
             </div>
           </div>
           <div className="mt-3 flex gap-2">

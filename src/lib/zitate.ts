@@ -17,6 +17,11 @@ import { useStimmenZahlen } from "./ergebnisse";
  * Ohne Datenbank (Demo) liegt alles im Browser.
  */
 export type ZitatArt = "lehrer" | "schueler";
+
+/** Zitat ohne eigene Anführungszeichen außen – die setzt die App selbst („…“) */
+export function zitatOhneZeichen(t: string): string {
+  return (t || "").trim().replace(/^["„“”‚‘’'«»‹›]+\s*/, "").replace(/\s*["„“”‚‘’'«»‹›]+$/, "").trim();
+}
 export type ZitatStatus = "offen" | "frei" | "abgelehnt";
 
 export interface Zitat {
@@ -144,7 +149,7 @@ export function useZitate(aktiv: boolean, uid: string | null) {
 
   const einreichen = useCallback(
     async (z: { text: string; wer: string; art: ZitatArt; kontext: string }): Promise<string | null> => {
-      const sauber = { text: z.text.trim().slice(0, 300), wer: z.wer.trim().slice(0, 60), art: z.art, kontext: z.kontext.trim().slice(0, 60) };
+      const sauber = { text: zitatOhneZeichen(z.text).slice(0, 300), wer: z.wer.trim().slice(0, 60), art: z.art, kontext: z.kontext.trim().slice(0, 60) };
       if (!sauber.text || !sauber.wer) return "Zitat und Name fehlen";
       if (!hasSupabase) {
         const d = demoLesen();
@@ -198,7 +203,7 @@ export function useZitate(aktiv: boolean, uid: string | null) {
   /** Nachträglich ändern (Recht zitate.pruefen) */
   const bearbeiten = useCallback(
     async (id: string, z: { text: string; wer: string; kontext: string }): Promise<string | null> => {
-      const sauber = { text: z.text.trim().slice(0, 300), wer: z.wer.trim().slice(0, 60), kontext: z.kontext.trim().slice(0, 60) };
+      const sauber = { text: zitatOhneZeichen(z.text).slice(0, 300), wer: z.wer.trim().slice(0, 60), kontext: z.kontext.trim().slice(0, 60) };
       if (!sauber.text || !sauber.wer) return "Zitat und Name fehlen";
       setZitate((l) => l.map((x) => (x.id === id ? { ...x, ...sauber } : x)));
       if (!hasSupabase) {

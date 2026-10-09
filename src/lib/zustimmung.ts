@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { hasSupabase, supabase } from "./supabase";
 import { abonniere } from "./realtime";
+import { useRole } from "../auth/RoleProvider";
 
 /**
  * Freigaben mit mehreren Zustimmungen (supabase/runden-und-freigaben.sql).
@@ -33,6 +34,8 @@ export function nochFehlend(e: ZustimmungErgebnis): string {
 
 /** Zustimmungen je Anfrage und die nötige Zahl – für die Anzeige „1/2“ */
 export function useZustimmungen(art: ZustimmungsArt, aktiv: boolean, uid: string | null) {
+  // Der Owner entscheidet allein (supabase/owner-entscheidet-allein.sql)
+  const { isOp: allein } = useRole();
   const [je, setJe] = useState<Record<string, string[]>>({});
   const [noetig, setNoetig] = useState(1);
 
@@ -64,7 +67,7 @@ export function useZustimmungen(art: ZustimmungsArt, aktiv: boolean, uid: string
 
   const zahl = (id: string) => (je[id] || []).length;
   const ichSchon = (id: string) => Boolean(uid && (je[id] || []).includes(uid));
-  return { noetig, zahl, ichSchon, laden };
+  return { noetig, zahl, ichSchon, laden, allein };
 }
 
 /** Kleine Marke „1/2 Zustimmungen“ – nur, wenn mehr als eine nötig ist */

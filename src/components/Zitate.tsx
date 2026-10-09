@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { Sheet, SheetKopf } from "./Sheet";
 import { useRole } from "../auth/RoleProvider";
 import { useFunktionen } from "../lib/funktionen";
-import { useZitate, type Zitat, type ZitatArt, type Zitatwand } from "../lib/zitate";
+import { useZitate, zitatOhneZeichen, type Zitat, type ZitatArt, type Zitatwand } from "../lib/zitate";
+import { ZustimmungsMarke } from "./ZustimmungsMarke";
 import { AusHinweis } from "./Funktionen";
 import { frage, melde, meldeFehler } from "../lib/melder";
 import { useRunden, type RundenStand } from "../lib/runden";
@@ -10,7 +11,7 @@ import { RundenAbschnitt, RundenMarke, SichtbarkeitWahl } from "./Runden";
 import { useErgebnisSichtbarkeit } from "../lib/ergebnisse";
 import { FarbKarte, KnopfGlas, KnopfHell } from "./Kachel";
 import { AutorInfo, WortfilterSchalter } from "./AutorInfo";
-import { useZustimmungen, zustimmungText } from "../lib/zustimmung";
+import { useZustimmungen } from "../lib/zustimmung";
 import { useLehrer, useStufePersonen } from "../lib/rankings";
 import { LehrerListe, ZahnradKnopf } from "./Rankings";
 import { GesperrtZeile, GESPERRT_TEXT } from "./Gesperrt";
@@ -72,7 +73,7 @@ export function ZitateKarte({ className = "" }: { className?: string }) {
             "Welche Zitate kommen in die Abizeitung?"
           ) : heute ? (
             <button onClick={() => setOffen("liste")} className="block text-left font-buch text-[1.3rem] font-normal italic leading-snug">
-              „{heute.text}“
+              „{zitatOhneZeichen(heute.text)}“
             </button>
           ) : (
             <span className="font-buch text-[1.2rem] font-normal italic leading-snug text-white/85">Wer hat diesen einen Satz gesagt, den niemand vergisst?</span>
@@ -183,7 +184,7 @@ function ZitateSheet({
                 stand={r}
                 quellen={wand.zitate
                   .filter((z) => z.status === "frei")
-                  .map((z) => ({ id: z.id, label: `„${z.text}“`, unter: `— ${z.wer}${z.kontext ? `, ${z.kontext}` : ""}`, punkte: wand.stimmenVon(z.id) }))}
+                  .map((z) => ({ id: z.id, label: `„${zitatOhneZeichen(z.text)}“`, unter: `— ${z.wer}${z.kontext ? `, ${z.kontext}` : ""}`, punkte: wand.stimmenVon(z.id) }))}
                 leitet={can("zitate.runden")}
                 gesperrt={banned}
                 startText="Abstimmungsrunde starten"
@@ -324,7 +325,7 @@ function ZitatZeile({ z, platz, wand }: { z: Zitat; platz: number; wand: Zitatwa
         {platz > 0 && platz <= 3 && n > 0 && (
           <div className="mb-1 text-[11px] font-bold uppercase tracking-[0.08em] text-[#9A7410] dark:text-[#E9C460]">Platz {platz}</div>
         )}
-        <div className="font-buch text-[17px] leading-[1.4]">„{z.text}“</div>
+        <div className="font-buch text-[17px] leading-[1.4]">„{zitatOhneZeichen(z.text)}“</div>
         <div className="mt-1.5 text-[13px] text-tinte-leise">
           — {z.wer}
           {z.kontext ? `, ${z.kontext}` : ""}
@@ -485,18 +486,15 @@ function Pruefen({ wand }: { wand: Zitatwand }) {
     <div className="space-y-2.5">
       {offen.map((z) => (
         <div key={z.id} className="animate-aufsteigen rounded-2xl bg-[rgb(118_118_128/0.08)] p-4 dark:bg-[rgb(118_118_128/0.18)]">
-          <div className="font-buch text-[16.5px] leading-snug">„{z.text}“</div>
+          <div className="font-buch text-[16.5px] leading-snug">„{zitatOhneZeichen(z.text)}“</div>
+          <div className="mt-1 text-[12.5px] leading-snug text-tinte-leise">
+            — {z.wer}
+            {z.kontext ? `, ${z.kontext}` : ""}
+          </div>
           <WortfilterHinweis text={`${z.text} ${z.wer} ${z.kontext}`} />
-          <div className="mt-2 flex items-center gap-2">
-            <span className="min-w-0 flex-1 text-[12.5px] text-tinte-leise">
-              — {z.wer}
-              {z.kontext ? `, ${z.kontext}` : ""}
-              {zustimmungText(zu.zahl(z.id), zu.noetig) && (
-                <span className="ml-1.5 rounded-full bg-brand/10 px-2 py-0.5 font-semibold text-brand-dark dark:text-brand">
-                  {zustimmungText(zu.zahl(z.id), zu.noetig)}
-                  {zu.ichSchon(z.id) ? " · deine ✓" : ""}
-                </span>
-              )}
+          <div className="mt-2.5 flex items-center gap-2">
+            <span className="min-w-0 flex-1">
+              <ZustimmungsMarke zahl={zu.zahl(z.id)} noetig={zu.noetig} ichSchon={zu.ichSchon(z.id)} />
             </span>
             <AutorInfo art="zitat" id={z.id} />
             <button

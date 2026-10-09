@@ -9,7 +9,8 @@ import { AnfrageSheet } from "./AnfrageSheet";
 import { tagLang, uhr, type TerminAnfrage } from "../lib/termine";
 
 import { frage, meldeFehler } from "../lib/melder";
-import { nochFehlend, useZustimmungen, zustimmen, zustimmungText } from "../lib/zustimmung";
+import { nochFehlend, useZustimmungen, zustimmen } from "../lib/zustimmung";
+import { ZustimmungsMarke } from "./ZustimmungsMarke";
 function wann(a: TerminAnfrage): string {
   const zeit = a.von ? `${uhr(a.von)}${a.bis ? ` – ${uhr(a.bis)}` : ""}` : "ganztägig";
   return `${tagLang(a.datum)} · ${zeit}`;
@@ -57,13 +58,8 @@ export function AnfragenFuerTeam({ onUebernehmen }: { onUebernehmen: (a: TerminA
               <div className="mt-1 text-[11px] text-tinte-leise">
                 von {profile[a.created_by]?.anzeigename || "Unbekannt"} ·{" "}
                 {new Date(a.created_at).toLocaleString("de-DE")}
-                {zustimmungText(zu.zahl(a.id), zu.noetig) && (
-                  <span className="ml-1.5 rounded-full bg-brand/10 px-2 py-0.5 font-semibold text-brand-dark dark:text-brand">
-                    {zustimmungText(zu.zahl(a.id), zu.noetig)}
-                    {zu.ichSchon(a.id) ? " · deine ✓" : ""}
-                  </span>
-                )}
               </div>
+              <ZustimmungsMarke className="mt-1.5" zahl={zu.zahl(a.id)} noetig={zu.noetig} ichSchon={zu.ichSchon(a.id)} />
             </div>
           </div>
 
@@ -126,7 +122,7 @@ export function AnfragenFuerTeam({ onUebernehmen }: { onUebernehmen: (a: TerminA
                 }}
                 className="flex-1 rounded-xl bg-brand py-2 text-sm font-bold text-white disabled:opacity-40"
               >
-                {zu.noetig > 1 && !zu.ichSchon(a.id) && zu.zahl(a.id) + 1 < zu.noetig ? "Zustimmen" : "Übernehmen"}
+                {!zu.allein && zu.noetig > 1 && !zu.ichSchon(a.id) && zu.zahl(a.id) + 1 < zu.noetig ? "Zustimmen" : "Übernehmen"}
               </button>
             </div>
           )}

@@ -58,11 +58,11 @@ export function SichtbarkeitWahl({ alle, onChange, className = "" }: { alle: boo
   return (
     <div className={`flex min-h-[44px] items-center gap-3 ${className}`}>
       <span className="min-w-0 flex-1 whitespace-nowrap text-[15px]">Ergebnisse sehen</span>
-      <div className="seg w-[168px] shrink-0" role="radiogroup" aria-label="Ergebnisse sehen">
-        <button type="button" role="radio" aria-checked={!alle} className={`seg-item !px-2 ${!alle ? "seg-aktiv" : ""}`} onClick={() => onChange(false)}>
+      <div className="seg w-[178px] shrink-0" role="radiogroup" aria-label="Ergebnisse sehen">
+        <button type="button" role="radio" aria-checked={!alle} className={`seg-item !px-1.5 !text-[12.5px] whitespace-nowrap ${!alle ? "seg-aktiv" : ""}`} onClick={() => onChange(false)}>
           Nur Komitee
         </button>
-        <button type="button" role="radio" aria-checked={alle} className={`seg-item !px-2 ${alle ? "seg-aktiv" : ""}`} onClick={() => onChange(true)}>
+        <button type="button" role="radio" aria-checked={alle} className={`seg-item !px-1.5 !text-[12.5px] whitespace-nowrap ${alle ? "seg-aktiv" : ""}`} onClick={() => onChange(true)}>
           Alle
         </button>
       </div>
