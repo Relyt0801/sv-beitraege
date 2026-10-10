@@ -140,7 +140,7 @@ export function PermissionsTab() {
 
 /** Startwerte wie in supabase/komitees-motto.sql (für die Demo) */
 const KOMITEE_START: Record<string, PermKey[]> = {
-  abizeitung: ["zitate.pruefen", "zitate.runden", "rankings.verwalten", "rankings.runden", "lehrer.verwalten", "album.redigieren", "funktion.album", "funktion.zitate", "funktion.rankings"],
+  abizeitung: ["zitate.pruefen", "zitate.runden", "rankings.verwalten", "rankings.runden", "lehrer.verwalten", "album.redigieren", "album.kategorien", "album.moderieren", "funktion.album", "funktion.zitate", "funktion.rankings"],
   "motto-pullis": ["motto.verwalten", "motto.runden", "funktion.motto"],
 };
 const permLabel = (k: PermKey) => PERM_CATEGORIES.flatMap((c) => c.perms).find((p) => p.key === k)?.label ?? k;

@@ -273,6 +273,11 @@ grant execute on function public.album_redigieren(uuid, jsonb, text) to authenti
 insert into public.komitee_rechte (tag, perm, allowed) values ('abizeitung', 'album.redigieren', true)
 on conflict (tag, perm) do nothing;
 
+-- 10.10.2026: Abizeitung verwaltet die Steckbriefe ganz (Kategorien, Moderation)
+insert into public.komitee_rechte (tag, perm, allowed) values
+  ('abizeitung', 'album.kategorien', true), ('abizeitung', 'album.moderieren', true)
+on conflict (tag, perm) do nothing;
+
 -- ------------------------------------------------------------ 6. Motto: nur 👍, Ergebnisse nur fürs Komitee
 -- Jede Person sieht nur ihre eigenen Stimmen; die Zahlen sieht nur, wer
 -- motto.verwalten hat (Komitee Motto & Pullis, Admin). 🔥 gibt es nicht mehr.
