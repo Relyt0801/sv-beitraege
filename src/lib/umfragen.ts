@@ -73,11 +73,32 @@ export const ZIEL_NAME: Record<Zielgruppe, string> = {
   alle: "Schüler & Eltern",
 };
 
+/**
+ * Freitext-Fragen gibt es in drei Formen. Gespeichert als Typ „text“, die Form
+ * steht in optionen[0] – so braucht die Datenbank keinen neuen Typ.
+ *   kurz  eine Zeile (max. 120 Zeichen)
+ *   lang  mehrere Zeilen (max. 1000) – Standard, auch für alte Fragen
+ *   zahl  nur eine Zahl
+ */
+export type TextArt = "kurz" | "lang" | "zahl";
+export const TEXT_ART_NAME: Record<TextArt, string> = { kurz: "Kurzer Text", lang: "Langer Text", zahl: "Zahl" };
+export function textArt(f: Pick<Frage, "typ" | "optionen">): TextArt {
+  const a = f.typ === "text" ? f.optionen?.[0] : undefined;
+  return a === "kurz" || a === "zahl" ? a : "lang";
+}
+/** "12,5" → 12.5; keine Zahl → null */
+export function alsZahl(t: string): number | null {
+  const s = (t || "").trim().replace(/\s/g, "").replace(",", ".");
+  if (!/^-?\d+(\.\d+)?$/.test(s)) return null;
+  const n = Number(s);
+  return Number.isFinite(n) ? n : null;
+}
+
 /** Ist die Antwort ausgefüllt? */
 export function beantwortet(f: Frage, w: Wert | undefined): boolean {
   if (w === undefined || w === null) return false;
   if (Array.isArray(w)) return w.length > 0;
-  if (typeof w === "string") return w.trim().length > 0;
+  if (typeof w === "string") return f.typ === "text" && textArt(f) === "zahl" ? alsZahl(w) !== null : w.trim().length > 0;
   return true;
 }
 

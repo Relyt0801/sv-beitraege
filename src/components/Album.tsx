@@ -956,12 +956,7 @@ function MeinSteckbrief({ album, vorschau }: { album: Album; vorschau: () => voi
             />
             </label>
             {spotifyAus(daten[k.id] || "") && (
-              <>
-                <SpotifyKarte wert={daten[k.id]} fallbackTitel={ohneLink(daten[k.id])} />
-                <button type="button" onClick={() => setDaten((d) => ({ ...d, [k.id]: ohneLink(d[k.id] || "") }))} className="mt-1.5 text-[12.5px] font-semibold text-red-600 dark:text-red-400">
-                  Spotify-Link entfernen
-                </button>
-              </>
+              <SpotifyKarte wert={daten[k.id]} fallbackTitel={ohneLink(daten[k.id])} />
             )}
             {spotifyAn && /lied|song|musik/i.test(k.titel) && (
               <LiedSuche wert={daten[k.id] || ""} setzen={(v) => setDaten((d) => ({ ...d, [k.id]: v.slice(0, 200) }))} />

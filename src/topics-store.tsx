@@ -54,6 +54,8 @@ export interface TopicItem {
   poll_multi?: boolean;
   poll_anon?: boolean;
   poll_deadline?: string | null;
+  /** Freie Antwort statt Auswahl (supabase/freitext-abstimmungen.sql) */
+  antwort_art?: "kurz" | "lang" | "zahl" | null;
   author: string;
   author_role: string | null; // Rolle des Autors beim Schreiben (schueler/stufenteam/kassenwart/admin)
   author_koms: string[] | null; // relevante Komitees des Autors (Slugs)
@@ -135,7 +137,7 @@ interface TopicsValue {
   setUserCommittee: (userId: string, slug: string, on: boolean) => Promise<void>;
   selfAssignCommittee: (slug: string) => Promise<boolean>;
   committeesOf: (userId: string) => string[];
-  postItem: (topic: Topic, type: TopicItemType, body: string, options?: string[], title?: string, meta?: { role?: string | null; koms?: string[]; pinned?: boolean; poll?: { multi?: boolean; anon?: boolean; deadline?: string | null } }) => Promise<void>;
+  postItem: (topic: Topic, type: TopicItemType, body: string, options?: string[], title?: string, meta?: { role?: string | null; koms?: string[]; pinned?: boolean; poll?: { multi?: boolean; anon?: boolean; deadline?: string | null; antwortArt?: "kurz" | "lang" | "zahl" | null } }) => Promise<void>;
   updateItem: (id: string, patch: Partial<Pick<TopicItem, "done" | "pinned">>) => Promise<void>;
   deleteItem: (id: string) => Promise<void>;
   vote: (itemId: string, optionId: string, multi?: boolean) => Promise<void>;
@@ -507,7 +509,8 @@ export function TopicsProvider({ children }: { children: ReactNode }) {
   const postItem: TopicsValue["postItem"] = useCallback(async (topic, type, body, options, title = "", meta) => {
     const item: TopicItem = {
       id: uuid(), topic_id: topic.id, type, title: title.trim(), body: body.trim(),
-      options: type === "umfrage" ? (options || []).filter(Boolean).map((label) => ({ id: uuid(), label })) : null,
+      options: type === "umfrage" && !meta?.poll?.antwortArt ? (options || []).filter(Boolean).map((label) => ({ id: uuid(), label })) : null,
+      antwort_art: type === "umfrage" ? meta?.poll?.antwortArt ?? null : null,
       done: false, pinned: Boolean(meta?.pinned), author: nameRef.current,
       poll_multi: Boolean(meta?.poll?.multi), poll_anon: Boolean(meta?.poll?.anon),
       poll_deadline: meta?.poll?.deadline ?? null,
@@ -521,6 +524,7 @@ export function TopicsProvider({ children }: { children: ReactNode }) {
       id: item.id, topic_id: item.topic_id, type: item.type, title: item.title, body: item.body,
       options: item.options, pinned: item.pinned, author: item.author,
       poll_multi: item.poll_multi, poll_anon: item.poll_anon, poll_deadline: item.poll_deadline,
+      ...(item.antwort_art ? { antwort_art: item.antwort_art } : {}),
       author_role: item.author_role, author_koms: item.author_koms, created_by: uidRef.current,
     });
     if (error) {

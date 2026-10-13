@@ -13,6 +13,7 @@ import { VorsitzZeile } from "./VorsitzSheet";
 import { Icon } from "./Icon";
 
 import { frage } from "../lib/melder";
+import { ANTWORT_ART_NAME, FreiAntworten, type AntwortArt } from "./Freitext";
 type Neu = "pin" | "umfrage" | "todo" | null;
 
 /**
@@ -185,7 +186,7 @@ export function KomiteePage({ topic, onBack }: { topic: Topic; onBack: () => voi
           if (daten.art === "umfrage")
             await postItem(topic, "umfrage", daten.text, daten.optionen, daten.text.slice(0, 60), {
               ...meta,
-              poll: { multi: daten.multi, anon: daten.anon, deadline: daten.frist },
+              poll: { multi: daten.multi, anon: daten.anon, deadline: daten.frist, antwortArt: daten.antwortArt },
             });
           setNeu(null);
         }}
@@ -239,7 +240,7 @@ function UmfrageKarte({
         <div className="min-w-0 flex-1">
           <div className="text-[15px] font-bold [overflow-wrap:anywhere]">{item.body}</div>
           <div className="mt-0.5 flex flex-wrap gap-1.5 text-[11px] text-tinte-leise">
-            <span>{item.poll_multi ? "Mehrfachwahl" : "Einfachwahl"}</span>
+            <span>{item.antwort_art ? `Freie Antwort · ${ANTWORT_ART_NAME[item.antwort_art]}` : item.poll_multi ? "Mehrfachwahl" : "Einfachwahl"}</span>
             <span>·</span>
             <span>{item.poll_anon ? "anonym" : "nicht anonym"}</span>
             {item.poll_deadline && (
@@ -265,6 +266,10 @@ function UmfrageKarte({
         )}
       </div>
 
+      {item.antwort_art ? (
+        <FreiAntworten item={item} abgelaufen={abgelaufen} />
+      ) : (
+      <>
       <div className="mt-3 grid gap-1.5">
         {(Array.isArray(item.options) ? item.options : []).map((o) => {
           const n = counts[o.id] || 0;
@@ -329,6 +334,8 @@ function UmfrageKarte({
           optionen={Array.isArray(item.options) ? item.options : []}
           stimmen={voters[item.id] || []}
         />
+      )}
+      </>
       )}
     </div>
   );
@@ -398,6 +405,8 @@ interface NeuDaten {
   multi: boolean;
   anon: boolean;
   frist: string | null;
+  /** null = Auswahl-Möglichkeiten, sonst freie Antwort */
+  antwortArt: AntwortArt | null;
 }
 
 function NeuSheet({ art, onClose, onSave }: { art: Neu; onClose: () => void; onSave: (d: NeuDaten) => void }) {
@@ -406,9 +415,11 @@ function NeuSheet({ art, onClose, onSave }: { art: Neu; onClose: () => void; onS
   const [multi, setMulti] = useState(false);
   const [anon, setAnon] = useState(true);
   const [frist, setFrist] = useState("");
+  const [antwortArt, setAntwortArt] = useState<AntwortArt | null>(null);
 
   useEffect(() => {
     if (art) {
+      setAntwortArt(null);
       setText("");
       setOptionen(["", ""]);
       setMulti(false);
@@ -420,7 +431,7 @@ function NeuSheet({ art, onClose, onSave }: { art: Neu; onClose: () => void; onS
   if (!art) return null;
   const maxLen = art === "pin" ? 100 : 200;
   const titel = art === "pin" ? "Kurz anpinnen" : art === "todo" ? "Neues To-do" : "Neue Abstimmung";
-  const gueltig = text.trim() && (art !== "umfrage" || optionen.filter((o) => o.trim()).length >= 2);
+  const gueltig = text.trim() && (art !== "umfrage" || antwortArt || optionen.filter((o) => o.trim()).length >= 2);
 
   return (
     <Sheet open onClose={onClose}>
@@ -441,6 +452,21 @@ function NeuSheet({ art, onClose, onSave }: { art: Neu; onClose: () => void; onS
 
       {art === "umfrage" && (
         <>
+          <div className="mb-1.5 px-1 text-[12px] font-semibold uppercase tracking-[0.04em] text-tinte-leise">Art der Antwort</div>
+          <div className="seg mb-3" role="radiogroup" aria-label="Art der Antwort">
+            {([null, "kurz", "lang", "zahl"] as (AntwortArt | null)[]).map((a) => (
+              <button key={a ?? "auswahl"} role="radio" aria-checked={antwortArt === a} className={`seg-item ${antwortArt === a ? "seg-aktiv" : ""}`} onClick={() => setAntwortArt(a)}>
+                {a ? (a === "kurz" ? "Kurz" : a === "lang" ? "Lang" : "Zahl") : "Auswahl"}
+              </button>
+            ))}
+          </div>
+          {antwortArt && (
+            <p className="mb-4 px-1 text-[12.5px] text-tinte-leise">
+              {antwortArt === "kurz" ? "Alle antworten mit einer Zeile (höchstens 120 Zeichen)." : antwortArt === "lang" ? "Alle antworten mit freiem Text, auch mehrere Zeilen." : "Alle antworten mit einer Zahl. Dazu siehst du Ø, Median, kleinste und größte."}
+            </p>
+          )}
+          {!antwortArt && (
+          <>
           <div className="mb-1.5 px-1 text-[12px] font-semibold uppercase tracking-[0.04em] text-tinte-leise">Antworten</div>
           {optionen.map((o, i) => (
             <input
@@ -454,9 +480,11 @@ function NeuSheet({ art, onClose, onSave }: { art: Neu; onClose: () => void; onS
           <button onClick={() => setOptionen((p) => [...p, ""])} className="mb-4 text-sm font-bold text-brand">
             ＋ Antwort
           </button>
+          </>
+          )}
 
           <div className="mb-4 grid gap-2 rounded-2xl bg-papier-matt p-3 dark:bg-slate-800/70">
-            <Schalter label="Mehrfachauswahl erlauben" on={multi} set={setMulti} />
+            {!antwortArt && <Schalter label="Mehrfachauswahl erlauben" on={multi} set={setMulti} />}
             <Schalter label="Anonym abstimmen" on={anon} set={setAnon} />
             <label className="flex items-center gap-2 text-sm">
               <span className="flex-1 text-tinte-matt dark:text-slate-300">Frist (optional)</span>
@@ -478,8 +506,9 @@ function NeuSheet({ art, onClose, onSave }: { art: Neu; onClose: () => void; onS
           onSave({
             art,
             text: text.trim(),
-            optionen: optionen.map((o) => o.trim()).filter(Boolean),
-            multi,
+            optionen: antwortArt ? [] : optionen.map((o) => o.trim()).filter(Boolean),
+            multi: antwortArt ? false : multi,
+            antwortArt,
             anon,
             frist: frist ? new Date(frist).toISOString() : null,
           })

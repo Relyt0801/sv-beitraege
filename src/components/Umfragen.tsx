@@ -7,6 +7,10 @@ import { useRole } from "../auth/RoleProvider";
 import { useStore } from "../store";
 import {
   TYP_NAME,
+  TEXT_ART_NAME,
+  alsZahl,
+  textArt,
+  type TextArt,
   WEISS_NICHT,
   ZIEL_NAME,
   beantwortet,
@@ -33,6 +37,7 @@ import { useRunden } from "../lib/runden";
 import { RundenAbschnitt, SichtbarkeitWahl } from "./Runden";
 import { Kachel } from "./Kachel";
 import { Icon } from "./Icon";
+import { ZahlenAuswertung } from "./Freitext";
 import { WortfilterSchalter } from "./AutorInfo";
 
 const name = (p: UPerson) => `${p.vorname} ${p.nachname}`;
@@ -401,6 +406,7 @@ function Antwort({ f, wert, personen, setzen }: { f: Frage; wert: Wert | undefin
   // Freitext: speichert beim Verlassen des Feldes und kurz nach dem Tippen
   return (
     <TextAntwort
+      art={textArt(f)}
       text={text}
       setText={setText}
       speichern={(t) => setzen(t)}
@@ -408,21 +414,43 @@ function Antwort({ f, wert, personen, setzen }: { f: Frage; wert: Wert | undefin
   );
 }
 
-function TextAntwort({ text, setText, speichern }: { text: string; setText: (t: string) => void; speichern: (t: string) => void }) {
+function TextAntwort({ art, text, setText, speichern }: { art: TextArt; text: string; setText: (t: string) => void; speichern: (t: string) => void }) {
+  // Zahl: erst speichern, wenn es wirklich eine Zahl ist
+  const ok = art !== "zahl" || !text.trim() || alsZahl(text) !== null;
+  const sichern = (t: string) => {
+    if (art === "zahl" && t.trim() && alsZahl(t) === null) return;
+    speichern(art === "zahl" && t.trim() ? String(alsZahl(t)) : t);
+  };
   useEffect(() => {
-    const t = setTimeout(() => speichern(text), 700);
+    const t = setTimeout(() => sichern(text), 700);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [text]);
+  if (art === "lang")
+    return (
+      <textarea
+        className="field min-h-[140px] resize-y"
+        value={text}
+        maxLength={1000}
+        placeholder="Deine Antwort …"
+        onChange={(e) => setText(e.target.value)}
+        onBlur={() => sichern(text)}
+      />
+    );
   return (
-    <textarea
-      className="field min-h-[140px] resize-y"
-      value={text}
-      maxLength={1000}
-      placeholder="Deine Antwort …"
-      onChange={(e) => setText(e.target.value)}
-      onBlur={() => speichern(text)}
-    />
+    <div>
+      <input
+        className={`field ${art === "zahl" ? "zahl text-[20px]" : ""}`}
+        value={text}
+        maxLength={art === "zahl" ? 15 : 120}
+        inputMode={art === "zahl" ? "decimal" : "text"}
+        placeholder={art === "zahl" ? "Zahl, z. B. 12 oder 3,5" : "Kurze Antwort …"}
+        onChange={(e) => setText(e.target.value)}
+        onBlur={() => sichern(text)}
+      />
+      {!ok && <p className="mt-1.5 px-1 text-[13px] font-semibold text-red-600 dark:text-red-400">Bitte nur eine Zahl eingeben.</p>}
+      {art === "kurz" && <p className="mt-1 px-1 text-right text-[11.5px] text-tinte-leise">{text.length} / 120</p>}
+    </div>
   );
 }
 
@@ -684,7 +712,7 @@ function UmfrageEditor({
                 value={f.typ}
                 onChange={(e) => {
                   const typ = e.target.value as FrageTyp;
-                  aendern(i, { typ, optionen: typ === "einfach" || typ === "mehrfach" ? (f.optionen.length ? f.optionen : ["", ""]) : typ === "skala" ? ["gar nicht", "sehr"] : [] });
+                  aendern(i, { typ, optionen: typ === "einfach" || typ === "mehrfach" ? (f.optionen.length ? f.optionen : ["", ""]) : typ === "skala" ? ["gar nicht", "sehr"] : typ === "text" ? ["kurz"] : [] });
                 }}
               >
                 {(Object.keys(TYP_NAME) as FrageTyp[]).filter((t) => t !== "ranking").map((t) => (
@@ -724,6 +752,15 @@ function UmfrageEditor({
               <div className="mt-2 flex gap-2">
                 <input className="field" placeholder="1 = …" value={f.optionen[0] || ""} onChange={(e) => aendern(i, { optionen: [e.target.value, f.optionen[1] || ""] })} />
                 <input className="field" placeholder="5 = …" value={f.optionen[1] || ""} onChange={(e) => aendern(i, { optionen: [f.optionen[0] || "", e.target.value] })} />
+              </div>
+            )}
+            {f.typ === "text" && (
+              <div className="seg mt-2" role="radiogroup" aria-label="Art der Antwort">
+                {(["kurz", "lang", "zahl"] as TextArt[]).map((a) => (
+                  <button key={a} role="radio" aria-checked={textArt(f) === a} className={`seg-item ${textArt(f) === a ? "seg-aktiv" : ""}`} onClick={() => aendern(i, { optionen: [a] })}>
+                    {TEXT_ART_NAME[a]}
+                  </button>
+                ))}
               </div>
             )}
             {f.typ === "person" && <p className="mt-2 text-[12.5px] text-tinte-leise">Alle wählen eine Person aus der Stufe. Gezählt wird, wie oft jemand gewählt wurde.</p>}
@@ -886,7 +923,8 @@ function ErgebnisSheet({
                 </p>
                 {f.typ === "text" ? (
                   <ul className="mt-2 space-y-1.5">
-                    {e.texte.map((t, i) => (
+                    {textArt(f) === "zahl" && <ZahlenAuswertung werte={e.texte.map(alsZahl).filter((z): z is number => z !== null)} />}
+                    {(textArt(f) === "zahl" ? [...e.texte].sort((x, y) => (alsZahl(x) ?? 0) - (alsZahl(y) ?? 0)) : e.texte).map((t, i) => (
                       <li key={i} className="rounded-xl bg-[rgb(118_118_128/0.08)] px-3 py-2 text-[14px] dark:bg-[rgb(118_118_128/0.18)]">
                         {t}
                       </li>

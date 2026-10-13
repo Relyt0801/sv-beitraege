@@ -1,4 +1,4 @@
-# Änderungen – Stand 03.10.2026
+# Änderungen – Stand 13.10.2026
 
 Diese Datei erklärt, was sich in den letzten Runden geändert hat, **wo** es im
 Code steht und **warum** es so gebaut ist. Die Kommentare im Code selbst sind
@@ -11,6 +11,18 @@ ausführlich (auf Deutsch); hier steht der Überblick dazu.
 
 ---
 
+
+## 13.10.2026: Freie Antworten, Spotify-Knopf
+
+- **Freie Antworten bei Abstimmungen im Chat** (`supabase/freitext-abstimmungen.sql`, `components/Freitext.tsx`, `KomiteePage.tsx`):
+  - Beim Anlegen wählt man zwischen Auswahl, Kurz (eine Zeile, höchstens 120 Zeichen), Lang und Zahl (`topic_items.antwort_art`).
+  - Antworten stehen in `topic_antworten`, eine pro Person; man kann sie ändern oder zurückziehen.
+  - Der Trigger `freitext_pruefen` kürzt Leerzeichen, prüft die Länge und erlaubt bei „Zahl“ nur Zahlen (Komma wird zum Punkt). Der Wortfilter läuft im Bereich „Chat“.
+  - Bei Zahlen erscheinen Ø, Median, die kleinste und die größte Zahl. Bei anonymen Abstimmungen stehen keine Namen dabei (Admins sehen sie).
+  - Nach Ablauf der Frist sind keine Antworten mehr möglich (RLS `freitext_offen`).
+- **Pop-up-Umfragen**: Fragen vom Typ „Freitext“ haben jetzt die Unterarten Kurzer Text, Langer Text und Zahl (`optionen[0]`, ohne DB-Änderung). Zahlen werden geprüft und ausgewertet.
+- **Steckbrief**: Der Knopf „Spotify-Link entfernen“ ist entfallen; die Spotify-Karte bleibt.
+- **Fotos für alle**: Dafür war kein Code nötig. Das Foto-Feld sehen alle, die das Album nutzen dürfen; freigegebene Fotos sind für sie sichtbar. Dafür muss das Album für alle freigeschaltet sein (Funktionen → Abi-Album + „Nutzen dürfen“).
 
 ## 10.10.2026: Fotos, Sprungziele, Scrollen
 
