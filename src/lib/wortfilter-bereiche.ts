@@ -9,22 +9,30 @@ import { useRole } from "../auth/RoleProvider";
  * prüft das Team jedes Zitat selbst. Schalten darf, wer den Wortfilter pflegt
  * oder den Bereich verwaltet (z. B. Abizeitung die Zitate).
  */
-export type WfBereich = "chat" | "kommentare" | "steckbrief" | "motto" | "zitate" | "rankings" | "umfragen" | "anfragen" | "team";
+export type WfBereich =
+  | "chat" | "kommentare" | "steckbrief" | "motto" | "zitate" | "rankings" | "umfragen" | "anfragen" | "team"
+  // Inoffizielle Teile (supabase/offiziell-inoffiziell.sql) – Standard aus
+  | "motto_inoffiziell" | "zitate_inoffiziell" | "rankings_inoffiziell" | "kommentare_inoffiziell";
 
 export const WF_BEREICHE: { key: WfBereich; titel: string; text: string }[] = [
   { key: "chat", titel: "Chats", text: "Nachrichten, To-dos, Abstimmungen in Chats" },
-  { key: "kommentare", titel: "Kommentare", text: "Kommentare im Abi-Album" },
+  { key: "kommentare", titel: "Kommentare (offiziell)", text: "Offizielle Kommentare im Abi-Album" },
+  { key: "kommentare_inoffiziell", titel: "Kommentare (inoffiziell)", text: "Nur für die Stufe – Standard aus" },
   { key: "steckbrief", titel: "Steckbriefe", text: "Stammdaten, Lebensmotto, Texte" },
-  { key: "motto", titel: "Abimotto", text: "Vorschläge und Erklärungen" },
-  { key: "zitate", titel: "Zitate", text: "Standard aus – das Team prüft jedes Zitat" },
-  { key: "rankings", titel: "Rankings", text: "Ranking-Kategorien" },
+  { key: "motto", titel: "Abimotto (offiziell)", text: "Offizielle Vorschläge und Erklärungen" },
+  { key: "motto_inoffiziell", titel: "Abimotto (inoffiziell)", text: "Nur für die Stufe – Standard aus" },
+  { key: "zitate", titel: "Zitate (offiziell)", text: "Kommen ins Abibuch" },
+  { key: "zitate_inoffiziell", titel: "Zitate (inoffiziell)", text: "Nur für die Stufe – Standard aus" },
+  { key: "rankings", titel: "Rankings (offiziell)", text: "Offizielle Ranking-Kategorien" },
+  { key: "rankings_inoffiziell", titel: "Rankings (inoffiziell)", text: "Nur für die Stufe – Standard aus" },
   { key: "umfragen", titel: "Umfragen", text: "Fragen und freie Antworten" },
   { key: "anfragen", titel: "Anfragen", text: "Nachträge, Termin-, Kosten-, Komitee- und Entsperr-Anfragen" },
   { key: "team", titel: "Termine & Events", text: "Was das Team selbst einträgt" },
 ];
 
 const STANDARD: Record<WfBereich, boolean> = {
-  chat: true, kommentare: true, steckbrief: true, motto: true, zitate: false, rankings: true, umfragen: true, anfragen: true, team: true,
+  chat: true, kommentare: true, steckbrief: true, motto: true, zitate: true, rankings: true, umfragen: true, anfragen: true, team: true,
+  motto_inoffiziell: false, zitate_inoffiziell: false, rankings_inoffiziell: false, kommentare_inoffiziell: false,
 };
 const DEMO = "sv-wf-bereiche-demo";
 
@@ -32,13 +40,15 @@ const DEMO = "sv-wf-bereiche-demo";
 export function useWfRecht() {
   const { can } = useRole();
   return useCallback(
-    (b: WfBereich) =>
-      can("wortfilter.verwalten") ||
+    (bereich: WfBereich) => {
+      const b = bereich.replace("_inoffiziell", "") as WfBereich;
+      return can("wortfilter.verwalten") ||
       (b === "motto" && can("motto.verwalten")) ||
       (b === "zitate" && can("zitate.pruefen")) ||
       (b === "rankings" && can("rankings.verwalten")) ||
       (b === "umfragen" && can("umfragen.verwalten")) ||
-      ((b === "steckbrief" || b === "kommentare") && can("album.moderieren")),
+      ((b === "steckbrief" || b === "kommentare") && can("album.moderieren"));
+    },
     [can],
   );
 }
