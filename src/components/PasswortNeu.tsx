@@ -52,7 +52,7 @@ export function usePasswortNeu() {
       {ergebnis && (
         <>
           <SheetKopf titel="Neues Passwort" unter={`Für ${ergebnis.name}. Wird nur jetzt angezeigt – danach nirgends mehr.`} onClose={() => setErgebnis(null)} />
-          <div className="liste bg-[rgb(118_118_128/0.08)] dark:bg-[rgb(118_118_128/0.18)]">
+          <div className="liste zelle">
             <div className="zeile">
               <span className="min-w-0 flex-1 text-[15px] text-tinte-leise">Nutzername</span>
               <span className="select-all font-mono text-[15px]">{ergebnis.username}</span>

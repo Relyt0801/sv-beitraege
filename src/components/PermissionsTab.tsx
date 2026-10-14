@@ -5,6 +5,7 @@ import { KomiteeZugriff } from "./KomiteeZugriff";
 import { SkelettKarten } from "./Skelett";
 import { Sheet } from "./Sheet";
 import type { Profile } from "../auth/RoleProvider";
+import { ALLE_KACHEL_PERMS } from "./KachelVerwaltung";
 import { PERM_CATEGORIES, PERM_ROLES, ALL_PERMS, ROLE_DEFAULTS, ROLLE_KURZ, KOMITEE_PERMS, permsNachThema, rechteRolle, rollenDerZeile, type PermKey } from "../lib/permissions";
 import { COMMITTEES } from "../lib/committees";
 import { Schalter } from "./Schalter";
@@ -44,7 +45,9 @@ export function PermissionsTab() {
   }, []);
 
   /** Nur Rechte zeigen, die man selbst besitzt – Admin sieht alles. */
-  const sichtbar = (perm: PermKey) => isAdmin || can(perm);
+  // Rechte, die direkt in einer Kachel eingestellt werden (Abimotto, Zitate …),
+  // stehen hier nicht mehr – siehe KachelVerwaltung.
+  const sichtbar = (perm: PermKey) => (isAdmin || can(perm)) && !ALLE_KACHEL_PERMS.has(perm);
   const kategorien = PERM_CATEGORIES.map((c) => ({ ...c, perms: c.perms.filter((p) => sichtbar(p.key)) }))
     .filter((c) => c.perms.length > 0);
 
@@ -71,7 +74,8 @@ export function PermissionsTab() {
     <div className="space-y-5">
       <p className="text-sm text-tinte-leise">
         Rechte gelten pro Rolle. Ausnahmen für einzelne Personen setzt du unter „Rollen“: Person antippen. Der Admin
-        hat immer alle Rechte.
+        hat immer alle Rechte. Wer Abimotto, Zitate, Rankings, Abi-Album und Umfragen verwalten darf, stellst du direkt in
+        der jeweiligen Kachel ein (Einstellungen → Wer darf was?).
       </p>
 
       {kategorien.map((cat) => {
@@ -204,15 +208,15 @@ function KomiteeRechte() {
                 <span className="min-w-0 flex-1">
                   <span className="block text-[15px] font-semibold">{k.label}</span>
                   <span className="block truncate text-[12px] text-tinte-leise">
-                    {an.size ? KOMITEE_PERMS.filter((p) => an.has(p)).map(permLabel).join(", ") : "Keine zusätzlichen Rechte"}
+                    {an.size ? KOMITEE_PERMS.filter((p) => an.has(p) && !ALLE_KACHEL_PERMS.has(p)).map(permLabel).join(", ") || "Rechte in den Kacheln" : "Keine zusätzlichen Rechte"}
                   </span>
                 </span>
                 <span className={`text-tinte-leise transition ${offen ? "rotate-90" : ""}`} aria-hidden>›</span>
               </button>
               {offen && (
                 <div className="space-y-2 px-4 pb-4">
-                  {permsNachThema(KOMITEE_PERMS).map((t) => (
-                    <details key={t.label} className="group overflow-hidden rounded-xl bg-[rgb(118_118_128/0.08)] dark:bg-[rgb(118_118_128/0.18)]">
+                  {permsNachThema(KOMITEE_PERMS.filter((p) => !ALLE_KACHEL_PERMS.has(p))).map((t) => (
+                    <details key={t.label} className="group overflow-hidden rounded-xl zelle">
                       <summary className="flex min-h-[44px] cursor-pointer list-none items-center gap-2 px-3 text-[14px] font-semibold [&::-webkit-details-marker]:hidden">
                         <span aria-hidden>{t.icon}</span>
                         <span className="min-w-0 flex-1">{t.label}</span>
@@ -344,7 +348,7 @@ export function PersonRechteSheet({ profil, name, onClose }: { profil: Profile; 
             const auf = offen.has(cat.label);
             const ausn = cat.perms.filter((pp) => ov[pp.key] !== undefined).length;
             return (
-              <section key={cat.label} className="overflow-hidden rounded-2xl bg-[rgb(118_118_128/0.08)] dark:bg-[rgb(118_118_128/0.18)]">
+              <section key={cat.label} className="overflow-hidden rounded-2xl zelle">
                 <button
                   onClick={() =>
                     setOffen((o) => {

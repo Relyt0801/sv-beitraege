@@ -82,7 +82,7 @@ export function MithilfeBlatt({
               onChange={(e) => setSuche(e.target.value)}
               className="w-full rounded-xl bg-[rgb(118_118_128/0.12)] px-3 py-2 text-[15px] outline-none placeholder:text-tinte-leise dark:bg-[rgb(118_118_128/0.24)]"
             />
-            <div className="mt-3 divide-y divide-black/[0.06] overflow-hidden rounded-2xl bg-[rgb(118_118_128/0.08)] dark:divide-white/[0.08] dark:bg-[rgb(118_118_128/0.18)]">
+            <div className="mt-3 divide-y divide-black/[0.06] overflow-hidden rounded-2xl zelle dark:divide-white/[0.08]">
               {treffer.length === 0 && (
                 <div className="px-4 py-4 text-center text-[13px] text-tinte-leise">
                   {vorlagen.length === 0 ? "Noch keine Aktionen – im Reiter „Beiträge“ anlegen." : "Nichts gefunden."}

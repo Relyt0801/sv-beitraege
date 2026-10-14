@@ -262,7 +262,7 @@ function MottoZeile({ x, m, gesperrt }: { x: Motto; m: MottoWahl; gesperrt: bool
   return (
     <div
       className={`rounded-2xl p-3.5 ${
-        x.gewaehlt ? "bg-brand/[0.06] ring-2 ring-brand/60" : "bg-[rgb(118_118_128/0.08)] dark:bg-[rgb(118_118_128/0.18)]"
+        x.gewaehlt ? "bg-brand/[0.06] ring-2 ring-brand/60" : "zelle"
       }`}
     >
       <div className="flex items-center gap-3">
@@ -312,7 +312,7 @@ function VerwaltenZeile({ x, m, platz, anteil }: { x: Motto; m: MottoWahl; platz
     return f;
   };
   return (
-    <div className={`rounded-2xl bg-[rgb(118_118_128/0.08)] p-3.5 dark:bg-[rgb(118_118_128/0.18)] ${x.ausgeblendet ? "opacity-60" : ""}`}>
+    <div className={`rounded-2xl zelle p-3.5 ${x.ausgeblendet ? "opacity-60" : ""}`}>
       {bearbeite ? (
         <div className="space-y-2">
           <input className="field" maxLength={80} value={text} onChange={(e) => setText(e.target.value)} autoFocus />

@@ -193,7 +193,7 @@ function KategorieKachel({
     <button
       onClick={onClick}
       className={`block w-full rounded-2xl p-3 text-left transition active:scale-[.98] ${
-        hat && !offeneRunde ? "bg-[rgb(118_118_128/0.08)] dark:bg-[rgb(118_118_128/0.18)]" : "bg-white shadow-card ring-1 ring-brand/40 dark:bg-slate-800"
+        hat && !offeneRunde ? "zelle" : "bg-white shadow-card ring-1 ring-brand/40 dark:bg-slate-800"
       }`}
     >
       {offeneRunde && <RundenMarke runde={offeneRunde} className="mb-1.5 !px-2 !py-0.5 !text-[11px]" />}
@@ -356,7 +356,7 @@ export function ZielWahl({
               key={p.id}
               onClick={() => setzen(p.id)}
               className={`flex flex-col items-center gap-1 rounded-2xl px-1 pb-2 pt-2.5 transition active:scale-95 ${
-                an ? "bg-[#E9C460]/20 ring-2 ring-[#C99A1E]" : "bg-[rgb(118_118_128/0.08)] dark:bg-[rgb(118_118_128/0.18)]"
+                an ? "bg-[#E9C460]/20 ring-2 ring-[#C99A1E]" : "zelle"
               }`}
             >
               <span className={`flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br text-[14px] font-bold text-white ${personVerlauf(p.id)}`}>

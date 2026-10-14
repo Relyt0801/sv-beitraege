@@ -318,7 +318,7 @@ export function ProtokollSheet({
             onChange={(e) => setSuche(e.target.value)}
           />
 
-          <div className="divide-y divide-black/[0.06] overflow-hidden rounded-2xl bg-[rgb(118_118_128/0.08)] dark:divide-white/[0.08] dark:bg-[rgb(118_118_128/0.18)]">
+          <div className="divide-y divide-black/[0.06] overflow-hidden rounded-2xl zelle dark:divide-white/[0.08]">
             {zeilen.map((z) => (
               <ProtokollZeile key={z.id} z={z} />
             ))}

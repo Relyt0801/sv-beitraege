@@ -87,7 +87,7 @@ export function FreigabenSheet({ open, onClose }: { open: boolean; onClose: () =
       <SheetKopf titel="Freigaben" unter="Wie viele zustimmen müssen – und wer Nachträge bearbeitet." onClose={onClose} />
 
       <h3 className="abschnitt">Nötige Zustimmungen</h3>
-      <div className="liste bg-[rgb(118_118_128/0.08)] dark:bg-[rgb(118_118_128/0.18)]">
+      <div className="liste zelle">
         {ARTEN.map((a) => (
           <div key={a.key} className="zeile">
             <span className="min-w-0 flex-1">
@@ -103,7 +103,7 @@ export function FreigabenSheet({ open, onClose }: { open: boolean; onClose: () =
       </p>
 
       <h3 className="abschnitt mt-6">Nachträge bearbeiten</h3>
-      <div className="liste bg-[rgb(118_118_128/0.08)] dark:bg-[rgb(118_118_128/0.18)]">
+      <div className="liste zelle">
         {bearbeiter.length === 0 && (
           <div className="zeile text-[14px] text-tinte-leise">Niemand ausgewählt – alle aus dem Team dürfen.</div>
         )}
@@ -123,7 +123,7 @@ export function FreigabenSheet({ open, onClose }: { open: boolean; onClose: () =
       {waehlen && (
         <div className="mt-2">
           <input className="field mb-2" placeholder="Name suchen" value={suche} onChange={(e) => setSuche(e.target.value)} autoFocus />
-          <div className="liste max-h-[40vh] overflow-y-auto bg-[rgb(118_118_128/0.08)] dark:bg-[rgb(118_118_128/0.18)]">
+          <div className="liste max-h-[40vh] overflow-y-auto zelle">
             {kandidaten.map(({ p, n }) => (
               <button key={p.user_id} onClick={() => void bearbeiterSetzen(p.user_id, true)} className="zeile w-full text-left">
                 <Avatar userId={p.user_id} size={30} />

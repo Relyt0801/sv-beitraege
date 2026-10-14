@@ -284,7 +284,7 @@ function ZitatZeile({ z, platz, wand }: { z: Zitat; platz: number; wand: Zitatwa
 
   if (edit)
     return (
-      <div className="space-y-2 rounded-2xl bg-[rgb(118_118_128/0.08)] p-3 dark:bg-[rgb(118_118_128/0.18)]">
+      <div className="space-y-2 rounded-2xl zelle p-3">
         <textarea className="field min-h-[80px] resize-y font-buch" maxLength={300} value={edit.text} onChange={(e) => setEdit({ ...edit, text: e.target.value })} />
         <div className="grid grid-cols-2 gap-2">
           <input className="field" maxLength={60} placeholder="Wer" value={edit.wer} onChange={(e) => setEdit({ ...edit, wer: e.target.value })} />
@@ -321,7 +321,7 @@ function ZitatZeile({ z, platz, wand }: { z: Zitat; platz: number; wand: Zitatwa
     );
 
   return (
-    <div className="flex gap-3 rounded-2xl bg-[rgb(118_118_128/0.08)] p-4 dark:bg-[rgb(118_118_128/0.18)]">
+    <div className="flex gap-3 rounded-2xl zelle p-4">
       <div className="min-w-0 flex-1">
         {platz > 0 && platz <= 3 && n > 0 && (
           <div className="mb-1 text-[11px] font-bold uppercase tracking-[0.08em] text-[#9A7410] dark:text-[#E9C460]">Platz {platz}</div>
@@ -486,7 +486,7 @@ function Pruefen({ wand }: { wand: Zitatwand }) {
   return (
     <div className="space-y-2.5">
       {offen.map((z) => (
-        <div key={z.id} className="animate-aufsteigen rounded-2xl bg-[rgb(118_118_128/0.08)] p-4 dark:bg-[rgb(118_118_128/0.18)]">
+        <div key={z.id} className="animate-aufsteigen rounded-2xl zelle p-4">
           <div className="font-buch text-[16.5px] leading-snug">„{zitatOhneZeichen(z.text)}“</div>
           <div className="mt-1 text-[12.5px] leading-snug text-tinte-leise">
             — {z.wer}

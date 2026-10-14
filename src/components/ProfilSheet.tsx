@@ -130,7 +130,7 @@ export function ProfilSheet({
 
       {/* ------------------------------------------------ Darstellung */}
       <h3 className="abschnitt">Darstellung</h3>
-      <div className="liste mb-5 bg-[rgb(118_118_128/0.08)] dark:bg-[rgb(118_118_128/0.18)]">
+      <div className="liste mb-5 zelle">
         {!istEltern && (
           <div>
             <button className={row} onClick={() => setFarbenOffen((o) => !o)} aria-expanded={farbenOffen}>
@@ -176,7 +176,7 @@ export function ProfilSheet({
 
       {/* ------------------------------------------------ Mitteilungen */}
       {(hasSupabase || !istEltern) && <h3 className="abschnitt">Mitteilungen</h3>}
-      <div className="liste mb-5 bg-[rgb(118_118_128/0.08)] dark:bg-[rgb(118_118_128/0.18)] [&:empty]:hidden">
+      <div className="liste mb-5 zelle [&:empty]:hidden">
         {!istEltern && (
           <label className={row}>
             <span className="symbol bg-[#34C759]">
@@ -237,7 +237,7 @@ export function ProfilSheet({
 
       {/* ------------------------------------------------ Konto */}
       {(hasSupabase || (!isStaff && !istEltern)) && <h3 className="abschnitt">Konto</h3>}
-      <div className="liste mb-5 [&:empty]:hidden bg-[rgb(118_118_128/0.08)] dark:bg-[rgb(118_118_128/0.18)]">
+      <div className="liste mb-5 [&:empty]:hidden zelle">
         {hasSupabase && (
           <div>
             <button className={row} onClick={() => { setPwOffen((o) => !o); setPwInfo(""); }} aria-expanded={pwOffen}>
@@ -313,7 +313,7 @@ export function ProfilSheet({
       {verwaltung && (
         <>
           <h3 className="abschnitt">Verwaltung</h3>
-          <div className="liste mb-5 bg-[rgb(118_118_128/0.08)] dark:bg-[rgb(118_118_128/0.18)]">
+          <div className="liste mb-5 zelle">
             {darfFunktionen && (
               <VZeile row={row} icon="auswahl" farbe="bg-brand" text="Funktionen" onClick={() => setFunktionenOffen(true)} />
             )}
@@ -352,7 +352,7 @@ export function ProfilSheet({
         </>
       )}
 
-      <div className="liste mb-5 bg-[rgb(118_118_128/0.08)] dark:bg-[rgb(118_118_128/0.18)] [&:empty]:hidden">
+      <div className="liste mb-5 zelle [&:empty]:hidden">
         {onTutorial && <VZeile row={row} icon="info" farbe="bg-brand" text="Einführung noch mal ansehen" onClick={onTutorial} />}
         {hasSupabase && (
           <button className={`${row} justify-center font-semibold text-red-600 dark:text-red-400`} onClick={() => void frage("Wirklich abmelden?", "Abmelden", true).then((ok) => { if (ok) void abmelden(); })}>

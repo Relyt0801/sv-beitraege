@@ -25,12 +25,12 @@ export function Gruppe({
   return (
     <section className={className}>
       {titel && (
-        <h3 className="mb-1.5 px-4 text-[12px] font-semibold uppercase tracking-[0.04em] text-tinte-leise">{titel}</h3>
+        <h3 className="mb-1.5 px-4 text-[13px] font-normal uppercase tracking-[0.02em] text-tinte-leise">{titel}</h3>
       )}
-      <div className="divide-y divide-black/[0.06] overflow-hidden rounded-2xl bg-[rgb(118_118_128/0.08)] dark:divide-white/[0.08] dark:bg-[rgb(118_118_128/0.18)]">
+      <div className="gruppe-zellen">
         {children}
       </div>
-      {fuss && <p className="mt-1.5 px-4 text-[12px] leading-snug text-tinte-leise">{fuss}</p>}
+      {fuss && <p className="mt-1.5 px-4 text-[13px] leading-snug text-tinte-leise">{fuss}</p>}
     </section>
   );
 }

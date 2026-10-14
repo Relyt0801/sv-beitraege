@@ -494,7 +494,7 @@ export function RundeStartenSheet({
         unter={`${gruppeTitel ? gruppeTitel + " · " : ""}Wähle aus, was weiterkommt. Eine laufende Runde wird dabei beendet.`}
         onClose={onClose}
       />
-      <div className="liste mb-3 bg-[rgb(118_118_128/0.08)] dark:bg-[rgb(118_118_128/0.18)]">
+      <div className="liste mb-3 zelle">
         <label className="zeile">
           <span className="min-w-0 flex-1 text-[15px]">Name der Runde</span>
           <input className="w-36 bg-transparent text-right text-[15px] text-tinte-matt outline-none" maxLength={40} value={titel} onChange={(e) => setTitel(e.target.value)} />
@@ -559,7 +559,7 @@ export function RundeStartenSheet({
           </button>
         </div>
       )}
-      <div className="liste max-h-[45vh] overflow-y-auto bg-[rgb(118_118_128/0.08)] dark:bg-[rgb(118_118_128/0.18)]">
+      <div className="liste max-h-[45vh] overflow-y-auto zelle">
         {sortiert.map((q, i) => {
           const an = wahl.has(q.id);
           const istHerz = herz.has(q.id);

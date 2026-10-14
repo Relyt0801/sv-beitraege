@@ -295,7 +295,7 @@ export function LiedSuche({ wert, setzen }: { wert: string; setzen: (v: string) 
     );
 
   return (
-    <span className="mt-2 block overflow-hidden rounded-2xl bg-[rgb(118_118_128/0.08)] dark:bg-[rgb(118_118_128/0.18)]">
+    <span className="mt-2 block overflow-hidden rounded-2xl zelle">
       <span className="flex items-center gap-2 px-3 pt-3">
         <input
           type="search"

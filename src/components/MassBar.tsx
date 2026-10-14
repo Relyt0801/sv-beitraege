@@ -94,7 +94,7 @@ export function MassBar({
         zusatz={
           <div className="mt-4">
             <div className="mb-1.5 px-4 text-[12px] font-semibold uppercase tracking-[0.04em] text-tinte-leise">Wer war dabei?</div>
-            <div className="rounded-2xl bg-[rgb(118_118_128/0.08)] p-3 dark:bg-[rgb(118_118_128/0.18)]">{namen}</div>
+            <div className="rounded-2xl zelle p-3">{namen}</div>
             <p className="mt-1.5 px-4 text-[11.5px] text-tinte-leise">Antippen zum Abwählen. Alle bekommen eine Mitteilung.</p>
           </div>
         }

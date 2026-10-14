@@ -386,7 +386,7 @@ function Antwort({ f, wert, personen, setzen }: { f: Frage; wert: Wert | undefin
                   key={p.id}
                   onClick={() => setzen(p.id)}
                   className={`flex flex-col items-center gap-1 rounded-2xl px-1 pb-2 pt-2.5 transition active:scale-95 ${
-                    an ? "bg-[#5E5CE6]/10 ring-2 ring-[#5E5CE6]" : "bg-[rgb(118_118_128/0.08)] dark:bg-[rgb(118_118_128/0.18)]"
+                    an ? "bg-[#5E5CE6]/10 ring-2 ring-[#5E5CE6]" : "zelle"
                   }`}
                 >
                   <span className={`flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br text-[14px] font-bold text-white ${personVerlauf(p.id)}`}>
@@ -545,7 +545,7 @@ export function UmfragenSheet({ open, onClose }: { open: boolean; onClose: () =>
                     setVorlage(t.bauen(kategorien));
                     setBearbeite("neu");
                   }}
-                  className="w-full rounded-2xl bg-[rgb(118_118_128/0.08)] px-3.5 py-3 text-left transition active:scale-[.98] dark:bg-[rgb(118_118_128/0.18)]"
+                  className="w-full rounded-2xl zelle px-3.5 py-3 text-left transition active:scale-[.98]"
                 >
                   <span className="block text-[14px] font-semibold">{t.name}</span>
                   <span className="mt-0.5 block text-[12px] leading-snug text-tinte-leise">{t.beschreibung}</span>
@@ -703,7 +703,7 @@ function UmfrageEditor({
       <h3 className="mb-1.5 mt-5 px-4 text-[12px] font-semibold uppercase tracking-[0.04em] text-tinte-leise">Fragen</h3>
       <div className="space-y-3">
         {liste.map((f, i) => (
-          <div key={i} className="rounded-2xl bg-[rgb(118_118_128/0.08)] p-3 dark:bg-[rgb(118_118_128/0.18)]">
+          <div key={i} className="rounded-2xl zelle p-3">
             <div className="flex items-center gap-2">
               <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#5E5CE6] text-[12px] font-bold text-white">{i + 1}</span>
               <select
@@ -925,7 +925,7 @@ function ErgebnisSheet({
                   <ul className="mt-2 space-y-1.5">
                     {textArt(f) === "zahl" && <ZahlenAuswertung werte={e.texte.map(alsZahl).filter((z): z is number => z !== null)} />}
                     {(textArt(f) === "zahl" ? [...e.texte].sort((x, y) => (alsZahl(x) ?? 0) - (alsZahl(y) ?? 0)) : e.texte).map((t, i) => (
-                      <li key={i} className="rounded-xl bg-[rgb(118_118_128/0.08)] px-3 py-2 text-[14px] dark:bg-[rgb(118_118_128/0.18)]">
+                      <li key={i} className="rounded-xl zelle px-3 py-2 text-[14px]">
                         {t}
                       </li>
                     ))}
@@ -934,7 +934,7 @@ function ErgebnisSheet({
                 ) : (
                   <div className="mt-2 space-y-1.5">
                     {eintraege.slice(0, f.typ === "person" ? 10 : 50).map(([k, v], i) => (
-                      <div key={k} className="relative overflow-hidden rounded-xl bg-[rgb(118_118_128/0.08)] dark:bg-[rgb(118_118_128/0.18)]">
+                      <div key={k} className="relative overflow-hidden rounded-xl zelle">
                         <div
                           className={`absolute inset-y-0 left-0 rounded-xl ${i === 0 && f.typ !== "skala" ? "bg-brand/30" : "bg-brand/15"}`}
                           style={{ width: `${(v / max) * 100}%` }}

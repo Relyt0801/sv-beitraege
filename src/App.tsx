@@ -47,6 +47,7 @@ import { Icon, type IconName } from "./components/Icon";
 import { HintergrundEbene } from "./components/HintergrundEbene";
 import { InstallKarte, InstallOverlay } from "./components/InstallHinweis";
 import { useGescrollt, useHoeheAlsVariable, useReiter } from "./lib/gescrollt";
+import { GlasLeiste } from "./components/GlasLeiste";
 import { Schalter } from "./components/Schalter";
 import { AlbumProvider } from "./components/Album";
 import { FunktionenProvider } from "./lib/funktionen";
@@ -515,28 +516,13 @@ function Main() {
 
         {/* Am Rechner und iPad quer: schwebende Reiterleiste oben in der Mitte
             (wie iPadOS). Auf dem Handy steht sie unten. */}
-        <nav className="mx-auto mt-3 hidden w-fit max-w-full items-center gap-0.5 overflow-x-auto rounded-full border border-black/[0.06] p-1 shadow-glas glas no-scrollbar dark:border-white/10 lg:flex">
-          {navItems.filter((n) => n.show).map((n) => (
-            <button
-              key={n.key}
-              data-tour={`tab-${n.key}`}
-              onClick={() => setTab(n.key)}
-              aria-current={tab === n.key ? "page" : undefined}
-              className={`relative flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[14px] font-semibold transition duration-300 ease-ios active:scale-95 ${
-                tab === n.key
-                  ? "bg-white text-brand-dark shadow-[0_2px_8px_rgba(0,0,0,.1)] dark:bg-slate-700 dark:text-white"
-                  : "text-tinte-matt hover:text-tinte dark:text-slate-300 dark:hover:text-white"
-              }`}
-            >
-              <Icon name={n.icon} size={16} />
-              {n.label}
-              {(n.badge ?? 0) > 0 && (
-                <span className="flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#FF3B30] px-1 text-[11px] font-semibold text-white">
-                  {n.badge! > 9 ? "9+" : n.badge}
-                </span>
-              )}
-            </button>
-          ))}
+        <nav className="mx-auto mt-3 hidden w-fit max-w-full rounded-full border border-black/[0.06] p-1 shadow-glas glas dark:border-white/10 lg:flex">
+          <GlasLeiste
+            variante="oben"
+            aktiv={tab}
+            onWahl={setTab}
+            reiter={navItems.filter((n) => n.show).map((n) => ({ key: n.key, label: n.label, badge: n.badge, tour: `tab-${n.key}`, icon: <Icon name={n.icon} size={16} /> }))}
+          />
         </nav>
       </header>
 
@@ -844,31 +830,22 @@ function Main() {
       {!massMode && (
         <nav
           ref={leisteRef}
-          className="fixed inset-x-0 bottom-0 z-40 border-t border-black/[0.08] bg-[rgb(var(--glas))] pb-[env(safe-area-inset-bottom)] dark:border-white/[0.08] lg:hidden"
+          className="pointer-events-none fixed inset-x-0 bottom-0 z-40 px-3 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] lg:hidden"
         >
-          <div className="mx-auto flex max-w-xl items-stretch px-1">
-            {navItems.filter((n) => n.show).map((n) => (
-              <button
-                key={n.key}
-                data-tour={`tab-${n.key}`}
-                onClick={() => setTab(n.key)}
-                aria-current={tab === n.key ? "page" : undefined}
-                className={`relative flex min-w-0 flex-1 flex-col items-center gap-[3px] px-0.5 pb-1 pt-[7px] text-[10px] font-medium tracking-[-0.01em] transition duration-200 ease-ios active:scale-90 ${
-                  tab === n.key ? "text-brand dark:text-brand-dark" : "text-[#6E6E73] dark:text-[#A1A1A6]"
-                }`}
-                aria-label={n.label}
-              >
-                <span className="relative flex h-[24px] items-center leading-none">
-                  <Icon name={n.icon} size={24} strich={tab === n.key ? 2.2 : 1.7} />
-                  {(n.badge ?? 0) > 0 && (
-                    <span className="absolute -right-3 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#FF3B30] px-1 text-[11px] font-semibold text-white ring-2 ring-[rgb(var(--glas))]">
-                      {n.badge! > 9 ? "9+" : n.badge}
-                    </span>
-                  )}
-                </span>
-                <span className="w-full truncate text-center">{n.label}</span>
-              </button>
-            ))}
+          {/* Schwebende Glas-Kapsel wie in iOS 26 – die Linse gleitet zum gewählten Reiter */}
+          <div className="pointer-events-auto mx-auto max-w-md rounded-[2rem] border border-white/60 p-1 shadow-[0_8px_32px_-8px_rgba(0,0,0,.28),0_0_0_.5px_rgba(0,0,0,.08)] glas dark:border-white/10 dark:shadow-[0_8px_32px_-8px_rgba(0,0,0,.8),0_0_0_.5px_rgba(255,255,255,.08)]">
+            <GlasLeiste
+              variante="unten"
+              aktiv={tab}
+              onWahl={setTab}
+              reiter={navItems.filter((n) => n.show).map((n) => ({
+                key: n.key,
+                label: n.label,
+                badge: n.badge,
+                tour: `tab-${n.key}`,
+                icon: <Icon name={n.icon} size={24} strich={tab === n.key ? 2.2 : 1.7} />,
+              }))}
+            />
           </div>
         </nav>
       )}

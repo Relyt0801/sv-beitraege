@@ -208,7 +208,7 @@ const STATUS_TEXT: Record<TicketBestellung["status"], string> = {
 /** Kleine Info-Zeile statt großer Kästen */
 function Info({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex items-center gap-2 rounded-xl bg-[rgb(118_118_128/0.08)] px-3 py-2 text-[12.5px] text-tinte-matt dark:bg-[rgb(118_118_128/0.16)] dark:text-slate-300">
+    <div className="flex items-center gap-2 rounded-xl zelle px-3 py-2 text-[12.5px] text-tinte-matt dark:text-slate-300">
       {children}
     </div>
   );
@@ -273,7 +273,7 @@ export function TicketKasse({
   return (
     <div className="grid content-start gap-2.5">
       {status === "bald" && (
-        <div className="rounded-2xl bg-[rgb(118_118_128/0.08)] p-4 text-center dark:bg-[rgb(118_118_128/0.16)]">
+        <div className="rounded-2xl zelle p-4 text-center">
           <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-tinte-leise">Verkauf startet in</div>
           <div className="zahl mt-1 text-[1.9rem] font-extrabold leading-none tracking-[-0.02em]">{countdown(abMs - jetzt)}</div>
           <div className="mt-1 text-[12px] text-tinte-leise">{zeitpunktSchoen(a.verkaufAb!)}</div>
@@ -353,7 +353,7 @@ export function TicketKasse({
       )}
 
       {meine.length > 0 && (
-        <div className="overflow-hidden rounded-2xl bg-[rgb(118_118_128/0.08)] dark:bg-[rgb(118_118_128/0.16)]">
+        <div className="overflow-hidden rounded-2xl zelle">
           <div className="px-4 pb-1 pt-2.5 text-[11px] font-bold uppercase tracking-[0.14em] text-tinte-leise">
             {fuerEltern ? `Bestellungen von ${student.vorname}` : "Deine Bestellungen"}
           </div>

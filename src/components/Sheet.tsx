@@ -52,7 +52,7 @@ export function Sheet({ open, onClose, children }: { open: boolean; onClose: () 
         onClick={onClose}
       />
       <div
-        className="relative max-h-[92dvh] w-full max-w-2xl animate-sheetIn overflow-y-auto overscroll-contain rounded-t-[1.75rem] bg-white px-5 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] pt-1.5 shadow-2xl dark:bg-slate-900 sm:animate-popIn sm:rounded-[1.75rem] sm:pt-5"
+        className="relative max-h-[92dvh] w-full max-w-2xl animate-sheetIn overflow-y-auto overscroll-contain blatt rounded-t-[1.75rem] bg-papier px-5 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] pt-1.5 shadow-2xl dark:bg-slate-900 sm:animate-popIn sm:rounded-[1.75rem] sm:pt-5"
         style={{
           transform: zug ? `translateY(${zug}px)` : undefined,
           transition: ziehend ? "none" : "transform .38s cubic-bezier(.32,.72,0,1)",

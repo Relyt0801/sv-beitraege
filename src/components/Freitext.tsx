@@ -158,7 +158,7 @@ export function FreiAntworten({ item, abgelaufen }: { item: TopicItem; abgelaufe
       <ul className="space-y-1.5">
         {art === "zahl" && <ZahlenAuswertung werte={werte} />}
         {sortiert.map((a) => (
-          <li key={a.user_id} className="flex items-start gap-2 rounded-xl bg-[rgb(118_118_128/0.08)] px-3 py-2 dark:bg-[rgb(118_118_128/0.18)]">
+          <li key={a.user_id} className="flex items-start gap-2 rounded-xl zelle px-3 py-2">
             {zeigeNamen ? (
               <Avatar userId={a.user_id} size={22} />
             ) : (

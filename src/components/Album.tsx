@@ -535,7 +535,7 @@ function SteckbriefAnsicht({
 
       {/* Stammdaten: gleich breite Zeilen wie in den Kontakten */}
       {felder.length > 0 && (
-        <div className="liste mt-5 bg-[rgb(118_118_128/0.08)] dark:bg-[rgb(118_118_128/0.18)]">
+        <div className="liste mt-5 zelle">
           {felder.map((k) => {
             const wert = s!.stammdaten[k.id] || "";
             const lied = spotifyAus(wert);
@@ -1000,7 +1000,7 @@ function MeinSteckbrief({ album, vorschau }: { album: Album; vorschau: () => voi
         )}
       </Gruppe>
       {freigabe === "gezielt" && waehlen && (
-        <div className="mt-2 rounded-2xl bg-[rgb(118_118_128/0.08)] p-2 dark:bg-[rgb(118_118_128/0.18)]">
+        <div className="mt-2 rounded-2xl zelle p-2">
           <input className="field mb-2" placeholder="Name suchen" value={suche} onChange={(e) => setSuche(e.target.value)} />
           <div className="max-h-64 overflow-y-auto">
             {album.personen

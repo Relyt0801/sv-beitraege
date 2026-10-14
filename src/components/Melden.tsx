@@ -58,7 +58,7 @@ export function MeldenWurzel() {
                 onClick={() => setGrund(g.key)}
                 aria-pressed={grund === g.key}
                 className={`flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left text-[15px] font-semibold transition active:scale-[.99] ${
-                  grund === g.key ? "bg-brand text-white" : "bg-[rgb(118_118_128/0.08)] dark:bg-[rgb(118_118_128/0.18)]"
+                  grund === g.key ? "bg-brand text-white" : "zelle"
                 }`}
               >
                 <span className="text-[20px]">{g.zeichen}</span>
@@ -165,7 +165,7 @@ function MeldungKarte({ gruppe, m }: { gruppe: Meldung[]; m: ReturnType<typeof u
           <div className="mt-0.5 text-[12.5px] text-tinte-matt dark:text-slate-300">
             {gruende.join(", ")} · {gruppe.length === 1 ? "1 Meldung" : `${gruppe.length} Meldungen`}
           </div>
-          <blockquote className="mt-2 whitespace-pre-wrap break-words rounded-xl bg-[rgb(118_118_128/0.08)] px-3 py-2 text-[13.5px] leading-snug dark:bg-[rgb(118_118_128/0.18)]">
+          <blockquote className="mt-2 whitespace-pre-wrap break-words rounded-xl zelle px-3 py-2 text-[13.5px] leading-snug">
             {x.auszug || "–"}
           </blockquote>
           {notizen.map((n, i) => (
@@ -328,7 +328,7 @@ export function WortfilterSheet({ open, onClose }: { open: boolean; onClose: () 
 
       {teil === "bereiche" ? (
         <>
-          <div className="liste bg-[rgb(118_118_128/0.08)] dark:bg-[rgb(118_118_128/0.18)]">
+          <div className="liste zelle">
             {WF_BEREICHE.map((b) => (
               <label key={b.key} className="zeile">
                 <span className="min-w-0 flex-1">
@@ -354,7 +354,7 @@ export function WortfilterSheet({ open, onClose }: { open: boolean; onClose: () 
         <>
           {/* Hinzufügen */}
           <h3 className="abschnitt">{teil === "block" ? "Neues Wort blocken" : "Neue Ausnahme"}</h3>
-          <div className="liste mb-1.5 bg-[rgb(118_118_128/0.08)] dark:bg-[rgb(118_118_128/0.18)]">
+          <div className="liste mb-1.5 zelle">
             <div className="zeile">
               <input
                 className="min-w-0 flex-1 bg-transparent text-[16px] outline-none placeholder:text-tinte-leise"
@@ -385,7 +385,7 @@ export function WortfilterSheet({ open, onClose }: { open: boolean; onClose: () 
           {teil === "block" && (
             <>
               <h3 className="abschnitt mt-5">Emojis blocken</h3>
-              <div className="liste bg-[rgb(118_118_128/0.08)] dark:bg-[rgb(118_118_128/0.18)]">
+              <div className="liste zelle">
                 <div className="zeile">
                   <input
                     className="min-w-0 flex-1 bg-transparent text-[20px] tracking-wider outline-none placeholder:text-[15px] placeholder:tracking-normal placeholder:text-tinte-leise"
@@ -419,7 +419,7 @@ export function WortfilterSheet({ open, onClose }: { open: boolean; onClose: () 
             <h3 className="kennlabel min-w-0 flex-1">{teil === "block" ? "Geblockte Wörter" : "Ausnahmen"}</h3>
           </div>
           <input className="field mb-2" placeholder="In der Liste suchen" value={suche} onChange={(e) => setSuche(e.target.value)} />
-          <div className="liste bg-[rgb(118_118_128/0.08)] dark:bg-[rgb(118_118_128/0.18)]">
+          <div className="liste zelle">
             {sichtbar.map((e) => (
               <div key={e.id} className={`zeile !gap-2 ${e.aktiv ? "" : "opacity-55"}`}>
                 <span className="min-w-0 flex-1 truncate text-[15px]">{e.wort}</span>
