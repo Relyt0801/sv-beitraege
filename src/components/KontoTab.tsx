@@ -104,6 +104,10 @@ export function KontoTab({
             : "Bitte immer den Verwendungszweck angeben – sonst können wir das Geld nicht zuordnen. Bei mehreren Kindern bitte für jedes Kind einzeln überweisen."}
         </p>
 
+        {/* Eltern am Rechner: links wohin, rechts was (je Kind) – vorher eine
+            schmale Spalte mitten im Bildschirm. Im Blatt (personen) bleibt es
+            eine Spalte. */}
+        <div className={personen ? "" : "lg:grid lg:grid-cols-2 lg:items-start lg:gap-x-4"}>
         {/* Wohin das Geld geht */}
         <div className="gruppe-zellen mt-4" data-tour="konto-daten">
           <KontoWert label="Empfänger" wert={konto.inhaber} onKopieren={() => kopieren(konto.inhaber, "inhaber")} kopiert={kopiert === "inhaber"} />
@@ -119,6 +123,7 @@ export function KontoTab({
         </div>
 
         {/* Was überwiesen wird: je Kind Betrag und Verwendungszweck zum Kopieren */}
+        <div className={personen ? "" : "lg:pt-1"}>
         {festerZweck ? (
           <div className="gruppe-zellen mt-3">
             {betrag && <KontoWert label="Betrag" wert={betrag} stark onKopieren={() => kopieren(betrag.replace(/\s*€$/, ""), "betrag")} kopiert={kopiert === "betrag"} />}
@@ -159,6 +164,8 @@ export function KontoTab({
             );
           })
         )}
+        </div>
+        </div>
 
         {/* Der Hinweis ist für Eltern geschrieben („bei mehreren Kindern …“) */}
         {konto.hinweis && !du && (

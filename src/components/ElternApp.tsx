@@ -18,7 +18,7 @@ import { KontoTab } from "./KontoTab";
 import { ProfilSheet } from "./ProfilSheet";
 import { Tour, elternSchritte } from "./Tour";
 import { useTheme } from "../lib/theme";
-import { useGescrollt, useReiter } from "../lib/gescrollt";
+import { useBreit, useGescrollt, useReiter } from "../lib/gescrollt";
 import { hasSupabase } from "../lib/supabase";
 import { PushHinweis, usePushAuffrischen } from "./PushHinweis";
 import { InstallKarte } from "./InstallHinweis";
@@ -27,7 +27,8 @@ import { abmelden, appZaehler } from "../lib/push";
 import { frage } from "../lib/melder";
 type Reiter = "uebersicht" | "infos" | "finanzen" | "konto";
 
-const TITEL: Record<Reiter, string> = { uebersicht: "Stufenkasse", infos: "Infos", finanzen: "Finanzen der Stufe", konto: "Kontodaten" };
+// Titel = Name des Reiters (wie in der Schüler-App; vorher hieß „Übersicht“ oben „Stufenkasse“)
+const TITEL: Record<Reiter, string> = { uebersicht: "Übersicht", infos: "Infos", finanzen: "Finanzen der Stufe", konto: "Kontodaten" };
 const TOUR_MERKER = "sv:tour:v3:eltern";
 
 /**
@@ -51,6 +52,7 @@ export function ElternApp() {
   const { theme, toggle } = useTheme();
   const gescrollt = useGescrollt(4);
   const titelWeg = useGescrollt(44);
+  const breit = useBreit();
   const { students, contributions, settings, ready, reload } = useStore();
   const { bereit, ungelesen, kinder: zugeordnet, zuordnungFehlt } = useEltern();
   // Fehlt die Zuordnung wegen eines Ladefehlers, gilt, was die Datenbank an
@@ -170,18 +172,20 @@ export function ElternApp() {
       <MottoEnthuellung />
       <header
         className={`sticky top-0 z-20 px-4 pb-2 pt-[calc(env(safe-area-inset-top)+0.5rem)] transition-[background-color,box-shadow] duration-300 ${
-          gescrollt ? "glas shadow-[0_0.5px_0_rgba(0,0,0,.18)] dark:shadow-[0_0.5px_0_rgba(255,255,255,.15)]" : "kopf-grund bg-papier dark:bg-slate-950"
+          gescrollt ? "kopf-band" : "kopf-grund bg-papier dark:bg-slate-950"
         }`}
       >
         <div className="mx-auto flex max-w-5xl items-center gap-2.5">
-          <div
-            aria-hidden={!titelWeg}
-            className={`min-w-0 flex-1 truncate text-[17px] font-semibold tracking-[-0.01em] transition duration-300 ease-ios ${
-              titelWeg ? "translate-y-0 opacity-100" : "translate-y-1 opacity-0"
-            }`}
+          {/* Wie in der Schüler-App: am Rechner steht der Titel fest hier oben
+              (vorher sprang der große Titel je Reiter zwischen zwei Breiten) */}
+          <h2
+            aria-hidden={!titelWeg && !breit}
+            className={`min-w-0 flex-1 truncate text-[17px] font-semibold tracking-[-0.01em] transition-[opacity,transform,visibility] duration-300 ease-ios lg:visible lg:translate-y-0 lg:font-zahl lg:text-[1.625rem] lg:font-bold lg:tracking-[-0.025em] lg:opacity-100 ${
+              titelWeg ? "visible translate-y-0 opacity-100" : "invisible translate-y-1 opacity-0"
+            } ${gescrollt ? "" : "auf-bild"}`}
           >
             {TITEL[reiter]}
-          </div>
+          </h2>
           <button className="iconbtn" onClick={toggle} aria-label={theme === "dark" ? "Helles Design" : "Dunkles Design"}>
             <Icon name={theme === "dark" ? "sonne" : "mond"} size={19} />
           </button>
@@ -197,7 +201,7 @@ export function ElternApp() {
         </div>
 
         {/* Am Rechner: schwebende Reiterleiste oben, auf dem Handy unten. */}
-        <nav className="glas mx-auto mt-3 hidden w-fit max-w-full rounded-full border border-black/[0.06] p-1 shadow-glas dark:border-white/10 lg:flex">
+        <nav className="glas mx-auto mt-2 hidden w-fit max-w-full rounded-full border border-black/[0.06] p-1 shadow-glas dark:border-white/10 lg:flex">
           <GlasLeiste
             variante="oben"
             aktiv={reiter}
@@ -208,12 +212,14 @@ export function ElternApp() {
       </header>
 
       {/* Großer Titel – läuft beim Scrollen mit weg, oben erscheint er klein */}
-      <div className={`mx-auto max-w-3xl px-5 pb-1 pt-1 ${reiter === "uebersicht" ? "lg:max-w-5xl" : ""}`}>
+      <div className="auf-bild mx-auto max-w-3xl px-5 pb-1 pt-1 lg:hidden">
         <h1 className="font-zahl text-[2.125rem] font-bold leading-tight tracking-[-0.025em]">{TITEL[reiter]}</h1>
         <p className="truncate text-[13px] text-tinte-leise">{familienName} · Abi 28</p>
       </div>
 
-      <main className="mx-auto max-w-3xl px-4 pt-2 lg:max-w-5xl">
+      {/* lg:box-content: Breite ohne Rand gerechnet – so fluchtet der Inhalt
+          genau mit Titel und Knöpfen der Kopfzeile */}
+      <main className="mx-auto max-w-3xl px-4 pt-2 lg:box-content lg:max-w-5xl lg:pt-3">
         <PushHinweis fuerEltern />
         {reiter === "uebersicht" && <InstallKarte />}
         {reiter === "uebersicht" &&
@@ -263,7 +269,7 @@ export function ElternApp() {
           ))}
 
         {reiter === "infos" && (
-          <div key="infos" className="mx-auto max-w-3xl animate-fadeIn">
+          <div key="infos" className="mx-auto max-w-3xl animate-fadeIn lg:max-w-5xl">
             <ElternInfosTab />
           </div>
         )}
@@ -273,7 +279,7 @@ export function ElternApp() {
           </div>
         )}
         {reiter === "konto" && (
-          <div key="konto" className="mx-auto max-w-3xl animate-fadeIn">
+          <div key="konto" className="mx-auto max-w-3xl animate-fadeIn lg:max-w-5xl">
             <KontoTab />
           </div>
         )}

@@ -291,10 +291,14 @@ export function ChatsTab() {
   }
   // Ungerade Anzahl: die letzte Kachel geht über beide Spalten (am Handy)
   const breitLetzte = kacheln.length % 2 === 1;
+  // Am Rechner so viele Spalten, dass keine halbe Reihe leer bleibt
+  // (6 Kacheln: 3 + 3 statt 4 + 2)
+  const n = kacheln.length;
+  const lgSpalten = n <= 2 ? "lg:grid-cols-2" : n === 3 || n === 5 || n === 6 || n === 9 ? "lg:grid-cols-3" : "lg:grid-cols-4";
 
   return (
     <div className="space-y-6 pb-4">
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className={`grid grid-cols-2 gap-3 ${lgSpalten}`}>
         {kacheln.map((k, i) =>
           breitLetzte && i === kacheln.length - 1 ? (
             <div key={k.key} className="col-span-2 grid lg:col-span-1">

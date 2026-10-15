@@ -371,7 +371,7 @@ export function teamSchritte(o: {
   finanzen: boolean;
   rollen: boolean;
   rechte: boolean;
-  /** Team mit eigener Person: Reiter Profil mit den Kacheln der Abizeitung */
+  /** Team mit eigener Person: Reiter Übersicht mit den Kacheln der Abizeitung */
   profilReiter?: boolean;
   /** Der Nachtragen-Knopf im Kopf (nur mit eigener Person) */
   nachtragen?: boolean;
@@ -414,7 +414,7 @@ export function teamSchritte(o: {
     { tab: "themen", anchor: "tab-themen", title: "Chats", text: "Alle Komitee-Chats, der Stufenteam-Chat, die Fragen der Eltern und die Anfragen an einem Ort." },
   );
   if (o.beitraege)
-    s.push({ tab: "beitraege", anchor: "tab-beitraege", title: "Beiträge & Abiball", text: "Was jedes Halbjahr kostet, die Prozent-Staffel fürs Ticket und die Vorlagen für Mithilfe." });
+    s.push({ tab: "beitraege", anchor: "tab-beitraege", title: "Beiträge & Abiball", text: "Oben in der Kasse umschalten: was jedes Halbjahr kostet, die Prozent-Staffel fürs Ticket und die Vorlagen für Mithilfe." });
   if (o.finanzen)
     s.push({ tab: "finanzen", anchor: "tab-finanzen", title: "Finanzen", text: "Das Kassenbuch: Kontostand, Einnahmen und Ausgaben. Ein Tipp auf eine Buchung zeigt alle Details." });
   if (o.rollen || o.rechte)

@@ -8,6 +8,7 @@ import { Gruppe, Wert, Zeile, ZeileEingabe, ZeileMitSchalter } from "./Liste";
 import { Schalter } from "./Schalter";
 import { Sheet, SheetKopf } from "./Sheet";
 import { FussLeiste } from "./Kachel";
+import { useBreit } from "../lib/gescrollt";
 
 import { frage } from "../lib/melder";
 
@@ -38,6 +39,10 @@ export function BeitraegeTab() {
   // Drei Bereiche, einer zur Zeit – als Segment (vorher Kacheln, die wie
   // reine Zahlen-Anzeigen aussahen und nicht wie Reiter).
   const [bereich, setBereich] = useState<"prozente" | "halbjahre" | "ticket">("prozente");
+  // Am Rechner ist Platz für alle drei nebeneinander – kein Umschalten, kein
+  // leerer Bildschirm unter einer kurzen Liste.
+  const breit = useBreit();
+  const zeige = (b: typeof bereich) => breit || bereich === b;
 
   const reiter: { key: typeof bereich; titel: string }[] = [
     { key: "prozente", titel: "Prozente" },
@@ -49,8 +54,8 @@ export function BeitraegeTab() {
     // Volle Breite der Seitenspalte (max-w-5xl in App.tsx) – KEIN eigenes
     // max-w-*: sonst endet der Inhalt am Laptop mitten auf der Seite, während
     // Titel, Reiterleiste und Knöpfe bis zum Rand der Spalte gehen.
-    <div className="grid gap-1">
-      <div className="seg mb-3" role="tablist" aria-label="Bereich">
+    <div className="grid gap-1 lg:grid-cols-3 lg:items-start lg:gap-x-4">
+      <div className="seg mb-3 lg:hidden" role="tablist" aria-label="Bereich">
         {reiter.map((r) => (
           <button
             key={r.key}
@@ -65,8 +70,8 @@ export function BeitraegeTab() {
       </div>
 
       {/* ---------------- Möglichkeiten ---------------- */}
-      {bereich === "prozente" && (
-        <>
+      {zeige("prozente") && (
+        <div>
           <Gruppe
             titel="Wofür gibt es Prozent?"
             className=""
@@ -110,12 +115,12 @@ export function BeitraegeTab() {
               />
             ) : null;
           })()}
-        </>
+        </div>
       )}
 
       {/* ---------------- Beitrag je Halbjahr ---------------- */}
-      {bereich === "halbjahre" && (
-        <>
+      {zeige("halbjahre") && (
+        <div>
           <Gruppe
             titel="Was kostet ein Halbjahr?"
             className=""
@@ -136,12 +141,12 @@ export function BeitraegeTab() {
               <Wert stark>{gesamt} €</Wert>
             </Zeile>
           </Gruppe>
-        </>
+        </div>
       )}
 
       {/* ---------------- Abiballticket ---------------- */}
-      {bereich === "ticket" && (
-        <>
+      {zeige("ticket") && (
+        <div>
           <Gruppe
             titel="Abiball-Ticket"
             className=""
@@ -181,7 +186,7 @@ export function BeitraegeTab() {
           </Gruppe>
 
           <AbiballEinstellungen />
-        </>
+        </div>
       )}
     </div>
   );

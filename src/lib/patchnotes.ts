@@ -42,9 +42,15 @@ export const PATCH: PatchVersion = {
       eintraege: [
         {
           titel: "Neue Reiterleiste",
-          text: "Aus Glas – am Handy unten, am Laptop und iPad quer oben. Der gewählte Reiter schwebt sichtbar hervor.",
+          text: "Aus Glas – am Handy unten, am Laptop und iPad quer oben. Ein geöffneter Chat steht am Laptop in derselben Kopfzeile wie jede Seite.",
           icon: "haus",
           farbe: "bg-brand",
+        },
+        {
+          titel: "Übersicht",
+          text: "Deine Startseite mit Betrag, Abizeitung und Ticket heißt jetzt für alle „Übersicht“. Die App öffnet den Reiter, den du zuletzt benutzt hast.",
+          icon: "haus",
+          farbe: "bg-[#34C759]",
         },
         {
           titel: "Offiziell & Inoffiziell",
@@ -99,6 +105,13 @@ export const PATCH: PatchVersion = {
           text: "Ein Zahnrad je Bereich, Profil und Rechte im Stil der iPhone-Einstellungen.",
           icon: "regler",
           farbe: "bg-[#8E8E93]",
+          nur: "team",
+        },
+        {
+          titel: "Beiträge in der Kasse",
+          text: "„Beiträge & Abiball“ ist kein eigener Reiter mehr: oben in der Kasse umschalten. Einnahme und Ausgabe stehen in Finanzen ganz oben.",
+          icon: "kasse",
+          farbe: "bg-brand",
           nur: "team",
         },
         {

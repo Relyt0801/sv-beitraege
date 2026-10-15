@@ -81,8 +81,12 @@ export function MyKasse({
     <div
       className="mx-auto grid max-w-3xl items-start gap-3 lg:max-w-5xl lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-stretch"
     >
+      {/* Reihenfolge: Handy = Zahl, Abizeitung, Halbjahre … (das Häufige
+          zuerst). Am Rechner stehen Zahl und Halbjahre nebeneinander – beides
+          ist „meine Kasse“, und die dunkle Karte war über die volle Breite
+          zu zwei Dritteln leer. */}
       {/* ------------------------------------------ die eine Zahl */}
-      <section className="leitkarte lg:col-span-2" data-tour="meine-karte">
+      <section className="leitkarte order-1 flex flex-col" data-tour="meine-karte">
         <div className="text-[13px] font-medium text-white/60">
           {offen > 0 ? "Du musst noch zahlen" : "Deine Stufenkasse"}
         </div>
@@ -98,7 +102,7 @@ export function MyKasse({
         {/* Überweisen – falls Schüler selbst zahlen (sonst die Eltern) */}
         <button
           onClick={() => setUeberweisen(true)}
-          className="mt-3 inline-flex min-h-[44px] items-center gap-1.5 rounded-full bg-white/15 px-4 text-[14px] font-semibold text-white transition active:scale-95"
+          className="mt-3 inline-flex min-h-[44px] items-center gap-1.5 self-start rounded-full bg-white/15 px-4 text-[14px] font-semibold text-white transition active:scale-95 lg:mt-auto"
         >
           <Icon name="bank" size={15} />
           Überweisen – Kontodaten
@@ -112,7 +116,7 @@ export function MyKasse({
       {/* ------------------------------------------ Abi-Album (nur mit Recht) */}
       {/* Abizeitung & Co. als ruhige Kacheln: Handy untereinander, ab iPad zwei nebeneinander */}
       {/* data-tour: Einführung zeigt hier auf die Kacheln (Tour.tsx) */}
-      <div data-tour="kacheln" className="grid gap-3 sm:grid-cols-2 lg:col-span-2 [&:empty]:hidden">
+      <div data-tour="kacheln" className="order-2 grid gap-3 sm:grid-cols-2 lg:order-3 lg:col-span-2 [&:empty]:hidden">
         <AlbumKarte />
         <MottoKarte />
         <ZitateKarte />
@@ -121,7 +125,7 @@ export function MyKasse({
       </div>
 
       {/* ------------------------------------------ Halbjahre mit Preis */}
-      <section className="card p-4 sm:p-5 lg:col-span-2">
+      <section className="card order-3 p-4 sm:p-5 lg:order-2">
         <div className="flex items-center justify-between gap-2">
           <Titel icon="kalender" farbe="bg-[#0A84FF]">Deine Halbjahre</Titel>
           <span className="text-[12px] text-tinte-leise">
@@ -147,10 +151,10 @@ export function MyKasse({
 
       {/* ------------------------------------------ Abiballticket */}
       {/* Links die Tickets, rechts bestellen und überweisen */}
-      <TicketBereich student={student} settings={settings} prozent={pct} className="lg:col-span-2" />
+      <TicketBereich student={student} settings={settings} prozent={pct} className="order-4 lg:col-span-2" />
 
       {/* ------------------------------------------ Prozentstand */}
-      <section className="card p-4 sm:p-5" data-tour="meine-punkte">
+      <section className="card order-5 p-4 sm:p-5" data-tour="meine-punkte">
         <Titel icon="herz" farbe="bg-[#34C759]">Mithilfe bei Aktionen</Titel>
 
         <div className="mt-3 flex items-center gap-4">
@@ -178,7 +182,7 @@ export function MyKasse({
       </section>
 
       {/* ------------------------------------------ meine Beiträge */}
-      <section className="card p-4 sm:p-5">
+      <section className="card order-6 p-4 sm:p-5">
         <Titel icon="beitraege" farbe="bg-[#FF9500]">Wobei du geholfen hast</Titel>
         <BeitragsListe
           eintraege={meine}

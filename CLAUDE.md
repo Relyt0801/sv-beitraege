@@ -38,6 +38,8 @@ Kurzfassung der häufigsten Fehler, die **nicht** mehr vorkommen dürfen:
    Personen) – eine `Gruppe` aus Zeilen.
 5. Klebende Kopfleisten lassen nichts durchscheinen.
 6. Text direkt auf dem Hintergrundbild: Klasse `auf-bild`.
-7. Jede sichtbare Änderung mit `tests/geraet.mjs` fotografieren: iPhone und
+7. EINE Kopfzeile je Gerät: am Laptop kein zweites Band darunter – ein
+   geöffneter Chat legt seinen Kopf in `#kopf-ebene` (siehe Design-Regeln 3).
+8. Jede sichtbare Änderung mit `tests/geraet.mjs` fotografieren: iPhone und
    Laptop, hell, dunkel und dunkel mit `BILD=1` – und die Bilder ansehen,
    bevor „fertig“ gemeldet wird.

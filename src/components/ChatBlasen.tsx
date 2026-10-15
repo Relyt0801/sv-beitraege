@@ -1,6 +1,7 @@
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { scrollSperren } from "../lib/scrollsperre";
+import { useBreit } from "../lib/gescrollt";
 import { Icon } from "./Icon";
 import { REAKTIONEN, erstesEmoji, useTopicsOptional, type Reaktion, type TopicItem } from "../topics-store";
 import { Avatar, PersonName } from "./Avatar";
@@ -659,6 +660,14 @@ function useHoehe() {
  * beginnt die Ebene unter der App-Kopfleiste, damit die Reiter oben
  * erreichbar bleiben.
  *
+ * Am Rechner/iPad quer gibt es KEINE zweite Kopfleiste (Okt. 2026: „die
+ * Headbar ist nach unten verschoben“ – unter der App-Leiste stand ein
+ * zweites Band mit Zurück, Name und „Chat | Übersicht“). Dort wandert der
+ * Kopf in die Kopfzeile der App (Platzhalter #kopf-ebene in App.tsx) und
+ * ersetzt Seitentitel und Seiten-Knöpfe – Zurück steht genau dort, wo
+ * sonst der Titel steht. Gibt es den Platzhalter nicht (Eltern-App), bleibt
+ * es beim eigenen Band.
+ *
  * Direkt an <body> gehängt (Portal): sonst sperrt eine animierte Elternebene
  * (animate-fadeIn am <main>) die Ebene in ihren eigenen Stapel ein, und die
  * App-Kopfleiste läge doch wieder darüber.
@@ -693,6 +702,12 @@ export function ChatEbene({
   const [fussRef, fussH] = useHoehe();
   const scroller = useRef<HTMLDivElement>(null);
   const warUnten = useRef(start !== "oben");
+  // Am Rechner: Kopf in die Kopfzeile der App statt als eigenes Band
+  const breit = useBreit();
+  const [kopfZiel, setKopfZiel] = useState<HTMLElement | null>(null);
+  useLayoutEffect(() => {
+    setKopfZiel(breit && sichtbar ? document.getElementById("kopf-ebene") : null);
+  }, [breit, sichtbar]);
 
   // Die Seite dahinter scrollt nicht mit
   useEffect(() => {
@@ -739,19 +754,23 @@ export function ChatEbene({
         data-chat-scroller
         className="min-h-0 flex-1 overflow-y-auto overscroll-contain"
         style={{
-          paddingTop: kopfH,
+          paddingTop: kopfZiel ? 4 : kopfH,
           paddingBottom: fuss ? fussH : "calc(env(safe-area-inset-bottom) + 1.5rem)",
         }}
       >
         <div className="mx-auto max-w-5xl px-3 sm:px-5">{children}</div>
       </div>
 
-      <div
-        ref={kopfRef}
-        className="glas absolute inset-x-0 top-0 z-10 !bg-[rgb(var(--glas)/0.97)] pb-2 pt-[calc(env(safe-area-inset-top)+0.5rem)] shadow-[0_0.5px_0_rgba(0,0,0,0.16)] dark:shadow-[0_0.5px_0_rgba(255,255,255,0.14)] lg:pt-2"
-      >
-        <div className="mx-auto max-w-5xl px-3 sm:px-5">{kopf}</div>
-      </div>
+      {kopfZiel ? (
+        createPortal(<KopfArt.Provider value="zeile">{kopf}</KopfArt.Provider>, kopfZiel)
+      ) : (
+        <div
+          ref={kopfRef}
+          className="glas absolute inset-x-0 top-0 z-10 !bg-[rgb(var(--glas)/0.97)] pb-2 pt-[calc(env(safe-area-inset-top)+0.5rem)] shadow-[0_0.5px_0_rgba(0,0,0,0.16)] dark:shadow-[0_0.5px_0_rgba(255,255,255,0.14)] lg:pt-2"
+        >
+          <div className="mx-auto max-w-5xl px-3 sm:px-5">{kopf}</div>
+        </div>
+      )}
 
       {fuss && (
         <div
@@ -767,6 +786,9 @@ export function ChatEbene({
     document.body,
   );
 }
+
+/** Wo ein ChatKopf steht: im eigenen Band der Ebene oder in der App-Kopfzeile. */
+const KopfArt = createContext<"band" | "zeile">("band");
 
 /**
  * Kopfleiste einer ChatEbene: links der runde Zurück-Knopf, in der Mitte
@@ -790,6 +812,32 @@ export function ChatKopf({
   rechts?: ReactNode;
   children?: ReactNode;
 }) {
+  // Am Rechner in der Kopfzeile der App: alles in EINER Zeile – Zurück und
+  // Name links (wo sonst der Seitentitel steht), Umschalter und Knöpfe rechts.
+  const art = useContext(KopfArt);
+  if (art === "zeile")
+    return (
+      <div className="flex min-w-0 flex-1 items-center gap-2.5">
+        <button type="button" className="iconbtn shrink-0" onClick={onBack} aria-label="Zurück" title="Zurück">
+          <span className="block rotate-180">
+            <Icon name="chevron" size={20} strich={2.4} />
+          </span>
+        </button>
+        {symbol && (
+          <span aria-hidden className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[rgb(118_118_128/0.12)] text-[18px] leading-none dark:bg-[rgb(118_118_128/0.24)]">
+            {symbol}
+          </span>
+        )}
+        <div className="min-w-0">
+          <div className="auf-bild truncate text-[1.375rem] font-bold leading-tight tracking-[-0.02em]">{titel}</div>
+          {unter && <div className="auf-bild truncate text-[12px] leading-tight text-tinte-leise">{unter}</div>}
+        </div>
+        <div className="ml-auto flex shrink-0 items-center gap-2">
+          {children && <div className="w-[17rem]">{children}</div>}
+          {rechts}
+        </div>
+      </div>
+    );
   return (
     <>
       <div className="grid grid-cols-[minmax(min-content,1fr)_minmax(0,max-content)_minmax(min-content,1fr)] items-center gap-2">

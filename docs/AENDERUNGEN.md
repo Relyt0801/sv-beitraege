@@ -11,6 +11,56 @@ ausführlich (auf Deutsch); hier steht der Überblick dazu.
 
 ---
 
+## Eine Kopfzeile, Rollen, weniger Scrollen (15.10.2026, abends)
+
+Anlass: Am Laptop stand im geöffneten Chat unter der App-Leiste ein zweites
+Band (Zurück, Name, „Chat | Übersicht“) – Kopfleisten an verschiedenen Orten.
+Danach alle Rollen auf iPhone, iPad und Laptop durchfotografiert.
+
+- **Kopfzeile** (`App.tsx`, `ChatBlasen.tsx` → `ChatEbene`/`ChatKopf`,
+  `index.css` → `.kopf-ebene`, `lib/gescrollt.ts` → `useBreit`): Am Laptop
+  steht der Titel fest oben links, darunter die Reiterleiste; der große Titel
+  im Inhalt entfällt dort (~75 px mehr Platz). Ein geöffneter Chat legt
+  Zurück, Name und „Chat | Übersicht“ in genau diese Zeile. Am Handy bleibt
+  der Chat eine Vollbild-Ebene wie in iMessage.
+- **Eltern-App** genauso: Titel springt nicht mehr je Reiter zwischen zwei
+  Breiten (Finanzen stand sogar neben dem Inhalt); Infos und Kontodaten am
+  Laptop zweispaltig.
+- **Kopf deckender** (0.95 statt 0.88): im Dunkeln schimmerte der große Titel
+  als Geist unter dem kleinen durch.
+- **Spalte wächst** (`--spalte`): 64rem, ab 1400 px 74rem, ab 1700 px 84rem –
+  bei 1920 px blieben vorher links und rechts je ~450 px leer.
+- **Übersicht statt Profil/Kasse**: Die eigene Startseite heißt für alle
+  „Übersicht“ (Haus-Symbol). Vorher „Profil“ beim Team (wie das Profil-Blatt)
+  und „Kasse“ bei Schülern. Am Laptop stehen Stufenkasse und Halbjahre
+  nebeneinander.
+- **Zuletzt benutzter Reiter** wird je Gerät gemerkt (`sv:reiter`): der
+  Kassenwart landet in Finanzen, Komitee-Leute in den Chats. Ein Sprung aus
+  einer Mitteilung geht vor.
+- **Beiträge & Abiball** ist kein eigener Reiter mehr, sondern oben in der
+  Kasse umschaltbar („Personen | Beiträge & Abiball“). Kassenwart: 5 Reiter
+  statt 6. Am Laptop stehen Prozente, Halbjahre und Ticket nebeneinander.
+- **Kasse (Team)**: Kennzahlen in EINER Karte, Halbjahre in einer Reihe, das
+  laufende Halbjahr stellt man dort um („EF.1 läuft · ändern“). Am Handy ist
+  die erste Person ~150 px früher zu sehen; am Laptop steht die Suche in der
+  Kopfzeile der Liste.
+- **Finanzen**: Einnahme/Ausgabe ganz oben (am Laptop neben „Für alle
+  sichtbar | Alle Buchungen“) statt unter Kontostand und Kreis.
+- **Seiten-Umschalter in der Kopfzeile** (`components/InKopf.tsx`): Kasse,
+  Rollen und Finanzen (samt Einnahme/Ausgabe) legen ihre Umschalter am
+  Laptop rechts in die Kopfzeile, am Handy bleiben sie über dem Inhalt.
+- **Chats**: Kachelraster ohne halbe leere Reihe (6 Kacheln = 3 + 3).
+  Komitee-Übersicht am Laptop: Angepinnt und To-dos nebeneinander,
+  Abstimmungen darunter.
+- **Titel = Reiter**: Eltern-„Übersicht“ heißt oben auch „Übersicht“ (vorher
+  „Stufenkasse“). Der kleine Titel im Kopf ist vor dem Scrollen auch für
+  Vorlesehilfen unsichtbar (`invisible`), nicht nur durchsichtig.
+- **Test `tests/ui-check.mjs`**: klickt Demo-Pop-ups weg (brach sonst ab) und
+  wartet vor der axe-Prüfung das Ausblenden ab. Vergleich alter/neuer
+  Demo-Build: Überlauf 0/0, verdeckt 0/0, Konsolenfehler keine, Knöpfe ohne
+  Namen 192 → 0 (die alte zugeklappte Halbjahres-Zeile), axe-Kontrast 82/82.
+- Regeln ergänzt: `docs/DESIGN-REGELN.md` Abschnitt 3, `CLAUDE.md` Punkt 7.
+
 ## Laptop-Layout & Design-Regeln (15.10.2026)
 
 - **Beiträge**: Inhalt nutzt die volle Spalte (vorher `max-w-3xl` ohne

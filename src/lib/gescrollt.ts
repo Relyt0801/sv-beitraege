@@ -22,6 +22,26 @@ export function useGescrollt(ab = 12): boolean {
 }
 
 /**
+ * Breiter Bildschirm (Laptop, iPad quer – ab 1024 px, Tailwind „lg“)? Dort
+ * steht die Reiterleiste oben und es gibt EINE Kopfzeile für alles: Titel,
+ * Zurück-Pfeil eines geöffneten Chats und die Knöpfe (siehe App.tsx,
+ * ChatEbene in ChatBlasen.tsx).
+ */
+const BREIT = "(min-width: 1024px)";
+export function useBreit(): boolean {
+  const [breit, setBreit] = useState(() => typeof window !== "undefined" && !!window.matchMedia?.(BREIT).matches);
+  useEffect(() => {
+    const mq = window.matchMedia?.(BREIT);
+    if (!mq) return;
+    const neu = () => setBreit(mq.matches);
+    neu();
+    mq.addEventListener("change", neu);
+    return () => mq.removeEventListener("change", neu);
+  }, []);
+  return breit;
+}
+
+/**
  * Reiter wechseln und dabei oben anfangen – ohne dass iOS die Tab-Leiste
  * hochfedern lässt.
  *

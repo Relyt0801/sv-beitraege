@@ -16,6 +16,7 @@ import {
 } from "../lib/finanzen";
 import type { KostenAnfrage, KostenValue } from "../lib/kosten";
 import { Sheet, SheetKopf } from "./Sheet";
+import { InKopf } from "./InKopf";
 import { Icon, type IconName } from "./Icon";
 import { Gruppe, Symbol, Wert, Zeile, ZeileEingabe, ZeileHaken } from "./Liste";
 
@@ -130,7 +131,11 @@ export function FinanzenTab({ kosten }: { kosten: KostenValue }) {
   if ((!darfSehen && darfStandard) || (darfSehen && ansicht === "standard")) {
     return (
       <div className="grid grid-cols-[minmax(0,1fr)] gap-3">
-        {darfSehen && <AnsichtWahl ansicht={ansicht} setAnsicht={setAnsicht} />}
+        {darfSehen && (
+          <InKopf>
+            <AnsichtWahl ansicht={ansicht} setAnsicht={setAnsicht} />
+          </InKopf>
+        )}
         <FinanzStandard aktionName={aktionName} />
         {!darfSehen && meineVorsitze.length > 0 && (
           <KostenKarte kosten={kosten} darfEntscheiden={false} vorsitze={meineVorsitze} />
@@ -172,9 +177,33 @@ export function FinanzenTab({ kosten }: { kosten: KostenValue }) {
 
   return (
     <div className="grid grid-cols-[minmax(0,1fr)] gap-3 pb-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-start">
-      <div className="lg:col-span-2">
+      {/* Oben, was der Kassenwart am häufigsten tut: Einnahme / Ausgabe buchen.
+          Vorher standen die Knöpfe unter Kontostand und Kreis – am Handy erst
+          nach gut einer Bildschirmhöhe. Am Rechner rechts in der Kopfzeile
+          (InKopf) neben der Ansicht-Wahl – wie jeder Seiten-Umschalter. */}
+      <InKopf className="flex flex-col gap-3 lg:col-span-2">
         <AnsichtWahl ansicht={ansicht} setAnsicht={setAnsicht} />
-      </div>
+        {darfBuchen && (
+          // Echte, volle Knöpfe (vorher blasse Pastell-Flächen, die wie
+          // abgeschaltet wirkten): grün = Einnahme, rot = Ausgabe, weiße Schrift.
+          <div className="grid grid-cols-2 gap-2 lg:flex">
+            <button
+              onClick={() => setBuchen("ein")}
+              className="flex min-h-[3rem] items-center justify-center gap-1.5 rounded-full bg-[#1E7B34] text-[16px] font-semibold text-white transition duration-200 ease-ios active:scale-[.97] lg:min-h-[2.5rem] lg:px-4 lg:text-[15px]"
+            >
+              <Icon name="plus" size={17} strich={2.4} />
+              Einnahme
+            </button>
+            <button
+              onClick={() => setBuchen("aus")}
+              className="flex min-h-[3rem] items-center justify-center gap-1.5 rounded-full bg-red-600 text-[16px] font-semibold text-white transition duration-200 ease-ios active:scale-[.97] lg:min-h-[2.5rem] lg:px-4 lg:text-[15px]"
+            >
+              <span className="text-[20px] leading-none">−</span>
+              Ausgabe
+            </button>
+          </div>
+        )}
+      </InKopf>
       {nurLesen && (
         <div className="flex items-center gap-2 rounded-2xl zelle px-4 py-2.5 text-[14px] text-tinte-matt dark:text-slate-300 lg:col-span-2">
           <Icon name="info" size={17} />
@@ -192,26 +221,6 @@ export function FinanzenTab({ kosten }: { kosten: KostenValue }) {
           darf={darfBuchen}
           onEinstellungen={() => setEinstellungen(true)}
         />
-        {darfBuchen && (
-          // Echte, volle Knöpfe (vorher blasse Pastell-Flächen, die wie
-          // abgeschaltet wirkten): grün = Einnahme, rot = Ausgabe, weiße Schrift.
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              onClick={() => setBuchen("ein")}
-              className="flex min-h-[3.125rem] items-center justify-center gap-1.5 rounded-full bg-[#1E7B34] text-[16px] font-semibold text-white transition duration-200 ease-ios active:scale-[.97]"
-            >
-              <Icon name="plus" size={17} strich={2.4} />
-              Einnahme
-            </button>
-            <button
-              onClick={() => setBuchen("aus")}
-              className="flex min-h-[3.125rem] items-center justify-center gap-1.5 rounded-full bg-red-600 text-[16px] font-semibold text-white transition duration-200 ease-ios active:scale-[.97]"
-            >
-              <span className="text-[20px] leading-none">−</span>
-              Ausgabe
-            </button>
-          </div>
-        )}
       </div>
 
       {/* ================================================ Kostenanfragen (oben, wenn etwas ansteht) */}
@@ -255,27 +264,31 @@ export function FinanzenTab({ kosten }: { kosten: KostenValue }) {
  * oder „Alle Buchungen“ (das ganze Kassenbuch mit Namen) – nur für wer alles
  * sieht. Vorher „Standard – wie alle“ / „Erweitert“: unverständlich.
  */
+const ANSICHT_TEXT = {
+  standard: "So sehen es Schüler und Eltern: nur Summen, keine Namen.",
+  erweitert: "Das ganze Kassenbuch mit jeder Buchung – nur für dich und die Kasse.",
+} as const;
+
 function AnsichtWahl({ ansicht, setAnsicht }: { ansicht: "standard" | "erweitert"; setAnsicht: (a: "standard" | "erweitert") => void }) {
   return (
-    <div>
+    // Am Rechner steht die Wahl in der Kopfzeile (InKopf) – dort feste Breite,
+    // die Erklärung als Hinweis beim Darüberfahren statt als eigene Zeile
+    <div className="lg:w-[17rem]">
       <div className="seg" role="tablist" aria-label="Ansicht der Finanzen">
         {([["standard", "Für alle sichtbar"], ["erweitert", "Alle Buchungen"]] as const).map(([k, label]) => (
           <button
             key={k}
             role="tab"
             aria-selected={ansicht === k}
+            title={ANSICHT_TEXT[k]}
             onClick={() => setAnsicht(k)}
-            className={`seg-item !py-2 !text-[14px] ${ansicht === k ? "seg-aktiv" : ""}`}
+            className={`seg-item !py-2 !text-[14px] lg:!py-1.5 lg:!text-[13px] ${ansicht === k ? "seg-aktiv" : ""}`}
           >
             {label}
           </button>
         ))}
       </div>
-      <p className="mt-1.5 px-3 text-[13px] leading-snug text-tinte-leise">
-        {ansicht === "standard"
-          ? "So sehen es Schüler und Eltern: nur Summen, keine Namen."
-          : "Das ganze Kassenbuch mit jeder Buchung – nur für dich und die Kasse."}
-      </p>
+      <p className="mt-1.5 px-3 text-[13px] leading-snug text-tinte-leise lg:hidden">{ANSICHT_TEXT[ansicht]}</p>
     </div>
   );
 }

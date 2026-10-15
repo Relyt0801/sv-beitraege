@@ -94,6 +94,16 @@ html, body, #root {
   :root { --leiste: 0px; }
 }
 
+/* Breite der App-Spalte (max-w-5xl, tailwind.config.js): am Laptop 64rem,
+   auf großen Bildschirmen breiter – sonst bleibt die Hälfte leer. */
+:root { --spalte: 64rem; }
+@media (min-width: 1400px) {
+  :root { --spalte: 74rem; }
+}
+@media (min-width: 1700px) {
+  :root { --spalte: 84rem; }
+}
+
 /* iPhone, App vom Home-Bildschirm (Statusleiste "black-translucent"):
    Safari rechnet die Seitenhöhe dort ohne die Statusleiste oben. Ist eine
    Seite kürzer als der Bildschirm (Events ohne Einträge, Chats), sass die
@@ -403,6 +413,22 @@ html.mit-hintergrund {
 html.mit-hintergrund .kopf-grund {
   background-color: transparent;
 }
+/* Kopfzeile (App.tsx): Platz für den Kopf eines geöffneten Chats. Nur am
+   Rechner/iPad quer – dort steht Zurück + Name genau da, wo sonst der
+   Seitentitel steht, statt als zweites Band darunter. Solange ein Chat
+   offen ist, treten Seitentitel und Seiten-Knöpfe zurück. */
+.kopf-ebene {
+  display: none;
+}
+@media (min-width: 1024px) {
+  .kopf-ebene:not(:empty) {
+    display: flex;
+  }
+  .kopf-zeile:has(> .kopf-ebene:not(:empty)) > .kopf-eigen {
+    display: none;
+  }
+}
+
 /* Kopfleiste beim Scrollen: Glas über die GANZE Breite (vorher nur so breit
    wie der Inhalt – am Laptop sah das Hintergrundbild abgeschnitten aus). */
 .kopf-band {
@@ -415,7 +441,9 @@ html.mit-hintergrund .kopf-grund {
   width: 100vw;
   transform: translateX(-50%);
   z-index: -1;
-  background-color: rgb(var(--glas) / 0.88);
+  /* 0.95: bei 0.88 schimmerte im Dunkeln der große Titel als Geist unter dem
+     kleinen Titel durch (zweimal „Chats“) – Design-Regel 3 */
+  background-color: rgb(var(--glas) / 0.95);
   -webkit-backdrop-filter: blur(40px) saturate(1.8);
   backdrop-filter: blur(40px) saturate(1.8);
   box-shadow: 0 0.5px 0 rgba(0, 0, 0, 0.18);
@@ -475,12 +503,14 @@ html.mit-hintergrund .ebene-grund {
    wird unlesbar. In Blättern bleiben sie wie gehabt. */
 html.mit-hintergrund main .seg,
 html.mit-hintergrund .ebene-grund .seg,
+html.mit-hintergrund header .seg,
 html.mit-hintergrund .feld-auf-bild {
   background-color: rgb(227 227 232);
   box-shadow: 0 0 0 0.5px rgb(0 0 0 / 0.08);
 }
 html.dark.mit-hintergrund main .seg,
 html.dark.mit-hintergrund .ebene-grund .seg,
+html.dark.mit-hintergrund header .seg,
 html.dark.mit-hintergrund .feld-auf-bild {
   background-color: rgb(var(--glas));
 }

@@ -51,6 +51,28 @@ wieder passieren.**
 
 ## 3. Kopfleisten und Ebenen
 
+- **Eine Kopfzeile, immer an derselben Stelle** (Anlass Okt. 2026: am Laptop
+  stand unter der App-Leiste ein zweites Band mit Zurück, Chat-Name und
+  „Chat | Übersicht“ – „die Headbar ist nach unten verschoben“):
+  - Handy/iPad hoch: oben die Kopfzeile (kleiner Titel erst nach dem
+    Scrollen, rechts die Knöpfe), unten die Reiterleiste. Ein geöffneter Chat
+    ist eine Vollbild-Ebene mit eigener Kopfzeile oben und Eingabe unten –
+    wie in iMessage.
+  - Laptop/iPad quer (ab 1024 px): oben EINE Kopfzeile – links Titel (fest,
+    kein großer Titel im Inhalt), rechts Seiten-Knöpfe und die Knöpfe der App
+    (Hell/Dunkel, Nachtragen, Profil); darunter die Reiterleiste. Ein
+    geöffneter Chat legt seinen Kopf über `ChatEbene` → `#kopf-ebene` genau
+    in diese Zeile (Zurück + Name links, „Chat | Übersicht“ rechts).
+  - Umschalter und Knöpfe für eine ganze Seite (Kasse „Personen | Beiträge &
+    Abiball“, Rollen „Personen | Rechte je Rolle“, Finanzen „Für alle
+    sichtbar | Alle Buchungen“ + Einnahme/Ausgabe) in `<InKopf>` packen: am
+    Handy stehen sie über dem Inhalt, am Laptop rechts in der Kopfzeile
+    (`#kopf-aktionen`) – wie „Chat | Übersicht“ im Chat.
+  - Keine zweite klebende Leiste unter der Kopfzeile. Neue Unterseiten als
+    `ChatEbene` mit `ChatKopf` oder als Blatt (`Sheet`).
+- Die Spalte (`max-w-5xl`) ist eine Variable (`--spalte`, index.css): 64rem,
+  ab 1400 px 74rem, ab 1700 px 84rem. Nie eine feste Breite dagegen setzen.
+
 - Klebende Kopfleisten (`kopf-band`, `SheetKopf`, `ChatEbene`-Kopf) dürfen
   Inhalt **nie lesbar durchscheinen lassen**. Mit Hintergrundbild ist der Kopf
   deckend (`index.css`, `html.mit-hintergrund .kopf-band::before`). Keine
@@ -77,7 +99,8 @@ wieder passieren.**
   keine neuen Grautöne erfinden. Dunkelmodus immer mitdenken (`dark:`).
 - Bestehende Bausteine benutzen statt neu bauen: `Gruppe`, `Zeile`,
   `ZeileMitSchalter`, `ZeileEingabe`, `Wert`, `Schalter`, `Sheet`,
-  `SheetKopf`, `FussLeiste`, `GlasLeiste`, `TeilUmschalter`, `Suchfeld`.
+  `SheetKopf`, `FussLeiste`, `GlasLeiste`, `TeilUmschalter`, `Suchfeld`,
+  `InKopf`, `ChatEbene` + `ChatKopf`.
 
 ## 6. Prüfen, bevor etwas als fertig gilt
 

@@ -63,7 +63,8 @@ export function ElternInfosTab() {
   }
 
   return (
-    <div className="grid gap-3">
+    // Am Rechner nebeneinander: links die Infos, rechts die Frage ans Team
+    <div className="grid gap-3 lg:grid-cols-2 lg:items-start">
       {/* ------------------------------------------- angeheftete Infos */}
       <section className="card p-5">
         <h2 className="text-lg font-bold">Vom Stufenteam</h2>

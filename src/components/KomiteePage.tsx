@@ -138,9 +138,15 @@ export function KomiteePage({ topic, onBack }: { topic: Topic; onBack: () => voi
       )}
 
       {tab === "uebersicht" ? (
-        <div className="space-y-5 py-3">
+        // Am Rechner: Angepinnt und To-dos (kurze Listen) nebeneinander,
+        // die Abstimmungen (Karten) darunter über die volle Breite
+        <div className="grid grid-cols-[minmax(0,1fr)] gap-5 py-3 lg:grid-cols-2 lg:items-start">
           {/* Wer hier den Vorsitz hat, darf Termine anfragen. */}
-          {topic.tag && <VorsitzZeile tag={topic.tag} />}
+          {topic.tag && (
+            <div className="empty:hidden lg:col-span-2">
+              <VorsitzZeile tag={topic.tag} />
+            </div>
+          )}
 
           <Abschnitt titel="Angepinnt" leer="Nichts angepinnt. Mit „Anpinnen“ bleibt eine Info hier oben stehen." zellen>
             {pins.map((p) => (
@@ -175,7 +181,7 @@ export function KomiteePage({ topic, onBack }: { topic: Topic; onBack: () => voi
             ))}
           </Abschnitt>
 
-          <Abschnitt titel="Abstimmungen" leer="Keine Abstimmung offen. Mit „Abstimmung“ unten startest du eine.">
+          <Abschnitt titel="Abstimmungen" leer="Keine Abstimmung offen. Mit „Abstimmung“ unten startest du eine." className="lg:order-last lg:col-span-2">
             {umfragen.map((u) => (
               <UmfrageKarte key={u.id} item={u} kannLoeschen={u.created_by === uid || darfEintraege} onDelete={() => deleteItem(u.id)} />
             ))}
@@ -271,11 +277,11 @@ export function KomiteePage({ topic, onBack }: { topic: Topic; onBack: () => voi
  * (Abstimmungen). Leer: ein ruhiger Satz, der sagt, wie man etwas anlegt.
  */
 function Abschnitt({
-  titel, leer, zellen, children,
-}: { titel: string; leer: string; zellen?: boolean; children: React.ReactNode }) {
+  titel, leer, zellen, className = "", children,
+}: { titel: string; leer: string; zellen?: boolean; className?: string; children: React.ReactNode }) {
   const hat = Array.isArray(children) ? children.length > 0 : Boolean(children);
   return (
-    <section>
+    <section className={`min-w-0 ${className}`}>
       <h3 className="mb-1.5 px-4 text-[13px] font-normal uppercase tracking-[0.02em] text-tinte-leise">{titel}</h3>
       {!hat ? (
         <div className="gruppe-zellen">
