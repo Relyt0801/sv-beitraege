@@ -96,7 +96,7 @@ export function MassBar({
   ];
 
   return (
-    <div ref={hoeheRef} className="pointer-events-none fixed inset-x-0 bottom-0 z-40 px-3 pb-[calc(env(safe-area-inset-bottom)+0.5rem)]">
+    <div ref={hoeheRef} data-unterkante className="pointer-events-none fixed inset-x-0 bottom-0 z-40 px-3 pb-[calc(env(safe-area-inset-bottom)+0.5rem)]">
       {/* Deckend (--glas ohne Alpha): darunter scheint keine Liste durch */}
       <div className="pointer-events-auto mx-auto flex max-w-3xl flex-wrap items-center gap-x-2 gap-y-1.5 rounded-[1.5rem] border border-white/60 bg-[rgb(var(--glas))] p-3 shadow-[0_8px_32px_-8px_rgba(0,0,0,.28),0_0_0_.5px_rgba(0,0,0,.08)] dark:border-white/10">
         <span className="order-1 mr-auto min-w-0 truncate text-[15px] font-semibold" aria-live="polite">

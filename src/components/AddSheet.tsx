@@ -7,6 +7,7 @@ import { Sheet, SheetKopf } from "./Sheet";
 import { Gruppe, ZeileEingabe, ZeileSegmente } from "./Liste";
 import { FussLeiste } from "./FussLeiste";
 import { PersonAnlegenSheet } from "./PersonAnlegenSheet";
+import { melde } from "../lib/melder";
 
 /**
  * „+ Person“ in der Kasse.
@@ -66,6 +67,8 @@ function ListenEintrag({ open, onClose, zurueck }: { open: boolean; onClose: () 
   function submit() {
     if (!nachname.trim()) return;
     addStudent(nachname, vorname, ab);
+    // Rückmeldung: die neue Zeile steht oft weit unten in der Liste
+    melde(`${[vorname.trim(), nachname.trim()].filter(Boolean).join(" ")} hinzugefügt – dabei ab ${ab}`, "erfolg");
     onClose();
   }
 

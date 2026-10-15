@@ -491,6 +491,7 @@ html.mit-hintergrund .ebene-grund {
 html.mit-hintergrund main .seg,
 html.mit-hintergrund .ebene-grund .seg,
 html.mit-hintergrund header .seg,
+html.mit-hintergrund .in-kopf .seg,
 html.mit-hintergrund .feld-auf-bild {
   background-color: rgb(227 227 232);
   box-shadow: 0 0 0 0.5px rgb(0 0 0 / 0.08);
@@ -498,6 +499,7 @@ html.mit-hintergrund .feld-auf-bild {
 html.dark.mit-hintergrund main .seg,
 html.dark.mit-hintergrund .ebene-grund .seg,
 html.dark.mit-hintergrund header .seg,
+html.dark.mit-hintergrund .in-kopf .seg,
 html.dark.mit-hintergrund .feld-auf-bild {
   background-color: rgb(var(--glas));
 }

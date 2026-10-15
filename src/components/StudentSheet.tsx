@@ -90,7 +90,8 @@ export function StudentSheet({
         <SheetKopf
           titel={istDabei ? "Dabei ab" : "Verlässt ab"}
           unter={istDabei ? "Halbjahre davor zählen nicht zum Beitrag." : "Ab diesem Halbjahr zählt kein Beitrag mehr."}
-          zurueck={{ text: student.vorname, onClick: () => setWahl(null) }}
+          // Wie die automatische Beschriftung der übrigen Unterseiten („‹ Finn Brandt“)
+          zurueck={{ text: `${student.vorname} ${student.nachname}`.length <= 22 ? `${student.vorname} ${student.nachname}` : "Zurück", onClick: () => setWahl(null) }}
           onClose={onClose}
         />
         <Gruppe className="">

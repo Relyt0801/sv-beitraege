@@ -65,11 +65,22 @@ export function useReiter<T>(start: T | (() => T)): [T, (neu: T, angetippt?: boo
   const [reiter, setReiterRoh] = useState<T>(start);
   const aktuell = useRef(reiter);
   aktuell.current = reiter;
+  // Wie in iOS behält jeder Reiter seine Stelle: Wer zwischen Kasse und
+  // Finanzen hin- und herwechselt, landet wieder bei derselben Person
+  // (Rollen-Prüfung Okt. 2026). Nur bei echten Tipps auf die Reiterleiste –
+  // Sprünge zu einem Eintrag scrollen selbst dorthin.
+  const stellen = useRef(new Map<T, number>());
   const setReiter = useCallback((neu: T, angetippt?: boolean) => {
     const gleich = neu === aktuell.current;
+    if (!gleich) stellen.current.set(aktuell.current, window.scrollY);
     if (window.scrollY > 0) {
       if (gleich) window.scrollTo({ top: 0, behavior: "smooth" });
       else window.scrollTo(0, 0);
+    }
+    const ziel = !gleich && angetippt ? stellen.current.get(neu) ?? 0 : 0;
+    if (ziel > 0) {
+      // Erst nach dem Zeichnen des neuen Reiters (zwei Bilder später)
+      requestAnimationFrame(() => requestAnimationFrame(() => window.scrollTo(0, ziel)));
     }
     if (gleich && angetippt) window.dispatchEvent(new CustomEvent(REITER_WURZEL, { detail: neu }));
     aktuell.current = neu;

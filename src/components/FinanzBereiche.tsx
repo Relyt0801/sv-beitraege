@@ -5,7 +5,7 @@ import {
   type Buchung, type FinanzPosten, type FinanzUebersicht, type FinanzenValue, type KassenGeplant, type PostenRef, type Quelle,
 } from "../lib/finanzen";
 import { useDunkel } from "../lib/dunkel";
-import { frage, meldeFehler } from "../lib/melder";
+import { frage, melde, meldeFehler } from "../lib/melder";
 import { Sheet, SheetKopf } from "./Sheet";
 import { Icon } from "./Icon";
 import { Gruppe, Zeile } from "./Liste";
@@ -108,10 +108,11 @@ export function PostenBereiche({
         fin={fin ?? null}
         onClose={() => setAuswahl(null)}
         onUmgezogen={(key) => setAuswahl({ typ: "posten", key })}
-        onBuchen={(start) => {
-          setAuswahl(null);
-          setBuchung(start);
-        }}
+        // Buchen aus einer Kategorie: die Kategorie bleibt offen, das
+        // Buchungsblatt geht als Unterseite darüber auf („‹ Waffelverkauf“,
+        // gleiche Höhe) – vorher ging sie zu und ein neues Blatt fuhr von unten
+        // herein (Kopf sprang um 180 px)
+        onBuchen={(start) => setBuchung(start)}
         onBuchung={onBuchung}
       />
       {fin && (
@@ -128,11 +129,7 @@ export function PostenBereiche({
           <BuchungSheet
             start={buchung}
             fin={fin}
-            onClose={() => {
-              const zurueck = buchung?.zurueck;
-              setBuchung(null);
-              if (zurueck) setAuswahl({ typ: "posten", key: zurueck });
-            }}
+            onClose={() => setBuchung(null)}
           />
         </>
       )}
@@ -635,6 +632,8 @@ export function BuchungSheet({ start, fin, onClose }: { start: BuchungStart | nu
     const f = await fin.buchen(b);
     setBusy(false);
     if (f) return setFehler("Hat nicht geklappt: " + f);
+    // Rückmeldung: die neue Buchung steht oft außer Sicht
+    melde(`${typ === "aus" ? "Ausgabe" : "Einnahme"} gebucht`, "erfolg");
     onClose();
   }
 

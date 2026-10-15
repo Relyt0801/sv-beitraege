@@ -30,5 +30,7 @@ export function InKopf({
     setZiel(breit ? document.getElementById("kopf-aktionen") : null);
   }, [breit]);
   if (ziel) return createPortal(<div className={`flex shrink-0 items-center gap-2 ${kopfClassName}`}>{children}</div>, ziel);
-  return <div className={className}>{children}</div>;
+  // Am Handy steht der Umschalter ausserhalb von <main>: „in-kopf“ macht ihn
+  // auf dem Hintergrundbild deckend wie jedes Segment (index.css)
+  return <div className={`in-kopf ${className}`}>{children}</div>;
 }

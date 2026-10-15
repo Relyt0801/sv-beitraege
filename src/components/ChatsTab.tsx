@@ -84,7 +84,7 @@ const istAnfrageSprung = () => {
  *     Kopfleiste und Zurück-Pfeil, wie in iMessage.
  */
 export function ChatsTab() {
-  const { topics, items, members, ready, unreadCount, createTopic, committeesOf, uid } = useTopics();
+  const { topics, items, members, ready, unreadCount, createTopic, committeesOf, uid, myVotes } = useTopics();
   const { can, isStaff } = useRole();
   const [anschreiben, setAnschreiben] = useState(false);
   const { mitteilungen, setKategorie, setKomitee } = useMitteilungen();
@@ -238,7 +238,7 @@ export function ChatsTab() {
   const komiteeUnter = (t: Topic, leer: string) => {
     const nPin = unreadCount(t.id, "uebersicht");
     if (nPin && !unreadCount(t.id, "chat")) return `${nPin} neu auf der Pinnwand`;
-    return vorschau([t.id], "") || standText(items, t.id) || leer;
+    return vorschau([t.id], "") || standText(items, t.id, myVotes) || leer;
   };
 
   const glocke = (k: Kategorie) => ({ an: kategorieAn(mitteilungen, k), setAn: (an: boolean) => void setKategorie(k, an) });
@@ -514,9 +514,10 @@ const zeitKurz = (iso: string) => {
 };
 
 /** Was in einem Komitee offen ist, als eine Zeile („1 Abstimmung offen · 2 To-dos offen“). */
-function standText(items: TopicItem[], topicId: string): string {
+function standText(items: TopicItem[], topicId: string, myVotes: Record<string, unknown[]>): string {
   const eig = items.filter((i) => i.topic_id === topicId);
-  const umfragen = eig.filter((i) => i.type === "umfrage" && !abgelaufen(i)).length;
+  // Nur Abstimmungen, bei denen man selbst noch nicht abgestimmt hat
+  const umfragen = eig.filter((i) => i.type === "umfrage" && !abgelaufen(i) && !(myVotes[i.id] || []).length).length;
   const todos = eig.filter((i) => i.type === "todo" && !i.done).length;
   const teile: string[] = [];
   if (umfragen) teile.push(`${umfragen} ${umfragen === 1 ? "Abstimmung" : "Abstimmungen"} offen`);

@@ -34,7 +34,7 @@ import { Icon, type IconName } from "./components/Icon";
 import { HintergrundEbene } from "./components/HintergrundEbene";
 import { InstallKarte, InstallOverlay } from "./components/InstallHinweis";
 import { ZuErledigen } from "./components/ZuErledigen";
-import { TeamAufgabenQuelle, useTeamAufgaben, type TeamArt } from "./lib/offen";
+import { TeamAufgabenQuelle, useFuerMichOffen, useTeamAufgaben, type TeamArt } from "./lib/offen";
 import { useBreit, useGescrollt, useHoeheAlsVariable, useReiter } from "./lib/gescrollt";
 import { GlasLeiste } from "./components/GlasLeiste";
 import { InKopf } from "./components/InKopf";
@@ -288,11 +288,18 @@ function Main() {
   // nichts darauf hin, wer zuletzt in Kasse, Rollen oder Events war. Was schon
   // an einem anderen Reiter zählt, zählt hier nicht noch einmal:
   // Kostenanfragen (Finanzen) und Terminanfragen (Events).
+  // Dazu, was unter „Für dich offen“ steht (offene Abstimmungen, ungelesene
+  // wichtige Infos) – so passt die Zahl immer zur Liste darunter (Rollen-
+  // Prüfung: Reiter zeigte 2, die Liste 4 Einträge).
   const teamAufgaben = useTeamAufgaben();
-  const aufgabenZahl = (Object.entries(teamAufgaben) as [TeamArt, number][]).reduce(
-    (summe, [art, n]) => summe + (art === "kosten" || art === "termin" ? 0 : n),
-    0,
-  );
+  const fuerMich = useFuerMichOffen();
+  const aufgabenZahl =
+    (Object.entries(teamAufgaben) as [TeamArt, number][]).reduce(
+      (summe, [art, n]) => summe + (art === "kosten" || art === "termin" ? 0 : n),
+      0,
+    ) +
+    fuerMich.abstimmungen.length +
+    fuerMich.wichtig.length;
 
   /*
    * Darf man den gewählten Reiter sehen? Vorher leitete ein Effekt sofort zur
@@ -482,6 +489,14 @@ function Main() {
     setSichtbar(SCHRITT_LISTE);
   }, [suche, min, max, onlyOpen, tab]);
 
+  // In „Nur offene“ bleibt, wer gerade abgehakt wurde, stehen (mit Haken),
+  // bis Filter, Suche oder Reiter wechseln – sonst verschwand die Zeile beim
+  // Tipp, und ein Fehltipp war an der Stelle nicht zurückzunehmen.
+  const [geradeGeaendert, setGeradeGeaendert] = useState<Set<string>>(() => new Set());
+  useEffect(() => {
+    setGeradeGeaendert(new Set());
+  }, [suche, min, max, onlyOpen, tab]);
+
 
   const filtered = useMemo(() => {
     const q = normalize(suche);
@@ -496,10 +511,10 @@ function Main() {
       const p = punkte[st.id] || 0;
       if (mn !== null && p < mn) return false;
       if (mx !== null && p > mx) return false;
-      if (onlyOpen && offenGesamt(st, settings, p) === 0) return false;
+      if (onlyOpen && offenGesamt(st, settings, p) === 0 && !geradeGeaendert.has(st.id)) return false;
       return true;
     });
-  }, [students, suche, min, max, onlyOpen, settings, punkte]);
+  }, [students, suche, min, max, onlyOpen, settings, punkte, geradeGeaendert]);
 
   const halbjahrSetzen = useCallback(
     async (h: Halbjahr) => {
@@ -526,6 +541,7 @@ function Main() {
         return;
       }
       const neu: Status = alt === "offen" ? "bezahlt" : "offen";
+      setGeradeGeaendert((s) => (s.has(id) ? s : new Set(s).add(id)));
       setTerm(id, h, neu);
       melde(`${st.vorname} ${st.nachname}: ${h} ${neu === "bezahlt" ? "bezahlt" : "wieder offen"}`, neu === "bezahlt" ? "erfolg" : "info");
     },
@@ -679,6 +695,14 @@ function Main() {
             title="Mehrere auswählen"
           >
             <Icon name="auswahl" size={20} />
+          </button>
+        )}
+        {/* Handy: „Person hinzufügen“ hier in der Listenzeile statt als
+            schwebender Knopf – der lag sonst auf „Offen“ und den Halbjahren
+            der untersten Personen (ab iPad steht er im Kopf) */}
+        {canEditData && (
+          <button className="iconbtn md:hidden" onClick={() => setShowAdd(true)} aria-label="Person hinzufügen" title="Person hinzufügen">
+            <Icon name="plus" size={20} strich={2.4} />
           </button>
         )}
       </>
@@ -956,8 +980,9 @@ function Main() {
                 <button role="radio" aria-checked={!onlyOpen} onClick={() => setOnlyOpen(false)} className={`seg-item ${!onlyOpen ? "seg-aktiv" : ""}`}>
                   Alle
                 </button>
-                <button role="radio" aria-checked={onlyOpen} onClick={() => setOnlyOpen(true)} className={`seg-item ${onlyOpen ? "seg-aktiv" : ""}`}>
-                  Nur offene
+                <button role="radio" aria-checked={onlyOpen} onClick={() => setOnlyOpen(true)} className={`seg-item whitespace-nowrap ${onlyOpen ? "seg-aktiv" : ""}`}>
+                  {/* Kurz wie „Alle | Ungelesen“ in Mail – passt am SE neben drei Knöpfe */}
+                  Offene
                 </button>
               </div>
               {/* Suche am Rechner: hier statt als eigene Zeile über den Kennzahlen */}
@@ -1127,7 +1152,7 @@ function Main() {
       {/* Schwebender „Neu“-Knopf nur auf dem Handy (unter 768 px): beschriftete Kapsel,
           damit man die „+“ der Seite auseinanderhält. Ab iPad-Breite sitzt der
           Knopf im Kopf (siehe neuKnopf). */}
-      {neuKnopf && !massMode && (
+      {neuKnopf && !massMode && tab !== "kasse" && (
         <button
           data-tour="neu"
           onClick={neuKnopf.los}

@@ -443,9 +443,14 @@ export function AktionSheet({ offen, onSchliessen }: { offen: boolean; onSchlies
         )}
       </p>
 
-      {fehler && <p className="mt-2 px-4 text-[14px] font-semibold text-amber-700 dark:text-amber-300">{fehler}</p>}
-
       <FussLeiste>
+        {fehler && (
+          // Direkt über dem Knopf, der sie auslöst (klebende Fußleiste) – vorher
+          // stand die Meldung unsichtbar am Blattende und der Knopf wirkte tot
+          <p role="alert" className="mb-2 px-1 text-center text-[13px] font-semibold text-amber-700 dark:text-amber-300">
+            {fehler}
+          </p>
+        )}
         <button disabled={busy || anzahl === 0} onClick={speichern} className="btn-primary">
           {busy ? "…" : `${anzahl || ""} ${anzahl === 1 ? "Schicht" : "Schichten"} ausschreiben`}
         </button>

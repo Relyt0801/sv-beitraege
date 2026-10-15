@@ -243,10 +243,13 @@ export function EventsTab() {
     };
   }, [events, myVotes, aktionsSchluessel, isStaff, ready]);
 
-  // Beim Ansehen als gelesen markieren
+  // Beim Ansehen als gelesen markieren. Wichtige Infos (Schüler) erst, wenn
+  // man sie wirklich öffnet: Sie stehen unter „Bitte ansehen“ und in der
+  // Übersicht unter „Für dich offen“ – vorher verschwanden sie dort schon,
+  // wenn man den Reiter nur kurz antippte, ohne sie gesehen zu haben.
   useEffect(() => {
-    for (const e of events) if (!reads.has(e.id)) markRead(e.id);
-  }, [events, reads, markRead]);
+    for (const e of events) if (!reads.has(e.id) && (isStaff || !e.is_warning)) markRead(e.id);
+  }, [events, reads, markRead, isStaff]);
 
   // Eine Karte bauen – im Feed, in einer Gruppe und unter „Älter“ gleich
   const karte = (e: EventItem, flach = false) => (
@@ -312,6 +315,10 @@ export function EventsTab() {
       </div>
     ) : null;
   const offenesBitte = bitteOffen ? events.find((e) => e.id === bitteOffen) ?? null : null;
+  // Geöffnet = gelesen (auch für wichtige Infos)
+  useEffect(() => {
+    if (offenesBitte && !reads.has(offenesBitte.id)) markRead(offenesBitte.id);
+  }, [offenesBitte, reads, markRead]);
 
   // Rechte Spalte am Laptop: nur, wenn etwas drinsteht
   const rechteSpalte = breit && (offeneAbschluesse.length > 0 || meineSchichten.length > 0 || bitteBlock !== null);

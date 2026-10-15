@@ -539,8 +539,6 @@ export function TerminSheet({
         </ZeileMitSchalter>
       </Gruppe>
 
-      {fehler && <p className="mt-3 px-4 text-[14px] font-semibold text-amber-700 dark:text-amber-300">{fehler}</p>}
-
       {/* Löschen weit weg vom Hauptknopf, rot, mit Rückfrage */}
       {termin && (
         <Gruppe className="mt-8">
@@ -558,6 +556,13 @@ export function TerminSheet({
       )}
 
       <FussLeiste>
+        {fehler && (
+          // Direkt über dem Knopf, der sie auslöst (klebende Fußleiste) – vorher
+          // stand die Meldung unsichtbar am Blattende und der Knopf wirkte tot
+          <p role="alert" className="mb-2 px-1 text-center text-[13px] font-semibold text-amber-700 dark:text-amber-300">
+            {fehler}
+          </p>
+        )}
         <button disabled={busy} onClick={speichern} className="btn-primary">
           {busy
             ? "…"

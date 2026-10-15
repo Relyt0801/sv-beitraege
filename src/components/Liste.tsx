@@ -68,6 +68,7 @@ export function Zeile({
   ohnePfeil?: boolean;
 }) {
   const farbe = rot ? "text-red-600 dark:text-red-400" : blau ? "text-brand-dark dark:text-brand" : "";
+  const hatWert = children !== undefined && children !== null && children !== false && children !== "";
   const inhalt = (
     <>
       {symbol}
@@ -78,11 +79,13 @@ export function Zeile({
           <span className="mt-0.5 block text-[12.5px] leading-snug text-tinte-leise">{unter}</span>
         </span>
       ) : (
-        // Lange Bezeichnung bricht um, statt „›“ aus der Zeile zu schieben;
-        // der Wert rechts behält seine Breite
-        <span className={`min-w-0 shrink text-[15px] leading-snug ${rot ? "font-semibold" : blau ? "font-medium" : ""} ${farbe}`}>{label}</span>
+        // Ohne Wert rechts darf eine lange Bezeichnung umbrechen (statt „›“
+        // aus der Zeile zu schieben). Mit Wert/Eingabefeld bleibt sie ganz
+        // (höchstens 65 % breit) – sonst brach „Bezeichnung“ neben einem
+        // Eingabefeld mitten im Wort um.
+        <span className={`text-[15px] leading-snug ${hatWert ? "max-w-[65%] shrink-0" : "min-w-0 flex-1"} ${rot ? "font-semibold" : blau ? "font-medium" : ""} ${farbe}`}>{label}</span>
       )}
-      <span className={`flex items-center justify-end gap-1.5 ${unter ? "min-w-0 shrink-0" : "min-w-fit flex-1"}`}>{children}</span>
+      {(hatWert || unter) && <span className={`flex min-w-0 items-center justify-end gap-1.5 ${unter ? "shrink-0" : "flex-1"}`}>{children}</span>}
       {onClick && !rot && !blau && !ohnePfeil && <span aria-hidden className="shrink-0 text-[17px] leading-none text-tinte-leise">›</span>}
     </>
   );
