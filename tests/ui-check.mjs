@@ -92,7 +92,14 @@ for (const rolle of ROLLEN) for (const g of GROESSEN) for (const thema of ['ligh
       for (const el of document.querySelectorAll('#root *')) {
         if (el.closest('nav') || el.children.length || !(el.innerText || '').trim()) continue;
         const r = el.getBoundingClientRect(); const cs = getComputedStyle(el);
-        if (r.height && cs.visibility !== 'hidden' && cs.position !== 'fixed') unten = Math.max(unten, r.bottom);
+        if (!r.height || cs.visibility === 'hidden' || cs.position === 'fixed') continue;
+        // In einer eigenen Scroll-Fläche (z. B. Buchungsliste am Laptop) zählt
+        // nur der sichtbare Teil – weggescrollte Zeilen liegen nicht unter der Leiste
+        let b = r.bottom;
+        for (let a = el.parentElement; a && a !== document.body; a = a.parentElement) {
+          if (/(auto|scroll|hidden)/.test(getComputedStyle(a).overflowY)) b = Math.min(b, a.getBoundingClientRect().bottom);
+        }
+        if (b > r.top) unten = Math.max(unten, b);
       }
       window.scrollTo(0, 0);
       return unten > oben + 1 ? Math.round(unten - oben) : 0;
