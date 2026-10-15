@@ -136,6 +136,7 @@ export function FinanzenTab({ kosten }: { kosten: KostenValue }) {
             <AnsichtWahl ansicht={ansicht} setAnsicht={setAnsicht} />
           </InKopf>
         )}
+        {darfSehen && <p className="auf-bild hidden px-1 text-[13px] leading-snug text-tinte-leise lg:block">{ANSICHT_TEXT.standard}</p>}
         <FinanzStandard aktionName={aktionName} />
         {!darfSehen && meineVorsitze.length > 0 && (
           <KostenKarte kosten={kosten} darfEntscheiden={false} vorsitze={meineVorsitze} />
@@ -179,10 +180,16 @@ export function FinanzenTab({ kosten }: { kosten: KostenValue }) {
     <div className="grid grid-cols-[minmax(0,1fr)] gap-3 pb-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-start">
       {/* Oben, was der Kassenwart am häufigsten tut: Einnahme / Ausgabe buchen.
           Vorher standen die Knöpfe unter Kontostand und Kreis – am Handy erst
-          nach gut einer Bildschirmhöhe. Am Rechner rechts in der Kopfzeile
-          (InKopf) neben der Ansicht-Wahl – wie jeder Seiten-Umschalter. */}
-      <InKopf className="flex flex-col gap-3 lg:col-span-2">
+          nach gut einer Bildschirmhöhe. Die Ansicht-Wahl steht am Rechner in
+          der Kopfzeile (InKopf), die Knöpfe am Anfang der Seite. */}
+      <InKopf className="lg:col-span-2">
         <AnsichtWahl ansicht={ansicht} setAnsicht={setAnsicht} />
+      </InKopf>
+      {/* Am Rechner: links in einem Satz, was man gerade sieht, rechts Einnahme/
+          Ausgabe – nicht mehr oben neben „Nachtragen“ (zwei grüne Knöpfe
+          nebeneinander, Rückmeldung 15.10.). Am Handy direkt unter der Wahl. */}
+      <div className="flex flex-col gap-3 empty:hidden lg:col-span-2 lg:flex-row lg:items-center">
+        <p className="auf-bild hidden min-w-0 flex-1 px-1 text-[13px] leading-snug text-tinte-leise lg:block">{ANSICHT_TEXT[ansicht]}</p>
         {darfBuchen && (
           // Echte, volle Knöpfe (vorher blasse Pastell-Flächen, die wie
           // abgeschaltet wirkten): grün = Einnahme, rot = Ausgabe, weiße Schrift.
@@ -203,7 +210,7 @@ export function FinanzenTab({ kosten }: { kosten: KostenValue }) {
             </button>
           </div>
         )}
-      </InKopf>
+      </div>
       {nurLesen && (
         <div className="flex items-center gap-2 rounded-2xl zelle px-4 py-2.5 text-[14px] text-tinte-matt dark:text-slate-300 lg:col-span-2">
           <Icon name="info" size={17} />
@@ -271,8 +278,9 @@ const ANSICHT_TEXT = {
 
 function AnsichtWahl({ ansicht, setAnsicht }: { ansicht: "standard" | "erweitert"; setAnsicht: (a: "standard" | "erweitert") => void }) {
   return (
-    // Am Rechner steht die Wahl in der Kopfzeile (InKopf) – dort feste Breite,
-    // die Erklärung als Hinweis beim Darüberfahren statt als eigene Zeile
+    // Am Rechner steht die Wahl in der Kopfzeile (InKopf) – dort feste Breite;
+    // die Erklärung steht dann am Anfang der Seite (FinanzenTab), nicht als
+    // Hinweis beim Darüberfahren (der legte sich über die Reiterleiste)
     <div className="lg:w-[17rem]">
       <div className="seg" role="tablist" aria-label="Ansicht der Finanzen">
         {([["standard", "Für alle sichtbar"], ["erweitert", "Alle Buchungen"]] as const).map(([k, label]) => (
@@ -280,7 +288,6 @@ function AnsichtWahl({ ansicht, setAnsicht }: { ansicht: "standard" | "erweitert
             key={k}
             role="tab"
             aria-selected={ansicht === k}
-            title={ANSICHT_TEXT[k]}
             onClick={() => setAnsicht(k)}
             className={`seg-item !py-2 !text-[14px] lg:!py-1.5 lg:!text-[13px] ${ansicht === k ? "seg-aktiv" : ""}`}
           >
@@ -288,7 +295,7 @@ function AnsichtWahl({ ansicht, setAnsicht }: { ansicht: "standard" | "erweitert
           </button>
         ))}
       </div>
-      <p className="mt-1.5 px-3 text-[13px] leading-snug text-tinte-leise lg:hidden">{ANSICHT_TEXT[ansicht]}</p>
+      <p className="auf-bild mt-1.5 px-3 text-[13px] leading-snug text-tinte-leise lg:hidden">{ANSICHT_TEXT[ansicht]}</p>
     </div>
   );
 }

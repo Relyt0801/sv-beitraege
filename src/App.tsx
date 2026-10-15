@@ -572,6 +572,38 @@ function Main() {
       </div>
     ) : null;
 
+  // Werkzeuge der Personenliste (Filter, Mehrere auswählen): am Handy/iPad
+  // oben in der Kopfzeile, am Rechner in der Kopfzeile der Liste selbst –
+  // dort, wo man mit der Liste arbeitet (die obere Zeile blieb sonst voll).
+  const listenWerkzeuge =
+    kassePersonen && teamView ? (
+      <>
+        <button
+          data-tour="einstellungen"
+          className={`iconbtn ${showFilter ? "iconbtn-active" : ""}`}
+          onClick={() => setShowFilter((v) => !v)}
+          aria-label="Filter & Einstellungen"
+          title="Filter & Einstellungen"
+        >
+          <Icon name="regler" size={19} />
+        </button>
+        {(canEditData || canEditHilfen) && (
+          <button
+            data-tour="massen"
+            className={`iconbtn ${massMode ? "iconbtn-active" : ""}`}
+            onClick={() => {
+              setMassMode((v) => !v);
+              setSelected(new Set());
+            }}
+            aria-label="Mehrere auswählen"
+            title="Mehrere auswählen"
+          >
+            <Icon name="auswahl" size={20} />
+          </button>
+        )}
+      </>
+    ) : null;
+
   // „Neu“-Knopf je Reiter (Update 1.4, U3): Kasse → Person hinzufügen, Events →
   // Event erstellen. Auf dem Handy schwebt er als beschriftete Kapsel unten
   // rechts (damit die drei „+“ der App unterscheidbar sind: Nachtragen, Termin,
@@ -635,35 +667,9 @@ function Main() {
             <div className="ml-auto flex shrink-0 items-center gap-2 max-[379px]:gap-1.5">
               {/* Umschalter/Knöpfe der Seite (InKopf.tsx) – am Rechner hier */}
               <div id="kopf-aktionen" className="contents" />
-              {tab === "kasse" && !kasseBeitraege && (
-                <>
-                  {teamView && (
-                    <button
-                      data-tour="einstellungen"
-                      className={`iconbtn ${showFilter ? "iconbtn-active" : ""}`}
-                      onClick={() => setShowFilter((v) => !v)}
-                      aria-label="Filter & Einstellungen"
-                      title="Filter & Einstellungen"
-                    >
-                      <Icon name="regler" size={19} />
-                    </button>
-                  )}
-                  {teamView && (canEditData || canEditHilfen) && (
-                    <button
-                      data-tour="massen"
-                      className={`iconbtn ${massMode ? "iconbtn-active" : ""}`}
-                      onClick={() => {
-                        setMassMode((v) => !v);
-                        setSelected(new Set());
-                      }}
-                      aria-label="Mehrere auswählen"
-                      title="Mehrere auswählen"
-                    >
-                      <Icon name="auswahl" size={20} />
-                    </button>
-                  )}
-                </>
-              )}
+              {/* Filter und Auswählen gehören zur Liste: am Rechner stehen sie in
+                  deren Kopfzeile (neben „Alle | Nur offene“), hier nur bis iPad */}
+              {listenWerkzeuge && <div className="flex items-center gap-2 max-[379px]:gap-1.5 lg:hidden">{listenWerkzeuge}</div>}
               {/* Ab iPad-Breite: „Person“ / „Neu“ im Kopf statt schwebend */}
               {neuKnopf && (
                 <button data-tour="neu" onClick={neuKnopf.los} className="btn-klein hidden md:inline-flex" aria-label={neuKnopf.label}>
@@ -762,7 +768,10 @@ function Main() {
         {/* Zum Home-Bildschirm hinzufügen. Verschwindet von selbst, sobald die
             App installiert ist – und auf iPhone/iPad, sobald jemand bestätigt,
             dass er es gemacht hat (mehr dazu in src/lib/install.ts). */}
-        {tab === "kasse" && (
+        {/* Nur auf der eigenen Übersicht (Startseite) – nicht über der
+            Kassenliste oder den Beiträgen, wo gearbeitet wird. Team ohne
+            eigene Person hat keine Übersicht: dann über der Kasse. */}
+        {(hatProfilReiter ? tab === "profil" : tab === "kasse" && !kasseBeitraege) && (
           <div className="mx-auto max-w-5xl">
             <InstallKarte />
           </div>
@@ -930,6 +939,7 @@ function Main() {
               <span className="zahl ml-auto text-[13px] text-tinte-leise">
                 {filtered.length} von {students.length}
               </span>
+              {listenWerkzeuge && <div className="hidden items-center gap-2 lg:flex">{listenWerkzeuge}</div>}
             </div>
           )}
 

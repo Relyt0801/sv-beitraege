@@ -199,35 +199,25 @@ export function AktionenListe() {
  * Wahl stehen die Möglichkeiten aus dem Beiträge-Reiter; schon vergebene
  * Mithilfe dieser Aktion zieht mit. Keine Mitteilung.
  */
-function ProzentAendern({ aktion }: { aktion: Aktion }) {
+function ProzentAendern({ aktion, mitName, onFertig }: { aktion: Aktion; mitName: boolean; onFertig: () => void }) {
   const { aktionProzent } = useTermine();
   const { templates } = useStore();
-  const [offen, setOffen] = useState(false);
   const vorlagen = useMemo(() => [...templates].sort((a, b) => a.sort - b.sort || a.punkte - b.punkte), [templates]);
   return (
     <div className="px-4 py-2.5">
-      <div className="flex items-center gap-2 text-[14px]">
-        <span className="min-w-0 flex-1 truncate text-tinte-matt dark:text-slate-300">
-          {aktion.icon} {aktion.titel} zählt <span className="zahl font-semibold text-brand">+{aktion.prozent} %</span>
-        </span>
-        <button onClick={() => setOffen(!offen)} className="shrink-0 text-[14px] font-semibold text-brand">
-          {offen ? "Fertig" : "Ändern"}
-        </button>
+      <div className="mb-2 text-[13px] text-tinte-leise">
+        {mitName ? `${aktion.icon} ${aktion.titel} zählt` : "Diese Aktion zählt"} – schon vergebene Mithilfe zieht mit:
       </div>
-      {offen && (
-        <div className="mt-2">
-          <ProzentWahl
-            vorlagen={vorlagen}
-            wert={aktion.prozent}
-            setzen={(p) => {
-              void aktionProzent(aktion.id, p).then((f) => {
-                if (f) meldeFehler("Ändern hat nicht geklappt: " + f);
-                else setOffen(false);
-              });
-            }}
-          />
-        </div>
-      )}
+      <ProzentWahl
+        vorlagen={vorlagen}
+        wert={aktion.prozent}
+        setzen={(p) => {
+          void aktionProzent(aktion.id, p).then((f) => {
+            if (f) meldeFehler("Ändern hat nicht geklappt: " + f);
+            else onFertig();
+          });
+        }}
+      />
     </div>
   );
 }
@@ -267,6 +257,9 @@ function AktionGruppe({
   onOeffnen: (t: Termin) => void;
 }) {
   const [auf, setAuf] = useState(false);
+  // Team: Prozent ändern – über das „+5 %“-Abzeichen oben (vorher eine eigene
+  // Fußzeile „… zählt +5 % · Ändern“, die das Abzeichen nur wiederholte)
+  const [prozentOffen, setProzentOffen] = useState(false);
   const { schichten } = block;
   const jetzt = Date.now();
   const bisSonntag = sonntagVon(heuteKey());
@@ -306,30 +299,44 @@ function AktionGruppe({
           {kommend.length > 0 && ` · nächster ${kurzTag(kommend[0].datum)}`}
         </span>
       </span>
-      <span className="zahl shrink-0 rounded-full bg-brand/10 px-2 py-0.5 text-[12px] font-bold text-brand dark:bg-brand/20">
-        {prozentText}
-      </span>
-      {block.aufklappbar && (
-        <span className="text-tinte-leise">
-          <Winkel auf={auf} />
-        </span>
-      )}
     </>
+  );
+  const abzeichen = darfVerteilen ? (
+    <button
+      onClick={() => setProzentOffen((v) => !v)}
+      aria-expanded={prozentOffen}
+      aria-label={`Zählt ${prozentText} – antippen zum Ändern`}
+      title="Prozent ändern"
+      className={`zahl relative z-10 -my-2 flex min-h-[44px] shrink-0 items-center gap-1 rounded-full px-1.5 text-[12px] font-bold text-brand`}
+    >
+      <span className={`rounded-full px-2 py-0.5 ${prozentOffen ? "bg-brand text-white" : "bg-brand/10 dark:bg-brand/20"}`}>{prozentText}</span>
+    </button>
+  ) : (
+    <span className="zahl shrink-0 rounded-full bg-brand/10 px-2 py-0.5 text-[12px] font-bold text-brand dark:bg-brand/20">{prozentText}</span>
   );
 
   return (
     <div className="liste">
-      {block.aufklappbar ? (
-        <button
-          onClick={() => setAuf(!auf)}
-          aria-expanded={auf}
-          className="flex w-full items-center gap-3 px-4 py-3 text-left transition active:bg-black/[0.04] dark:active:bg-white/[0.06]"
-        >
-          {kopf}
-        </button>
-      ) : (
-        <div className="flex items-center gap-3 px-4 py-3">{kopf}</div>
-      )}
+      {/* Kopf: ganze Zeile klappt auf (unsichtbarer Knopf darunter), das
+          Abzeichen bleibt fürs Team ein eigener Knopf – keine Knöpfe ineinander */}
+      <div className="relative flex items-center gap-3 px-4 py-3">
+        {block.aufklappbar && (
+          <button
+            onClick={() => setAuf(!auf)}
+            aria-expanded={auf}
+            aria-label={`${block.titel}: ${auf ? "weniger anzeigen" : "alle Termine anzeigen"}`}
+            className="absolute inset-0 transition active:bg-black/[0.04] dark:active:bg-white/[0.06]"
+          />
+        )}
+        <span className="pointer-events-none contents">{kopf}</span>
+        {abzeichen}
+        {block.aufklappbar && (
+          <span aria-hidden className="pointer-events-none text-tinte-leise">
+            <Winkel auf={auf} />
+          </span>
+        )}
+      </div>
+      {darfVerteilen && prozentOffen && drin.map((a) => <ProzentAendern key={a.id} aktion={a} mitName={drin.length > 1} onFertig={() => setProzentOffen(false)} />)}
 
       {sichtbar.map((t) => (
         <SchichtZeile
@@ -356,8 +363,6 @@ function AktionGruppe({
         </button>
       )}
 
-      {/* Team: Prozent je Aktion ändern – erst aufgeklappt bzw. bei kleinen Gruppen */}
-      {darfVerteilen && (!block.aufklappbar || auf) && drin.map((a) => <ProzentAendern key={a.id} aktion={a} />)}
     </div>
   );
 }
@@ -444,7 +449,13 @@ function SchichtZeile({
           <SchichtSchild status={status} klein />
         ) : (
           gemeldet.length > 0 && (
-            <span className="zahl shrink-0 rounded-full bg-brand px-2 py-0.5 text-[12px] font-bold text-white">
+            // Volle Schicht: grau – es ist nichts mehr zu tun (blau sah nach
+            // offener Aufgabe aus, Rückmeldung 15.10.)
+            <span
+              className={`zahl shrink-0 rounded-full px-2 py-0.5 text-[12px] font-bold ${
+                voll ? "bg-[rgb(118_118_128/0.14)] text-tinte-matt dark:bg-[rgb(118_118_128/0.28)] dark:text-slate-300" : "bg-brand text-white"
+              }`}
+            >
               {gemeldet.length} angemeldet
             </span>
           )

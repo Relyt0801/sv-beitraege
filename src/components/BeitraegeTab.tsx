@@ -12,9 +12,52 @@ import { useBreit } from "../lib/gescrollt";
 
 import { frage } from "../lib/melder";
 
-/** Zahlenfeld ohne Dreh-Pfeile, rechtsbündig, in Blau – so sieht man, dass man es ändern kann. */
-const ZAHL_FELD =
-  "w-14 bg-transparent text-right text-[16px] font-semibold text-brand-dark outline-none dark:text-brand [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none";
+/**
+ * Zahl zum Ändern als kleine Kapsel: „+50 €“, „25 €“, „8 %“ – Zahl und Einheit
+ * dicht beieinander und auf einer Linie. Vorher stand die Zahl in einem
+ * 56 px breiten Feld rechtsbündig, das „+“ weit links davon und das „€“
+ * etwas höher daneben (Rückmeldung 15.10.: „+     50 €“).
+ * Die Kapsel zeigt außerdem, dass man den Wert antippen und ändern kann.
+ */
+function ZahlFeld({
+  wert,
+  aendern,
+  speichern,
+  einheit,
+  plus,
+  max,
+  label,
+}: {
+  wert: number;
+  aendern: (n: number) => void;
+  speichern: () => void;
+  einheit: "€" | "%";
+  plus?: boolean;
+  max?: number;
+  label: string;
+}) {
+  return (
+    <span className="zahl inline-flex shrink-0 cursor-text items-baseline rounded-lg bg-[rgb(118_118_128/0.12)] px-2.5 py-1 text-[16px] font-semibold leading-tight text-brand-dark transition focus-within:ring-2 focus-within:ring-brand/40 dark:bg-[rgb(118_118_128/0.24)] dark:text-brand">
+      {plus && <span aria-hidden>+</span>}
+      <input
+        type="number"
+        min={0}
+        max={max}
+        inputMode="numeric"
+        aria-label={label}
+        // So breit wie die Zahl (mind. 1 Zeichen) – kein Loch zwischen „+“, Zahl und Einheit
+        style={{ width: `${Math.max(1, String(wert).length)}ch` }}
+        className="bg-transparent p-0 text-right outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+        value={wert}
+        onChange={(e) => aendern(Math.max(0, Math.min(max ?? Infinity, Number(e.target.value) || 0)))}
+        onBlur={speichern}
+      />
+      <span aria-hidden className="ml-1">
+        {einheit}
+      </span>
+    </span>
+  );
+}
 
 /**
  * Reiter "Beiträge": hier wird festgelegt, wofür es wie viel Prozent gibt und
@@ -154,17 +197,7 @@ export function BeitraegeTab() {
           >
             <label className="flex min-h-[48px] items-center gap-3 px-4 py-2">
               <span className="min-w-0 flex-1 text-[15px]">Grundpreis je Ticket</span>
-              <input
-                type="number"
-                min={0}
-                inputMode="numeric"
-                aria-label="Grundpreis je Ticket in Euro"
-                className={ZAHL_FELD}
-                value={preis.wert}
-                onChange={(e) => preis.aendern(Math.max(0, Number(e.target.value) || 0))}
-                onBlur={preis.jetztSpeichern}
-              />
-              <span className="w-4 text-[15px] text-tinte-leise">€</span>
+              <ZahlFeld wert={preis.wert} aendern={preis.aendern} speichern={preis.jetztSpeichern} einheit="€" label="Grundpreis je Ticket in Euro" />
             </label>
           </Gruppe>
 
@@ -233,18 +266,7 @@ function VorlageBlatt({
         </label>
         <label className="flex min-h-[48px] items-center gap-3 px-4 py-2">
           <span className="min-w-0 flex-1 text-[15px]">Prozent</span>
-          <input
-            type="number"
-            min={0}
-            max={100}
-            inputMode="numeric"
-            aria-label="Prozent"
-            className={ZAHL_FELD}
-            value={punkte.wert}
-            onChange={(e) => punkte.aendern(Math.max(0, Math.min(100, Number(e.target.value) || 0)))}
-            onBlur={punkte.jetztSpeichern}
-          />
-          <span className="w-4 text-[15px] text-tinte-leise">%</span>
+          <ZahlFeld wert={punkte.wert} aendern={punkte.aendern} speichern={punkte.jetztSpeichern} einheit="%" max={100} label="Prozent" />
         </label>
       </Gruppe>
       <Gruppe fuss="Anpassbar heißt: Der Wert darf beim Eintragen je nach Aufwand geändert werden.">
@@ -320,18 +342,7 @@ function StufenZeile({
         <span className="block text-[15px] font-semibold">ab {stufe.ab} % Mithilfe</span>
         <span className="zahl block text-[12.5px] text-tinte-leise">1. Ticket kostet {grund + betrag.wert} €</span>
       </span>
-      <span className="text-[15px] text-tinte-leise">+</span>
-      <input
-        type="number"
-        min={0}
-        inputMode="numeric"
-        aria-label={`Aufschlag ab ${stufe.ab} Prozent in Euro`}
-        className={ZAHL_FELD}
-        value={betrag.wert}
-        onChange={(e) => betrag.aendern(Math.max(0, Number(e.target.value) || 0))}
-        onBlur={betrag.jetztSpeichern}
-      />
-      <span className="w-4 text-[15px] text-tinte-leise">€</span>
+      <ZahlFeld wert={betrag.wert} aendern={betrag.aendern} speichern={betrag.jetztSpeichern} einheit="€" plus label={`Aufschlag ab ${stufe.ab} Prozent in Euro`} />
     </label>
   );
 }
@@ -356,17 +367,7 @@ function HalbjahrZeile({
         <span className="block text-[15px] font-semibold">{halbjahr}</span>
         {aktuell && <span className="block text-[12.5px] font-medium text-brand-dark dark:text-brand">läuft gerade</span>}
       </span>
-      <input
-        type="number"
-        min={0}
-        inputMode="numeric"
-        aria-label={`Beitrag ${halbjahr} in Euro`}
-        className={ZAHL_FELD}
-        value={wert.wert}
-        onChange={(e) => wert.aendern(Math.max(0, Number(e.target.value) || 0))}
-        onBlur={wert.jetztSpeichern}
-      />
-      <span className="w-4 text-[15px] text-tinte-leise">€</span>
+      <ZahlFeld wert={wert.wert} aendern={wert.aendern} speichern={wert.jetztSpeichern} einheit="€" label={`Beitrag ${halbjahr} in Euro`} />
     </label>
   );
 }

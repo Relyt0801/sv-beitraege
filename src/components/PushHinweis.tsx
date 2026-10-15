@@ -61,7 +61,9 @@ export function PushHinweis({ fuerEltern }: { fuerEltern?: boolean }) {
 
   const sie = fuerEltern;
   return (
-    <div className="card mb-3 flex flex-wrap items-center gap-3 border-brand/40 bg-brand/5 p-3.5">
+    // Deckende Karte (vorher bg-brand/5: auf dem Hintergrundbild schien das
+    // Foto durch, der Text war kaum lesbar) – nur ein blauer Rand hebt sie ab
+    <div className="card mb-3 flex flex-wrap items-center gap-3 !border-brand/30 p-3.5">
       {/* Glocke als Linien-Symbol statt Emoji (Update 1.4, U3) */}
       <span aria-hidden className="symbol bg-[#FF3B30]">
         <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">

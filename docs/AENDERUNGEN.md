@@ -11,6 +11,25 @@ ausführlich (auf Deutsch); hier steht der Überblick dazu.
 
 ---
 
+## Rückmeldung zur Vorschau (15.10.2026, spätabends)
+
+- **Kopfzeile am Laptop entrümpelt**: oben stehen nur noch Titel, der
+  Seiten-Umschalter, ein „+ Person/Neu“ und Hell/Dunkel, Nachtragen, Profil.
+  Filter und „Mehrere auswählen“ der Kasse stehen in der Kopfzeile der Liste
+  (neben „Alle | Nur offene“ und der Suche); Einnahme/Ausgabe am Anfang der
+  Finanzen-Seite neben der Erklärung der Ansicht – nicht mehr neben dem
+  grünen „Nachtragen“. Kein Hinweis-Kästchen mehr beim Darüberfahren (legte
+  sich über die Reiterleiste).
+- **Hinweis-Karten deckend** (`InstallHinweis.tsx`, `PushHinweis.tsx`): vorher
+  7 % Blau – auf dem eigenen Hintergrundbild schien das Foto durch. Ab
+  Tablet-Breite eine Zeile, ✕ oben rechts. „Stufenkasse als App“ steht nur
+  noch auf der eigenen Übersicht, nicht über der Kassenliste/den Beiträgen.
+- **Beiträge**: Werte als Kapsel „+50 €“, „25 €“, „8 %“ (`ZahlFeld`) – Zahl
+  und Einheit auf einer Linie, kein Loch mehr zwischen „+“, Zahl und „€“.
+- **Events → Mitmachen** (`AktionenListe.tsx`): Das „+5 %“-Abzeichen ist fürs
+  Team der Ändern-Knopf; die Fußzeile „… zählt +5 % · Ändern“ (doppelt)
+  entfällt. „N angemeldet“ ist bei voller Schicht grau statt blau.
+
 ## Eine Kopfzeile, Rollen, weniger Scrollen (15.10.2026, abends)
 
 Anlass: Am Laptop stand im geöffneten Chat unter der App-Leiste ein zweites
