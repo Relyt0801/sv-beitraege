@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { appleAberNichtSafari, istApple, useInstall } from "../lib/install";
+import { appleAberNichtSafari, istApple, istMobil, useInstall } from "../lib/install";
 import { useRoleOptional } from "../auth/RoleProvider";
 import { Icon } from "./Icon";
 import { useTourOffen } from "./Tour";
@@ -150,7 +150,8 @@ export function InstallOverlay() {
     const t = setTimeout(() => setBereit(true), 1600);
     return () => clearTimeout(t);
   }, []);
-  const sichtbar = inst.overlayFaellig && bereit && !tourOffen;
+  // Das große Fenster nur auf Handy/Tablet – am Rechner reicht die Karte
+  const sichtbar = inst.overlayFaellig && bereit && !tourOffen && istMobil();
   const zu = () => inst.overlayGesehen();
   // Escape = „Später“; die Seite dahinter bleibt stehen
   useEscapeSchliesst(sichtbar, zu);

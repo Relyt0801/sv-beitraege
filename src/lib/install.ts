@@ -59,6 +59,20 @@ export function istApple(): boolean {
 }
 
 /** Auf dem iPhone/iPad kann NUR Safari installieren – Chrome und Firefox dort nicht. */
+/**
+ * Handy oder Tablet (Touch als Hauptbedienung)? Am Laptop/PC ist „auf den
+ * Home-Bildschirm legen“ unnötig – dort soll nichts den Login verdecken.
+ */
+export function istMobil(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    if (window.matchMedia("(pointer: coarse)").matches) return true;
+  } catch {
+    /* alter Browser */
+  }
+  return istApple() || /Android|Mobi/i.test(navigator.userAgent || "");
+}
+
 export function appleAberNichtSafari(): boolean {
   if (!istApple()) return false;
   const ua = navigator.userAgent || "";

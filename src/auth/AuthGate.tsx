@@ -2,7 +2,8 @@ import { useEffect, useState, type ReactNode } from "react";
 import { hasSupabase, supabase, usernameToEmail } from "../lib/supabase";
 import { pushConfigured, pushSupported } from "../lib/push";
 import { RechtLinks } from "../components/Rechtliches";
-import { InstallKarte, InstallOverlay } from "../components/InstallHinweis";
+import { InstallKarte } from "../components/InstallHinweis";
+import { istMobil } from "../lib/install";
 import { Schalter } from "../components/Schalter";
 import { OfflineBand } from "../components/Verbindung";
 import { fehlerText, istNetzfehler, OFFLINE_TEXT } from "../lib/netz";
@@ -273,10 +274,15 @@ function LoginForm() {
           sehen bekommt – und auf iPhone/iPad hat die installierte App einen
           eigenen Speicher. Wer sich erst anmeldet und dann installiert, steht
           in der App wieder vor dem Anmeldeformular. */}
-      <div className="mb-6 [&:empty]:hidden">
-        <InstallKarte />
-      </div>
-      <InstallOverlay />
+      {/* Nur am Handy, und nur als Karte – kein Fenster mehr über dem
+          Anmeldeformular (14.10.: Das Fenster ging am Laptop beim Tippen auf
+          und hat den Login blockiert). Das große Fenster kommt erst nach dem
+          Anmelden in der App. */}
+      {istMobil() && (
+        <div className="mb-6 [&:empty]:hidden">
+          <InstallKarte />
+        </div>
+      )}
 
       <AnmeldeKopf titel="Stufenkasse" unter="Melde dich mit den Zugangsdaten an, die du vom Stufenteam bekommen hast." />
 
