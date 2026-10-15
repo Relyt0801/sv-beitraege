@@ -48,6 +48,7 @@ import { HintergrundEbene } from "./components/HintergrundEbene";
 import { InstallKarte, InstallOverlay } from "./components/InstallHinweis";
 import { useGescrollt, useHoeheAlsVariable, useReiter } from "./lib/gescrollt";
 import { GlasLeiste } from "./components/GlasLeiste";
+import { MottoEnthuellung } from "./components/MottoEnthuellung";
 import { Schalter } from "./components/Schalter";
 import { AlbumProvider } from "./components/Album";
 import { FunktionenProvider } from "./lib/funktionen";
@@ -850,6 +851,8 @@ function Main() {
         </nav>
       )}
 
+      {/* Enthüllung des Abimottos – einmal pro Person, sobald es feststeht */}
+      <MottoEnthuellung />
       <StudentSheet student={openStudent} punkte={punkte[openStudent?.id ?? ""] || 0} onClose={() => setOpenId(null)} />
       <AddSheet open={showAdd} onClose={() => setShowAdd(false)} />
       <EventComposer

@@ -19,6 +19,8 @@ import { useFunktionen } from "../lib/funktionen";
 import { LiedSuche, SpotifyKarte, ohneLink, spotifyAus } from "./Spotify";
 import { FarbKarte, KleinerRing, KnopfGlas, KnopfHell } from "./Kachel";
 import { WortfilterSchalter } from "./AutorInfo";
+import { TeilMarke, TeilUmschalter } from "./TeilUmschalter";
+import { TEIL_NAME, useTeil, useVerschiebungen, type Teil } from "../lib/teile";
 import { AusHinweis } from "./Funktionen";
 import { GesperrtZeile, GESPERRT_TEXT } from "./Gesperrt";
 import { MeldenKnopf } from "./Melden";
@@ -475,7 +477,15 @@ function SteckbriefAnsicht({
   const s: Steckbrief | undefined = album.steckbriefVon(id);
   const ich = studentId === id;
   const darfSchreiben = !ich && !!studentId && !!s && (s.freigabe === "alle" || (s.freigabe === "gezielt" && s.freigabe_an.includes(studentId)));
-  const kommentare = album.kommentare.filter((k) => k.student_id === id);
+  // Kommentare haben zwei Teile: offiziell (kommt ins Abibuch) und
+  // inoffiziell (nur für die Stufe). Oben umschalten, geschrieben wird in den
+  // offenen Teil. Moderation kann mit Zustimmungen verschieben.
+  const [teil, setTeil] = useTeil("kommentare");
+  const alleKommentare = album.kommentare.filter((k) => k.student_id === id);
+  const kommentare = alleKommentare.filter((k) => (k.bereich ?? "inoffiziell") === teil);
+  const zahlTeil = (t: Teil) => alleKommentare.filter((k) => (k.bereich ?? "inoffiziell") === t).length;
+  const darfVerschieben = can("album.moderieren");
+  const vs = useVerschiebungen("album_kommentare", darfVerschieben, album.neuLaden);
   const gelikt = album.likes.some((l) => l.student_id === id && l.user_id === album.me);
   const likes = album.likes.filter((l) => l.student_id === id).length;
   const [neu, setNeu] = useState("");
@@ -489,7 +499,7 @@ function SteckbriefAnsicht({
   async function senden() {
     if (!neu.trim()) return;
     setSendet(true);
-    const f = await album.kommentieren(id, neu, meinName);
+    const f = await album.kommentieren(id, neu, meinName, teil);
     setSendet(false);
     if (f) return meldeFehler("Ging nicht: " + f);
     setNeu("");
@@ -516,7 +526,7 @@ function SteckbriefAnsicht({
         </h2>
         <div className="mt-2 flex items-center gap-4">
           <Herz an={gelikt} n={likes} onClick={() => void album.liken(id)} />
-          <span className="text-[14px] font-semibold text-tinte-leise">💬 {kommentare.length}</span>
+          <span className="text-[14px] font-semibold text-tinte-leise">💬 {alleKommentare.length}</span>
           {ich && (
             <button onClick={bearbeiten} className="rounded-full bg-brand/10 px-3 py-1 text-[13px] font-semibold text-brand-dark dark:text-brand">
               Bearbeiten
@@ -592,8 +602,13 @@ function SteckbriefAnsicht({
       )}
 
       {/* Kommentare */}
-      <h3 className="mb-2 mt-6 px-1 text-[12px] font-semibold uppercase tracking-[0.04em] text-tinte-leise">Kommentare</h3>
-      {kommentare.length === 0 && <p className="px-1 text-[13.5px] text-tinte-leise">Sei die erste Person, die etwas schreibt.</p>}
+      <h3 className="mb-2 mt-6 px-1 text-[13px] font-normal uppercase tracking-[0.02em] text-tinte-leise">Kommentare</h3>
+      <TeilUmschalter teil={teil} setTeil={setTeil} zahlen={{ offiziell: zahlTeil("offiziell"), inoffiziell: zahlTeil("inoffiziell") }} className="mb-4" />
+      {kommentare.length === 0 && (
+        <p className="px-1 text-[13.5px] text-tinte-leise">
+          {teil === "offiziell" ? "Noch kein offizieller Kommentar – der kommt später ins Abibuch." : "Sei die erste Person, die etwas schreibt."}
+        </p>
+      )}
       <ul className="space-y-3.5">
         {kommentare.map((k) => {
           const an = album.klikes.some((l) => l.kommentar_id === k.id && l.user_id === album.me);
@@ -610,6 +625,34 @@ function SteckbriefAnsicht({
                   <span>{vorWann(k.created_at)}</span>
                   {n > 0 && <span className="font-semibold">{n} „Gefällt mir“</span>}
                   {k.user_id !== album.me && <MeldenKnopf onClick={() => melden("kommentar", k.id)} />}
+                  {darfVerschieben &&
+                    (() => {
+                      const antrag = vs.antragZu(k.id);
+                      const nach: Teil = (k.bereich ?? "inoffiziell") === "offiziell" ? "inoffiziell" : "offiziell";
+                      if (antrag)
+                        return (
+                          <button
+                            className="font-semibold text-brand"
+                            disabled={antrag.ich}
+                            onClick={() => void vs.zustimmen(antrag.id)}
+                            title={`Nach „${TEIL_NAME[antrag.nach]}“ verschieben – Zustimmungen`}
+                          >
+                            {antrag.ich ? `Verschieben ${antrag.stimmen}/${antrag.noetig}` : `Zustimmen ${antrag.stimmen}/${antrag.noetig}`}
+                          </button>
+                        );
+                      return (
+                        <button
+                          className="font-semibold"
+                          onClick={() =>
+                            void frage(`Diesen Kommentar nach „${TEIL_NAME[nach]}“ verschieben? Das braucht Zustimmungen aus dem Team.`, "Verschieben").then((ok) => {
+                              if (ok) void vs.beantragen(k.id, nach);
+                            })
+                          }
+                        >
+                          Nach {TEIL_NAME[nach]}
+                        </button>
+                      );
+                    })()}
                   {darfEntfernen(k) && (
                     <button
                       className="font-semibold"
@@ -638,7 +681,7 @@ function SteckbriefAnsicht({
         <div className="flex items-center gap-2">
           <input
             className="field flex-1 !rounded-full"
-            placeholder={`Kommentar zu ${p.vorname} …`}
+            placeholder={`${TEIL_NAME[teil]}er Kommentar zu ${p.vorname} …`}
             value={neu}
             maxLength={500}
             onChange={(e) => setNeu(e.target.value)}
@@ -1061,6 +1104,7 @@ export function KategorienSheet({ open, album, onClose }: { open: boolean; album
       <div className="mb-4 space-y-2">
         <WortfilterSchalter bereich="steckbrief" />
         <WortfilterSchalter bereich="kommentare" />
+        <WortfilterSchalter bereich="kommentare_inoffiziell" />
       </div>
       <Gruppe>
         {album.kategorien.map((k, i) =>

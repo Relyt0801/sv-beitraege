@@ -1,4 +1,4 @@
-# Änderungen – Stand 13.10.2026
+# Änderungen – Stand 15.10.2026
 
 Diese Datei erklärt, was sich in den letzten Runden geändert hat, **wo** es im
 Code steht und **warum** es so gebaut ist. Die Kommentare im Code selbst sind
@@ -11,6 +11,22 @@ ausführlich (auf Deutsch); hier steht der Überblick dazu.
 
 ---
 
+
+## 15.10.2026: Update 1.4 (Vorschau-Branch `update-1-4`)
+
+- **Design-Grundlagen** (`index.css`, `Liste.tsx`, `Sheet.tsx`): weiße Zellen auf grauem Grund wie in den iOS-Einstellungen (Variable `--zelle`, Klasse `zelle`), Blätter mit grauem Grund, Eingabefelder als weiße Zellen mit Haarlinie. Graue 8-%-Flächen sind ersetzt.
+- **Reiterleiste aus Glas** (`GlasLeiste.tsx`): schwebende Kapsel unten (Handy) bzw. oben (Laptop/iPad); eine gläserne Linse gleitet federnd zum gewählten Reiter, mit Maus folgt eine leichte Linse dem Zeiger.
+- **Offiziell / Inoffiziell** (`supabase/offiziell-inoffiziell.sql`, `lib/teile.ts`, `TeilUmschalter.tsx`): Rankings, Zitate, Mottos und Steckbrief-Kommentare haben zwei Teile. Bestand = inoffiziell. Wortfilter je Teil (offiziell Standard an, inoffiziell aus). Verschieben nur über `verschieben_beantragen` mit Zustimmungen (Freigaben → „Verschieben“, Standard 3; Admin allein reicht); direktes Ändern blockt der Trigger `bereich_schuetzen`. Eltern sehen keinen der beiden Teile.
+- **Gewinner küren** (`gewinner`-Tabelle, `Gewinner.tsx`): Gewinner + „Gewinner der Herzen“ je Teil bzw. je Ranking-Kategorie, groß oben angezeigt. Das offizielle Motto setzt zugleich `gewaehlt`.
+- **Motto-Enthüllung** (`MottoEnthuellung.tsx`, RPC `motto_enthuellung()`): Variante „Bühne“; einmal pro Person und Motto beim nächsten Öffnen, auch für Eltern. Demo: `?enthuellung=1`.
+- **Verwaltung in den Kacheln** (`KachelVerwaltung.tsx`): „Wer darf was?“ direkt im Einstellungs-Blatt von Motto, Zitate, Rankings; diese Rechte sind aus dem Rechte-Reiter ausgeblendet.
+- **Motto, Zitate, Rankings neu geordnet**: Stand-Karte oben (Runde läuft / Gewinner), Segment „Vorschläge | Ergebnis“, EIN Zahnrad-Blatt mit allen Einstellungen. Runden-Bausteine `RundenStandKarte`, `RundenEinstellungen`, `RundenErgebnisBlatt` (`Runden.tsx`).
+- **Eigene Antwort** (`supabase/abstimmung-sonstiges.sql`, `supabase/umfrage-eigene-antwort.sql`, `Freitext.tsx`, `Umfragen.tsx`): In Chat-Abstimmungen und Pop-up-Umfragen kann man ankreuzen und/oder „Eigene Antwort“ mit Text geben; gleiche Texte werden gruppiert.
+- **Chats**: Übersicht als bunte Kacheln (Anfragen, Stufenteam, Schüler, Eltern, Infos, Komitees); ein geöffneter Chat ist eine Vollbild-Ebene mit einer Glas-Kopfleiste und darunter „Chat | Übersicht“.
+- **Events**: gleichartige Termine/Beiträge (z. B. Waffelverkauf) als aufklappbare Gruppen, Ältere eingeklappt. „Ins Handy übernehmen“ ist vorübergehend aus (`KALENDER_SYNC_AN` in `lib/kalender-sync.ts`).
+- **Ohne Internet** (`lib/netz.ts`, `Verbindung.tsx`): verständliche Meldungen statt „Failed to fetch“, Lade-Zustand beim Anmelden, Offline-Band, Zeitlimit für Anfragen.
+- **Hintergrundbild** (`lib/hintergrund.ts`): Server ist die Wahrheit; Cache wird beim Start und beim Wieder-Öffnen abgeglichen – auf allen Geräten gleich.
+- **Speicherwächter** (`supabase/speicherwaechter.sql`, `LoeschfristenSheet.tsx`): Speicher-Anzeige; Chats müssen nicht gelöscht werden. Not-Aufräumen nur über 80 % – Teil B (mit Löschbefehl) muss noch im SQL-Editor eingespielt werden, bis dahin misst der Wächter nur.
 
 ## 13.10.2026: Freie Antworten, Spotify-Knopf
 

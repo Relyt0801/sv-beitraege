@@ -1,3 +1,4 @@
+import { MottoEnthuellung } from "./MottoEnthuellung";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { SkelettKarten } from "./Skelett";
 import { HY } from "../lib/types";
@@ -160,6 +161,8 @@ export function ElternApp() {
 
   return (
     <div className="min-h-dvh bg-papier pb-32 dark:bg-slate-950 lg:pb-10">
+      {/* Das feststehende Abimotto sehen auch Eltern einmal groß */}
+      <MottoEnthuellung />
       <header
         className={`sticky top-0 z-20 px-4 pb-2 pt-[calc(env(safe-area-inset-top)+0.5rem)] transition-[background-color,box-shadow] duration-300 ${
           gescrollt ? "glas shadow-[0_0.5px_0_rgba(0,0,0,.18)] dark:shadow-[0_0.5px_0_rgba(255,255,255,.15)]" : "kopf-grund bg-papier dark:bg-slate-950"

@@ -1,5 +1,6 @@
 import { hatVerlassen } from "./logic";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { Teil } from "./teile";
 import { hasSupabase, supabase } from "./supabase";
 import { abonniere } from "./realtime";
 import { pushAlbum } from "./push";
@@ -46,6 +47,8 @@ export interface AlbumKommentar {
   autor_name: string;
   text: string;
   created_at: string;
+  /** offiziell (kommt ins Abibuch) oder inoffiziell (nur Stufe) – seit 1.4 */
+  bereich?: Teil;
 }
 
 export interface AlbumPerson {
@@ -180,7 +183,7 @@ export function useAlbum(aktiv: boolean, uid: string | null, meineStudentId: str
       sb.rpc("album_personen"),
       sb.from("album_kategorien").select("*").order("sort"),
       sb.from("album_steckbriefe").select("*"),
-      sb.from("album_kommentare").select("id, student_id, user_id, autor_name, text, created_at").order("created_at").limit(3000),
+      sb.from("album_kommentare").select("id, student_id, user_id, autor_name, text, created_at, bereich").order("created_at").limit(3000),
       sb.from("album_likes").select("student_id, user_id").eq("an", true),
       sb.from("album_kommentar_likes").select("kommentar_id, user_id").eq("an", true),
     ]);
@@ -338,7 +341,7 @@ export function useAlbum(aktiv: boolean, uid: string | null, meineStudentId: str
   );
 
   const kommentieren = useCallback(
-    async (studentId: string, text: string, vonName: string): Promise<string | null> => {
+    async (studentId: string, text: string, vonName: string, bereich: Teil = "inoffiziell"): Promise<string | null> => {
       const t = text.trim();
       if (!t) return null;
       if (!hasSupabase) {
@@ -350,11 +353,12 @@ export function useAlbum(aktiv: boolean, uid: string | null, meineStudentId: str
             autor_name: vonName,
             text: t.slice(0, 500),
             created_at: new Date().toISOString(),
+            bereich,
           });
         });
         return null;
       }
-      const { data: neu, error } = await supabase!.from("album_kommentare").insert({ student_id: studentId, text: t.slice(0, 500) }).select("id").single();
+      const { data: neu, error } = await supabase!.from("album_kommentare").insert({ student_id: studentId, text: t.slice(0, 500), bereich }).select("id").single();
       if (error) return error.message;
       if (studentId !== meineStudentId && neu) void pushAlbum({ art: "kommentar", kommentar_id: (neu as { id: string }).id });
       await laden();
