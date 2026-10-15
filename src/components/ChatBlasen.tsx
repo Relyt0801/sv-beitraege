@@ -928,7 +928,7 @@ export function ChatKopf({
             Pinnwand da ist (vorher sprang er um 89 px). */}
         <div className="ml-auto flex shrink-0 items-center gap-2">
           {rechts}
-          {children && <div className="w-[17rem]">{children}</div>}
+          {children && <div className="w-[19rem]">{children}</div>}
         </div>
       </div>
     );

@@ -1,4 +1,4 @@
-import { useCallback, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
 /**
  * Reiterleiste aus Glas wie in iPadOS/iOS 26:
@@ -85,6 +85,7 @@ export function GlasLeiste<K extends string>({
   }, [aktiv, reiter.length, rahmenVon]);
 
   const unten = variante === "unten";
+  const zahlId = useId();
   // Viele Reiter (Admin: 7) auf schmalem Handy: Schrift bleibt bei 10 px (kleiner
   // wird es unleserlich), dafür weniger Innenabstand und engerer Buchstabenabstand –
   // gekürzt („Finanz…“) wird nichts mehr.
@@ -143,6 +144,8 @@ export function GlasLeiste<K extends string>({
             aria-selected={an}
             aria-current={an ? "page" : undefined}
             aria-label={r.label}
+            // Die Zahl als Beschreibung („Chats, 5 neu“) – der Name bleibt der Reiter
+            aria-describedby={(r.badge ?? 0) > 0 ? `${zahlId}-${String(r.key)}` : undefined}
             data-tour={r.tour}
             onClick={() => onWahl(r.key, true)}
             onPointerEnter={(e) => {
@@ -164,8 +167,9 @@ export function GlasLeiste<K extends string>({
               {r.icon}
               {/* Handy: Zahl am Symbol (absolut, ändert keine Breite) */}
               {unten && (r.badge ?? 0) > 0 && (
-                <span className="absolute -right-3 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#FF3B30] px-1 text-[12px] font-semibold text-white ring-2 ring-[rgb(var(--glas))]">
+                <span id={`${zahlId}-${String(r.key)}`} className="absolute -right-3 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#FF3B30] px-1 text-[12px] font-semibold text-white ring-2 ring-[rgb(var(--glas))]">
                   {r.badge! > 9 ? "9+" : r.badge}
+                  <span className="sr-only"> neu</span>
                 </span>
               )}
             </span>
@@ -175,8 +179,9 @@ export function GlasLeiste<K extends string>({
                 Beschriftung, aber ohne Platz im Textfluss. Sie liegt im
                 Innenabstand der Leiste und wird deshalb nicht abgeschnitten. */}
             {!unten && (r.badge ?? 0) > 0 && (
-              <span className="pointer-events-none absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#FF3B30] px-1 text-[12px] font-semibold leading-none text-white ring-2 ring-[rgb(var(--glas))]">
+              <span id={`${zahlId}-${String(r.key)}`} className="pointer-events-none absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#FF3B30] px-1 text-[12px] font-semibold leading-none text-white ring-2 ring-[rgb(var(--glas))]">
                 {r.badge! > 9 ? "9+" : r.badge}
+                <span className="sr-only"> neu</span>
               </span>
             )}
           </button>

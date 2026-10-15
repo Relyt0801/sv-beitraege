@@ -655,7 +655,7 @@ function ErgebnisKacheln({
                   )}
                   {h && (
                     <span className="flex items-center gap-1 truncate rounded-full bg-[#FF4F7B]/15 px-2 py-0.5 text-[12px] font-bold text-[#C2185B] dark:text-[#FF8FB1]">
-                      ♥ <span className="truncate">{h.label}</span>
+                      <Icon name="herz" size={12} strich={2.4} /> <span className="truncate">{h.label}</span>
                     </span>
                   )}
                 </span>
