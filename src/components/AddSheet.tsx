@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { HY, type Halbjahr } from "../lib/types";
 import { useStore } from "../store";
-import { Sheet } from "./Sheet";
-import { Gruppe, KopfBild, RechnungKopf, ZeileEingabe, ZeileSegmente } from "./Liste";
+import { Sheet, SheetKopf } from "./Sheet";
+import { Gruppe, ZeileEingabe, ZeileSegmente } from "./Liste";
 
 export function AddSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { addStudent } = useStore();
@@ -21,8 +21,8 @@ export function AddSheet({ open, onClose }: { open: boolean; onClose: () => void
 
   return (
     <Sheet open={open} onClose={onClose}>
-      <div className="mx-auto max-w-md">
-        <RechnungKopf bild={<KopfBild text="＋" />} oben="Person hinzufügen" titel={`${vorname} ${nachname}`.trim() || " "} onClose={onClose} />
+      <div>
+        <SheetKopf titel="Person hinzufügen" unter={`${vorname} ${nachname}`.trim() || undefined} onClose={onClose} />
 
         <Gruppe titel="Name">
           <ZeileEingabe label="Nachname" value={nachname} onChange={setNachname} placeholder="Pflicht" autoFocus onEnter={submit} />

@@ -5,6 +5,7 @@ import { useProfiles } from "../profiles-store";
 import { useRole } from "../auth/RoleProvider";
 import { committeeIcon, committeeLabel } from "../lib/committees";
 import { Avatar } from "./Avatar";
+import { Icon } from "./Icon";
 import { AnfrageSheet } from "./AnfrageSheet";
 import { tagLang, uhr, type TerminAnfrage } from "../lib/termine";
 
@@ -40,22 +41,24 @@ export function AnfragenFuerTeam({ onUebernehmen }: { onUebernehmen: (a: TerminA
   return (
     <div id="sprung-termin" className="mb-4 grid gap-2.5">
       {offen.map((a) => (
-        <div key={a.id} className="card border-brand/40 p-4">
+        <div key={a.id} className="card p-4">
           <div className="flex items-start gap-2.5">
             <Avatar userId={a.created_by} size={36} />
             <div className="min-w-0 flex-1">
-              <div className="text-[15px] font-bold">
-                Terminanfrage {committeeIcon(a.tag)} {committeeLabel(a.tag)}
+              <div className="text-[13px] font-semibold uppercase tracking-[0.02em] text-brand-dark dark:text-brand">
+                Terminanfrage · {committeeLabel(a.tag)}
               </div>
-              <div className="mt-0.5 text-[13px] text-tinte-matt dark:text-slate-300">
-                <b>{a.titel}</b>
+              <div className="mt-0.5 text-[17px] font-semibold leading-snug">
+                {a.titel}
+              </div>
+              <div className="text-[14px] text-tinte-matt dark:text-slate-300">
+                {wann(a)}
                 {a.ort ? ` · ${a.ort}` : ""}
               </div>
-              <div className="text-[13px] text-tinte-matt dark:text-slate-300">{wann(a)}</div>
               {a.nachricht && (
-                <div className="mt-1 text-[13px] text-tinte-matt dark:text-slate-300">„{a.nachricht}"</div>
+                <div className="mt-1 text-[14px] text-tinte-matt dark:text-slate-300">„{a.nachricht}"</div>
               )}
-              <div className="mt-1 text-[11px] text-tinte-leise">
+              <div className="mt-1 text-[12px] text-tinte-leise">
                 von {profile[a.created_by]?.anzeigename || "Unbekannt"} ·{" "}
                 {new Date(a.created_at).toLocaleString("de-DE")}
               </div>
@@ -78,7 +81,7 @@ export function AnfragenFuerTeam({ onUebernehmen }: { onUebernehmen: (a: TerminA
                     setAblehnen(null);
                     setGrund("");
                   }}
-                  className="flex-1 rounded-xl border border-papier-linie py-2 text-sm font-bold text-tinte-matt dark:border-slate-700"
+                  className="btn-klein-grau flex-1 !min-h-[2.75rem]"
                 >
                   Zurück
                 </button>
@@ -92,7 +95,7 @@ export function AnfragenFuerTeam({ onUebernehmen }: { onUebernehmen: (a: TerminA
                     setGrund("");
                     if (f) meldeFehler("Fehler: " + f);
                   }}
-                  className="flex-1 rounded-xl border border-red-300 py-2 text-sm font-bold text-red-500 dark:border-red-500/40"
+                  className="btn-klein-grau flex-1 !min-h-[2.75rem] !text-red-600 dark:!text-red-400"
                 >
                   Absagen
                 </button>
@@ -102,7 +105,7 @@ export function AnfragenFuerTeam({ onUebernehmen }: { onUebernehmen: (a: TerminA
             <div className="mt-3 flex gap-2">
               <button
                 onClick={() => setAblehnen(a.id)}
-                className="flex-1 rounded-xl border border-papier-linie py-2 text-sm font-bold text-tinte-matt dark:border-slate-700"
+                className="btn-klein-grau flex-1 !min-h-[2.75rem]"
               >
                 Ablehnen
               </button>
@@ -120,7 +123,7 @@ export function AnfragenFuerTeam({ onUebernehmen }: { onUebernehmen: (a: TerminA
                   }
                   onUebernehmen(a);
                 }}
-                className="flex-1 rounded-xl bg-brand py-2 text-sm font-bold text-white disabled:opacity-40"
+                className="btn-klein flex-1 !min-h-[2.75rem]"
               >
                 {!zu.allein && zu.noetig > 1 && !zu.ichSchon(a.id) && zu.zahl(a.id) + 1 < zu.noetig ? "Zustimmen" : "Übernehmen"}
               </button>
@@ -155,35 +158,34 @@ export function MeineAnfragen() {
   return (
     <>
       <div className="mb-4 card p-4">
-        <div className="flex items-center gap-2.5">
-          <span className="shrink-0 text-[15px]">🪑</span>
+        <div className="flex items-center gap-3">
+          <span aria-hidden className="symbol shrink-0 bg-brand">
+            <Icon name="kalender" size={17} strich={2.2} />
+          </span>
           <div className="min-w-0 flex-1">
-            <div className="truncate text-[14px] font-bold">
+            <div className="truncate text-[15px] font-semibold">
               Vorsitz {meineVorsitze.map(committeeLabel).join(" · ")}
             </div>
-            <div className="text-[12px] text-tinte-leise">
+            <div className="text-[13px] text-tinte-leise">
               Du kannst Termine beim Stufenteam anfragen.
             </div>
           </div>
-          <button
-            onClick={() => setFormOffen(true)}
-            className="shrink-0 rounded-xl bg-brand px-3 py-2 text-[13px] font-bold text-white"
-          >
+          <button onClick={() => setFormOffen(true)} className="btn-klein shrink-0">
             Anfragen
           </button>
         </div>
 
         {meine.length > 0 && (
-          <div className="mt-3 grid gap-1.5 border-t border-papier-linie pt-3 dark:border-slate-700">
+          <div className="mt-3 grid gap-1 border-t border-black/[0.08] pt-2 dark:border-white/[0.1]">
             {meine.map((a) => (
-              <div key={a.id} className="flex flex-wrap items-center gap-2 text-[13px]">
+              <div key={a.id} className="flex min-h-[44px] flex-wrap items-center gap-2 text-[14px]">
                 <span
-                  className={`shrink-0 rounded-md px-1.5 py-0.5 text-[11px] font-bold ${
+                  className={`shrink-0 rounded-full px-2.5 py-0.5 text-[12px] font-bold ${
                     a.status === "offen"
-                      ? "bg-papier-matt text-tinte-matt dark:bg-slate-800 dark:text-slate-300"
+                      ? "bg-[rgb(118_118_128/0.12)] text-tinte-matt dark:bg-[rgb(118_118_128/0.24)] dark:text-slate-300"
                       : a.status === "angenommen"
-                        ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400"
-                        : "bg-red-100 text-red-600 dark:bg-red-500/15 dark:text-red-400"
+                        ? "bg-bezahlt-grund text-bezahlt"
+                        : "bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-400"
                   }`}
                 >
                   {a.status === "offen" ? "wartet" : a.status === "angenommen" ? "im Kalender" : "abgelehnt"}
@@ -197,8 +199,8 @@ export function MeineAnfragen() {
                     onClick={async () => {
                       if (await frage(`Die Anfrage „${a.titel}" zurücknehmen?`, "Zurücknehmen", true)) void anfrageLoeschen(a.id);
                     }}
-                    className="shrink-0 text-tinte-leise hover:text-red-500"
-                    aria-label="Zurücknehmen"
+                    className="-mr-2 flex h-11 w-11 shrink-0 items-center justify-center text-tinte-leise active:opacity-50"
+                    aria-label={`Anfrage „${a.titel}“ zurücknehmen`}
                   >
                     ✕
                   </button>

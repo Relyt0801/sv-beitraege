@@ -62,19 +62,22 @@ function useName(n: Nachtrag) {
 function NachtragKarte({ n, onOpen }: { n: Nachtrag; onOpen: () => void }) {
   const name = useName(n);
   return (
-    <button onClick={onOpen} className="card flex w-full items-center gap-3 p-4 text-left transition active:scale-[.99]">
-      <Avatar userId={n.user_id} name={name} size={36} />
-      <span className="min-w-0 flex-1">
-        <span className="block truncate text-[15px] font-bold">{name}</span>
-        <span className="block truncate text-[12.5px] text-tinte-matt dark:text-slate-300">
-          🙌 {n.titel} · {tagLang(n.datum)}
+    // Eine Zelle wie in den iOS-Einstellungen: ganze Zeile antippbar, Wert rechts, Pfeil
+    <div className="gruppe-zellen">
+      <button onClick={onOpen} className="flex min-h-[60px] w-full items-center gap-3 px-4 py-2.5 text-left transition active:bg-black/[0.04] dark:active:bg-white/[0.06]">
+        <Avatar userId={n.user_id} name={name} size={36} />
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-[15px] font-semibold">{name}</span>
+          <span className="block truncate text-[13px] text-tinte-matt dark:text-slate-300">
+            {n.titel} · {tagLang(n.datum)}
+          </span>
         </span>
-      </span>
-      <span className="zahl shrink-0 rounded-full bg-brand/10 px-2 py-0.5 text-[12px] font-bold text-brand dark:bg-brand/20">
-        {n.punkte !== null ? `+${n.punkte} %` : "% ?"}
-      </span>
-      <span className="text-slate-300">›</span>
-    </button>
+        <span className="zahl shrink-0 rounded-full bg-brand/10 px-2.5 py-0.5 text-[13px] font-bold text-brand-dark dark:bg-brand/20 dark:text-brand">
+          {n.punkte !== null ? `+${n.punkte} %` : "% ?"}
+        </span>
+        <span aria-hidden className="shrink-0 text-[17px] leading-none text-tinte-leise">›</span>
+      </button>
+    </div>
   );
 }
 
@@ -134,11 +137,11 @@ function NachtragEntscheiden({ n, onClose }: { n: Nachtrag; onClose: () => void 
                 max={100}
                 aria-label="Wert in Prozent"
                 placeholder="?"
-                className="w-16 rounded-lg bg-white px-2 py-1 text-right text-[15px] font-bold text-brand outline-none dark:bg-slate-800"
+                className="w-20 rounded-lg bg-[rgb(118_118_128/0.12)] px-2 py-1.5 text-right text-[16px] font-bold text-brand-dark outline-none focus:ring-2 focus:ring-brand/40 dark:bg-[rgb(118_118_128/0.24)] dark:text-brand"
                 value={wert}
                 onChange={(e) => setWert(e.target.value)}
               />
-              <span className="text-[15px] font-bold text-brand">%</span>
+              <span className="text-[15px] font-bold text-brand-dark dark:text-brand">%</span>
             </span>
           </Zeile>
         </Gruppe>
@@ -158,22 +161,14 @@ function NachtragEntscheiden({ n, onClose }: { n: Nachtrag; onClose: () => void 
         {fehler && <p className="mt-3 text-center text-[13px] font-semibold text-red-600">Das hat nicht geklappt: {fehler}</p>}
 
         <div className="mt-4 flex gap-2">
-          <button
-            disabled={busy}
-            onClick={() => void los(false)}
-            className="flex-1 rounded-2xl bg-[rgb(118_118_128/0.12)] py-3 text-[15px] font-bold text-red-600 transition active:scale-[.98] disabled:opacity-40 dark:bg-[rgb(118_118_128/0.24)] dark:text-red-400"
-          >
+          <button disabled={busy} onClick={() => void los(false)} className="btn-grau flex-1 !text-red-600 dark:!text-red-400">
             Ablehnen
           </button>
-          <button
-            disabled={busy || !wertOk}
-            onClick={() => void los(true)}
-            className="flex-[1.4] rounded-2xl bg-brand py-3 text-[15px] font-bold text-white transition active:scale-[.98] disabled:opacity-40"
-          >
+          <button disabled={busy || !wertOk} onClick={() => void los(true)} className="btn-primary flex-[1.4]">
             {wertOk ? `Annehmen (+${Math.round(zahl)} %)` : "Wert angeben"}
           </button>
         </div>
-        <p className="mt-2 text-center text-[11.5px] text-tinte-leise">
+        <p className="mt-2.5 text-center text-[12.5px] leading-snug text-tinte-leise">
           Annehmen trägt die Mithilfe mit dem Datum des Antrags ein. {name.split(" ")[0]} bekommt Bescheid.
         </p>
       </div>

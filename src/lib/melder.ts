@@ -88,7 +88,7 @@ export function meldeFehler(eingabe: string | unknown): void {
   if (/gerade gesperrt|row-level security/i.test(text)) {
     sperrePruefen();
     if (gesperrt || /gerade gesperrt/i.test(text)) {
-      melde("Du bist gerade gesperrt und kannst nichts schreiben, einreichen oder abstimmen.", "fehler");
+      melde("Dieses Konto ist gerade gesperrt: Schreiben, Einreichen und Abstimmen sind nicht möglich.", "fehler");
       return;
     }
   }

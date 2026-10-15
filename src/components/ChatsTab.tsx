@@ -26,7 +26,9 @@ import { useZaehltMit } from "../lib/chat-zaehler";
 import { FotoFreigaben } from "./FotoFreigaben";
 import { FarbKachel } from "./Kachel";
 import { Gruppe } from "./Liste";
-import { Icon } from "./Icon";
+import { Icon, type IconName } from "./Icon";
+import { ZustimmungsMarke } from "./ZustimmungsMarke";
+import { TABELLE_NAME, TEIL_NAME, useAlleVerschiebungen, type Verschiebung, type TeilTabelle } from "../lib/teile";
 import { sprungAusHash, type Sprungziel } from "../lib/sprung";
 const TEAM_CHAT_TITLE = "Stufenteam";
 
@@ -412,7 +414,8 @@ function Glocke({ an, setAn, name }: { an: boolean; setAn: (an: boolean) => void
       aria-checked={an}
       aria-label={`Mitteilungen für ${name}`}
       title={an ? "Mitteilungen an – antippen zum Ausschalten" : "Mitteilungen aus – antippen zum Einschalten"}
-      className={`flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-[11.5px] font-bold transition active:scale-95 ${
+      // after: unsichtbar vergrößerte Trefferfläche (die Kapsel selbst bleibt klein und ruhig)
+      className={`relative flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-[12px] font-bold transition after:absolute after:-inset-x-1 after:-inset-y-3 after:content-[''] active:scale-95 ${
         an
           ? "bg-brand/[0.08] text-[#004f9e] dark:bg-brand/20 dark:text-brand-soft"
           : "bg-[rgb(118_118_128/0.12)] text-tinte-matt dark:bg-[rgb(118_118_128/0.24)] dark:text-slate-300"
@@ -480,11 +483,13 @@ function MitteilungsGruppe({ an, setAn, name, fuss }: { an: boolean; setAn: (an:
   );
 }
 
-/** Leerer Zustand einer Unterseite: Symbol, ein Satz, was als Nächstes passiert. */
-function Leer({ icon, text }: { icon: string; text: string }) {
+/** Leerer Zustand einer Unterseite: Liniensymbol, ein Satz, was als Nächstes passiert. */
+function Leer({ icon, text }: { icon: IconName; text: string }) {
   return (
     <div className="flex flex-col items-center px-8 py-12 text-center">
-      <span aria-hidden className="text-[40px] leading-none">{icon}</span>
+      <span aria-hidden className="flex h-14 w-14 items-center justify-center rounded-full bg-brand/10 text-brand dark:bg-brand/20">
+        <Icon name={icon} size={26} />
+      </span>
       <p className="mt-3 max-w-xs text-[14px] leading-snug text-tinte-leise">{text}</p>
     </div>
   );
@@ -510,6 +515,24 @@ function useMeldungenZahl(box: HTMLElement | null) {
 }
 
 /**
+ * Ein Abschnitt der Anfragen-Seite (Überschrift mit Zahl + Karten). Bleibt immer
+ * eingehängt (nur unsichtbar, wenn n = 0), damit die Anfrage-Komponenten darin
+ * weiter zählen und live nachladen. Bewusst AUSSERHALB von AnfragenEbene: als
+ * Funktion im Funktionskörper wäre es bei jedem Zeichnen ein „neuer“ Baustein,
+ * und alle Kinder würden dabei neu aufgebaut und neu geladen.
+ */
+function AnfragenAbschnitt({ titel, n, children }: { titel: string; n: number; children: React.ReactNode }) {
+  return (
+    <section className={n ? "mb-6" : "hidden"}>
+      <h3 className="mb-1.5 px-4 text-[13px] uppercase tracking-[0.02em] text-tinte-leise">
+        {titel} <span className="zahl">· {n}</span>
+      </h3>
+      <div className="grid gap-2.5 lg:grid-cols-2">{children}</div>
+    </section>
+  );
+}
+
+/**
  * Alle Anfragen ans Team auf einer Seite, nach Art gruppiert (mit Anzahl),
  * damit man nicht durch eine lange gemischte Liste scrollen muss.
  */
@@ -521,54 +544,99 @@ function AnfragenEbene({
   onZahl: (n: number) => void;
   glocke: { an: boolean; setAn: (an: boolean) => void };
 }) {
+  const { can } = useRole();
   const [zahlen, setZahlen] = useState({ nachtrag: 0, komitee: 0, entsperren: 0, foto: 0 });
   const [box, setBox] = useState<HTMLDivElement | null>(null);
   const meldungen = useMeldungenZahl(box);
+  // Verschieben (offiziell ↔ inoffiziell): nur laden/zeigen, wenn man irgendwo mitentscheiden darf –
+  // die Datenbank liefert ohnehin nur, was man sehen darf (Rechte je Bereich).
+  const darfVerschieben = can("zitate.pruefen") || can("rankings.verwalten") || can("motto.verwalten") || can("album.moderieren");
+  const verschieben = useAlleVerschiebungen(darfVerschieben);
+  const verschiebeZahl = darfVerschieben ? verschieben.liste.length : 0;
   // Je Art ein fester Rückruf – sonst liefen die Effekte der Kinder bei jedem Zeichnen neu
   const setzer = useMemo(() => {
     const f = (k: keyof typeof zahlen) => (n: number) => setZahlen((z) => (z[k] === n ? z : { ...z, [k]: n }));
     return { nachtrag: f("nachtrag"), komitee: f("komitee"), entsperren: f("entsperren"), foto: f("foto") };
   }, []);
-  const summe = zahlen.nachtrag + zahlen.komitee + zahlen.entsperren + zahlen.foto + meldungen;
+  const summe = zahlen.nachtrag + zahlen.komitee + zahlen.entsperren + zahlen.foto + meldungen + verschiebeZahl;
   useEffect(() => onZahl(summe), [summe, onZahl]);
-
-  const Abschnitt = ({ titel, n, children }: { titel: string; n: number; children: React.ReactNode }) => (
-    <section className={n ? "mb-6" : "hidden"}>
-      <h3 className="mb-1.5 px-4 text-[13px] uppercase tracking-[0.02em] text-tinte-leise">
-        {titel} <span className="zahl">· {n}</span>
-      </h3>
-      <div className="grid gap-2.5 lg:grid-cols-2">{children}</div>
-    </section>
-  );
 
   return (
     <ChatEbene
       sichtbar={sichtbar}
       label="Anfragen"
-      kopf={<ChatKopf onBack={onBack} symbol="📥" titel="Anfragen" unter={summe ? `${summe} offen` : "Alles erledigt"} />}
+      // Listen beginnen oben – die erste Anfrage ist die wichtigste, nicht die letzte
+      start="oben"
+      kopf={<ChatKopf onBack={onBack} symbol={<Icon name="haken" size={17} strich={2.4} />} titel="Anfragen" unter={summe ? `${summe} offen` : "Alles erledigt"} />}
     >
       <div ref={setBox} className="py-4">
-        {summe === 0 && <Leer icon="✅" text="Gerade keine offenen Anfragen. Neue erscheinen hier – mit roter Zahl auf der Kachel." />}
-        {/* Die Abschnitte bleiben immer eingehängt (nur unsichtbar), damit sie
-            weiter zählen und live nachladen. */}
-        <Abschnitt titel="Meldungen" n={meldungen}>
+        {summe === 0 && <Leer icon="haken" text="Gerade keine offenen Anfragen. Neue erscheinen hier – mit roter Zahl auf der Kachel." />}
+        <AnfragenAbschnitt titel="Meldungen" n={meldungen}>
           <MeldungenAnfragen />
-        </Abschnitt>
-        <Abschnitt titel="Mithilfe nachtragen" n={zahlen.nachtrag}>
+        </AnfragenAbschnitt>
+        <AnfragenAbschnitt titel="Verschieben (offiziell ↔ inoffiziell)" n={verschiebeZahl}>
+          {darfVerschieben &&
+            verschieben.liste.map((v) => (
+              <VerschiebeAnfrage key={v.id} v={v} onZustimmen={() => void verschieben.zustimmen(v.id)} onAblehnen={() => void verschieben.ablehnen(v.id)} />
+            ))}
+        </AnfragenAbschnitt>
+        <AnfragenAbschnitt titel="Mithilfe nachtragen" n={zahlen.nachtrag}>
           <NachtragAnfragen onAnzahl={setzer.nachtrag} />
-        </Abschnitt>
-        <Abschnitt titel="Komitee-Wünsche" n={zahlen.komitee}>
+        </AnfragenAbschnitt>
+        <AnfragenAbschnitt titel="Komitee-Wünsche" n={zahlen.komitee}>
           <KomiteeRequests onAnzahl={setzer.komitee} />
-        </Abschnitt>
-        <Abschnitt titel="Entsperren" n={zahlen.entsperren}>
+        </AnfragenAbschnitt>
+        <AnfragenAbschnitt titel="Entsperren" n={zahlen.entsperren}>
           <UnbanRequests onAnzahl={setzer.entsperren} />
-        </Abschnitt>
-        <Abschnitt titel="Steckbrief-Fotos" n={zahlen.foto}>
+        </AnfragenAbschnitt>
+        <AnfragenAbschnitt titel="Steckbrief-Fotos" n={zahlen.foto}>
           <FotoFreigaben onAnzahl={setzer.foto} />
-        </Abschnitt>
+        </AnfragenAbschnitt>
         <MitteilungsGruppe {...glocke} name="Neue Anfragen" fuss="Kommt als Mitteilung aufs Handy, sobald jemand etwas beantragt." />
       </div>
     </ChatEbene>
+  );
+}
+
+/**
+ * Ein offener Antrag „von Inoffiziell nach Offiziell verschieben“ (oder zurück).
+ * Zustimmen zählt eine Stimme; ist die nötige Zahl erreicht (Admin: reicht allein),
+ * wird verschoben. Verwerfen zieht den Antrag zurück. Gleiche Zellen wie die übrigen
+ * Anfragen – Bereich (Zitat, Ranking, Motto, Kommentar) steht über dem Text.
+ */
+function VerschiebeAnfrage({
+  v, onZustimmen, onAblehnen,
+}: { v: Verschiebung & { tabelle: TeilTabelle }; onZustimmen: () => void; onAblehnen: () => void }) {
+  return (
+    <div className="gruppe-zellen">
+      <div className="px-4 py-3.5">
+        <div className="text-[12.5px] font-semibold text-tinte-leise">
+          {TABELLE_NAME[v.tabelle]} · nach „{TEIL_NAME[v.nach]}“
+        </div>
+        <div className="mt-0.5 line-clamp-3 text-[15px] font-semibold leading-snug [overflow-wrap:anywhere]">{v.titel}</div>
+        <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12.5px] text-tinte-leise">
+          <span>Beantragt von {v.von || "jemandem aus dem Team"}</span>
+          <ZustimmungsMarke zahl={v.stimmen} noetig={v.noetig} ichSchon={v.ich} />
+        </div>
+        <div className="mt-3 flex gap-2">
+          <button
+            className="btn-klein-grau flex-1"
+            onClick={() => void frage("Diesen Antrag verwerfen? Der Eintrag bleibt, wo er ist.", "Verwerfen", true).then((ok) => { if (ok) onAblehnen(); })}
+          >
+            Verwerfen
+          </button>
+          {v.ich ? (
+            <span className="flex min-h-[2.25rem] flex-1 items-center justify-center gap-1.5 text-[14px] font-semibold text-[#1E7B34] dark:text-[#30D158]">
+              <Icon name="haken" size={15} strich={2.6} /> Zugestimmt
+            </span>
+          ) : (
+            <button className="btn-klein flex-1" onClick={onZustimmen}>
+              Zustimmen
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -627,7 +695,7 @@ function TeamChatSchueler({ tickets, onBack }: { tickets: Topic[]; onBack: () =>
   return (
     <ChatEbene
       label="Stufenteam"
-      kopf={<ChatKopf onBack={onBack} symbol="🛡️" titel="Stufenteam" unter="Frag hier alles – das Team antwortet dir" />}
+      kopf={<ChatKopf onBack={onBack} symbol={<Icon name="schild" size={17} strich={2.2} />} titel="Stufenteam" unter="Frag hier alles – das Team antwortet dir" />}
       fuss={banned ? undefined : <ChatEingabe wert={text} setWert={setText} onSenden={senden} />}
     >
       {banned ? (
@@ -857,10 +925,11 @@ function TicketListe({
   return (
     <ChatEbene
       label="Gespräche mit Schülern"
+      start="oben"
       kopf={
         <ChatKopf
           onBack={onBack}
-          symbol="🎓"
+          symbol={<Icon name="person" size={17} strich={2.2} />}
           titel="Schüler"
           unter={offene.length ? `${offene.length} offen` : "Nichts offen"}
           rechts={
@@ -873,7 +942,7 @@ function TicketListe({
     >
       <div className="py-4">
         {offene.length === 0 ? (
-          <Leer icon="💬" text="Gerade keine offenen Fragen. Mit „+“ oben rechts schreibst du jemanden an." />
+          <Leer icon="chats" text="Gerade keine offenen Fragen. Mit „+“ oben rechts schreibst du jemanden an." />
         ) : (
           <Gruppe titel="Offen" className="">
             {offene.map((t) => (

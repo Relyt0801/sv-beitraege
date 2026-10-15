@@ -41,7 +41,7 @@ const NUR_ADMIN: Role[] = ["sprecher", "stv_sprecher", "admin", "kassenwart", "e
 const NUR_EINMAL: Role[] = ["sprecher", "stv_sprecher"];
 
 export function RolesTab() {
-  const { profiles, setRole, setBan, can, isAdmin, isOp, opUserId, refreshProfiles } = useRole();
+  const { profiles, setRole, setBan, can, isAdmin, isOp, opUserId, uid, refreshProfiles } = useRole();
   const pw = usePasswortNeu();
   const { zuordnung } = useEltern();
   const [anlegen, setAnlegen] = useState(false);
@@ -121,7 +121,7 @@ export function RolesTab() {
       {(isAdmin || isOp) && (
         <button
           onClick={() => setAnlegen(true)}
-          className="btn-grau mb-3 gap-2 !text-[15px]"
+          className="btn-grau mb-3 gap-2 !text-[15px] md:!w-auto md:px-6"
         >
           <Icon name="plus" size={18} strich={2.4} />
           Person hinzufügen
@@ -157,7 +157,9 @@ export function RolesTab() {
         </label>
       )}
 
-      <div className="grid gap-2.5 [&>*]:min-w-0">
+      {/* Ab iPad-Breite zwei Spalten – sonst standen Name und Auswahl
+          1300 px auseinander */}
+      <div className="grid items-start gap-2.5 md:grid-cols-2 [&>*]:min-w-0">
         {rows.slice(0, sichtbar).map(({ p, kinder }) => {
           const koms = committeesOf(p.user_id);
           const banned = isBanned(p);
@@ -188,14 +190,14 @@ export function RolesTab() {
                   istEltern
                     ? kinder.length
                       ? kinder.join(" und ")
-                      : "kein Kind zugeordnet – sieht nichts"
+                      : "kein Kind verknüpft – sieht nichts"
                     : undefined
                 }
                 hinweisWarnt={istEltern && kinder.length === 0}
                 rechts={
                   darfRechte && !istEltern ? (
-                    <span className="flex shrink-0 items-center gap-1 text-[12px] font-semibold text-brand">
-                      Rechte <span aria-hidden>›</span>
+                    <span className="flex shrink-0 items-center gap-0.5 text-[14px] font-medium text-brand-dark dark:text-brand">
+                      Rechte <Icon name="chevron" size={15} strich={2.4} />
                     </span>
                   ) : undefined
                 }
@@ -256,7 +258,7 @@ export function RolesTab() {
                         {koms.length > 0 && (
                           <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-brand px-1.5 text-xs font-semibold text-white">{koms.length}</span>
                         )}
-                        <span className="ml-auto text-tinte-leise">▾</span>
+                        <span aria-hidden className="ml-auto rotate-90 text-tinte-leise"><Icon name="chevron" size={14} strich={2.4} /></span>
                       </button>
                       {openKom === p.user_id && (
                         <>
@@ -284,82 +286,74 @@ export function RolesTab() {
                   )
                 )}
 
-                {/* Eltern schreiben in keinem Chat – da gibt es nichts zu sperren. */}
-                {canTimeout && !geschuetzt && !istEltern && (
-                  <div className={`relative shrink-0 ${canAssignKom ? "" : "ml-auto"}`}>
+              </div>
+
+              {/* Zeile 3: Aktionen mit Beschriftung (vorher ein Emoji-Knopf, hinter
+                  dem das Passwort-Zurücksetzen versteckt war) */}
+              {((pw.darf && !geschuetzt && p.user_id !== uid) || (canTimeout && !geschuetzt && !istEltern)) && (
+                <div className="mt-2 flex min-w-0 flex-wrap items-center gap-2">
+                  {pw.darf && !geschuetzt && p.user_id !== uid && (
                     <button
-                      onClick={() => (banned ? setBan(p.user_id, null, false) : setOpenBan(openBan === p.user_id ? null : p.user_id))}
-                      title={banned ? "Sperre aufheben" : "Vom Chat sperren"}
-                      aria-label={banned ? "Sperre aufheben" : "Vom Chat sperren"}
-                      className={`flex h-11 w-11 items-center justify-center rounded-xl border text-lg transition active:scale-95 ${
-                        banned
-                          ? "border-red-300 bg-red-500/10 text-red-500"
-                          : "border-transparent bg-[rgb(118_118_128/0.12)] text-tinte-leise dark:bg-[rgb(118_118_128/0.24)]"
-                      }`}
+                      type="button"
+                      disabled={pw.busy}
+                      onClick={() => void pw.zuruecksetzen(p.user_id, p.username || "diese Person")}
+                      className="btn-klein-grau"
                     >
-                      {banned ? "🚫" : "💬"}
+                      <Icon name="schluessel" size={16} />
+                      {pw.busy ? "Wird erzeugt …" : "Passwort zurücksetzen"}
                     </button>
-                    {openBan === p.user_id && !banned && (
-                      <>
-                        <button className="fixed inset-0 z-20 cursor-default" onClick={() => setOpenBan(null)} aria-label="Schließen" />
-                        <div className="absolute right-0 z-30 mt-1.5 w-44 animate-popIn rounded-2xl border border-black/[0.06] bg-white/95 p-1.5 shadow-glas backdrop-blur-xl dark:border-white/10 dark:bg-slate-800/95">
-                          <div className="px-2.5 py-1 text-[12px] font-semibold text-tinte-leise">Sperren für</div>
-                          {DAUERN.map((d) => (
-                            <button
-                              key={d.label}
-                              onClick={() => {
-                                setOpenBan(null);
-                                void setBan(
-                                  p.user_id,
-                                  d.ms ? new Date(Date.now() + d.ms).toISOString() : null,
-                                  d.ms === null,
-                                );
-                              }}
-                              className="w-full rounded-xl px-2.5 py-2 text-left text-[15px] hover:bg-black/[0.04] dark:hover:bg-white/[0.06]"
-                            >
-                              {d.label}
-                            </button>
-                          ))}
-                          {pw.darf && (
-                            <>
-                              <div className="mx-2.5 my-1 h-px bg-black/10 dark:bg-white/10" />
+                  )}
+                  {/* Eltern schreiben in keinem Chat – da gibt es nichts zu sperren. */}
+                  {canTimeout && !geschuetzt && !istEltern && (
+                    <div className="relative shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => (banned ? setBan(p.user_id, null, false) : setOpenBan(openBan === p.user_id ? null : p.user_id))}
+                        aria-haspopup={banned ? undefined : "menu"}
+                        aria-expanded={banned ? undefined : openBan === p.user_id}
+                        className={banned ? "btn-klein !bg-red-600 dark:!bg-red-600" : "btn-klein-grau"}
+                      >
+                        {banned ? "Chat-Sperre aufheben" : "Chat sperren"}
+                      </button>
+                      {openBan === p.user_id && !banned && (
+                        <>
+                          <button className="fixed inset-0 z-20 cursor-default" onClick={() => setOpenBan(null)} aria-label="Schließen" />
+                          <div role="menu" className="absolute left-0 z-30 mt-1.5 w-48 animate-popIn rounded-2xl border border-black/[0.06] bg-white/95 p-1.5 shadow-glas backdrop-blur-xl dark:border-white/10 dark:bg-slate-800/95">
+                            <div className="px-2.5 py-1 text-[12px] font-semibold text-tinte-leise">Chat sperren für</div>
+                            {DAUERN.map((d) => (
                               <button
+                                key={d.label}
+                                role="menuitem"
                                 onClick={() => {
                                   setOpenBan(null);
-                                  void pw.zuruecksetzen(p.user_id, p.username || "diese Person");
+                                  void setBan(
+                                    p.user_id,
+                                    d.ms ? new Date(Date.now() + d.ms).toISOString() : null,
+                                    d.ms === null,
+                                  );
                                 }}
-                                className="w-full rounded-xl px-2.5 py-2 text-left text-[15px] text-brand-dark hover:bg-black/[0.04] dark:text-brand dark:hover:bg-white/[0.06]"
+                                className="min-h-[44px] w-full rounded-xl px-2.5 py-2 text-left text-[15px] hover:bg-black/[0.04] dark:hover:bg-white/[0.06]"
                               >
-                                Neues Passwort …
+                                {d.label}
                               </button>
-                            </>
-                          )}
-                        </div>
-                      </>
-                    )}
-                  </div>
-                )}
-                {canTimeout && geschuetzt && !istEltern && (
-                  <span
-                    title="Dieses Konto kann nicht gesperrt werden"
-                    className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[rgb(118_118_128/0.12)] text-lg opacity-40 ${
-                      canAssignKom ? "" : "ml-auto"
-                    }`}
-                  >
-                    💬
-                  </span>
-                )}
-              </div>
+                            ))}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           );
         })}
         {rest > 0 && (
-          <div ref={marke} className="py-6 text-center text-[12px] text-tinte-leise">
+          <div ref={marke} className="py-6 text-center text-[13px] text-tinte-leise md:col-span-2">
             lädt weitere … ({rest} übrig)
           </div>
         )}
         {rows.length === 0 && (
-          <div className="py-16 text-center text-sm text-tinte-leise">
+          <div className="py-16 text-center text-[15px] text-tinte-leise md:col-span-2">
             Noch keine Konten. Sobald Konten angelegt sind, erscheinen sie hier.
           </div>
         )}
@@ -421,8 +415,8 @@ function RollenMenue({
         className={`${feld} flex w-full items-center gap-1.5 px-3 text-left active:scale-[.98] disabled:opacity-50 disabled:active:scale-100`}
       >
         <span className="min-w-0 flex-1 truncate">{rolleName(profil.role)}</span>
-        <span className={`shrink-0 text-tinte-leise transition ${offen ? "rotate-180" : ""}`} aria-hidden>
-          ▾
+        <span className={`shrink-0 text-tinte-leise transition ${offen ? "-rotate-90" : "rotate-90"}`} aria-hidden>
+          <Icon name="chevron" size={14} strich={2.4} />
         </span>
       </button>
       {offen && (
@@ -465,8 +459,8 @@ function RollenMenue({
                       </span>
                     )}
                     {belegt && (
-                      <span className="shrink-0 text-tinte-leise" aria-hidden>
-                        🔒
+                      <span className="shrink-0 text-[12px] font-semibold text-tinte-leise" aria-hidden>
+                        vergeben
                       </span>
                     )}
                   </button>

@@ -31,10 +31,16 @@ import { useEffect, useState } from "react";
  * hängt supabase.ts deshalb über `serverPruefungSetzen()` ein.
  */
 
+/*
+ * Update 1.4 (U3): Alle Texte hier sind bewusst neutral formuliert (weder „du“
+ * noch „Sie“) – sie erscheinen sowohl bei Schülerinnen als auch bei Eltern,
+ * die förmlich angesprochen werden sollen.
+ */
+
 /** Text, wenn der Server nicht erreichbar ist (Gerät ist aber online). */
-export const NETZ_TEXT = "Keine Verbindung zum Server. Prüfe dein Internet und versuch es nochmal.";
+export const NETZ_TEXT = "Keine Verbindung zum Server. Bitte Internet prüfen und noch einmal versuchen.";
 /** Text, wenn das Gerät selbst offline ist. */
-export const OFFLINE_TEXT = "Du bist offline. Sobald du wieder Internet hast, versuch es nochmal.";
+export const OFFLINE_TEXT = "Gerade kein Internet. Sobald die Verbindung wieder da ist, bitte noch einmal versuchen.";
 
 /*
  * Die englischen (und ein paar deutsche) Formulierungen, mit denen Browser,
@@ -65,9 +71,9 @@ const UEBERSETZT: [RegExp, string][] = [
   [/invalid login credentials/i, "Benutzername oder Passwort falsch."],
   [/new password should be different/i, "Das neue Passwort muss sich vom alten unterscheiden."],
   [/password should be at least (\d+)/i, "Das Passwort ist zu kurz."],
-  [/too many requests|rate limit|over_request_rate_limit|for security purposes, you can only request/i, "Zu viele Versuche. Warte kurz und versuch es dann nochmal."],
-  [/user is banned/i, "Dieses Konto ist gesperrt. Meld dich beim Stufenteam."],
-  [/jwt expired|invalid refresh token|refresh token not found|refresh_token_not_found|auth session missing/i, "Deine Anmeldung ist abgelaufen. Bitte melde dich neu an."],
+  [/too many requests|rate limit|over_request_rate_limit|for security purposes, you can only request/i, "Zu viele Versuche. Bitte kurz warten und dann noch einmal versuchen."],
+  [/user is banned/i, "Dieses Konto ist gesperrt. Bitte beim Stufenteam melden."],
+  [/jwt expired|invalid refresh token|refresh token not found|refresh_token_not_found|auth session missing/i, "Die Anmeldung ist abgelaufen. Bitte neu anmelden."],
 ];
 
 function geraetOffline(): boolean {
@@ -103,7 +109,7 @@ export function istNetzfehler(e: unknown): boolean {
 /**
  * Jeden Fehler in einen verständlichen deutschen Satz verwandeln.
  *
- * - Netzwerkfehler → „Keine Verbindung zum Server …“ bzw. „Du bist offline …“.
+ * - Netzwerkfehler → „Keine Verbindung zum Server …“ bzw. „Gerade kein Internet …“.
  *   Steht davor schon ein deutscher Anfang („Speichern ging nicht: …“), bleibt
  *   der stehen – man weiß dann noch, WAS nicht geklappt hat.
  * - Bekannte englische Supabase-Meldungen → deutsche Übersetzung.
@@ -130,7 +136,7 @@ export function fehlerText(e: unknown): string {
       return vorne && !/^(Auth|Error)/.test(vorne) ? `${vorne}: ${deutsch}` : deutsch;
     }
   }
-  return text || "Das hat nicht geklappt. Versuch es nochmal.";
+  return text || "Das hat nicht geklappt. Bitte noch einmal versuchen.";
 }
 
 /* ---------------------------------------------------------------------------

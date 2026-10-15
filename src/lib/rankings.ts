@@ -5,7 +5,7 @@ import { useStore } from "../store";
 import type { Teil } from "./teile";
 
 /**
- * Abi-Rankings und Lehrerliste (supabase/rankings-lehrer.sql)
+ * Abi-Rankings und Lehrkräfte (supabase/rankings-lehrer.sql)
  *
  *   Kategorien  „Wird am ehesten berühmt“ – je Kategorie Schüler ODER Lehrer
  *   Stimmen     eine je Person und Kategorie, änderbar; null = „weiß nicht“
@@ -130,7 +130,7 @@ export function useStufePersonen(aktiv: boolean): StufenPerson[] {
   );
 }
 
-/* ---------------------------------------------------------------- Lehrerliste */
+/* ---------------------------------------------------------------- Lehrkräfte */
 export function useLehrer(aktiv: boolean) {
   const [lehrer, setLehrer] = useState<Lehrer[]>([]);
 

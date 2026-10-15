@@ -10,32 +10,99 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <!-- Schriften kommen aus dem eigenen Build (src/main.tsx, @fontsource), nicht von Google -->
     <title>Stufenkasse</title>
-  </head>
-  <body>
-    <div id="root"></div>
     <!--
-      Notausgang gegen die weiße Seite: Ist nach 8 Sekunden noch nichts zu sehen
-      (meist hängt ein alter Zwischenspeicher nach einem Update), erscheint ein
-      Knopf, der den Speicher der App leert und neu lädt. Anmeldung und Daten
-      bleiben dabei erhalten – es werden nur die Programmdateien neu geholt.
+      Aussehen schon vor dem ersten Zeichnen setzen (Update 1.4, U3): dieselbe
+      Regel wie in src/lib/theme.ts – "light"/"dark" ausdrücklich gewählt,
+      sonst (Automatisch) so wie das Gerät. Sonst blitzt beim Start kurz hell
+      auf, obwohl das Handy auf Dunkel steht.
     -->
     <script>
-      setTimeout(function () {
-        var root = document.getElementById("root");
-        if (!root || root.children.length) return;
-        root.innerHTML =
-          '<div style="font-family:-apple-system,BlinkMacSystemFont,system-ui,sans-serif;max-width:22rem;margin:18vh auto;padding:1.5rem;text-align:center">' +
-          '<div style="font-size:2rem">🔄</div>' +
-          '<p style="font-weight:700;margin:.5rem 0">Die App lädt nicht richtig.</p>' +
-          '<p style="font-size:.9rem;color:#666;margin:0 0 1rem">Meist hängt noch eine alte Version im Speicher. Ein Tipp behebt das.</p>' +
-          '<button id="sv-rettung" style="background:#0071e3;color:#fff;border:0;border-radius:999px;padding:.8rem 1.4rem;font-weight:600;font-size:1rem">Neu laden</button></div>';
-        document.getElementById("sv-rettung").onclick = function () {
-          var fertig = function () { location.reload(); };
-          var sw = navigator.serviceWorker ? navigator.serviceWorker.getRegistrations().then(function (r) { return Promise.all(r.map(function (x) { return x.unregister(); })); }) : Promise.resolve();
-          var cs = window.caches ? caches.keys().then(function (k) { return Promise.all(k.map(function (x) { return caches.delete(x); })); }) : Promise.resolve();
-          Promise.all([sw, cs]).then(fertig, fertig);
-        };
-      }, 8000);
+      (function () {
+        try {
+          var s = localStorage.getItem("sv-beitraege:theme");
+          var dunkel = s === "dark" || (s !== "light" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+          if (dunkel) document.documentElement.classList.add("dark");
+        } catch (e) {}
+      })();
+    </script>
+    <style>
+      /* Startbild: steht da, bevor die Programmdateien geladen sind (React ersetzt es beim ersten Zeichnen) */
+      html { background: #f2f2f7; }
+      html.dark { background: #000; }
+      #sv-start { font-family: -apple-system, BlinkMacSystemFont, system-ui, sans-serif; max-width: 22rem; margin: 0 auto; padding: 0 1.5rem; min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; color: #1c1c1e; }
+      html.dark #sv-start { color: #f2f2f7; }
+      #sv-start img { width: 72px; height: 72px; border-radius: 18px; box-shadow: 0 6px 24px rgba(0, 0, 0, .15); animation: sv-atmen 1.8s ease-in-out infinite; }
+      #sv-start p { margin: 1rem 0 0; font-size: .95rem; opacity: .7; min-height: 1.4em; }
+      #sv-start p.sv-fett { opacity: 1; font-weight: 700; font-size: 1.05rem; }
+      #sv-start button { margin-top: 1rem; background: #0071e3; color: #fff; border: 0; border-radius: 999px; padding: .8rem 1.4rem; font-weight: 600; font-size: 1rem; }
+      @keyframes sv-atmen { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(.94); opacity: .8; } }
+      @media (prefers-reduced-motion: reduce) { #sv-start img { animation: none; } }
+    </style>
+  </head>
+  <body>
+    <div id="root">
+      <div id="sv-start" role="status" aria-live="polite">
+        <img src="/icon-192.png" alt="" width="72" height="72" />
+        <p id="sv-start-text">Stufenkasse wird geladen …</p>
+      </div>
+    </div>
+    <!--
+      Notausgang gegen die weiße Seite – aber nur, wenn wirklich etwas hängt
+      (Update 1.4, U3). Vorher kam nach festen 8 Sekunden „Die App lädt nicht
+      richtig“ – auf langsamem Netz (Schul-WLAN, 3G) war die App dann gar nicht
+      kaputt, nur noch nicht fertig, und der Knopf „Neu laden“ hat das Laden
+      von vorn begonnen.
+
+      Jetzt in drei Stufen:
+        ab  6 s  freundlicher Text „Lädt noch … langsame Verbindung“
+        ab 20 s  Notausgang-Knopf – aber nur, wenn die App nicht gestartet ist
+                 UND in den letzten 6 Sekunden keine Datei mehr fertig geworden
+                 ist (dann lädt es ja noch; erneut prüfen, bis Schluss ist)
+        ab 90 s  Knopf in jedem Fall
+      main.tsx setzt window.__svGestartet, sobald die App läuft.
+    -->
+    <script>
+      (function () {
+        var t0 = Date.now();
+        var letzteDatei = Date.now();
+        try {
+          new PerformanceObserver(function () { letzteDatei = Date.now(); }).observe({ type: "resource", buffered: true });
+        } catch (e) {}
+        function el() { return document.getElementById("sv-start"); }
+        function text(t) {
+          var p = document.getElementById("sv-start-text");
+          if (p) p.textContent = t;
+        }
+        setTimeout(function () {
+          if (window.__svGestartet || !el()) return;
+          text("Lädt noch … langsame Verbindung. Einen Moment bitte.");
+        }, 6000);
+        function notausgang() {
+          if (window.__svGestartet) return;
+          var box = el();
+          if (!box) return;
+          var vergangen = Date.now() - t0;
+          var ladeNoch = Date.now() - letzteDatei < 6000;
+          if (ladeNoch && vergangen < 90000) return setTimeout(notausgang, 4000);
+          var p = document.getElementById("sv-start-text");
+          p.className = "sv-fett";
+          p.textContent = "Die App lädt nicht richtig.";
+          var q = document.createElement("p");
+          q.textContent = "Meist hängt noch eine alte Version im Speicher. Ein Tipp behebt das.";
+          var b = document.createElement("button");
+          b.id = "sv-rettung";
+          b.textContent = "Neu laden";
+          box.appendChild(q);
+          box.appendChild(b);
+          b.onclick = function () {
+            var fertig = function () { location.reload(); };
+            var sw = navigator.serviceWorker ? navigator.serviceWorker.getRegistrations().then(function (r) { return Promise.all(r.map(function (x) { return x.unregister(); })); }) : Promise.resolve();
+            var cs = window.caches ? caches.keys().then(function (k) { return Promise.all(k.map(function (x) { return caches.delete(x); })); }) : Promise.resolve();
+            Promise.all([sw, cs]).then(fertig, fertig);
+          };
+        }
+        setTimeout(notausgang, 20000);
+      })();
     </script>
     <!--
       Chrome, Edge und Samsung Internet melden sehr früh, dass die Seite

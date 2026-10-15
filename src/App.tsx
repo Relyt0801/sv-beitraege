@@ -1,61 +1,81 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { SkelettZeilen } from "./components/Skelett";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { SkelettKarten, SkelettZeilen } from "./components/Skelett";
 import { HY, type Halbjahr, type Status } from "./lib/types";
 import { normalize, offenGesamt, offenStufe, sortStudents, staffelVon } from "./lib/logic";
 import { neuLadenBeobachten } from "./lib/neuladen";
 import { MyKasse } from "./components/MyKasse";
-import { PunkteSheet } from "./components/PunkteSheet";
-import { ProfilSheet } from "./components/ProfilSheet";
 import { Avatar } from "./components/Avatar";
-import { Tour, schuelerSchritte, teamSchritte } from "./components/Tour";
+import { Tour, schuelerSchritte, teamSchritte, useTourOffen } from "./components/Tour";
 import { useTheme } from "./lib/theme";
 import { useVerzoegert } from "./lib/entwurf";
 import { hasSupabase, supabase } from "./lib/supabase";
 import { abmelden, appZaehler } from "./lib/push";
 import { PushHinweis, usePushAuffrischen } from "./components/PushHinweis";
 import { useStore } from "./store";
-import { AuthGate } from "./auth/AuthGate";
+import { AuthGate, Splash } from "./auth/AuthGate";
 import { PasswordGate } from "./auth/PasswordGate";
 import { RoleProvider, useRole } from "./auth/RoleProvider";
-import { Sheet } from "./components/Sheet";
 import { ProfilesProvider, useProfiles } from "./profiles-store";
 import { EventsProvider, useEvents } from "./events-store";
 import { TermineProvider, useTermine } from "./termine-store";
 import { TopicsProvider } from "./topics-store";
-import { ChatsTab } from "./components/ChatsTab";
 import { StudentCard, nextStatus } from "./components/StudentCard";
-import { StudentSheet } from "./components/StudentSheet";
-import { AddSheet } from "./components/AddSheet";
-import { MassBar } from "./components/MassBar";
-import { RollenRechteTab } from "./components/RollenRechteTab";
-import { EventsTab } from "./components/EventsTab";
-import { BeitraegeTab } from "./components/BeitraegeTab";
-import { FinanzenTab } from "./components/FinanzenTab";
 import { useKostenAnfragen } from "./lib/kosten";
 import { SPRUNG_TAB, sprungAusHash } from "./lib/sprung";
 import { MeldenWurzel } from "./components/Melden";
 import { KassenKopf } from "./components/KassenKopf";
-import { EventComposer } from "./components/EventComposer";
-import { AktionSheet } from "./components/AktionSheet";
 import { SchichtAbschluss } from "./components/SchichtAbschluss";
 import { useChatZaehler } from "./lib/chat-zaehler";
 import { PatchNotes } from "./components/PatchNotes";
 import { PATCH, PATCH_MERKER } from "./lib/patchnotes";
 import { ElternProvider, useEltern } from "./eltern-store";
-import { ElternApp } from "./components/ElternApp";
 import { Icon, type IconName } from "./components/Icon";
 import { HintergrundEbene } from "./components/HintergrundEbene";
 import { InstallKarte, InstallOverlay } from "./components/InstallHinweis";
 import { useGescrollt, useHoeheAlsVariable, useReiter } from "./lib/gescrollt";
 import { GlasLeiste } from "./components/GlasLeiste";
-import { MottoEnthuellung } from "./components/MottoEnthuellung";
 import { Schalter } from "./components/Schalter";
 import { AlbumProvider } from "./components/Album";
 import { FunktionenProvider } from "./lib/funktionen";
-import { UmfragePopup, UmfragenSheet } from "./components/Umfragen";
-import { NachtragSheet } from "./components/NachtragSheet";
+import { FaulGrenze, allesVorladen, faul } from "./components/FaulLaden";
 
 import { frage, melde, meldeFehler } from "./lib/melder";
+
+/*
+ * Große, seltene Teile werden erst geladen, wenn man sie braucht (Update 1.4, U3
+ * – Leistung; Hilfen und Begründung in components/FaulLaden.tsx). Nach dem Start
+ * holt Main sie im Leerlauf nach (allesVorladen), damit der erste Tipp nicht aufs
+ * Netz wartet. Die Dateien selbst sind unverändert: `.then(m => ({ default: m.X }))`
+ * macht den benannten Export zum Standard-Export für React.lazy.
+ */
+const ElternApp = faul(() => import("./components/ElternApp").then((m) => ({ default: m.ElternApp })));
+const EventsTab = faul(() => import("./components/EventsTab").then((m) => ({ default: m.EventsTab })));
+const ChatsTab = faul(() => import("./components/ChatsTab").then((m) => ({ default: m.ChatsTab })));
+const FinanzenTab = faul(() => import("./components/FinanzenTab").then((m) => ({ default: m.FinanzenTab })));
+const BeitraegeTab = faul(() => import("./components/BeitraegeTab").then((m) => ({ default: m.BeitraegeTab })));
+const RollenRechteTab = faul(() => import("./components/RollenRechteTab").then((m) => ({ default: m.RollenRechteTab })));
+const ProfilSheet = faul(() => import("./components/ProfilSheet").then((m) => ({ default: m.ProfilSheet })));
+const StudentSheet = faul(() => import("./components/StudentSheet").then((m) => ({ default: m.StudentSheet })));
+const AddSheet = faul(() => import("./components/AddSheet").then((m) => ({ default: m.AddSheet })));
+const MassBar = faul(() => import("./components/MassBar").then((m) => ({ default: m.MassBar })));
+const EventComposer = faul(() => import("./components/EventComposer").then((m) => ({ default: m.EventComposer })));
+const AktionSheet = faul(() => import("./components/AktionSheet").then((m) => ({ default: m.AktionSheet })));
+const NachtragSheet = faul(() => import("./components/NachtragSheet").then((m) => ({ default: m.NachtragSheet })));
+const UmfragenSheet = faul(() => import("./components/Umfragen").then((m) => ({ default: m.UmfragenSheet })));
+const UmfragePopup = faul(() => import("./components/Umfragen").then((m) => ({ default: m.UmfragePopup })));
+const MottoEnthuellung = faul(() => import("./components/MottoEnthuellung").then((m) => ({ default: m.MottoEnthuellung })));
+
+/**
+ * Hängt ein Blatt erst beim ersten Öffnen ein (und lädt damit seine Datei) –
+ * danach bleibt es eingehängt, damit es seinen Zustand behält. Nicht
+ * geladen werden kann es nur offline/mit altem Stand: dann kommt eine Meldung.
+ */
+function ErstBeiBedarf({ offen, children }: { offen: boolean; children: ReactNode }) {
+  const [warOffen, setWarOffen] = useState(offen);
+  if (offen && !warOffen) setWarOffen(true);
+  return warOffen ? <FaulGrenze still>{children}</FaulGrenze> : null;
+}
+
 export default function App() {
   return (
     <AuthGate>
@@ -78,21 +98,21 @@ export default function App() {
 function NachRolle() {
   const { ready, isEltern } = useRole();
 
-  if (!ready)
-    return (
-      <div className="flex min-h-dvh items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-[3px] border-slate-200 border-t-slate-500 dark:border-slate-700 dark:border-t-slate-300" />
-      </div>
-    );
+  // Dasselbe Ladebild wie beim Anmelden (Symbol, ruhig) statt eines zweiten Kringels
+  if (!ready) return <Splash />;
 
   if (isEltern)
     return (
       <ProfilesProvider>
         <ElternProvider>
           <HintergrundEbene />
-          <ElternApp />
+          <FaulGrenze fallback={<Splash />}>
+            <ElternApp />
+          </FaulGrenze>
           <InstallOverlay />
-          <UmfragePopup bereitZumZeigen />
+          <FaulGrenze still>
+            <UmfragePopup bereitZumZeigen />
+          </FaulGrenze>
         </ElternProvider>
       </ProfilesProvider>
     );
@@ -286,17 +306,51 @@ function Main() {
     return () => clearTimeout(t);
   }, [roleReady, ready, showTour]);
 
-  // Einmaliger Hinweis auf den Nachtragen-Knopf – erst, wenn nichts anderes offen ist
+  // Ist irgendwo ein Blatt offen? Dann darf der „Neu“-Hinweis nicht darüber erscheinen.
+  const blattOffen = showSettings || openId !== null || showAdd || showComposer || showAktion || showUmfragen || nachtragOffen || massMode;
+  const tourOffen = useTourOffen();
+
+  // Einmaliger Hinweis auf den Nachtragen-Knopf – erst, wenn nichts anderes offen
+  // ist: weder Einführung noch Patch-Notes noch ein Blatt oder anderes Fenster
+  // (Install-Hinweis, Enthüllung, Rückfrage …). Ist doch etwas offen, wird alle
+  // 2 s neu nachgesehen, statt über dem Fenster aufzutauchen (Update 1.4, U3).
   useEffect(() => {
-    if (!roleReady || !ready || !studentId || showTour || showPatch || umfrageSichtbar) return;
+    if (!roleReady || !ready || !studentId || showTour || showPatch || umfrageSichtbar || blattOffen || tourOffen) return;
     try {
       if (localStorage.getItem(NACHTRAG_HINWEIS)) return;
     } catch {
       return;
     }
-    const t = setTimeout(() => setNachtragHinweis(true), 1600);
+    let t: ReturnType<typeof setTimeout>;
+    const pruefen = () => {
+      if (document.querySelector('[role="dialog"], [role="alertdialog"]')) {
+        t = setTimeout(pruefen, 2000);
+        return;
+      }
+      setNachtragHinweis(true);
+    };
+    t = setTimeout(pruefen, 1600);
     return () => clearTimeout(t);
-  }, [roleReady, ready, studentId, showTour, showPatch, umfrageSichtbar]);
+  }, [roleReady, ready, studentId, showTour, showPatch, umfrageSichtbar, blattOffen, tourOffen]);
+  // Öffnet jemand trotzdem ein Blatt, räumt der Hinweis das Feld (kommt später wieder)
+  useEffect(() => {
+    if (nachtragHinweis && blattOffen) setNachtragHinweis(false);
+  }, [nachtragHinweis, blattOffen]);
+
+  // Nach dem Start im Leerlauf die seltenen Teile vorladen (FaulLaden.tsx)
+  useEffect(() => {
+    if (!ready) return;
+    const t = setTimeout(allesVorladen, 2500);
+    return () => clearTimeout(t);
+  }, [ready]);
+
+  // Der Auswahl-Modus gehört zur Kasse: wer den Reiter wechselt, beendet ihn
+  useEffect(() => {
+    if (tab !== "kasse") {
+      setMassMode(false);
+      setShowFilter(false);
+    }
+  }, [tab]);
 
   const gescrollt = useGescrollt(4);
   // Kopf und Tab-Leiste messen: danach richten sich Chat-Eingabe,
@@ -436,10 +490,32 @@ function Main() {
     if (roleReady && !reiterErlaubt) setTab("kasse");
   }, [roleReady, reiterErlaubt, setTab]);
 
+  // „Neu“-Knopf je Reiter (Update 1.4, U3): Kasse → Person hinzufügen, Events →
+  // Event erstellen. Auf dem Handy schwebt er als beschriftete Kapsel unten
+  // rechts (damit die drei „+“ der App unterscheidbar sind: Nachtragen, Termin,
+  // Neu); ab iPad-Breite sitzt er stattdessen im Kopf – ein schwebender Knopf
+  // am Rechner stand mitten im Leeren und deckte am iPad die letzte Spalte.
+  const neuKnopf =
+    tab === "kasse" && teamView && canEditData
+      ? { text: "Person", label: "Person hinzufügen", los: () => setShowAdd(true) }
+      : tab === "events" && isStaff
+        ? { text: "Neu", label: "Event erstellen", los: () => setShowComposer(true) }
+        : null;
+  const anzahlReiter = navItems.filter((n) => n.show).length;
+
   // Im Auswahl-Modus ist die Leiste unten höher (Namen der Ausgewählten) –
-  // sonst verdeckt sie die letzten Personen der Liste.
+  // sonst verdeckt sie die letzten Personen der Liste. Mit schwebendem Knopf
+  // (Handy) bekommt die Seite unten mehr Luft, damit der Knopf nichts verdeckt.
   return (
-    <div className={`mx-auto max-w-5xl px-3 sm:px-5 ${massMode ? "pb-72" : "pb-[calc(var(--leiste)+2.5rem)] lg:pb-16"}`}>
+    <div
+      className={`mx-auto max-w-5xl px-3 sm:px-5 ${
+        massMode
+          ? "pb-72"
+          : neuKnopf
+            ? "pb-[calc(var(--leiste)+6.5rem)] md:pb-[calc(var(--leiste)+2.5rem)] lg:pb-16"
+            : "pb-[calc(var(--leiste)+2.5rem)] lg:pb-16"
+      }`}
+    >
       {/* Kopf wie eine iOS-Navigationsleiste: oben die Knöpfe, darunter der
           große Titel. Scrollt der Titel weg, erscheint er klein in der nun
           milchigen Leiste (Glas). */}
@@ -459,7 +535,7 @@ function Main() {
             {REITER_TITEL[tab]}
           </div>
 
-          <div className="ml-auto flex shrink-0 items-center gap-2">
+          <div className="ml-auto flex shrink-0 items-center gap-2 max-[379px]:gap-1.5">
             {tab === "kasse" && (
               <>
                 {teamView && (
@@ -489,6 +565,13 @@ function Main() {
                 )}
               </>
             )}
+            {/* Ab iPad-Breite: „Person“ / „Neu“ im Kopf statt schwebend */}
+            {neuKnopf && (
+              <button data-tour="neu" onClick={neuKnopf.los} className="btn-klein hidden md:inline-flex" aria-label={neuKnopf.label}>
+                <Icon name="plus" size={16} strich={2.6} />
+                {neuKnopf.text}
+              </button>
+            )}
             <button className="iconbtn" onClick={toggle} aria-label={theme === "dark" ? "Helles Design" : "Dunkles Design"} title="Hell/Dunkel">
               <Icon name={theme === "dark" ? "sonne" : "mond"} size={19} />
             </button>
@@ -496,21 +579,26 @@ function Main() {
               <button
                 data-tour="nachtragen"
                 onClick={() => setNachtragOffen(true)}
-                className="flex h-10 items-center gap-1 rounded-full bg-[#248A3D] px-3.5 text-[14px] font-semibold text-white transition active:scale-90 dark:bg-[#30D158] dark:text-black"
+                // Beschriftung bleibt auch auf kleinen Handys (nur kompakter): ein
+                // unbeschriftetes grünes „+“ neben dem Mond verstand niemand.
+                // Dunkleres Grün (#1E7B34): weiße Schrift mit 5,3:1 statt 4,4:1.
+                className="flex h-11 items-center gap-1 rounded-full bg-[#1E7B34] px-3.5 text-[14px] font-semibold text-white transition active:scale-90 max-[379px]:px-3 max-[379px]:text-[13px] dark:bg-[#30D158] dark:text-black"
                 aria-label="Mithilfe nachtragen"
                 title="Mithilfe nachtragen"
               >
                 <Icon name="plus" size={16} strich={2.6} />
-                <span className="hidden min-[380px]:inline">Nachtragen</span>
+                <span className="max-[339px]:hidden">Nachtragen</span>
               </button>
             )}
             <button
               data-tour="profil"
               onClick={() => setShowSettings(true)}
-              className="rounded-full ring-2 ring-white transition active:scale-90 dark:ring-slate-900"
+              className="flex h-11 w-11 items-center justify-center rounded-full transition active:scale-90"
               aria-label="Mein Profil"
             >
-              <Avatar userId={uid} size={40} />
+              <span className="rounded-full ring-2 ring-white dark:ring-slate-900">
+                <Avatar userId={uid} size={40} />
+              </span>
             </button>
           </div>
         </div>
@@ -537,19 +625,25 @@ function Main() {
           oben kleben. Sonst verdeckt der Kopf auf dem Handy die halbe Liste. */}
       <div>
         {tab === "kasse" && teamView && (
-          <div className="mx-auto mt-1 flex h-11 max-w-5xl items-center gap-2 rounded-xl bg-[rgb(118_118_128/0.12)] px-3 dark:bg-[rgb(118_118_128/0.24)]">
-            <span className="text-tinte-leise">
-              <Icon name="lupe" size={17} />
-            </span>
+          // Dasselbe Suchfeld wie überall (.field: weiße Zelle mit Haarlinie, 16 px) –
+          // vorher war es hier grau gefüllt, im Album und bei Rollen weiß.
+          <div className="relative mx-auto mt-1 max-w-5xl">
             <input
-              className="w-full min-w-0 bg-transparent text-base outline-none placeholder:text-tinte-leise"
+              type="text"
+              enterKeyHint="search"
+              aria-label="Name suchen"
+              className="field pr-12"
               placeholder="Name suchen"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
             {query && (
-              <button onClick={() => setQuery("")} aria-label="Suche leeren" className="px-1 text-tinte-leise">
-                ✕
+              <button
+                onClick={() => setQuery("")}
+                aria-label="Suche leeren"
+                className="absolute right-0 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center text-tinte-leise"
+              >
+                <Icon name="x" size={15} strich={2.4} />
               </button>
             )}
           </div>
@@ -665,7 +759,9 @@ function Main() {
 
       {tab === "rollen" ? (
         <main key={tab} className="animate-fadeIn mt-3 pb-4">
-          <RollenRechteTab />
+          <FaulGrenze fallback={<SkelettKarten n={3} />}>
+            <RollenRechteTab />
+          </FaulGrenze>
         </main>
       ) : tab === "profil" ? (
         <main key={tab} className="animate-fadeIn mt-3">
@@ -678,19 +774,27 @@ function Main() {
         </main>
       ) : tab === "events" ? (
         <main key={tab} className="animate-fadeIn mt-3">
-          <EventsTab />
+          <FaulGrenze fallback={<SkelettKarten n={3} />}>
+            <EventsTab />
+          </FaulGrenze>
         </main>
       ) : tab === "themen" ? (
         <main key={tab} className="animate-fadeIn mt-3 pb-4">
-          <ChatsTab />
+          <FaulGrenze fallback={<SkelettKarten n={3} />}>
+            <ChatsTab />
+          </FaulGrenze>
         </main>
       ) : tab === "finanzen" ? (
         <main key={tab} className="animate-fadeIn mt-3 pb-4">
-          <FinanzenTab kosten={kosten} />
+          <FaulGrenze fallback={<SkelettKarten n={3} />}>
+            <FinanzenTab kosten={kosten} />
+          </FaulGrenze>
         </main>
       ) : tab === "beitraege" ? (
         <main key={tab} className="animate-fadeIn mt-3 pb-4">
-          <BeitraegeTab />
+          <FaulGrenze fallback={<SkelettKarten n={3} />}>
+            <BeitraegeTab />
+          </FaulGrenze>
         </main>
       ) : !teamView ? (
         <main className="mt-3">
@@ -795,35 +899,32 @@ function Main() {
         </main>
       )}
 
-      {tab === "kasse" && teamView && canEditData && !massMode && (
+      {/* Schwebender „Neu“-Knopf nur auf dem Handy (unter 768 px): beschriftete Kapsel,
+          damit man die „+“ der Seite auseinanderhält. Ab iPad-Breite sitzt der
+          Knopf im Kopf (siehe neuKnopf). */}
+      {neuKnopf && !massMode && (
         <button
-          onClick={() => setShowAdd(true)}
-          className="fixed bottom-[calc(var(--leiste)+1rem)] right-4 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-brand text-white shadow-[0_8px_24px_-6px_rgb(var(--brand)/.6)] transition duration-200 ease-ios active:scale-90 sm:right-6 lg:bottom-8"
-          aria-label="Person hinzufügen"
+          data-tour="neu"
+          onClick={neuKnopf.los}
+          className="fixed bottom-[calc(var(--leiste)+1rem)] right-4 z-30 flex h-12 items-center gap-1.5 rounded-full bg-brand pl-4 pr-5 text-[16px] font-semibold text-white shadow-[0_8px_24px_-6px_rgb(var(--brand)/.6)] transition duration-200 ease-ios active:scale-90 sm:right-6 md:hidden"
+          aria-label={neuKnopf.label}
         >
-          <Icon name="plus" size={26} strich={2.4} />
-        </button>
-      )}
-
-      {tab === "events" && isStaff && (
-        <button
-          onClick={() => setShowComposer(true)}
-          className="fixed bottom-[calc(var(--leiste)+1rem)] right-4 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-brand text-white shadow-[0_8px_24px_-6px_rgb(var(--brand)/.6)] transition duration-200 ease-ios active:scale-90 sm:right-6 lg:bottom-8"
-          aria-label="Event erstellen"
-        >
-          <Icon name="plus" size={26} strich={2.4} />
+          <Icon name="plus" size={20} strich={2.6} />
+          {neuKnopf.text}
         </button>
       )}
 
       {massMode && (
-        <MassBar
-          selected={selected}
-          onAbwaehlen={waehleAus}
-          onDone={() => {
-            setMassMode(false);
-            setSelected(new Set());
-          }}
-        />
+        <FaulGrenze still>
+          <MassBar
+            selected={selected}
+            onAbwaehlen={waehleAus}
+            onDone={() => {
+              setMassMode(false);
+              setSelected(new Set());
+            }}
+          />
+        </FaulGrenze>
       )}
 
       {/* Tab-Leiste wie in iOS: ganz unten angedockt, über die volle Breite,
@@ -831,10 +932,13 @@ function Main() {
       {!massMode && (
         <nav
           ref={leisteRef}
-          className="pointer-events-none fixed inset-x-0 bottom-0 z-40 px-3 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] lg:hidden"
+          className={`pointer-events-none fixed inset-x-0 bottom-0 z-40 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] lg:hidden ${
+            // Viele Reiter (Admin: 7) brauchen auf schmalen Handys jeden Pixel
+            anzahlReiter >= 6 ? "px-1.5" : "px-3"
+          }`}
         >
           {/* Schwebende Glas-Kapsel wie in iOS 26 – die Linse gleitet zum gewählten Reiter */}
-          <div className="pointer-events-auto mx-auto max-w-md rounded-[2rem] border border-white/60 p-1 shadow-[0_8px_32px_-8px_rgba(0,0,0,.28),0_0_0_.5px_rgba(0,0,0,.08)] glas dark:border-white/10 dark:shadow-[0_8px_32px_-8px_rgba(0,0,0,.8),0_0_0_.5px_rgba(255,255,255,.08)]">
+          <div className="pointer-events-auto mx-auto max-w-md rounded-[2rem] border border-white/60 p-1 shadow-[0_8px_32px_-8px_rgba(0,0,0,.28),0_0_0_.5px_rgba(0,0,0,.08)] glas !bg-[rgb(var(--glas)/0.92)] dark:border-white/10 dark:shadow-[0_8px_32px_-8px_rgba(0,0,0,.8),0_0_0_.5px_rgba(255,255,255,.08)]">
             <GlasLeiste
               variante="unten"
               aktiv={tab}
@@ -852,39 +956,68 @@ function Main() {
       )}
 
       {/* Enthüllung des Abimottos – einmal pro Person, sobald es feststeht */}
-      <MottoEnthuellung />
-      <StudentSheet student={openStudent} punkte={punkte[openStudent?.id ?? ""] || 0} onClose={() => setOpenId(null)} />
-      <AddSheet open={showAdd} onClose={() => setShowAdd(false)} />
-      <EventComposer
-        open={showComposer}
-        onClose={() => setShowComposer(false)}
-        onVorlagen={() => {
-          setShowComposer(false);
-          setShowAktion(true);
-        }}
-        onUmfrage={() => {
-          setShowComposer(false);
-          setShowUmfragen(true);
-        }}
-      />
-      <UmfragenSheet open={showUmfragen} onClose={() => setShowUmfragen(false)} />
-      <AktionSheet offen={showAktion} onSchliessen={() => setShowAktion(false)} />
-      <ProfilSheet
-        open={showSettings}
-        onClose={() => setShowSettings(false)}
-        onTutorial={() => {
-          setShowSettings(false);
-          setShowTour(true);
-        }}
-      />
+      {ready && (
+        <FaulGrenze still>
+          <MottoEnthuellung />
+        </FaulGrenze>
+      )}
+      {/* Blätter: Datei wird erst beim ersten Öffnen geladen (ErstBeiBedarf) */}
+      <ErstBeiBedarf offen={openStudent !== null}>
+        <StudentSheet student={openStudent} punkte={punkte[openStudent?.id ?? ""] || 0} onClose={() => setOpenId(null)} />
+      </ErstBeiBedarf>
+      <ErstBeiBedarf offen={showAdd}>
+        <AddSheet open={showAdd} onClose={() => setShowAdd(false)} />
+      </ErstBeiBedarf>
+      <ErstBeiBedarf offen={showComposer}>
+        <EventComposer
+          open={showComposer}
+          onClose={() => setShowComposer(false)}
+          onVorlagen={() => {
+            setShowComposer(false);
+            setShowAktion(true);
+          }}
+          onUmfrage={() => {
+            setShowComposer(false);
+            setShowUmfragen(true);
+          }}
+        />
+      </ErstBeiBedarf>
+      <ErstBeiBedarf offen={showUmfragen}>
+        <UmfragenSheet open={showUmfragen} onClose={() => setShowUmfragen(false)} />
+      </ErstBeiBedarf>
+      <ErstBeiBedarf offen={showAktion}>
+        <AktionSheet offen={showAktion} onSchliessen={() => setShowAktion(false)} />
+      </ErstBeiBedarf>
+      <ErstBeiBedarf offen={showSettings}>
+        <ProfilSheet
+          open={showSettings}
+          onClose={() => setShowSettings(false)}
+          onTutorial={() => {
+            setShowSettings(false);
+            setShowTour(true);
+          }}
+          // „Was ist neu“: die Patch-Notes jederzeit wieder öffnen
+          onNeu={() => {
+            setShowSettings(false);
+            setShowPatch(true);
+          }}
+        />
+      </ErstBeiBedarf>
       {/* Nicht zwei Begrüßungen übereinander: erst die Einführung, danach der
-          Hinweis zum Home-Bildschirm. */}
+          Hinweis zum Home-Bildschirm (InstallOverlay wartet außerdem selbst auf
+          jede laufende Einführung). */}
       {!showTour && !showPatch && <InstallOverlay />}
       {/* Schicht vorbei: Stufenteam vergibt die Beitragspunkte mit einem Tipp */}
       {!showTour && !showPatch && <SchichtAbschluss />}
-      <NachtragSheet open={nachtragOffen} onClose={() => setNachtragOffen(false)} />
+      <ErstBeiBedarf offen={nachtragOffen}>
+        <NachtragSheet open={nachtragOffen} onClose={() => setNachtragOffen(false)} />
+      </ErstBeiBedarf>
       {/* Pop-up-Umfragen: nach Einführung und Patch Notes, vor allem anderen */}
-      <UmfragePopup bereitZumZeigen={roleReady && ready && !showTour && !showPatch} onSichtbar={setUmfrageSichtbar} />
+      {ready && (
+        <FaulGrenze still>
+          <UmfragePopup bereitZumZeigen={roleReady && ready && !showTour && !showPatch} onSichtbar={setUmfrageSichtbar} />
+        </FaulGrenze>
+      )}
       <Tour
         open={nachtragHinweis}
         steps={[
@@ -927,8 +1060,10 @@ function Main() {
                 finanzen: showFinanzen,
                 rollen: canManageRoles,
                 rechte: can("perms.manage"),
+                profilReiter: hatProfilReiter,
+                nachtragen: Boolean(studentId),
               })
-            : schuelerSchritte(staffelVon(settings))
+            : schuelerSchritte(staffelVon(settings), { nachtragen: Boolean(studentId), finanzen: showFinanzen })
         }
         onTab={(t) => {
           setShowFilter(false);
@@ -938,9 +1073,12 @@ function Main() {
         onClose={() => {
           setShowTour(false);
           setTab(hatProfilReiter ? "profil" : "kasse");
-          // Wer die Einführung gerade gesehen hat, braucht die Patch Notes nicht
+          // Wer die Einführung gerade gesehen hat, braucht die Patch Notes nicht –
+          // und den „Neu: Mithilfe nachtragen“-Hinweis auch nicht (die Einführung
+          // erklärt den Knopf selbst)
           try {
             localStorage.setItem(PATCH_MERKER, PATCH.version);
+            if (studentId) localStorage.setItem(NACHTRAG_HINWEIS, "1");
           } catch {
             /* privater Modus */
           }

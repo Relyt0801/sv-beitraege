@@ -36,7 +36,7 @@ export function TermChip({
 
   let cls: string, glyph: string;
   if (pre) {
-    cls = "border-dashed border-papier-linie text-tinte-leise dark:border-slate-600 dark:text-slate-500";
+    cls = "border-dashed border-black/25 text-tinte-leise dark:border-slate-600 dark:text-slate-500";
     glyph = "–";
   } else if (dead) {
     cls = "bg-red-100 text-red-500 border-red-200 opacity-70 dark:bg-red-500/15 dark:text-red-300 dark:border-red-500/25";
@@ -50,7 +50,7 @@ export function TermChip({
     glyph = GLYPH[t.status];
   }
 
-  const size = big ? "h-14 text-sm" : kompakt ? "h-8 text-[11px]" : "h-12 text-[13px] sm:h-[52px] lg:h-16 lg:text-[15px]";
+  const size = big ? "h-14 text-sm" : kompakt ? "h-9 text-[12px]" : "h-12 text-[13px] sm:h-[52px] lg:h-16 lg:text-[15px]";
   const ring = isCur
     ? kompakt
       ? "ring-2 ring-brand"
@@ -71,7 +71,7 @@ export function TermChip({
       }`}
     >
       {/* Früher 8 px mit 70 % Deckkraft – kaum lesbar (Kontrast 3,1:1). */}
-      <span className={`font-semibold ${kompakt ? "text-[9px] leading-none" : "text-[10px] lg:text-[12px]"}`}>{h}</span>
+      <span className={`font-semibold ${kompakt ? "text-[12px] leading-none" : "text-[12px] lg:text-[13px]"}`}>{h}</span>
       <span
         className={`${kompakt ? "text-[12px]" : "text-base"} ${
           t.status === "erlassen" && !inactive ? (kompakt ? "font-black" : "text-lg font-black") : ""
@@ -100,7 +100,7 @@ export function HalbjahrLegende({ nichtDabei = false }: { nichtDabei?: boolean }
     <li key={e.text} className="flex min-w-0 items-center gap-1 whitespace-nowrap">
       <span
         aria-hidden
-        className={`flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-[5px] border text-[10px] leading-none ${e.fett ? "font-black" : "font-bold"} ${e.cls}`}
+        className={`flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-[5px] border text-[12px] leading-none ${e.fett ? "font-black" : "font-bold"} ${e.cls}`}
       >
         {e.glyph}
       </span>
@@ -108,12 +108,12 @@ export function HalbjahrLegende({ nichtDabei = false }: { nichtDabei?: boolean }
     </li>
   );
   return (
-    <div className="mt-3 text-[clamp(11px,3.1vw,12px)] text-tinte-matt dark:text-slate-300" aria-label="Legende">
+    <div className="mt-3 text-[12px] text-tinte-matt dark:text-slate-300" aria-label="Legende">
       <ul className="flex flex-nowrap items-center justify-between gap-x-2">{eintraege.map(punkt)}</ul>
       {nichtDabei && (
         <ul className="mt-1.5 flex">
           {punkt({
-            cls: "border-dashed border-papier-linie text-tinte-leise dark:border-slate-600 dark:text-slate-500",
+            cls: "border-dashed border-black/25 text-tinte-leise dark:border-slate-600 dark:text-slate-500",
             glyph: "–",
             text: "nicht dabei (vor dem Eintritt)",
           })}

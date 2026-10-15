@@ -5,7 +5,7 @@ import { lesbarerName } from "./lib/profil";
 import { abonniere } from "./lib/realtime";
 import { committeeIcon, committeeLabel } from "./lib/committees";
 
-import { meldeFehler } from "./lib/melder";
+import { melde, meldeFehler } from "./lib/melder";
 import { demoRolle } from "./lib/demo";
 /** Pop-up zu einer Chat-Nachricht. Wer es bekommt, entscheidet der Server. */
 async function chatPush(itemId: string, angepinnt = false): Promise<void> {
@@ -220,6 +220,8 @@ interface TopicsValue {
   postItem: (topic: Topic, type: TopicItemType, body: string, options?: string[], title?: string, meta?: { role?: string | null; koms?: string[]; pinned?: boolean; poll?: { multi?: boolean; anon?: boolean; deadline?: string | null; antwortArt?: "kurz" | "lang" | "zahl" | null; eigene?: boolean } }) => Promise<void>;
   updateItem: (id: string, patch: Partial<Pick<TopicItem, "done" | "pinned">>) => Promise<void>;
   deleteItem: (id: string) => Promise<void>;
+  /** Eine nicht gesendete Nachricht noch einmal abschicken (Knopf „Erneut senden“ in der Blase). */
+  erneutSenden: (id: string) => Promise<void>;
   vote: (itemId: string, optionId: string, multi?: boolean) => Promise<void>;
   /** Als gelesen markieren – Chat und Übersicht getrennt (ohne Angabe: beides). */
   markRead: (topicId: string, bereich?: LeseBereich) => void;
@@ -592,6 +594,42 @@ export function TopicsProvider({ children }: { children: ReactNode }) {
     [tagMembers],
   );
 
+  /**
+   * Eintrag an den Server schicken. Klappt es nicht, bleibt er stehen und wird
+   * markiert (statt zu verschwinden): so sieht man, dass etwas geschrieben wurde
+   * und dass es nicht angekommen ist – und kann es mit „Erneut senden“ wiederholen.
+   * Gemeinsamer Weg für das erste Senden und den zweiten Versuch.
+   */
+  const sendeItem = useCallback(async (item: TopicItem): Promise<boolean> => {
+    const { error } = await supabase!.from("topic_items").insert({
+      id: item.id, topic_id: item.topic_id, type: item.type, title: item.title, body: item.body,
+      options: item.options, pinned: item.pinned, author: item.author,
+      poll_multi: item.poll_multi, poll_anon: item.poll_anon, poll_deadline: item.poll_deadline,
+      ...(item.antwort_art ? { antwort_art: item.antwort_art } : {}),
+      author_role: item.author_role, author_koms: item.author_koms, created_by: uidRef.current,
+    });
+    // 23505 = gibt es schon: der erste Versuch ist doch angekommen, nur die Antwort ging verloren
+    if (error && (error as { code?: string }).code !== "23505") {
+      setItems((p) => p.map((i) => (i.id === item.id ? { ...i, nicht_gesendet: error.message } : i)));
+      meldeFehler("Die Nachricht ging nicht raus: " + error.message);
+      return false;
+    }
+    setItems((p) => p.map((i) => (i.id === item.id && i.nicht_gesendet ? { ...i, nicht_gesendet: undefined } : i)));
+    // Empfänger rechnet der Server aus (send-push, chat_item_id). Im Browser
+    // sieht ein Schüler nur seine eigene Komitee-Zeile – vorher landeten
+    // Chat-Pop-ups deshalb nur bei den Nachrichten des Teams.
+    void chatPush(item.id);
+    return true;
+  }, []);
+
+  const erneutSenden: TopicsValue["erneutSenden"] = useCallback(async (id) => {
+    const item = stateRef.current.items.find((i) => i.id === id);
+    if (!item || !hasSupabase) return;
+    // Markierung sofort weg: der Knopf soll beim Tippen sichtbar „arbeiten“ und nicht doppelt auslösen
+    setItems((p) => p.map((i) => (i.id === id ? { ...i, nicht_gesendet: undefined } : i)));
+    if (await sendeItem({ ...item, nicht_gesendet: undefined })) melde("Gesendet", "erfolg");
+  }, [sendeItem]);
+
   const postItem: TopicsValue["postItem"] = useCallback(async (topic, type, body, options, title = "", meta) => {
     const item: TopicItem = {
       id: uuid(), topic_id: topic.id, type, title: title.trim(), body: body.trim(),
@@ -613,38 +651,34 @@ export function TopicsProvider({ children }: { children: ReactNode }) {
     // Sofort anzeigen – die Nachricht steht da, bevor der Server geantwortet hat.
     setItems((p) => [...p, item]);
     if (!hasSupabase) return;
-    const { error } = await supabase!.from("topic_items").insert({
-      id: item.id, topic_id: item.topic_id, type: item.type, title: item.title, body: item.body,
-      options: item.options, pinned: item.pinned, author: item.author,
-      poll_multi: item.poll_multi, poll_anon: item.poll_anon, poll_deadline: item.poll_deadline,
-      ...(item.antwort_art ? { antwort_art: item.antwort_art } : {}),
-      author_role: item.author_role, author_koms: item.author_koms, created_by: uidRef.current,
-    });
-    if (error) {
-      // Stehen lassen und markieren statt löschen: so sieht man, dass etwas
-      // geschrieben wurde und dass es nicht angekommen ist.
-      setItems((p) => p.map((i) => (i.id === item.id ? { ...i, nicht_gesendet: error.message } : i)));
-      meldeFehler("Die Nachricht ging nicht raus: " + error.message);
-      return;
-    }
-    // Empfänger rechnet der Server aus (send-push, chat_item_id). Im Browser
-    // sieht ein Schüler nur seine eigene Komitee-Zeile – vorher landeten
-    // Chat-Pop-ups deshalb nur bei den Nachrichten des Teams.
-    void chatPush(item.id);
-  }, []);
+    await sendeItem(item);
+  }, [sendeItem]);
 
   const updateItem: TopicsValue["updateItem"] = useCallback(async (id, patch) => {
     setItems((p) => p.map((i) => (i.id === id ? { ...i, ...patch } : i)));
     if (!hasSupabase) return;
     const { error } = await supabase!.from("topic_items").update(patch).eq("id", id);
+    if (error) {
+      // Der Bildschirm hat die Änderung schon gezeigt – also sagen, dass sie nicht gespeichert
+      // ist, und den echten Stand vom Server zurückholen (sonst zeigt er etwas Falsches).
+      meldeFehler("Die Änderung wurde nicht gespeichert: " + error.message);
+      planeNachladen();
+      return;
+    }
     // Frisch angepinnt: alle Bescheid geben – auch wer Chat-Meldungen aus hat.
-    if (!error && patch.pinned === true) void chatPush(id, true);
-  }, []);
+    if (patch.pinned === true) void chatPush(id, true);
+  }, [planeNachladen]);
 
   const deleteItem: TopicsValue["deleteItem"] = useCallback(async (id) => {
     setItems((p) => p.filter((i) => i.id !== id));
-    if (hasSupabase) await supabase!.from("topic_items").delete().eq("id", id);
-  }, []);
+    if (!hasSupabase) return;
+    const { error } = await supabase!.from("topic_items").delete().eq("id", id);
+    if (error) {
+      // Sonst verschwindet der Eintrag nur auf diesem Gerät und kommt beim nächsten Laden zurück
+      meldeFehler("Das Löschen hat nicht geklappt: " + error.message);
+      planeNachladen();
+    }
+  }, [planeNachladen]);
 
   const vote: TopicsValue["vote"] = useCallback(async (itemId, optionId, multi = false) => {
     const bisher = stateRef.current.myVotes[itemId] || [];
@@ -696,6 +730,7 @@ export function TopicsProvider({ children }: { children: ReactNode }) {
     // die ganze Seite neu laden lassen.
     if (schiefgegangen) {
       console.error("[Abstimmung]", schiefgegangen);
+      meldeFehler("Deine Stimme ist nicht angekommen: " + schiefgegangen);
       planeNachladen();
     }
   }, [planeNachladen]);
@@ -768,7 +803,7 @@ export function TopicsProvider({ children }: { children: ReactNode }) {
   const value: TopicsValue = {
     topics, items, members, topicTags, tagMembers, myVotes, voteCounts, voters, reads, readsUebersicht, reaktionen, reagieren,
     uid: uidRef.current, ready,
-    createTopic, updateTopic, deleteTopic, setMembers, setTagMembers, setUserCommittee, selfAssignCommittee, committeesOf, postItem, updateItem, deleteItem, vote, markRead, unreadCount,
+    createTopic, updateTopic, deleteTopic, setMembers, setTagMembers, setUserCommittee, selfAssignCommittee, committeesOf, postItem, updateItem, deleteItem, erneutSenden, vote, markRead, unreadCount,
   };
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

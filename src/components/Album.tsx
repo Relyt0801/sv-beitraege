@@ -17,9 +17,9 @@ import {
 import { frage, melde, meldeFehler } from "../lib/melder";
 import { useFunktionen } from "../lib/funktionen";
 import { LiedSuche, SpotifyKarte, ohneLink, spotifyAus } from "./Spotify";
-import { FarbKarte, KleinerRing, KnopfGlas, KnopfHell } from "./Kachel";
+import { FarbKarte, FussLeiste, KleinerRing, KnopfGlas, KnopfHell } from "./Kachel";
 import { WortfilterSchalter } from "./AutorInfo";
-import { TeilMarke, TeilUmschalter } from "./TeilUmschalter";
+import { TeilMarke, TeilUmschalter, useVerschiebenRueckfrage } from "./TeilUmschalter";
 import { TEIL_NAME, useTeil, useVerschiebungen, type Teil } from "../lib/teile";
 import { AusHinweis } from "./Funktionen";
 import { GesperrtZeile, GESPERRT_TEXT } from "./Gesperrt";
@@ -124,7 +124,8 @@ function Herz({ an, n, onClick, klein }: { an: boolean; n: number; onClick: () =
       }}
       aria-label={an ? "Gefällt mir nicht mehr" : "Gefällt mir"}
       aria-pressed={an}
-      className={`flex items-center gap-1 ${klein ? "flex-col gap-0 text-[11px]" : "text-[14px]"} font-semibold transition active:scale-90 ${
+      // Tippfläche mindestens 44 × 44 px, auch wenn das Symbol klein bleibt
+      className={`flex min-h-[44px] min-w-[44px] items-center justify-center gap-1 ${klein ? "flex-col gap-0 self-start text-[11px]" : "text-[14px]"} font-semibold transition active:scale-90 ${
         an ? "text-[#FF2D55]" : "text-tinte-leise"
       }`}
     >
@@ -141,6 +142,9 @@ function Herz({ an, n, onClick, klein }: { an: boolean; n: number; onClick: () =
     </button>
   );
 }
+
+/** Kleine Text-Aktion (Melden, Löschen …): sieht klein aus, die Tippfläche ist unsichtbar größer (mind. 40 px hoch) */
+const MINI_AKTION = "relative before:absolute before:-inset-x-2 before:-inset-y-3.5 before:content-['']";
 
 function vorWann(iso: string): string {
   const s = (Date.now() - new Date(iso).getTime()) / 1000;
@@ -175,6 +179,9 @@ export function AlbumKarte({ className = "" }: { className?: string }) {
     <div className={`flex flex-col ${className}`}>
       <AusHinweis funktion="album" className="mb-1.5 px-1" />
       <FarbKarte
+        // Ganze Karte antippbar: öffnet das Album (die Knöpfe unten bleiben als Abkürzungen)
+        onClick={() => oeffne(null)}
+        label="Abi-Album öffnen"
         verlauf="from-[#FF375F] to-[#E0164A]"
         schatten="shadow-[0_12px_28px_-14px_rgba(224,22,74,.8)]"
         oben="Abi-Album"
@@ -486,6 +493,8 @@ function SteckbriefAnsicht({
   const zahlTeil = (t: Teil) => alleKommentare.filter((k) => (k.bereich ?? "inoffiziell") === t).length;
   const darfVerschieben = can("album.moderieren");
   const vs = useVerschiebungen("album_kommentare", darfVerschieben, album.neuLaden);
+  // Rückfrage überall gleich: mit Zahl der nötigen Zustimmungen (Admin: reicht allein)
+  const verschiebenFrage = useVerschiebenRueckfrage();
   const gelikt = album.likes.some((l) => l.student_id === id && l.user_id === album.me);
   const likes = album.likes.filter((l) => l.student_id === id).length;
   const [neu, setNeu] = useState("");
@@ -592,7 +601,7 @@ function SteckbriefAnsicht({
       )}
       {!ich && s && (s.text.trim() || Object.keys(s.stammdaten || {}).length > 0) && (
         <div className="mt-2 text-right">
-          <MeldenKnopf label="Steckbrief melden" onClick={() => melden("steckbrief", id)} />
+          <MeldenKnopf label="Steckbrief melden" className="min-h-[44px] px-2 text-[13px]" onClick={() => melden("steckbrief", id)} />
         </div>
       )}
       {darfSchreiben && (
@@ -621,10 +630,10 @@ function SteckbriefAnsicht({
                 <p className="text-[14px] leading-snug">
                   <b className="font-semibold">{k.autor_name}</b> <span className="whitespace-pre-wrap break-words">{k.text}</span>
                 </p>
-                <div className="mt-0.5 flex gap-3 text-[12px] text-tinte-leise">
+                <div className="mt-0.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] text-tinte-leise">
                   <span>{vorWann(k.created_at)}</span>
                   {n > 0 && <span className="font-semibold">{n} „Gefällt mir“</span>}
-                  {k.user_id !== album.me && <MeldenKnopf onClick={() => melden("kommentar", k.id)} />}
+                  {k.user_id !== album.me && <MeldenKnopf className={MINI_AKTION} onClick={() => melden("kommentar", k.id)} />}
                   {darfVerschieben &&
                     (() => {
                       const antrag = vs.antragZu(k.id);
@@ -632,7 +641,7 @@ function SteckbriefAnsicht({
                       if (antrag)
                         return (
                           <button
-                            className="font-semibold text-brand"
+                            className={`font-semibold text-brand ${MINI_AKTION}`}
                             disabled={antrag.ich}
                             onClick={() => void vs.zustimmen(antrag.id)}
                             title={`Nach „${TEIL_NAME[antrag.nach]}“ verschieben – Zustimmungen`}
@@ -642,9 +651,9 @@ function SteckbriefAnsicht({
                         );
                       return (
                         <button
-                          className="font-semibold"
+                          className={`font-semibold ${MINI_AKTION}`}
                           onClick={() =>
-                            void frage(`Diesen Kommentar nach „${TEIL_NAME[nach]}“ verschieben? Das braucht Zustimmungen aus dem Team.`, "Verschieben").then((ok) => {
+                            void verschiebenFrage(nach).then((ok) => {
                               if (ok) void vs.beantragen(k.id, nach);
                             })
                           }
@@ -655,7 +664,7 @@ function SteckbriefAnsicht({
                     })()}
                   {darfEntfernen(k) && (
                     <button
-                      className="font-semibold"
+                      className={`font-semibold ${MINI_AKTION}`}
                       onClick={() =>
                         void frage("Kommentar löschen?", "Löschen", true).then(async (ok) => {
                           if (!ok) return;
@@ -676,12 +685,12 @@ function SteckbriefAnsicht({
       </ul>
       <div ref={ende} />
 
-      {/* Eingabe klebt unten */}
-      <div className="sticky bottom-0 -mx-5 mt-4 border-t border-black/[0.06] bg-white/95 px-5 pb-1 pt-3 backdrop-blur dark:border-white/10 dark:bg-slate-900/95">
+      {/* Eingabe klebt unten – bis an den Rand des Blatts (FussLeiste deckt auch den Streifen unter der Leiste ab) */}
+      <FussLeiste className="!bg-papier dark:!bg-slate-900">
         <div className="flex items-center gap-2">
           <input
             className="field flex-1 !rounded-full"
-            placeholder={`${TEIL_NAME[teil]}er Kommentar zu ${p.vorname} …`}
+            placeholder={`${TEIL_NAME[teil]}er Kommentar …`}
             value={neu}
             maxLength={500}
             onChange={(e) => setNeu(e.target.value)}
@@ -690,12 +699,12 @@ function SteckbriefAnsicht({
           <button
             disabled={!neu.trim() || sendet}
             onClick={() => void senden()}
-            className="rounded-full px-3 py-2 text-[15px] font-semibold text-brand disabled:opacity-35"
+            className="min-h-[44px] shrink-0 rounded-full px-4 text-[15px] font-semibold text-brand transition active:scale-95 disabled:opacity-35"
           >
             Posten
           </button>
         </div>
-      </div>
+      </FussLeiste>
     </div>
   );
 }

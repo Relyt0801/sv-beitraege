@@ -69,6 +69,10 @@ export function GlasLeiste<K extends string>({
   }, [aktiv, reiter.length, rahmenVon]);
 
   const unten = variante === "unten";
+  // Viele Reiter (Admin: 7) auf schmalem Handy: Schrift bleibt bei 10 px (kleiner
+  // wird es unleserlich), dafür weniger Innenabstand und engerer Buchstabenabstand –
+  // gekürzt („Finanz…“) wird nichts mehr.
+  const eng = unten && reiter.length >= 6;
   const feder = bereit ? "transform 520ms cubic-bezier(.34,1.32,.5,1), width 520ms cubic-bezier(.34,1.32,.5,1), opacity 200ms" : "none";
 
   return (
@@ -123,23 +127,26 @@ export function GlasLeiste<K extends string>({
             onPointerCancel={() => setGedrueckt(false)}
             className={`relative z-[1] flex min-w-0 items-center justify-center rounded-full transition-colors duration-300 ease-ios ${
               unten
-                ? "flex-1 flex-col gap-[2px] px-0.5 py-[7px] text-[10px] font-semibold tracking-[-0.01em]"
+                ? `flex-1 flex-col gap-[2px] py-[7px] text-[10px] font-semibold ${eng ? "px-0 tracking-[-0.025em]" : "px-0.5 tracking-[-0.01em]"}`
                 : "shrink-0 gap-1.5 px-3.5 py-1.5 text-[14px] font-semibold"
             } ${an ? "text-brand dark:text-brand-dark" : "text-[#3C3C43]/75 dark:text-white/70"}`}
           >
             <span className={`relative flex items-center leading-none ${unten ? "h-[24px]" : ""}`}>
               {r.icon}
-              {(r.badge ?? 0) > 0 && (
-                <span
-                  className={`flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#FF3B30] px-1 text-[11px] font-semibold text-white ${
-                    unten ? "absolute -right-3 -top-1 ring-2 ring-[rgb(var(--glas))]" : "ml-1.5"
-                  }`}
-                >
+              {/* Handy: Zahl am Symbol. Laptop/iPad quer: erst die Beschriftung,
+                  dann die Zahl – sonst liest sich „Symbol 8 Events“ wie „8 Events“. */}
+              {unten && (r.badge ?? 0) > 0 && (
+                <span className="absolute -right-3 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#FF3B30] px-1 text-[11px] font-semibold text-white ring-2 ring-[rgb(var(--glas))]">
                   {r.badge! > 9 ? "9+" : r.badge}
                 </span>
               )}
             </span>
-            <span className={unten ? "w-full truncate text-center" : ""}>{r.label}</span>
+            <span className={unten ? "w-full whitespace-nowrap text-center" : ""}>{r.label}</span>
+            {!unten && (r.badge ?? 0) > 0 && (
+              <span className="-ml-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#FF3B30] px-1 text-[11px] font-semibold text-white">
+                {r.badge! > 9 ? "9+" : r.badge}
+              </span>
+            )}
           </button>
         );
       })}

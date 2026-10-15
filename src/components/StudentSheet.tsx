@@ -3,9 +3,9 @@ import { HY, type Halbjahr, type Status, type Student } from "../lib/types";
 import { basisOffen, beitragFuer, isDead, isPreJoin, prozentVon, ticketPreise } from "../lib/logic";
 import { useStore } from "../store";
 import { useRole } from "../auth/RoleProvider";
-import { Sheet } from "./Sheet";
+import { Sheet, SheetKopf } from "./Sheet";
 import { PunkteSheet } from "./PunkteSheet";
-import { Gruppe, KopfBild, RechnungKopf, Wert, Zeile, ZeileAuswahl } from "./Liste";
+import { Gruppe, Wert, Zeile, ZeileAuswahl } from "./Liste";
 
 import { frage } from "../lib/melder";
 import { usePasswortNeu } from "./PasswortNeu";
@@ -42,20 +42,25 @@ export function StudentSheet({
   const offen = basisOffen(student, settings.aktuelles_halbjahr, settings);
   const pct = prozentVon(punkte, settings);
   const ticket = ticketPreise(pct, settings);
-  const initialen = ((student.vorname[0] || "") + (student.nachname[0] || "")).toUpperCase();
 
   return (
     <Sheet open onClose={onClose}>
-      <div className="mx-auto max-w-md">
-        <RechnungKopf
-          bild={<KopfBild text={initialen} />}
-          oben={`${student.vorname} ${student.nachname}`}
-          wert={`${offen} €`}
-          wertKlasse={offen > 0 ? "text-offen dark:text-amber-300" : "text-bezahlt dark:text-emerald-300"}
-          titel={offen > 0 ? `noch offen bis ${settings.aktuelles_halbjahr}` : "alles bezahlt"}
+      <div>
+        <SheetKopf
+          titel={`${student.vorname} ${student.nachname}`}
           unter={`dabei seit ${student.beigetreten_ab}`}
           onClose={onClose}
         />
+
+        <Gruppe>
+          <Zeile label={offen > 0 ? `Noch offen bis ${settings.aktuelles_halbjahr}` : "Beitrag"}>
+            <Wert stark>
+              <span className={offen > 0 ? "text-offen dark:text-amber-300" : "text-bezahlt dark:text-emerald-300"}>
+                {offen > 0 ? `${offen} €` : "alles bezahlt"}
+              </span>
+            </Wert>
+          </Zeile>
+        </Gruppe>
 
         {/* ------------------------------------------------- Halbjahre */}
         <Gruppe titel="Halbjahre" fuss={canEditBeitrag ? "Antippen: offen → bezahlt → erlassen" : undefined}>
@@ -79,7 +84,7 @@ export function StudentSheet({
                 <span className="w-12 shrink-0 text-[15px] font-semibold">{h}</span>
                 <span className="zahl min-w-0 flex-1 text-[14px] text-tinte-leise">
                   {beitragFuer(h, settings)} €
-                  {jetzt && !aus && <span className="ml-2 text-[11px] font-bold text-brand">jetzt</span>}
+                  {jetzt && !aus && <span className="ml-2 text-[12px] font-bold text-brand">jetzt</span>}
                 </span>
                 <span
                   className={`shrink-0 rounded-full px-2.5 py-1 text-[12.5px] font-semibold transition-colors duration-200 ${
@@ -99,7 +104,7 @@ export function StudentSheet({
             <Wert stark>{pct} %</Wert>
           </Zeile>
           <Zeile label="1. Abiball-Ticket">
-            <Wert>{ticket.preisSteht ? `${ticket.erstes} €` : `+${ticket.aufschlag - ticket.rabatt} € Zuschlag`}</Wert>
+            <Wert>{ticket.preisSteht ? `${ticket.erstes} €` : `+${ticket.aufschlag - ticket.rabatt} € Aufschlag`}</Wert>
           </Zeile>
         </Gruppe>
 

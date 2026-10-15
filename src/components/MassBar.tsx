@@ -4,6 +4,7 @@ import { useStore } from "../store";
 import { useRole } from "../auth/RoleProvider";
 import { sortStudents } from "../lib/logic";
 import { MithilfeBlatt } from "./MithilfeBlatt";
+import { useEscapeSchliesst } from "./Sheet";
 
 /**
  * Leiste im Auswahl-Modus der Kasse.
@@ -14,6 +15,10 @@ import { MithilfeBlatt } from "./MithilfeBlatt";
  * eine Auswahl aus einer früheren Suche bleibt stehen. So bekam jemand
  * Mithilfe samt „Danke fürs Mithelfen“-Mitteilung, ohne irgendwo
  * eingetragen zu sein – und niemand sah es vor dem Tippen.
+ *
+ * Update 1.4 (U3): schwebt als Glas-Karte (am Laptop nicht mehr über die ganze
+ * Fensterbreite), Knöpfe im Stil der App, Escape beendet den Auswahl-Modus
+ * (solange nicht das Mithilfe-Blatt darüber offen ist).
  */
 export function MassBar({
   selected,
@@ -32,7 +37,11 @@ export function MassBar({
   // Nur Personen, die es noch gibt – alphabetisch wie in der Liste.
   const ausgewaehlt = useMemo(() => sortStudents(students.filter((s) => selected.has(s.id))), [students, selected]);
 
-  const btn = "rounded-xl border border-papier-linie bg-papier-matt px-3 py-2 text-sm font-bold text-tinte disabled:opacity-40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200";
+  // Escape beendet den Modus. Ist das Mithilfe-Blatt offen, liegt es im Escape-
+  // Stapel (Sheet.tsx) weiter oben und schließt zuerst – dieses Escape bekommt nur das oberste.
+  useEscapeSchliesst(true, onDone);
+
+  const btn = "btn-klein-grau !px-3.5";
   const disabled = ausgewaehlt.length === 0;
 
   const namen = ausgewaehlt.length > 0 && (
@@ -47,18 +56,21 @@ export function MassBar({
           <span className="truncate">
             {s.nachname}, {s.vorname}
           </span>
-          <span className="shrink-0 text-tinte-leise">✕</span>
+          <span className="shrink-0 px-1 text-tinte-leise">✕</span>
         </button>
       ))}
     </div>
   );
 
   return (
-    <div className="fixed inset-x-0 bottom-0 z-40 flex flex-wrap items-center gap-2 border-t border-papier-linie bg-white/95 px-3.5 py-2.5 pb-[calc(env(safe-area-inset-bottom)+0.6rem)] backdrop-blur dark:border-slate-800 dark:bg-slate-900/95">
+    <div className="pointer-events-none fixed inset-x-0 bottom-0 z-40 px-3 pb-[calc(env(safe-area-inset-bottom)+0.5rem)]">
+    <div className="pointer-events-auto mx-auto flex max-w-3xl flex-wrap items-center gap-2 rounded-[1.5rem] border border-white/60 p-3 shadow-[0_8px_32px_-8px_rgba(0,0,0,.28),0_0_0_.5px_rgba(0,0,0,.08)] glas dark:border-white/10">
       {namen}
-      <span className="mr-auto text-sm font-bold">{ausgewaehlt.length} ausgewählt</span>
+      <span className="mr-auto text-[15px] font-semibold">{ausgewaehlt.length} ausgewählt</span>
+      {/* Halbjahr: native Auswahl, aber wie die übrigen Knöpfe gestaltet */}
       <select
-        className="rounded-xl border border-papier-linie bg-papier-matt px-2.5 py-2 text-sm font-bold dark:border-slate-700 dark:bg-slate-800"
+        aria-label="Halbjahr"
+        className="min-h-[2.5rem] rounded-full bg-[rgb(118_118_128/0.12)] px-3.5 text-[14px] font-semibold text-brand-dark outline-none dark:bg-[rgb(118_118_128/0.24)] dark:text-brand"
         value={h}
         onChange={(e) => setH(e.target.value as Halbjahr)}
       >
@@ -67,20 +79,20 @@ export function MassBar({
         ))}
       </select>
       <button disabled={disabled} className={btn} onClick={() => massApply(selected, h, "bezahlt")}>
-        ✓ bezahlt
+        bezahlt
       </button>
       <button disabled={disabled} className={btn} onClick={() => massApply(selected, h, "erlassen")}>
-        ~ erlassen
+        erlassen
       </button>
       <button disabled={disabled} className={btn} onClick={() => massApply(selected, h, "offen")}>
         offen
       </button>
       {canEditHilfen && (
         <button disabled={disabled} className={btn} onClick={() => setPunkteOffen(true)}>
-          ＋ Mithilfe
+          Mithilfe
         </button>
       )}
-      <button className="rounded-xl bg-brand px-3 py-2 text-sm font-bold text-white" onClick={onDone}>
+      <button className="btn-klein !px-5" onClick={onDone}>
         Fertig
       </button>
 
@@ -93,9 +105,9 @@ export function MassBar({
         knopf={`Für ${ausgewaehlt.length} eintragen`}
         zusatz={
           <div className="mt-4">
-            <div className="mb-1.5 px-4 text-[12px] font-semibold uppercase tracking-[0.04em] text-tinte-leise">Wer war dabei?</div>
+            <div className="mb-1.5 px-4 text-[13px] font-semibold uppercase tracking-[0.02em] text-tinte-leise">Wer war dabei?</div>
             <div className="rounded-2xl zelle p-3">{namen}</div>
-            <p className="mt-1.5 px-4 text-[11.5px] text-tinte-leise">Antippen zum Abwählen. Alle bekommen eine Mitteilung.</p>
+            <p className="mt-1.5 px-4 text-[12px] text-tinte-leise">Antippen zum Abwählen. Alle bekommen eine Mitteilung.</p>
           </div>
         }
         onEintragen={(titel, p, datum) => {
@@ -109,6 +121,7 @@ export function MassBar({
           onDone();
         }}
       />
+    </div>
     </div>
   );
 }

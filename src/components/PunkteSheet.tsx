@@ -1,10 +1,11 @@
 import { useState } from "react";
 import type { Contribution, Settings, Student } from "../lib/types";
 import { useStore } from "../store";
-import { Sheet } from "./Sheet";
+import { Sheet, SheetKopf } from "./Sheet";
 import { prozentVon, ticketPreise } from "../lib/logic";
 import { StaffelKacheln } from "./Staffel";
-import { Gruppe, KopfBild, RechnungKopf } from "./Liste";
+import { Gruppe, Wert, Zeile } from "./Liste";
+import { Icon } from "./Icon";
 import { MithilfeBlatt } from "./MithilfeBlatt";
 import { useProfiles } from "../profiles-store";
 
@@ -42,16 +43,21 @@ export function PunkteSheet({
 
   return (
     <Sheet open={open} onClose={onClose}>
-      <div className="mx-auto max-w-md">
-        <RechnungKopf
-          bild={<KopfBild text="🙌" />}
-          oben={`${student.vorname} ${student.nachname}`}
-          wert={`${pct} %`}
-          wertKlasse={pct > 100 ? "text-[#9A7410] dark:text-[#E9C460]" : pct >= 100 ? "text-bezahlt dark:text-emerald-300" : "text-brand"}
-          titel="mitgeholfen"
-          unter={ticket.preisSteht ? `1. Abiball-Ticket ${ticket.erstes} €` : `Zuschlag aufs 1. Ticket ${ticket.aufschlag - ticket.rabatt} €`}
+      <div>
+        <SheetKopf
+          titel={`${student.vorname} ${student.nachname}`}
+          unter="Mithilfe und Ticketpreis"
           onClose={onClose}
         />
+
+        <Gruppe>
+          <Zeile label="Mitgeholfen">
+            <Wert stark>{pct} %</Wert>
+          </Zeile>
+          <Zeile label={ticket.preisSteht ? "1. Abiball-Ticket" : "Aufschlag aufs 1. Ticket"}>
+            <Wert>{ticket.preisSteht ? `${ticket.erstes} €` : `${ticket.aufschlag - ticket.rabatt} €`}</Wert>
+          </Zeile>
+        </Gruppe>
 
         <StaffelKacheln pct={pct} settings={settings} />
 
@@ -109,38 +115,33 @@ function EintragZeile({
   if (edit)
     return (
       <div className="grid gap-2 px-4 py-3">
-        <input
-          className="w-full rounded-lg bg-white px-3 py-2 text-[15px] outline-none dark:bg-slate-800"
-          value={titel}
-          onChange={(e) => setTitel(e.target.value)}
-          autoFocus
-          aria-label="Wofür"
-        />
+        <input className="field" value={titel} onChange={(e) => setTitel(e.target.value)} autoFocus aria-label="Wofür" />
         <div className="flex items-center gap-2">
-          <span className="flex items-center gap-1">
-            <input
-              type="number"
-              min={0}
-              inputMode="numeric"
-              aria-label="Prozent"
-              className="w-16 rounded-lg bg-white px-2 py-2 text-right text-[15px] font-bold text-brand outline-none dark:bg-slate-800"
-              value={punkte}
-              onChange={(e) => setPunkte(e.target.value)}
-            />
-            <span className="text-[15px] font-bold text-brand">%</span>
-          </span>
-          <button onClick={onDelete} className="px-2 py-2 text-[14px] font-semibold text-red-600 dark:text-red-400">
+          <input
+            type="number"
+            min={0}
+            inputMode="numeric"
+            aria-label="Prozent"
+            className="field !w-20 text-right font-bold"
+            value={punkte}
+            onChange={(e) => setPunkte(e.target.value)}
+          />
+          <span className="text-[15px] font-bold text-brand">%</span>
+          <button type="button" onClick={onDelete} className="btn-klein-grau !text-red-600 dark:!text-red-400">
             Löschen
           </button>
-          <button onClick={() => setEdit(false)} className="ml-auto px-2 py-2 text-[14px] font-semibold text-tinte-matt dark:text-slate-300">
+        </div>
+        <div className="flex gap-2">
+          <button type="button" onClick={() => setEdit(false)} className="btn-grau flex-1">
             Abbrechen
           </button>
           <button
+            type="button"
             onClick={() => {
               onChange({ titel: titel.trim() || c.titel, punkte: Number(punkte) || 0 });
               setEdit(false);
             }}
-            className="rounded-full bg-brand px-4 py-2 text-[14px] font-bold text-white"
+            className="btn-primary flex-1"
           >
             Sichern
           </button>
@@ -181,9 +182,9 @@ export function MithilfeEintragen({
     <>
       <button
         onClick={() => setAuf(true)}
-        className="flex w-full items-center justify-center gap-2 rounded-2xl bg-brand py-3 text-[15px] font-bold text-white transition active:scale-[.98]"
+        className="btn-primary gap-2"
       >
-        <span aria-hidden className="text-lg leading-none">＋</span> Mithilfe eintragen
+        <Icon name="plus" size={18} /> Mithilfe eintragen
       </button>
       <MithilfeBlatt open={auf} onClose={() => setAuf(false)} fuer={fuer} onEintragen={onEintragen} />
     </>

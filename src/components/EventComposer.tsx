@@ -1,5 +1,9 @@
 import { useMemo, useState } from "react";
 import { Sheet, SheetKopf } from "./Sheet";
+import { Gruppe, Symbol, Zeile, ZeileHaken, ZeileMitSchalter } from "./Liste";
+import { Schalter } from "./Schalter";
+import { FussLeiste } from "./FussLeiste";
+import { Icon } from "./Icon";
 import { useStore } from "../store";
 import { useRole } from "../auth/RoleProvider";
 import { COMMITTEES, committeeIcon } from "../lib/committees";
@@ -8,6 +12,14 @@ import { normalize, offenGesamt, sortStudents } from "../lib/logic";
 import { NEUE_TYPEN, TYPE_META, type EventType } from "../lib/events";
 import { useFunktionen } from "../lib/funktionen";
 
+/**
+ * „Neu erstellen“ im Events-Reiter.
+ *
+ * Oben die zwei Arten, die hier im Blatt ausgefüllt werden (Info, Abstimmung).
+ * Direkt darunter – nicht mehr hinter „Vorlagen“ versteckt – die zwei Dinge,
+ * die ein eigenes Fenster haben: die Aktion mit Schichten (Waffelverkauf &
+ * Co.) und die Pop-up-Umfrage.
+ */
 export function EventComposer({
   open,
   onClose,
@@ -16,7 +28,7 @@ export function EventComposer({
 }: {
   open: boolean;
   onClose: () => void;
-  /** Wechsel zum Ausschreiben einer Aktion (Waffelverkauf & Co.). */
+  /** Wechsel zum Ausschreiben einer Aktion mit Schichten (Waffelverkauf & Co.). */
   onVorlagen?: () => void;
   /** Wechsel zu den Pop-up-Umfragen (eigenes Fenster mit Fragen und Auswertung). */
   onUmfrage?: () => void;
@@ -83,194 +95,219 @@ export function EventComposer({
     onClose();
   }
 
-  const seg = "flex-1 rounded-lg py-2 text-sm font-bold transition";
+  /** Eine Auswahl ein-/ausschalten (Komitees, Personen) */
+  const umschalten = (setter: (f: (prev: Set<string>) => Set<string>) => void, id: string) =>
+    setter((prev) => {
+      const n = new Set(prev);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      return n;
+    });
 
   return (
     <Sheet open={open} onClose={onClose}>
       <SheetKopf titel={<>Neu erstellen</>} onClose={onClose} />
 
-      {/* Typ – Vorlagen stehen gleichberechtigt daneben, fuehren aber in ein
-          eigenes Fenster: eine Aktion hat Schichten statt Antwortmoeglichkeiten. */}
-      <div className="mb-4 grid grid-cols-2 gap-1.5 rounded-xl bg-papier-matt p-1 dark:bg-slate-800 sm:grid-cols-4">
+      {/* Art des Beitrags – zwei gleich breite Felder, nichts bricht um */}
+      <div className="seg mb-3" role="tablist" aria-label="Art des Beitrags">
         {NEUE_TYPEN.map((t) => (
           <button
             key={t}
+            role="tab"
+            aria-selected={type === t}
             onClick={() => setType(t)}
-            className={`${seg} ${type === t ? "bg-brand text-white" : "text-tinte-matt"}`}
+            className={`seg-item whitespace-nowrap !py-2 !text-[14px] ${type === t ? "seg-aktiv" : ""}`}
           >
-            {TYPE_META[t].icon} {TYPE_META[t].label}
+            {TYPE_META[t].label}
           </button>
         ))}
-        {umfragenErlaubt && (
-          <button onClick={onUmfrage} className={`${seg} text-tinte-matt`}>
-            📊 Umfrage
-          </button>
-        )}
-        {onVorlagen && (
-          <button onClick={onVorlagen} className={`${seg} text-tinte-matt`}>
-            🧇 Vorlagen
-          </button>
-        )}
       </div>
 
-      <input className="field mb-3" placeholder="Überschrift" value={title} onChange={(e) => setTitle(e.target.value)} />
+      {/* Die zwei Dinge mit eigenem Fenster stehen gleich sichtbar daneben */}
+      {(onVorlagen || umfragenErlaubt) && (
+        <Gruppe titel="Oder etwas anderes anlegen" className="mb-4">
+          {onVorlagen && (
+            <Zeile
+              onClick={onVorlagen}
+              symbol={
+                <Symbol farbe="bg-[#34C759]">
+                  <Icon name="kalender" size={17} strich={2.2} />
+                </Symbol>
+              }
+              label="Aktion mit Schichten"
+              unter="z. B. Waffelverkauf: Termine mit Plätzen, in die man sich einträgt"
+            />
+          )}
+          {umfragenErlaubt && (
+            <Zeile
+              onClick={onUmfrage}
+              symbol={
+                <Symbol farbe="bg-[#AF52DE]">
+                  <Icon name="umfrage" size={17} strich={2.2} />
+                </Symbol>
+              }
+              label="Pop-up-Umfrage"
+              unter="Erscheint als Fenster mit Fragen und Auswertung"
+            />
+          )}
+        </Gruppe>
+      )}
+
+      <input className="field mb-3" placeholder="Überschrift" aria-label="Überschrift" value={title} onChange={(e) => setTitle(e.target.value)} />
       <textarea
         className="field mb-3 min-h-[90px] resize-y"
         placeholder={type === "umfrage" ? "Frage / Beschreibung (optional)" : "Text"}
+        aria-label="Text"
         value={body}
         onChange={(e) => setBody(e.target.value)}
       />
 
       {/* Abstimmung */}
       {type === "umfrage" && (
-        <div className="mb-4 rounded-2xl border border-papier-linie p-3 dark:border-slate-700">
-          <div className="mb-1.5 px-1 text-[12px] font-semibold uppercase tracking-[0.04em] text-tinte-leise">Antwortoptionen</div>
-          {options.map((o, i) => (
-            <div key={i} className="mb-2 flex gap-2">
-              <input
-                className="field"
-                placeholder={`Option ${i + 1}`}
-                value={o}
-                onChange={(e) => setOptions((prev) => prev.map((x, j) => (j === i ? e.target.value : x)))}
-              />
-              {options.length > 2 && (
-                <button
-                  onClick={() => setOptions((prev) => prev.filter((_, j) => j !== i))}
-                  className="rounded-lg border border-papier-linie px-3 dark:border-slate-700"
-                >
-                  −
-                </button>
-              )}
-            </div>
-          ))}
-          <button onClick={() => setOptions((prev) => [...prev, ""])} className="text-sm font-semibold text-brand">
-            + Option
-          </button>
-          <div className="mt-3 flex flex-col gap-2">
-            <Toggle label="Mehrere Antworten erlaubt" on={multiple} set={setMultiple} />
-            <Toggle label="Antwort ist Pflicht" on={minOne} set={setMinOne} />
-            <Toggle label="Schüler sehen Ergebnisse" on={showResults} set={setShowResults} />
-            <Toggle label="Anonym abstimmen" on={anon} set={setAnon} />
-            <p className="text-[11px] leading-snug text-tinte-leise">
-              Anonym: unter den Antworten stehen graue Kreise statt der Initialen. Wer wie gestimmt hat, sieht nur das Stufenteam.
-            </p>
-          </div>
-        </div>
+        <>
+          <Gruppe titel="Antwortoptionen" className="mb-3">
+            {options.map((o, i) => (
+              <div key={i} className="flex min-h-[48px] items-center gap-2 pl-4 pr-1">
+                <input
+                  className="min-w-0 flex-1 bg-transparent py-2 text-[16px] outline-none placeholder:text-tinte-leise"
+                  placeholder={`Option ${i + 1}`}
+                  aria-label={`Option ${i + 1}`}
+                  value={o}
+                  onChange={(e) => setOptions((prev) => prev.map((x, j) => (j === i ? e.target.value : x)))}
+                />
+                {options.length > 2 && (
+                  <button
+                    onClick={() => setOptions((prev) => prev.filter((_, j) => j !== i))}
+                    className="flex h-11 w-11 shrink-0 items-center justify-center text-tinte-leise active:opacity-50"
+                    aria-label={`Option ${i + 1} entfernen`}
+                  >
+                    <Icon name="x" size={16} />
+                  </button>
+                )}
+              </div>
+            ))}
+            <Zeile blau onClick={() => setOptions((prev) => [...prev, ""])} label="Option hinzufügen" />
+          </Gruppe>
+
+          <Gruppe
+            className="mb-4"
+            fuss="Anonym: unter den Antworten stehen graue Kreise statt der Initialen. Wer wie gestimmt hat, sieht nur das Stufenteam."
+          >
+            <ZeileMitSchalter label="Mehrere Antworten erlaubt">
+              <Schalter an={multiple} onChange={setMultiple} label="Mehrere Antworten erlaubt" />
+            </ZeileMitSchalter>
+            <ZeileMitSchalter label="Antwort ist Pflicht">
+              <Schalter an={minOne} onChange={setMinOne} label="Antwort ist Pflicht" />
+            </ZeileMitSchalter>
+            <ZeileMitSchalter label="Schüler sehen Ergebnisse">
+              <Schalter an={showResults} onChange={setShowResults} label="Schüler sehen Ergebnisse" />
+            </ZeileMitSchalter>
+            <ZeileMitSchalter label="Anonym abstimmen">
+              <Schalter an={anon} onChange={setAnon} label="Anonym abstimmen" />
+            </ZeileMitSchalter>
+          </Gruppe>
+        </>
       )}
 
-      {/* Hervorheben: rot, mit ⚠️ – z. B. für Zahlungserinnerungen */}
+      {/* Hervorheben: rot – z. B. für Zahlungserinnerungen */}
       {type === "info" && (
-        <div className="mb-3">
-          <Toggle label="Hervorheben (rot)" on={isWarning} set={setIsWarning} />
-        </div>
+        <Gruppe className="mb-4">
+          <ZeileMitSchalter label="Hervorheben (rot)" unter="Für Wichtiges, z. B. Zahlungserinnerungen">
+            <Schalter an={isWarning} onChange={setIsWarning} label="Hervorheben (rot)" />
+          </ZeileMitSchalter>
+        </Gruppe>
       )}
 
       {/* Empfänger */}
-      <div className="mb-1.5 px-1 text-[12px] font-semibold uppercase tracking-[0.04em] text-tinte-leise">Empfänger</div>
-      <div className="mb-2 flex gap-1.5 rounded-xl bg-papier-matt p-1 dark:bg-slate-800">
-        <button onClick={() => setAudience("all")} className={`${seg} ${audience === "all" ? "bg-brand text-white" : "text-tinte-matt"}`}>
-          Alle Schüler
-        </button>
-        <button onClick={() => setAudience("komitee")} className={`${seg} ${audience === "komitee" ? "bg-brand text-white" : "text-tinte-matt"}`}>
-          Komitees
-        </button>
-        <button onClick={() => setAudience("selected")} className={`${seg} ${audience === "selected" ? "bg-brand text-white" : "text-tinte-matt"}`}>
-          Personen
-        </button>
+      <div className="mb-1.5 px-4 text-[13px] uppercase tracking-[0.02em] text-tinte-leise">Empfänger</div>
+      <div className="seg mb-2" role="tablist" aria-label="Empfänger">
+        {(
+          [
+            ["all", "Alle Schüler"],
+            ["komitee", "Komitees"],
+            ["selected", "Personen"],
+          ] as const
+        ).map(([k, label]) => (
+          <button
+            key={k}
+            role="tab"
+            aria-selected={audience === k}
+            onClick={() => setAudience(k)}
+            className={`seg-item whitespace-nowrap !py-2 !text-[14px] ${audience === k ? "seg-aktiv" : ""}`}
+          >
+            {label}
+          </button>
+        ))}
       </div>
       {audience === "all" && (
-        <p className="-mt-1 mb-2 text-[11px] text-tinte-leise">Alle Schüler und das Stufenteam – Elternzugänge bekommen nichts.</p>
+        <p className="mb-3 px-4 text-[13px] leading-snug text-tinte-leise">
+          Alle Schüler und das Stufenteam – Elternzugänge bekommen nichts.
+        </p>
       )}
 
       {audience === "komitee" && (
-        <div className="mb-3 grid gap-1.5 rounded-2xl border border-papier-linie p-2 dark:border-slate-700 sm:grid-cols-2">
-          {COMMITTEES.map((c) => {
-            const on = tags.has(c.slug);
-            return (
-              <button
-                key={c.slug}
-                onClick={() =>
-                  setTags((prev) => {
-                    const n = new Set(prev);
-                    on ? n.delete(c.slug) : n.add(c.slug);
-                    return n;
-                  })
-                }
-                className={`flex items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm font-semibold transition ${
-                  on ? "bg-brand/10 text-brand" : "hover:bg-papier-matt dark:hover:bg-slate-800"
-                }`}
-              >
-                <span className={`flex h-5 w-5 items-center justify-center rounded border text-xs text-white ${on ? "border-brand bg-brand" : "border-papier-linie dark:border-slate-600"}`}>
-                  {on ? "✓" : ""}
-                </span>
-                <span>{committeeIcon(c.slug)}</span>
-                {c.label}
-              </button>
-            );
-          })}
-          <div className="px-2 pt-1 text-xs text-tinte-leise sm:col-span-2">
-            {tags.size === 0 ? "Noch kein Komitee gewählt" : `${tags.size} Komitee(s) – alle Mitglieder sehen den Beitrag`}
-          </div>
-        </div>
+        <Gruppe
+          className="mb-3 mt-2"
+          fuss={tags.size === 0 ? "Noch kein Komitee gewählt" : `${tags.size} Komitee(s) – alle Mitglieder sehen den Beitrag`}
+        >
+          {COMMITTEES.map((c) => (
+            <ZeileHaken
+              key={c.slug}
+              label={
+                <>
+                  <span aria-hidden className="mr-2">{committeeIcon(c.slug)}</span>
+                  {c.label}
+                </>
+              }
+              gewaehlt={tags.has(c.slug)}
+              onClick={() => umschalten(setTags, c.slug)}
+            />
+          ))}
+        </Gruppe>
       )}
+
       {type === "info" && (
-        <button onClick={selectUnpaid} className="mb-2 text-sm font-semibold text-brand">
-          → alle mit offenem Beitrag (bis {settings.aktuelles_halbjahr}) auswählen
+        <button onClick={selectUnpaid} className="mb-3 px-4 text-left text-[15px] font-medium text-brand-dark dark:text-brand">
+          Alle mit offenem Beitrag (bis {settings.aktuelles_halbjahr}) auswählen
         </button>
       )}
+
       {audience === "selected" && (
-        <div className="mb-3 rounded-2xl border border-papier-linie p-2 dark:border-slate-700">
-          <input className="field mb-2" placeholder="Person suchen…" value={q} onChange={(e) => setQ(e.target.value)} />
-          <div className="max-h-48 overflow-y-auto">
-            {list.map((s) => {
-              const on = targets.has(s.id);
-              return (
-                <button
+        <div className="mb-3 mt-2">
+          <input className="field mb-2" placeholder="Person suchen…" aria-label="Person suchen" value={q} onChange={(e) => setQ(e.target.value)} />
+          <div className="max-h-64 overflow-y-auto overscroll-contain rounded-[0.875rem]">
+            <Gruppe className="" fuss={`${targets.size} ausgewählt`}>
+              {list.map((s) => (
+                <ZeileHaken
                   key={s.id}
-                  onClick={() =>
-                    setTargets((prev) => {
-                      const n = new Set(prev);
-                      on ? n.delete(s.id) : n.add(s.id);
-                      return n;
-                    })
-                  }
-                  className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm hover:bg-papier-matt dark:hover:bg-slate-800"
-                >
-                  <span className={`flex h-5 w-5 items-center justify-center rounded border text-xs text-white ${on ? "border-brand bg-brand" : "border-papier-linie dark:border-slate-600"}`}>
-                    {on ? "✓" : ""}
-                  </span>
-                  {s.nachname}, {s.vorname}
-                </button>
-              );
-            })}
+                  label={`${s.nachname}, ${s.vorname}`}
+                  gewaehlt={targets.has(s.id)}
+                  onClick={() => umschalten(setTargets, s.id)}
+                />
+              ))}
+            </Gruppe>
           </div>
-          <div className="px-2 pt-1 text-xs text-tinte-leise">{targets.size} ausgewählt</div>
         </div>
       )}
 
-      <div className="mb-2 mt-1 grid gap-1">
-        <Toggle label="Mitteilung an alle, die es sehen" on={melden} set={setMelden} />
-        <p className="text-[11px] leading-relaxed text-tinte-leise">
-          {melden
+      <Gruppe
+        className="mb-2 mt-4"
+        fuss={
+          melden
             ? "Kommt bei allen an, die Mitteilungen erlaubt haben."
-            : "Still veröffentlichen: steht nur im Reiter Events, niemand bekommt ein Pop-up."}
-        </p>
-      </div>
+            : "Still veröffentlichen: steht nur im Reiter Events, niemand bekommt ein Pop-up."
+        }
+      >
+        <ZeileMitSchalter label="Mitteilung an alle, die es sehen">
+          <Schalter an={melden} onChange={setMelden} label="Mitteilung an alle, die es sehen" />
+        </ZeileMitSchalter>
+      </Gruppe>
 
-      <button className="btn-primary mt-2" disabled={busy || !title.trim()} onClick={submit}>
-        {busy ? "…" : "Veröffentlichen"}
-      </button>
+      <FussLeiste>
+        <button className="btn-primary" disabled={busy || !title.trim()} onClick={submit}>
+          {busy ? "…" : "Veröffentlichen"}
+        </button>
+      </FussLeiste>
     </Sheet>
-  );
-}
-
-function Toggle({ label, on, set }: { label: string; on: boolean; set: (v: boolean) => void }) {
-  return (
-    <button onClick={() => set(!on)} className="flex items-center justify-between gap-3 text-sm">
-      <span className="text-tinte-matt dark:text-slate-300">{label}</span>
-      <span className={`relative h-6 w-11 rounded-full transition ${on ? "bg-brand" : "bg-slate-300 dark:bg-slate-600"}`}>
-        <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-all ${on ? "left-[22px]" : "left-0.5"}`} />
-      </span>
-    </button>
   );
 }

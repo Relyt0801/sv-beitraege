@@ -250,6 +250,8 @@ export function ChangeForm({ onDone }: { onDone: () => void }) {
   const [netz, setNetz] = useState(false);
   const [busy, setBusy] = useState(false);
   const [nutzer, setNutzer] = useState("");
+  // Eltern werden gesiezt, alle anderen geduzt
+  const [eltern, setEltern] = useState(false);
   const [pwSchonGesetzt, setPwSchonGesetzt] = useState(false);
 
   // Den eigenen Nutzernamen holen, damit er nicht als Passwort durchgeht.
@@ -260,8 +262,10 @@ export function ChangeForm({ onDone }: { onDone: () => void }) {
         const { data: s } = await supabase!.auth.getSession();
         const uid = s.session?.user.id;
         if (!uid) return;
-        const { data } = await supabase!.from("profiles").select("username").eq("user_id", uid).maybeSingle();
-        setNutzer(((data as { username?: string } | null)?.username) || "");
+        const { data } = await supabase!.from("profiles").select("username, role").eq("user_id", uid).maybeSingle();
+        const profil = data as { username?: string; role?: string } | null;
+        setNutzer(profil?.username || "");
+        setEltern(profil?.role === "eltern");
       } catch {
         /* ohne Netz: Prüfung gegen den Namen entfällt, der Rest greift */
       }
@@ -314,7 +318,7 @@ export function ChangeForm({ onDone }: { onDone: () => void }) {
         const { error: e2 } = await supabase!.from("profiles").update({ must_change_password: false }).eq("user_id", s.session.user.id);
         if (e2) {
           setNetz(istNetzfehler(e2));
-          setErr(fehlerText("Dein Passwort ist geändert, nur der Vermerk fehlt noch: " + e2.message) + " Tipp einfach nochmal auf „Weiter“.");
+          setErr(fehlerText(`${eltern ? "Ihr" : "Dein"} Passwort ist geändert, nur der Vermerk fehlt noch: ` + e2.message) + (eltern ? " Tippen Sie einfach nochmal auf „Weiter“." : " Tipp einfach nochmal auf „Weiter“."));
           return;
         }
       }
@@ -331,7 +335,7 @@ export function ChangeForm({ onDone }: { onDone: () => void }) {
     <AnmeldeRahmen>
       <AnmeldeKopf
         titel="Neues Passwort"
-        unter="Du nutzt noch dein Startpasswort. Leg jetzt ein eigenes fest – danach geht es weiter."
+        unter={eltern ? "Sie nutzen noch das Startpasswort. Legen Sie jetzt ein eigenes fest – danach geht es weiter." : "Du nutzt noch dein Startpasswort. Leg jetzt ein eigenes fest – danach geht es weiter."}
       />
       <form
         noValidate
@@ -396,7 +400,7 @@ export function ChangeForm({ onDone }: { onDone: () => void }) {
           )}
         </div>
         <p className="mt-1 px-4 text-[13px] leading-snug text-tinte-leise">
-          Mindestens 8 Zeichen. Nimm nichts, was du anderswo schon benutzt.
+          {eltern ? "Mindestens 8 Zeichen. Bitte nichts verwenden, was Sie anderswo schon benutzen." : "Mindestens 8 Zeichen. Nimm nichts, was du anderswo schon benutzt."}
         </p>
 
         {err ? <FormFehler text={err} netz={netz} /> : <div className="h-6" />}

@@ -8,6 +8,7 @@ import { MuteKnopf } from "./MuteKnopf";
 import { useProfiles } from "../profiles-store";
 import { lesbarerName } from "../lib/profil";
 import { melden } from "../lib/melden";
+import { fehlerText } from "../lib/netz";
 
 import { frage, melde, meldeFehler } from "../lib/melder";
 /**
@@ -55,12 +56,14 @@ export function ChatBlase({
   return (
     <div className={`flex items-start gap-2 ${meins ? "justify-end" : "justify-start"}`}>
       {!meins && kreis}
-      <div className={`flex max-w-[78%] flex-col sm:max-w-[65%] lg:max-w-[50%] ${meins ? "items-end" : "items-start"}`}>
-      <div className={`relative ${reaktionen.length > 0 ? "mb-[18px]" : ""}`}>
+      {/* min-w-0: sonst darf ein langes Wort/Link die Spalte über den Rand schieben (Flex-Kinder
+          sind standardmäßig nie schmaler als ihr längstes Wort) */}
+      <div className={`flex min-w-0 max-w-[78%] flex-col sm:max-w-[65%] lg:max-w-[50%] ${meins ? "items-end" : "items-start"}`}>
+      <div className={`relative min-w-0 max-w-full ${reaktionen.length > 0 ? "mb-[18px]" : ""}`}>
       <div
         ref={blase}
         {...halten}
-        className={`select-none rounded-2xl px-3.5 py-2 transition [-webkit-touch-callout:none] ${
+        className={`max-w-full select-none rounded-2xl px-3.5 py-2 transition [-webkit-touch-callout:none] ${
           menue ? "scale-[1.03]" : ""
         } ${meins ? "bg-brand text-white" : "bg-white shadow-card dark:bg-slate-900 dark:shadow-cardDark"}`}
       >
@@ -72,23 +75,34 @@ export function ChatBlase({
           className={`mb-0.5 block text-[12px] font-bold leading-tight ${meins ? "text-right" : ""}`}
           aufFarbig={meins}
         />
-        <div className="whitespace-pre-wrap break-words text-[15px] leading-snug">{m.body}</div>
+        {/* overflow-wrap:anywhere (statt break-words) zählt beim Berechnen der Mindestbreite mit –
+            so brechen auch 100-Zeichen-Links ohne Leerzeichen um, statt die Blase aufzureißen */}
+        <div className="whitespace-pre-wrap text-[15px] leading-snug [overflow-wrap:anywhere]">{m.body}</div>
         {m.nicht_gesendet && (
           <div
-            className={`mt-1 rounded-lg px-2 py-1 text-[11px] font-semibold ${
+            className={`mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg px-2 py-1 text-[12px] font-semibold ${
               meins ? "bg-white/20 text-white" : "bg-red-50 text-red-600 dark:bg-red-500/15 dark:text-red-400"
             }`}
-            title={m.nicht_gesendet}
+            title={fehlerText(m.nicht_gesendet)}
           >
-            ⚠ Nicht gesendet – bitte noch einmal schreiben
+            <span>Nicht gesendet</span>
+            {/* Der Text steht ja noch in der Blase – einmal tippen schickt ihn erneut ab */}
+            <button
+              type="button"
+              onClick={() => void topics?.erneutSenden(m.id)}
+              className="-my-1.5 py-2.5 underline underline-offset-2 active:opacity-60"
+            >
+              Erneut senden
+            </button>
           </div>
         )}
-        <div className={`mt-0.5 text-right text-[10px] ${meins ? "text-white/90" : "text-tinte-leise"}`}>
+        <div className={`mt-0.5 text-right text-[11px] ${meins ? "text-white/90" : "text-tinte-leise"}`}>
           {new Date(m.created_at).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })}
           {(meins || darfLoeschen) && (
             <button
               onClick={() => void frage("Nachricht löschen?", "Löschen", true).then((ok) => { if (ok) void onDelete(m.id); })}
-              className="ml-2 underline"
+              // Kleine Schrift, aber große Trefferfläche (Padding hebt sich mit negativem Rand auf)
+              className="-my-2.5 ml-1 px-2 py-2.5 underline"
             >
               löschen
             </button>
@@ -511,11 +525,14 @@ export function ChatEingabe({
   setWert,
   onSenden,
   platzhalter = "Nachricht",
+  links,
 }: {
   wert: string;
   setWert: (v: string) => void;
   onSenden: () => void;
   platzhalter?: string;
+  /** Knopf links neben dem Feld (z. B. „+“ für Abstimmung/To-do/Anpinnen) */
+  links?: ReactNode;
 }) {
   const feld = useRef<HTMLTextAreaElement>(null);
   // Höhe an den Inhalt anpassen (auch nach dem Senden wieder einzeilig)
@@ -528,11 +545,12 @@ export function ChatEingabe({
   const leer = !wert.trim();
   return (
     <div className="flex items-end gap-2">
+      {links}
       <textarea
         ref={feld}
         rows={1}
         aria-label={platzhalter}
-        className="max-h-[8.25rem] min-h-[2.375rem] flex-1 resize-none rounded-[1.2rem] border-0 bg-[rgb(var(--zelle))] px-4 py-[0.5rem] text-[16px] leading-[1.35] text-tinte shadow-[0_0_0_0.5px_rgba(0,0,0,0.14)] outline-none transition placeholder:text-tinte-leise focus:shadow-[0_0_0_1px_rgb(var(--brand)/0.6)] dark:bg-[rgb(118_118_128/0.24)] dark:text-slate-100 dark:shadow-[0_0_0_0.5px_rgba(255,255,255,0.12)]"
+        className="max-h-[8.25rem] min-h-[2.5rem] flex-1 resize-none rounded-[1.2rem] border-0 bg-[rgb(var(--zelle))] px-4 py-[0.5rem] text-[16px] leading-[1.35] text-tinte shadow-[0_0_0_0.5px_rgba(0,0,0,0.14)] outline-none transition placeholder:text-tinte-leise focus:shadow-[0_0_0_1px_rgb(var(--brand)/0.6)] dark:bg-[rgb(118_118_128/0.24)] dark:text-slate-100 dark:shadow-[0_0_0_0.5px_rgba(255,255,255,0.12)]"
         placeholder={platzhalter}
         value={wert}
         onChange={(e) => setWert(e.target.value)}
@@ -549,10 +567,10 @@ export function ChatEingabe({
         disabled={leer}
         // Feld behält beim Tippen auf Senden den Fokus – die Tastatur bleibt offen
         onPointerDown={(e) => e.preventDefault()}
-        className="mb-[3px] flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand text-white transition duration-200 ease-ios active:scale-90 disabled:bg-[rgb(118_118_128/0.24)] disabled:text-white/90 dark:disabled:bg-[rgb(118_118_128/0.32)]"
+        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand text-white transition duration-200 ease-ios active:scale-90 disabled:bg-[rgb(118_118_128/0.24)] disabled:text-white/90 dark:disabled:bg-[rgb(118_118_128/0.32)]"
         aria-label="Senden"
       >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
           <path d="M12 19V5M6 11l6-6 6 6" />
         </svg>
       </button>
@@ -654,6 +672,7 @@ export function ChatEbene({
   children,
   sichtbar = true,
   label,
+  start = "unten",
 }: {
   kopf: ReactNode;
   fuss?: ReactNode;
@@ -661,18 +680,33 @@ export function ChatEbene({
   sichtbar?: boolean;
   /** Vorlesetext der Ebene, z. B. der Chat-Name */
   label?: string;
+  /**
+   * Wo der Inhalt beim Öffnen beginnt: "unten" = bei der neuesten Nachricht (Chat, Standard),
+   * "oben" = ganz oben (Übersichten und Listen – Angepinntes darf nicht übersprungen werden).
+   * Darf sich im Betrieb ändern (Reiter Chat ⇄ Übersicht): beim Wechsel springt die Ebene an
+   * den passenden Rand und merkt sich, dass sie bei „oben“ nicht mit der Tastatur nach unten soll.
+   */
+  start?: "unten" | "oben";
 }) {
   const sicht = useSichtfenster(sichtbar);
   const [kopfRef, kopfH] = useHoehe();
   const [fussRef, fussH] = useHoehe();
   const scroller = useRef<HTMLDivElement>(null);
-  const warUnten = useRef(true);
+  const warUnten = useRef(start !== "oben");
 
   // Die Seite dahinter scrollt nicht mit
   useEffect(() => {
     if (!sichtbar) return;
     return scrollSperren();
   }, [sichtbar]);
+
+  // Beginn der Ebene (und bei jedem Wechsel von start): oben oder ganz unten
+  useLayoutEffect(() => {
+    const sc = scroller.current;
+    if (!sc) return;
+    sc.scrollTop = start === "oben" ? 0 : sc.scrollHeight;
+    warUnten.current = start !== "oben";
+  }, [start]);
 
   // Wird der sichtbare Bereich kleiner (Tastatur geht auf) oder wächst die
   // Eingabe, bleibt man unten, wenn man unten war – wie in iMessage.
@@ -714,7 +748,7 @@ export function ChatEbene({
 
       <div
         ref={kopfRef}
-        className="glas absolute inset-x-0 top-0 z-10 !bg-[rgb(var(--glas)/0.9)] pb-2 pt-[calc(env(safe-area-inset-top)+0.5rem)] shadow-[0_0.5px_0_rgba(0,0,0,0.16)] dark:shadow-[0_0.5px_0_rgba(255,255,255,0.14)] lg:pt-2"
+        className="glas absolute inset-x-0 top-0 z-10 !bg-[rgb(var(--glas)/0.97)] pb-2 pt-[calc(env(safe-area-inset-top)+0.5rem)] shadow-[0_0.5px_0_rgba(0,0,0,0.16)] dark:shadow-[0_0.5px_0_rgba(255,255,255,0.14)] lg:pt-2"
       >
         <div className="mx-auto max-w-5xl px-3 sm:px-5">{kopf}</div>
       </div>
@@ -722,7 +756,7 @@ export function ChatEbene({
       {fuss && (
         <div
           ref={fussRef}
-          className={`glas absolute inset-x-0 bottom-0 z-10 pt-2 shadow-[0_-0.5px_0_rgba(0,0,0,0.16)] dark:shadow-[0_-0.5px_0_rgba(255,255,255,0.14)] ${
+          className={`glas absolute inset-x-0 bottom-0 z-10 !bg-[rgb(var(--glas)/0.97)] pt-2 shadow-[0_-0.5px_0_rgba(0,0,0,0.16)] dark:shadow-[0_-0.5px_0_rgba(255,255,255,0.14)] ${
             sicht.tastatur ? "pb-2" : "pb-[calc(env(safe-area-inset-bottom)+0.5rem)]"
           }`}
         >

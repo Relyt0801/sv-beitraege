@@ -11,7 +11,7 @@ import { frage, melde, meldeFehler } from "../lib/melder";
 import { useRunden, type KandidatEingabe, type Runde, type RundenStand } from "../lib/runden";
 import { RundenAbschnitt, RundenMarke, RundeStartenSheet, SichtbarkeitWahl, Stepper } from "./Runden";
 import { useErgebnisSichtbarkeit } from "../lib/ergebnisse";
-import { FarbKarte, KnopfGlas, KnopfHell } from "./Kachel";
+import { FarbKarte, KnopfGlas, KnopfHell, VerwaltetVon } from "./Kachel";
 import { AutorInfo, WortfilterSchalter } from "./AutorInfo";
 import { useZustimmungen } from "../lib/zustimmung";
 import { useLehrer, useStufePersonen } from "../lib/rankings";
@@ -19,10 +19,11 @@ import { LehrerListe, ZahnradKnopf } from "./Rankings";
 import { GesperrtZeile, GESPERRT_TEXT } from "./Gesperrt";
 import { MeldenKnopf } from "./Melden";
 import { melden, wortfilterFinden } from "../lib/melden";
-import { TEIL_ERKLAERUNG, TEIL_NAME, useGewinner, useTeil, useVerschiebungen, type Gewinner, type GewinnerArt, type Teil, type Verschiebung } from "../lib/teile";
-import { TEIL_FARBE, TeilMarke, TeilSymbol, TeilUmschalter, TeilWischer } from "./TeilUmschalter";
+import { TEIL_NAME, useGewinner, useTeil, useVerschiebungen, type Gewinner, type GewinnerArt, type Teil, type Verschiebung } from "../lib/teile";
+import { TEIL_FARBE, TeilMarke, TeilSymbol, TeilUmschalter, TeilWischer, useVerschiebenRueckfrage } from "./TeilUmschalter";
 import { GewinnerBuehne, GewinnerMarke, KuerenBlatt, type Kandidat } from "./Gewinner";
 import { KachelVerwaltung } from "./KachelVerwaltung";
+import { Icon } from "./Icon";
 import { useWfRecht } from "../lib/wortfilter-bereiche";
 
 /**
@@ -41,7 +42,7 @@ import { useWfRecht } from "../lib/wortfilter-bereiche";
  *      Ergebnis: Gewinner, Zwischenstand/Ergebnis der Runden, Top-Zitate
  *      Prüfen:   wartende Zitate des Teils, offene Verschiebe-Anträge
  *   4. Zahnrad → EIN Blatt „Einstellungen“ (Abstimmung, Ergebnisse,
- *      Gewinner, Offiziell & Inoffiziell, Lehrerliste, Wer darf was?)
+ *      Gewinner, Offiziell & Inoffiziell, Lehrkräfte, Wer darf was?)
  *
  * Runden laufen je Teil getrennt (lib/zitate.ts → rundenGruppe), Gewinner
  * ebenso (gewinner.gruppe = Teil).
@@ -56,7 +57,7 @@ const zitatUnter = (z: Zitat) => `— ${z.wer}${z.kontext ? `, ${z.kontext}` : "
 /* Karte auf der Startseite                                               */
 /* ====================================================================== */
 /**
- * Startseite: Läuft eine Abstimmungsrunde, steht sie vorn (mit Teil-Marke);
+ * Startseite: Läuft eine Runde, steht sie vorn (mit Teil-Marke);
  * sonst der gekürte Gewinner oder das neueste Zitat. Wer prüfen darf, sieht,
  * wie viele warten.
  */
@@ -104,6 +105,8 @@ export function ZitateKarte({ className = "" }: { className?: string }) {
         verlauf="from-[#2C2C2E] to-[#1C1C1E]"
         schatten="shadow-[0_12px_30px_-14px_rgba(0,0,0,.75)]"
         className="dark:ring-1 dark:ring-white/10"
+        onClick={() => (runde ? (setTeil(rundeTeil), setOffen("wand")) : setOffen("wand"))}
+        label="Zitatwand öffnen"
         marke={
           runde ? (
             <span className="flex flex-wrap gap-1.5">
@@ -276,10 +279,25 @@ function ZitateSheet({
                 <WandAnsicht wand={wand} r={r} gw={gw} teil={teil} v={v} einreichen={() => setAnsicht("neu")} />
               )}
             </TeilWischer>
+            <VerwaltetVon bereich="Die Zitatwand" komitee="Abizeitung" darf={darfEinstellungen || darfPruefen} />
           </>
         )}
       </Sheet>
-      <ZitateEinstellungen open={einstellungen} onClose={() => setEinstellungen(false)} wand={wand} r={r} gw={gw} teil={teil} v={v} />
+      <ZitateEinstellungen
+        open={einstellungen}
+        onClose={() => setEinstellungen(false)}
+        wand={wand}
+        r={r}
+        gw={gw}
+        teil={teil}
+        v={v}
+        // Nach dem Küren: Einstellungen zu, im Segment „Ergebnis“ steht die Gewinner-Bühne
+        nachKueren={() => {
+          setEinstellungen(false);
+          setAnsicht("ergebnis");
+          window.setTimeout(() => document.getElementById("zitate-gewinner")?.scrollIntoView({ behavior: "smooth", block: "start" }), 380);
+        }}
+      />
     </>
   );
 }
@@ -360,13 +378,14 @@ function Wand({ wand, teil, gw, v, einreichen }: { wand: Zitatwand; teil: Teil; 
           ))}
         </div>
         {wand.zahlenSichtbar && (
-          <button
-            onClick={() => setSort((s) => (s === "top" ? "neu" : "top"))}
-            className="rounded-[9px] bg-[rgb(118_118_128/0.12)] px-3 py-1.5 text-[13px] font-semibold dark:bg-[rgb(118_118_128/0.24)]"
-            aria-label={sort === "top" ? "Sortiert nach Feuer – auf Neueste umstellen" : "Sortiert nach Neueste – auf Feuer umstellen"}
-          >
-            {sort === "top" ? "🔥 Top" : "🕒 Neu"}
-          </button>
+          // Segment statt eines Chips, der nur den Zustand zeigte (Tippen schaltete heimlich um)
+          <div className="seg w-[116px] shrink-0" role="radiogroup" aria-label="Sortieren">
+            {(["top", "neu"] as const).map((k) => (
+              <button key={k} type="button" role="radio" aria-checked={sort === k} onClick={() => setSort(k)} className={`seg-item !px-2 ${sort === k ? "seg-aktiv" : ""}`}>
+                {k === "top" ? "Top" : "Neu"}
+              </button>
+            ))}
+          </div>
         )}
       </div>
 
@@ -438,20 +457,17 @@ function AntragLeiste({ a, v, className = "" }: { a: Verschiebung; v: Verschiebe
   );
 }
 
-/** Verschieben beantragen – mit kurzer Rückfrage, was das bedeutet */
+/** Verschieben beantragen – mit der gemeinsamen Rückfrage (Zahl der Zustimmungen, Chats → Anfragen) */
 function useVerschieben(wand: Zitatwand, v: VerschiebeStand) {
+  const rueckfrage = useVerschiebenRueckfrage();
   return useCallback(
     async (z: Zitat) => {
       const nach = ANDERER[z.bereich];
-      const ok = await frage(
-        `Nach „${TEIL_NAME[nach]}“ verschieben?\n\n${TEIL_ERKLAERUNG[nach]}\n\nDas braucht Zustimmungen aus dem Team (Profil → Freigaben).`,
-        "Beantragen",
-      );
-      if (!ok) return;
+      if (!(await rueckfrage(nach))) return;
       const fertig = await v.beantragen(z.id, nach);
       if (fertig) wand.demoVerschieben(z.id, nach);
     },
-    [wand, v],
+    [wand, v, rueckfrage],
   );
 }
 
@@ -531,7 +547,7 @@ function ZitatZeile({ z, platz, wand, v, marken }: { z: Zitat; platz: number; wa
                 Nach {TEIL_NAME[ANDERER[z.bereich]]}
               </button>
             )}
-            {!wand.istMeins(z.id) && <MeldenKnopf onClick={() => melden("zitat", z.id)} />}
+            {!wand.istMeins(z.id) && <MeldenKnopf onClick={() => melden("zitat", z.id)} className="-my-2.5 min-h-[44px] px-1" />}
             {darfPruefen && <AutorInfo art="zitat" id={z.id} />}
           </div>
         </div>
@@ -596,7 +612,7 @@ function ErgebnisZeile({ platz, label, unter, n, max, herz, marken = [] }: { pla
   );
 }
 
-/** Ergebnis bzw. Zwischenstand einer Runde – Wahl und Sieger der Herzen getrennt */
+/** Ergebnis bzw. Zwischenstand einer Runde – Wahl und Gewinner der Herzen getrennt */
 function RundenErgebnis({ r, runde, marke }: { r: RundenStand; runde: Runde; marke: (id: string) => GewinnerArt[] }) {
   const alle = r
     .kandidatenVon(runde.id)
@@ -617,7 +633,7 @@ function RundenErgebnis({ r, runde, marke }: { r: RundenStand; runde: Runde; mar
         ))}
       </Gruppe>
       {herz.length >= 2 && (
-        <Gruppe titel="Sieger der Herzen · Honorable Mentions">
+        <Gruppe titel="Gewinner der Herzen · Herzens-Kandidaten">
           {herz.map((k, i) => (
             <ErgebnisZeile key={k.ziel_id} platz={i + 1} label={k.label} unter={k.unter} n={k.n} max={herz[0].n} herz marken={marke(k.ziel_id)} />
           ))}
@@ -651,7 +667,11 @@ function ErgebnisAnsicht({ wand, r, gw, teil, einstellungen }: { wand: Zitatwand
 
   return (
     <div className="animate-fadeIn">
-      {(g || h) && <GewinnerBuehne gewinner={g} herzen={h} titel={TEIL_NAME[teil]} />}
+      {(g || h) && (
+        <div id="zitate-gewinner" className="scroll-mt-2">
+          <GewinnerBuehne gewinner={g} herzen={h} titel={TEIL_NAME[teil]} />
+        </div>
+      )}
       {darfKueren && (
         <Gruppe className={g || h ? "mt-3" : ""} fuss={!g && !h ? "Gekürte Gewinner stehen danach groß oben – auf der Wand und auf der Startseite." : undefined}>
           <Zeile label={g || h ? "Gewinner ändern" : "Gewinner küren"} onClick={einstellungen}>
@@ -833,28 +853,11 @@ function Pruefen({ wand, teil, setTeil, v }: { wand: Zitatwand; teil: Teil; setT
                 <ZustimmungsMarke zahl={zu.zahl(z.id)} noetig={zu.noetig} ichSchon={zu.ichSchon(z.id)} />
               </span>
               <AutorInfo art="zitat" id={z.id} />
-              {!antrag && (
-                <button
-                  aria-label={`Nach ${TEIL_NAME[ANDERER[z.bereich]]} verschieben`}
-                  title={`Nach ${TEIL_NAME[ANDERER[z.bereich]]} verschieben`}
-                  onClick={() => void verschieben(z)}
-                  className={`flex h-10 w-10 items-center justify-center rounded-full transition active:scale-90 ${TEIL_FARBE[ANDERER[z.bereich]].grund} ${TEIL_FARBE[ANDERER[z.bereich]].text}`}
-                >
-                  <TeilSymbol teil={ANDERER[z.bereich]} size={17} />
-                </button>
-              )}
+            </div>
+            {/* Aktionen mit Text statt unbeschrifteter Symbolknöpfe (Siegel/✕/✓ waren nicht zu erraten) */}
+            <div className="mt-3 flex flex-wrap items-center gap-2">
               <button
-                aria-label="Ablehnen"
-                onClick={async () => {
-                  const f = await wand.pruefen(z.id, "abgelehnt");
-                  if (f) meldeFehler(f);
-                }}
-                className="flex h-10 w-10 items-center justify-center rounded-full bg-[#FFEDEC] text-[16px] font-bold text-[#D70015] transition active:scale-90 dark:bg-red-500/15"
-              >
-                ✕
-              </button>
-              <button
-                aria-label="Freigeben"
+                type="button"
                 onClick={async () => {
                   const f = await wand.pruefen(z.id, "frei");
                   if (f?.startsWith("Deine Zustimmung")) {
@@ -862,10 +865,25 @@ function Pruefen({ wand, teil, setTeil, v }: { wand: Zitatwand; teil: Teil; setT
                     void zu.laden();
                   } else if (f) meldeFehler(f);
                 }}
-                className="flex h-10 w-10 items-center justify-center rounded-full bg-[#EAF6EC] text-[16px] font-bold text-[#248A3D] transition active:scale-90 dark:bg-green-500/15"
+                className="btn-klein"
               >
-                ✓
+                <Icon name="haken" size={15} strich={2.8} /> Freigeben
               </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  const f = await wand.pruefen(z.id, "abgelehnt");
+                  if (f) meldeFehler(f);
+                }}
+                className="btn-klein-grau !text-red-600 dark:!text-red-400"
+              >
+                Ablehnen
+              </button>
+              {!antrag && (
+                <button type="button" onClick={() => void verschieben(z)} className={`btn-klein-grau ml-auto ${TEIL_FARBE[ANDERER[z.bereich]].text}`}>
+                  <TeilSymbol teil={ANDERER[z.bereich]} size={14} /> Nach {TEIL_NAME[ANDERER[z.bereich]]}
+                </button>
+              )}
             </div>
             {antrag && <AntragLeiste a={antrag} v={v} className="mt-2.5" />}
           </div>
@@ -889,7 +907,7 @@ function Pruefen({ wand, teil, setTeil, v }: { wand: Zitatwand; teil: Teil; setT
 /** Liste offener Verschiebe-Anträge (Prüfen und Einstellungen) */
 function VerschiebeListe({ liste, v, titel }: { liste: Verschiebung[]; v: VerschiebeStand; titel: string }) {
   return (
-    <Gruppe titel={titel} className="" fuss="Verschoben wird, sobald genug zugestimmt haben (Profil → Freigaben).">
+    <Gruppe titel={titel} className="" fuss="Verschoben wird, sobald genug zugestimmt haben. Anträge stehen auch unter Chats → Anfragen.">
       {liste.map((a) => (
         <div key={a.id} className="px-4 py-3">
           <div className="font-buch text-[15px] leading-snug [overflow-wrap:anywhere]">„{zitatOhneZeichen(a.titel)}“</div>
@@ -924,7 +942,7 @@ function WortfilterHinweis({ text }: { text: string }) {
 /**
  * Reihenfolge wie überall in Update 1.4:
  *   1 Abstimmung   2 Ergebnisse   3 Gewinner   4 Offiziell & Inoffiziell
- *   (Lehrerliste)  5 Wer darf was?
+ *   (Lehrkräfte)    5 Wer darf was?
  * 1–3 gelten je Teil (Umschalter oben im Blatt), 4–5 für beide.
  */
 function ZitateEinstellungen({
@@ -935,6 +953,7 @@ function ZitateEinstellungen({
   gw,
   teil,
   v,
+  nachKueren,
 }: {
   open: boolean;
   onClose: () => void;
@@ -943,6 +962,8 @@ function ZitateEinstellungen({
   gw: GewinnerStand;
   teil: Teil;
   v: VerschiebeStand;
+  /** nach erfolgreichem Küren: Einstellungen schließen, Gewinner-Bühne zeigen */
+  nachKueren: () => void;
 }) {
   const { can } = useRole();
   const leitet = can("zitate.runden");
@@ -978,14 +999,14 @@ function ZitateEinstellungen({
   );
 
   // Kandidaten zum Küren: aus der letzten Runde des Teils (mit deren Stimmen,
-  // Honorable Mentions = Sieger der Herzen dahinter), sonst nach Feuer.
+  // Herzens-Kandidaten = Gewinner der Herzen dahinter), sonst nach Feuer.
   const kandidaten: Kandidat[] = useMemo(() => {
     if (runde) {
       const ks = r.kandidatenVon(runde.id).map((k) => ({ id: k.ziel_id, label: k.label, unter: k.unter, stimmen: r.zahl(runde.id, k.ziel_id) ?? null, hm: !!k.hm }));
       const nach = (a: { stimmen: number | null }, b: { stimmen: number | null }) => (b.stimmen ?? 0) - (a.stimmen ?? 0);
       return [
         ...ks.filter((k) => !k.hm).sort(nach),
-        ...ks.filter((k) => k.hm).sort(nach).map((k) => ({ ...k, unter: `♥ Honorable Mention${k.unter ? ` · ${k.unter}` : ""}` })),
+        ...ks.filter((k) => k.hm).sort(nach).map((k) => ({ ...k, unter: `♥ Herzens-Kandidat${k.unter ? ` · ${k.unter}` : ""}` })),
       ];
     }
     return [...quellen].sort((a, b) => b.punkte - a.punkte).map((q) => ({ id: q.id, label: q.label, unter: q.unter, stimmen: wand.zahlenSichtbar ? q.punkte : null }));
@@ -1017,7 +1038,7 @@ function ZitateEinstellungen({
                 ? "Eine neue Runde beendet die laufende. Zum Abstimmen steht die Runde für alle oben auf der Wand."
                 : quellen.length < 2
                   ? "Für eine Runde braucht es mindestens zwei freigegebene Zitate in diesem Teil."
-                  : "Die Besten auswählen, Stimmen je Person festlegen – optional mit Sieger der Herzen."
+                  : "Die Besten auswählen, Stimmen je Person festlegen – optional mit Gewinner der Herzen."
             }
           >
             {offen ? (
@@ -1033,8 +1054,8 @@ function ZitateEinstellungen({
                 </div>
                 {hmZahl >= 2 && (
                   <label className="flex min-h-[48px] items-center gap-3 px-4 py-2">
-                    <span className="min-w-0 flex-1 text-[15px]">Sieger der Herzen</span>
-                    <Schalter an={!!offen.hm_aktiv} label="Sieger der Herzen" onChange={async (v) => fehler(await r.aendern(offen.id, { hm: v }))} />
+                    <span className="min-w-0 flex-1 text-[15px]">Gewinner der Herzen</span>
+                    <Schalter an={!!offen.hm_aktiv} label="Gewinner der Herzen" onChange={async (v) => fehler(await r.aendern(offen.id, { hm: v }))} />
                   </label>
                 )}
                 <Zeile
@@ -1062,7 +1083,7 @@ function ZitateEinstellungen({
                 />
               </>
             ) : (
-              <Zeile label={letzte ? `Runde ${letzte.nr + 1} starten` : "Abstimmungsrunde starten"} onClick={() => setStart(quellen)} disabled={quellen.length < 2}>
+              <Zeile label={letzte ? `Runde ${letzte.nr + 1} starten` : "Runde starten"} onClick={() => setStart(quellen)} disabled={quellen.length < 2}>
                 <Wert>{quellen.length} Zitate</Wert>
               </Zeile>
             )}
@@ -1079,7 +1100,7 @@ function ZitateEinstellungen({
             )}
             <div className="px-4 py-1">
               <SichtbarkeitWahl
-                titel="🔥-Zahlen sehen"
+                titel="Feuer-Zahlen sehen"
                 alle={e.alle.zitate}
                 onChange={async (val) => {
                   const f = await e.setzen("zitate", val);
@@ -1093,7 +1114,7 @@ function ZitateEinstellungen({
 
         {/* 3 · Gewinner */}
         {darfKueren && (
-          <Gruppe titel={`Gewinner · ${TEIL_NAME[t]}`} fuss={runde ? `Vorschläge aus Runde ${runde.nr}, Honorable Mentions für den Gewinner der Herzen.` : "Vorschläge nach Feuer auf der Wand."}>
+          <Gruppe titel={`Gewinner · ${TEIL_NAME[t]}`} fuss={runde ? `Vorschläge aus Runde ${runde.nr}, Herzens-Kandidaten für den Gewinner der Herzen.` : "Vorschläge nach Feuer auf der Wand."}>
             <Zeile label="Gewinner" onClick={() => setKueren(true)}>
               <Wert>{g ? kurz(g) : "Noch keiner"}</Wert>
             </Zeile>
@@ -1124,10 +1145,10 @@ function ZitateEinstellungen({
           </div>
         )}
 
-        {/* Lehrerliste (auch für das Lehrer-Ranking) */}
+        {/* Lehrkräfte (auch für das Lehrer-Ranking) */}
         {can("lehrer.verwalten") && (
-          <Gruppe titel="Namen" fuss="Die Lehrerliste steht beim Einreichen zur Auswahl und im Lehrer-Ranking.">
-            <Zeile label="Lehrerliste pflegen" onClick={() => setLehrer(true)} />
+          <Gruppe titel="Namen" fuss="Die Lehrkräfte stehen beim Einreichen zur Auswahl und im Lehrer-Ranking.">
+            <Zeile label="Lehrkräfte pflegen" onClick={() => setLehrer(true)} />
           </Gruppe>
         )}
 
@@ -1136,7 +1157,7 @@ function ZitateEinstellungen({
       </Sheet>
 
       <Sheet open={lehrer} onClose={() => setLehrer(false)}>
-        <SheetKopf titel="Lehrerliste" unter="Zum Auswählen bei Zitaten und im Lehrer-Ranking." onClose={() => setLehrer(false)} />
+        <SheetKopf titel="Lehrkräfte" unter="Zum Auswählen bei Zitaten und im Lehrer-Ranking." onClose={() => setLehrer(false)} />
         <LehrerListe aktiv={lehrer} />
       </Sheet>
       <RundeStartenSheet
@@ -1157,8 +1178,9 @@ function ZitateEinstellungen({
         gewinner={g}
         herzen={h}
         hinweis={t === "offiziell" ? "Der offizielle Gewinner kommt so ins Abibuch." : "Nur für die Stufe – wird nicht gedruckt."}
-        onKueren={(art, k) => gw.kueren({ gruppe: t, art, ziel_id: k.id, label: k.label, unter: (k.unter || "").replace(/^♥ Honorable Mention( · )?/, ""), stimmen: k.stimmen ?? null })}
+        onKueren={(art, k, leise) => gw.kueren({ gruppe: t, art, ziel_id: k.id, label: k.label, unter: (k.unter || "").replace(/^♥ Herzens-Kandidat( · )?/, ""), stimmen: k.stimmen ?? null }, leise)}
         onZuruecknehmen={(art) => gw.zuruecknehmen(t, art)}
+        onFertig={nachKueren}
       />
     </>
   );

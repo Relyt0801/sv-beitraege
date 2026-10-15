@@ -52,14 +52,20 @@ function StudentCardRoh({
       } ${leaving ? "bg-red-50/60 dark:bg-red-500/5" : ""}`}
     >
       {selectable && (
+        // Sichtbar 24 px, tippbar 44 px (Update 1.4, U3)
         <button
           onClick={() => onToggleSelect(student.id)}
           aria-label="Auswählen"
-          className={`flex h-6 w-6 min-w-6 shrink-0 items-center justify-center rounded-lg border-2 text-sm text-white transition ${
-            selected ? "border-brand bg-brand" : "border-papier-linie dark:border-slate-600"
-          }`}
+          aria-pressed={selected}
+          className="-my-2 -ml-2 flex h-11 w-11 shrink-0 items-center justify-center"
         >
-          {selected ? "✓" : ""}
+          <span
+            className={`flex h-6 w-6 items-center justify-center rounded-lg border-2 text-sm text-white transition ${
+              selected ? "border-brand bg-brand" : "border-papier-linie dark:border-slate-600"
+            }`}
+          >
+            {selected ? "✓" : ""}
+          </span>
         </button>
       )}
 
@@ -85,7 +91,7 @@ function StudentCardRoh({
           <span className="block truncate text-[14px] font-semibold">
             {student.nachname}, {student.vorname}
           </span>
-          <span className="block truncate text-[11px] text-tinte-leise">
+          <span className="block truncate text-[12px] text-tinte-leise">
             {leaving
               ? `verlässt ${student.verlaesst_ab}`
               : joiningLate

@@ -1,27 +1,42 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTermine } from "../termine-store";
 import { useStore } from "../store";
 import { frage, meldeFehler } from "../lib/melder";
 import { Sheet, SheetKopf } from "./Sheet";
+import { Gruppe, Zeile, ZeileEingabe, ZeileHaken, ZeileMitSchalter } from "./Liste";
+import { Schalter } from "./Schalter";
+import { FussLeiste } from "./FussLeiste";
+import { ZeitFeld } from "./ZeitFeld";
 import {
-  WOCHENTAG_WAHL, heuteKey, plusTage, tagLang, uhr, wiederholungsTage,
+  PAUSEN, WOCHENTAG_WAHL, heuteKey, plusTage, tagLang, uhr, wiederholungsTage,
   type Aktion, type NeuerTermin,
 } from "../lib/termine";
 
-/** Ohne Vorlage: ein ganzer Schultag. */
-const STANDARD_VON = "07:35";
-const STANDARD_BIS = "16:15";
+/** Ohne Vorlage: die erste große Pause – dafür werden die meisten Aktionen
+ *  (Waffelverkauf, Kuchenverkauf) ausgeschrieben, nicht für den ganzen Schultag. */
+const STANDARD_VON = PAUSEN[0].von;
+const STANDARD_BIS = PAUSEN[0].bis;
 
 const ICONS = ["🧇", "🍰", "🥣", "☕", "🍪", "🎪", "🧹", "📦", "🎨", "🎵", "📣", "📌"];
 
+/** Ein Zeitfenster eines Tages – eine Aktion kann mehrere haben (1. und 2. Pause). */
+interface Fenster {
+  id: number;
+  von: string;
+  ende: string;
+}
+
 /**
- * Eine Aktion ausschreiben und ihre Schichten festlegen.
+ * Eine Aktion mit Schichten ausschreiben.
  *
  * Beispiel Waffelverkauf: Aktion wählen (oder neu anlegen), dann entweder
  * einen einzelnen Termin oder "jeden Montag und Donnerstag, 1. große Pause,
  * bis zu den Ferien". Die Wiederholung wird sofort in einzelne Schichten
  * umgerechnet – so lässt sich eine ausgefallene Pause später einfach löschen,
  * ohne dass die ganze Reihe auseinanderfällt.
+ *
+ * Mehrere Schichten am selben Tag (z. B. 1. und 2. Pause) sind ein
+ * Zeitfenster mehr – kein zweiter Durchlauf nötig.
  */
 export function AktionSheet({ offen, onSchliessen }: { offen: boolean; onSchliessen: () => void }) {
   const { aktionen, termine: alleTermine, aktionAnlegen, aktionAendern, aktionProzent, aktionLoeschen, anlegenViele } = useTermine();
@@ -33,6 +48,9 @@ export function AktionSheet({ offen, onSchliessen }: { offen: boolean; onSchlies
     [templates],
   );
 
+  const naechsteId = useRef(1);
+  const neuesFenster = (von: string, ende: string): Fenster => ({ id: naechsteId.current++, von, ende });
+
   const [aktionId, setAktionId] = useState<string>("");
   const [neuTitel, setNeuTitel] = useState("");
   const [neuIcon, setNeuIcon] = useState("🧇");
@@ -43,11 +61,10 @@ export function AktionSheet({ offen, onSchliessen }: { offen: boolean; onSchlies
   const [bis, setBis] = useState(plusTage(heuteKey(), 42));
   const [tage, setTage] = useState<Set<number>>(new Set([1, 4]));
   const [ganztaegig, setGanztaegig] = useState(false);
-  const [von, setVon] = useState(STANDARD_VON);
-  const [ende, setEnde] = useState(STANDARD_BIS);
+  const [fenster, setFenster] = useState<Fenster[]>(() => [neuesFenster(STANDARD_VON, STANDARD_BIS)]);
   const [alsVorlage, setAlsVorlage] = useState(true);
   const [ort, setOrt] = useState("");
-  const [plaetze, setPlaetze] = useState("2");
+  const [plaetze, setPlaetze] = useState(2);
 
   const [fehler, setFehler] = useState("");
   const [busy, setBusy] = useState(false);
@@ -55,15 +72,16 @@ export function AktionSheet({ offen, onSchliessen }: { offen: boolean; onSchlies
   const gewaehlt = aktionen.find((a) => a.id === aktionId) || null;
 
   // Aktion gewählt: ihre gespeicherten Zeiten, Ort und Plätze übernehmen.
-  // Keine Vorlage oder neue Aktion: ganzer Schultag 07:35–16:15.
+  // Keine Vorlage oder neue Aktion: die erste große Pause.
   useEffect(() => {
     if (!offen) return;
     const v = aktionen.find((x) => x.id === aktionId);
     setGanztaegig(Boolean(v?.vorlage_ganztaegig));
-    setVon(v?.vorlage_von ? uhr(v.vorlage_von) : STANDARD_VON);
-    setEnde(v?.vorlage_bis ? uhr(v.vorlage_bis) : STANDARD_BIS);
+    setFenster([
+      neuesFenster(v?.vorlage_von ? uhr(v.vorlage_von) : STANDARD_VON, v?.vorlage_bis ? uhr(v.vorlage_bis) : STANDARD_BIS),
+    ]);
     setOrt(v?.vorlage_ort || "");
-    setPlaetze(String(v?.vorlage_plaetze || 2));
+    setPlaetze(v?.vorlage_plaetze || 2);
     setAlsVorlage(!v?.vorlage_von && !v?.vorlage_ganztaegig);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [aktionId, offen]);
@@ -74,19 +92,34 @@ export function AktionSheet({ offen, onSchliessen }: { offen: boolean; onSchlies
     () => (wiederholt ? wiederholungsTage(datum, bis, [...tage]) : datum ? [datum] : []),
     [wiederholt, datum, bis, tage],
   );
+  /** Zeitfenster ohne Doppelte – gleiche Zeiten würden sonst zwei gleiche Schichten ergeben. */
+  const fensterListe = useMemo(() => {
+    if (ganztaegig) return [{ von: null as string | null, bis: null as string | null }];
+    const gesehen = new Set<string>();
+    const aus: { von: string | null; bis: string | null }[] = [];
+    for (const f of fenster) {
+      const k = `${f.von}-${f.ende}`;
+      if (gesehen.has(k)) continue;
+      gesehen.add(k);
+      aus.push({ von: f.von, bis: f.ende });
+    }
+    return aus;
+  }, [fenster, ganztaegig]);
+  const anzahl = termine.length * fensterListe.length;
 
   async function speichern() {
     setFehler("");
     let id = aktionId;
 
     // Neue Aktion? Erst anlegen, dann die Schichten dranhängen.
-    if (!ganztaegig && von && ende && ende <= von) return setFehler("Die Endzeit liegt vor der Anfangszeit.");
+    if (!ganztaegig && fenster.some((f) => f.ende <= f.von)) return setFehler("Eine Endzeit liegt vor der Anfangszeit.");
+    const erstes = fensterListe[0];
     const vorlage = {
-      vorlage_von: ganztaegig ? null : von || null,
-      vorlage_bis: ganztaegig ? null : ende || null,
+      vorlage_von: ganztaegig ? null : erstes.von,
+      vorlage_bis: ganztaegig ? null : erstes.bis,
       vorlage_ganztaegig: ganztaegig,
       vorlage_ort: ort.trim(),
-      vorlage_plaetze: Math.max(1, Math.min(50, Number(plaetze) || 1)),
+      vorlage_plaetze: Math.max(1, Math.min(50, plaetze || 1)),
     };
 
     if (!id) {
@@ -113,22 +146,27 @@ export function AktionSheet({ offen, onSchliessen }: { offen: boolean; onSchlies
     if (termine.length === 0) return setFehler("Kein Tag getroffen. Prüfe Zeitraum und Wochentage.");
 
     const aktion = aktionen.find((a) => a.id === id);
-    const liste: NeuerTermin[] = termine.map((tag) => ({
-      titel: aktion?.titel || neuTitel.trim(),
-      beschreibung: "",
-      ort: ort.trim(),
-      datum: tag,
-      bis_datum: null,
-      von: ganztaegig ? null : von || null,
-      bis: ganztaegig ? null : ende || null,
-      sichtbar: "alle",
-      fuer_eltern: false,
-      tags: [],
-      personen: [],
-      aktion_id: id,
-      plaetze: Math.max(1, Number(plaetze) || 1),
-      icon: aktion?.icon || neuIcon,
-    }));
+    const liste: NeuerTermin[] = [];
+    for (const tag of termine) {
+      for (const f of fensterListe) {
+        liste.push({
+          titel: aktion?.titel || neuTitel.trim(),
+          beschreibung: "",
+          ort: ort.trim(),
+          datum: tag,
+          bis_datum: null,
+          von: f.von,
+          bis: f.bis,
+          sichtbar: "alle",
+          fuer_eltern: false,
+          tags: [],
+          personen: [],
+          aktion_id: id,
+          plaetze: Math.max(1, plaetze || 1),
+          icon: aktion?.icon || neuIcon,
+        });
+      }
+    }
 
     setBusy(true);
     const f = await anlegenViele(liste);
@@ -137,34 +175,41 @@ export function AktionSheet({ offen, onSchliessen }: { offen: boolean; onSchlies
     onSchliessen();
   }
 
+  /** Eine Pause an-/abwählen: gleiche Zeiten schon da → raus, sonst dazu. */
+  function pauseUmschalten(von: string, ende: string) {
+    setFenster((prev) => {
+      const da = prev.find((f) => f.von === von && f.ende === ende);
+      if (da) return prev.length > 1 ? prev.filter((f) => f !== da) : prev;
+      return [...prev, neuesFenster(von, ende)];
+    });
+  }
+  const einFenster = (id: number, teil: Partial<Fenster>) =>
+    setFenster((prev) => prev.map((f) => (f.id === id ? { ...f, ...teil } : f)));
+
   return (
     <Sheet open={offen} onClose={onSchliessen}>
-      <SheetKopf titel={<>Aktion ausschreiben</>} onClose={onSchliessen} />
+      <SheetKopf titel="Aktion mit Schichten" unter="Termine mit Plätzen, in die man sich einträgt" onClose={onSchliessen} />
 
       {/* ------------------------------------------------ Welche Aktion */}
-      <div className="mb-1.5 px-1 text-[12px] font-semibold uppercase tracking-[0.04em] text-tinte-leise">Worum geht es?</div>
-      <div className="mb-3 flex flex-wrap gap-1.5">
-        {offeneAktionen.map((a) => (
-          <button
-            key={a.id}
-            onClick={() => setAktionId(a.id === aktionId ? "" : a.id)}
-            className={`flex items-center gap-1.5 rounded-xl border px-2.5 py-2 text-[12px] font-semibold transition active:scale-[.98] ${
-              a.id === aktionId
-                ? "border-brand bg-brand text-white"
-                : "border-papier-linie bg-white dark:border-slate-700 dark:bg-slate-900"
-            }`}
-          >
-            <span>{a.icon}</span>
-            {a.titel}
-            {(a.vorlage_von || a.vorlage_ganztaegig) && (
-              <span className={a.id === aktionId ? "text-white/90" : "text-tinte-leise"}>
-                {a.vorlage_ganztaegig ? "ganztägig" : uhr(a.vorlage_von ?? null)}
-              </span>
-            )}
-            <span className={a.id === aktionId ? "text-white/90" : "text-brand"}>+{a.prozent} %</span>
-          </button>
-        ))}
-      </div>
+      {offeneAktionen.length > 0 && (
+        <Gruppe titel="Worum geht es?" className="mt-0">
+          {offeneAktionen.map((a) => (
+            <ZeileHaken
+              key={a.id}
+              gewaehlt={a.id === aktionId}
+              onClick={() => setAktionId(a.id === aktionId ? "" : a.id)}
+              label={
+                <>
+                  <span aria-hidden className="mr-2">{a.icon}</span>
+                  {a.titel}
+                </>
+              }
+              unter={`${a.vorlage_ganztaegig ? "ganztägig · " : a.vorlage_von ? `${uhr(a.vorlage_von)} Uhr · ` : ""}zählt +${a.prozent} %`}
+            />
+          ))}
+          <ZeileHaken gewaehlt={!aktionId} onClick={() => setAktionId("")} label="Neue Aktion anlegen" />
+        </Gruppe>
+      )}
 
       {gewaehlt && (
         <AktionVerwalten
@@ -193,184 +238,201 @@ export function AktionSheet({ offen, onSchliessen }: { offen: boolean; onSchlies
       )}
 
       {!aktionId && (
-        <div className="mb-3 rounded-2xl border border-papier-linie p-3 dark:border-slate-700">
-          <div className="mb-1.5 text-[12px] font-semibold text-tinte-leise">… oder neue Aktion</div>
-          <input
-            className="field mb-2"
-            placeholder="z. B. Kuchenverkauf am Elternabend"
-            value={neuTitel}
-            onChange={(e) => setNeuTitel(e.target.value)}
-          />
-          <div className="mb-2 flex flex-wrap gap-1">
-            {ICONS.map((i) => (
-              <button
-                key={i}
-                onClick={() => setNeuIcon(i)}
-                className={`h-9 w-9 rounded-lg text-lg transition ${
-                  neuIcon === i ? "bg-brand/15 ring-2 ring-brand" : "hover:bg-papier-matt dark:hover:bg-slate-800"
-                }`}
-                aria-label={`Zeichen ${i}`}
-              >
-                {i}
-              </button>
-            ))}
-          </div>
-          <div className="mb-1 text-[12px] font-semibold text-tinte-leise">Zählt wie (aus dem Beiträge-Reiter)</div>
-          <ProzentWahl vorlagen={vorlagen} wert={Number(neuProzent) || 0} setzen={(p) => setNeuProzent(String(p))} />
-        </div>
+        <>
+          <Gruppe titel={offeneAktionen.length > 0 ? "Neue Aktion" : "Worum geht es?"} className={offeneAktionen.length > 0 ? "mt-4" : "mt-0"}>
+            <ZeileEingabe label="Name" placeholder="z. B. Kuchenverkauf" maxLength={60} value={neuTitel} onChange={setNeuTitel} />
+            <div className="px-4 py-3">
+              <div className="mb-2 text-[13px] text-tinte-leise">Zeichen</div>
+              <div className="flex flex-wrap gap-1.5">
+                {ICONS.map((i) => (
+                  <button
+                    key={i}
+                    onClick={() => setNeuIcon(i)}
+                    className={`h-11 w-11 rounded-xl text-[22px] transition active:scale-95 ${
+                      neuIcon === i ? "bg-brand/15 ring-2 ring-brand" : "bg-[rgb(118_118_128/0.12)] dark:bg-[rgb(118_118_128/0.24)]"
+                    }`}
+                    aria-label={`Zeichen ${i}`}
+                    aria-pressed={neuIcon === i}
+                  >
+                    {i}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </Gruppe>
+          <Gruppe
+            titel="Wie viel zählt eine Schicht?"
+            fuss="Die Werte kommen aus dem Reiter Beiträge. So passen Aktion und eingetragene Mithilfe immer zusammen."
+          >
+            <ProzentWahl vorlagen={vorlagen} wert={Number(neuProzent) || 0} setzen={(p) => setNeuProzent(String(p))} />
+          </Gruppe>
+        </>
       )}
 
       {/* ------------------------------------------------ Wann */}
-      <div className="mb-2 flex gap-1.5 rounded-xl bg-papier-matt p-1 dark:bg-slate-800">
-        <button
-          onClick={() => setWiederholt(false)}
-          className={`flex-1 rounded-lg py-2 text-[13px] font-bold transition ${
-            !wiederholt ? "bg-brand text-white" : "text-tinte-matt"
-          }`}
-        >
+      <div className="seg mb-0 mt-5" role="tablist" aria-label="Einmalig oder regelmäßig">
+        <button role="tab" aria-selected={!wiederholt} onClick={() => setWiederholt(false)} className={`seg-item whitespace-nowrap !py-2 !text-[14px] ${!wiederholt ? "seg-aktiv" : ""}`}>
           Einmalig
         </button>
-        <button
-          onClick={() => setWiederholt(true)}
-          className={`flex-1 rounded-lg py-2 text-[13px] font-bold transition ${
-            wiederholt ? "bg-brand text-white" : "text-tinte-matt"
-          }`}
-        >
+        <button role="tab" aria-selected={wiederholt} onClick={() => setWiederholt(true)} className={`seg-item whitespace-nowrap !py-2 !text-[14px] ${wiederholt ? "seg-aktiv" : ""}`}>
           Regelmäßig
         </button>
       </div>
 
-      <div className="mb-3 rounded-2xl border border-papier-linie p-3 dark:border-slate-700">
-        <div className="mb-2 flex flex-wrap items-center gap-2">
-          <label className="flex min-w-0 flex-1 items-center gap-2">
-            <span className="shrink-0 text-[12px] font-semibold text-tinte-leise">
-              {wiederholt ? "Ab" : "Am"}
-            </span>
+      <Gruppe
+        titel="Wann"
+        className="mt-3"
+        fuss={wiederholt ? "Jede Schicht steht einzeln im Kalender – fällt eine Pause aus, löschst du nur diese." : undefined}
+      >
+        <Zeile label={wiederholt ? "Ab" : "Am"}>
+          <input
+            type="date"
+            aria-label={wiederholt ? "Erster Tag" : "Datum"}
+            className="min-w-0 bg-transparent text-right text-[16px] outline-none"
+            value={datum}
+            onChange={(e) => setDatum(e.target.value)}
+          />
+        </Zeile>
+        {wiederholt && (
+          <Zeile label="Bis">
             <input
               type="date"
-              className="min-w-0 flex-1 rounded-lg border border-papier-linie bg-white px-2.5 py-2 text-[14px] dark:border-slate-700 dark:bg-slate-800"
-              value={datum}
-              onChange={(e) => setDatum(e.target.value)}
+              aria-label="Letzter Tag"
+              min={datum}
+              className="min-w-0 bg-transparent text-right text-[16px] outline-none"
+              value={bis}
+              onChange={(e) => setBis(e.target.value)}
             />
-          </label>
-          {wiederholt && (
-            <label className="flex min-w-0 flex-1 items-center gap-2">
-              <span className="shrink-0 text-[12px] font-semibold text-tinte-leise">Bis</span>
-              <input
-                type="date"
-                min={datum}
-                className="min-w-0 flex-1 rounded-lg border border-papier-linie bg-white px-2.5 py-2 text-[14px] dark:border-slate-700 dark:bg-slate-800"
-                value={bis}
-                onChange={(e) => setBis(e.target.value)}
-              />
-            </label>
-          )}
-        </div>
-
+          </Zeile>
+        )}
         {wiederholt && (
-          <div className="mb-2 flex flex-wrap gap-1">
-            {WOCHENTAG_WAHL.map((w) => {
-              const an = tage.has(w.nr);
-              return (
-                <button
-                  key={w.nr}
-                  onClick={() =>
-                    setTage((prev) => {
-                      const n = new Set(prev);
-                      if (an) n.delete(w.nr);
-                      else n.add(w.nr);
-                      return n;
-                    })
-                  }
-                  aria-label={w.lang}
-                  className={`h-9 w-10 rounded-lg text-[12px] font-bold transition ${
-                    an
-                      ? "bg-brand text-white"
-                      : "bg-papier-matt text-tinte-matt dark:bg-slate-800 dark:text-slate-300"
-                  }`}
-                >
-                  {w.kurz}
-                </button>
-              );
-            })}
+          <div className="px-4 py-3">
+            <div className="mb-2 text-[13px] text-tinte-leise">An diesen Wochentagen</div>
+            <div className="grid grid-cols-7 gap-1.5">
+              {WOCHENTAG_WAHL.map((w) => {
+                const an = tage.has(w.nr);
+                return (
+                  <button
+                    key={w.nr}
+                    onClick={() =>
+                      setTage((prev) => {
+                        const n = new Set(prev);
+                        if (an) n.delete(w.nr);
+                        else n.add(w.nr);
+                        return n;
+                      })
+                    }
+                    aria-label={w.lang}
+                    aria-pressed={an}
+                    className={`h-11 rounded-xl text-[14px] font-semibold transition active:scale-95 ${
+                      an ? "bg-brand text-white" : "bg-[rgb(118_118_128/0.12)] text-tinte-matt dark:bg-[rgb(118_118_128/0.24)] dark:text-slate-300"
+                    }`}
+                  >
+                    {w.kurz}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         )}
+      </Gruppe>
 
-        <label className="mb-2 flex w-fit cursor-pointer items-center gap-2 text-[13px] font-semibold text-tinte-matt dark:text-slate-300">
-          <input
-            type="checkbox"
-            className="h-4 w-4 accent-brand"
-            checked={ganztaegig}
-            onChange={(e) => setGanztaegig(e.target.checked)}
-          />
-          ganztägig
-        </label>
-
+      <Gruppe
+        titel="Uhrzeit"
+        fuss={ganztaegig ? undefined : "24-Stunden-Zeit, z. B. 0910 tippen. Mehrere Zeiten ergeben pro Tag mehrere Schichten."}
+      >
+        <ZeileMitSchalter label="Ganztägig">
+          <Schalter an={ganztaegig} onChange={setGanztaegig} label="Ganztägig" />
+        </ZeileMitSchalter>
         {!ganztaegig && (
-        <div className="flex flex-wrap items-center gap-2">
-          <label className="flex min-w-0 flex-1 items-center gap-2">
-            <span className="shrink-0 text-[12px] font-semibold text-tinte-leise">Von</span>
-            <input
-              type="time"
-              className="min-w-0 flex-1 rounded-lg border border-papier-linie bg-white px-2.5 py-2 text-[14px] dark:border-slate-700 dark:bg-slate-800"
-              value={von}
-              onChange={(e) => setVon(e.target.value)}
+          <>
+            <div className="flex flex-wrap gap-1.5 px-4 py-3" role="group" aria-label="Pausen">
+              {PAUSEN.map((p) => {
+                const an = fenster.some((f) => f.von === p.von && f.ende === p.bis);
+                return (
+                  <button
+                    key={p.name}
+                    onClick={() => pauseUmschalten(p.von, p.bis)}
+                    aria-pressed={an}
+                    className={`min-h-[44px] rounded-full px-3.5 text-[14px] font-semibold transition active:scale-95 ${
+                      an ? "bg-brand text-white" : "bg-[rgb(118_118_128/0.12)] text-brand-dark dark:bg-[rgb(118_118_128/0.24)] dark:text-brand"
+                    }`}
+                  >
+                    {p.name} <span className="zahl font-normal opacity-90">{p.von}</span>
+                  </button>
+                );
+              })}
+            </div>
+            {fenster.map((f, i) => (
+              <div key={f.id} className="flex min-h-[56px] items-center gap-2 py-2 pl-4 pr-1">
+                <span className="w-[4.5rem] shrink-0 text-[15px]">{fenster.length > 1 ? `Schicht ${i + 1}` : "Von – bis"}</span>
+                <ZeitFeld wert={f.von} onChange={(v) => einFenster(f.id, { von: v })} label={`Beginn Schicht ${i + 1}`} />
+                <span aria-hidden className="text-tinte-leise">–</span>
+                <ZeitFeld wert={f.ende} onChange={(v) => einFenster(f.id, { ende: v })} label={`Ende Schicht ${i + 1}`} />
+                <span className="flex-1" />
+                {fenster.length > 1 && (
+                  <button
+                    onClick={() => setFenster((prev) => prev.filter((x) => x.id !== f.id))}
+                    className="flex h-11 w-11 shrink-0 items-center justify-center text-[16px] text-tinte-leise active:opacity-50"
+                    aria-label={`Schicht ${i + 1} entfernen`}
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+            ))}
+            <Zeile
+              blau
+              label="Weitere Schicht am selben Tag"
+              onClick={() => {
+                // Nächste noch nicht gewählte Pause vorschlagen, sonst eine Stunde nach dem letzten Ende
+                const frei = PAUSEN.find((p) => !fenster.some((f) => f.von === p.von && f.ende === p.bis));
+                setFenster((prev) => [...prev, frei ? neuesFenster(frei.von, frei.bis) : neuesFenster("14:00", "14:45")]);
+              }}
             />
-          </label>
-          <label className="flex min-w-0 flex-1 items-center gap-2">
-            <span className="shrink-0 text-[12px] font-semibold text-tinte-leise">Bis</span>
-            <input
-              type="time"
-              className="min-w-0 flex-1 rounded-lg border border-papier-linie bg-white px-2.5 py-2 text-[14px] dark:border-slate-700 dark:bg-slate-800"
-              value={ende}
-              onChange={(e) => setEnde(e.target.value)}
-            />
-          </label>
-        </div>
+          </>
         )}
-      </div>
+      </Gruppe>
 
-      <div className="mb-3 flex flex-wrap items-center gap-2">
-        <label className="flex min-w-0 flex-1 items-center gap-2">
-          <span className="shrink-0 text-[12px] font-semibold text-tinte-leise">Ort</span>
-          <input
-            className="min-w-0 flex-1 rounded-lg border border-papier-linie bg-white px-2.5 py-2 text-[14px] dark:border-slate-700 dark:bg-slate-800"
-            placeholder="z. B. Pausenhalle"
-            value={ort}
-            onChange={(e) => setOrt(e.target.value)}
-          />
-        </label>
-        <label className="flex shrink-0 items-center gap-2">
-          <span className="text-[12px] font-semibold text-tinte-leise">Plätze</span>
-          <input
-            type="number"
-            min={1}
-            max={20}
-            className="w-16 rounded-lg border border-papier-linie bg-white px-2 py-2 text-center text-[14px] font-bold dark:border-slate-700 dark:bg-slate-800"
-            value={plaetze}
-            onChange={(e) => setPlaetze(e.target.value)}
-          />
-        </label>
-      </div>
+      <Gruppe titel="Ort und Plätze">
+        <ZeileEingabe label="Ort" placeholder="z. B. Pausenhalle" maxLength={60} value={ort} onChange={setOrt} />
+        <Zeile label="Plätze je Schicht">
+          <span className="flex items-center gap-1">
+            <button
+              onClick={() => setPlaetze((p) => Math.max(1, p - 1))}
+              disabled={plaetze <= 1}
+              className="flex h-11 w-11 items-center justify-center rounded-full bg-[rgb(118_118_128/0.12)] text-[20px] font-medium text-brand-dark transition active:scale-90 disabled:opacity-40 dark:bg-[rgb(118_118_128/0.24)] dark:text-brand"
+              aria-label="Einen Platz weniger"
+            >
+              −
+            </button>
+            <span className="zahl w-8 text-center text-[17px] font-bold" aria-live="polite">{plaetze}</span>
+            <button
+              onClick={() => setPlaetze((p) => Math.min(50, p + 1))}
+              disabled={plaetze >= 50}
+              className="flex h-11 w-11 items-center justify-center rounded-full bg-[rgb(118_118_128/0.12)] text-[20px] font-medium text-brand-dark transition active:scale-90 disabled:opacity-40 dark:bg-[rgb(118_118_128/0.24)] dark:text-brand"
+              aria-label="Einen Platz mehr"
+            >
+              +
+            </button>
+          </span>
+        </Zeile>
+      </Gruppe>
 
-      <label className="mb-3 flex cursor-pointer items-center gap-2 text-[12px] text-tinte-matt dark:text-slate-300">
-        <input
-          type="checkbox"
-          className="h-4 w-4 accent-brand"
-          checked={alsVorlage}
-          onChange={(e) => setAlsVorlage(e.target.checked)}
-        />
-        Zeit, Ort und Plätze für „{gewaehlt?.titel || neuTitel.trim() || "diese Aktion"}“ merken
-      </label>
+      <Gruppe className="mt-4">
+        <ZeileMitSchalter label={`Zeit, Ort und Plätze für „${gewaehlt?.titel || neuTitel.trim() || "diese Aktion"}“ merken`}>
+          <Schalter an={alsVorlage} onChange={setAlsVorlage} label="Zeit, Ort und Plätze merken" />
+        </ZeileMitSchalter>
+      </Gruppe>
 
       {/* ------------------------------------------------ Vorschau */}
-      <div className="mb-3 rounded-xl bg-papier-matt p-3 text-[12px] leading-relaxed text-tinte-matt dark:bg-slate-800 dark:text-slate-300">
-        {termine.length === 0 ? (
+      <p className="mt-4 px-4 text-[14px] leading-relaxed text-tinte-matt dark:text-slate-300">
+        {anzahl === 0 ? (
           "Noch kein Tag getroffen."
         ) : (
           <>
-            Das ergibt <b>{termine.length}</b> {termine.length === 1 ? "Schicht" : "Schichten"} mit je{" "}
-            <b>{Math.max(1, Number(plaetze) || 1)}</b> Plätzen, {ganztaegig ? "ganztägig" : `${von}–${ende}`}:
+            Das ergibt <b>{anzahl}</b> {anzahl === 1 ? "Schicht" : "Schichten"} mit je <b>{Math.max(1, plaetze || 1)}</b> Plätzen,{" "}
+            {ganztaegig ? "ganztägig" : fensterListe.map((f) => `${f.von}–${f.bis}`).join(" und ")}:
             <br />
             <span className="text-tinte-leise">
               {termine.slice(0, 3).map((t) => tagLang(t)).join(" · ")}
@@ -378,17 +440,15 @@ export function AktionSheet({ offen, onSchliessen }: { offen: boolean; onSchlies
             </span>
           </>
         )}
-      </div>
+      </p>
 
-      {fehler && <p className="mb-2 text-[13px] font-semibold text-amber-600">{fehler}</p>}
+      {fehler && <p className="mt-2 px-4 text-[14px] font-semibold text-amber-700 dark:text-amber-300">{fehler}</p>}
 
-      <button
-        disabled={busy || termine.length === 0}
-        onClick={speichern}
-        className="btn-primary disabled:opacity-50"
-      >
-        {busy ? "…" : `${termine.length || ""} ${termine.length === 1 ? "Schicht" : "Schichten"} ausschreiben`}
-      </button>
+      <FussLeiste>
+        <button disabled={busy || anzahl === 0} onClick={speichern} className="btn-primary">
+          {busy ? "…" : `${anzahl || ""} ${anzahl === 1 ? "Schicht" : "Schichten"} ausschreiben`}
+        </button>
+      </FussLeiste>
     </Sheet>
   );
 }
@@ -400,29 +460,26 @@ export type Vorlage = { id: string; titel: string; punkte: number };
 /** Prozent aus den Beitrags-Vorlagen wählen – keine freie Zahl mehr. */
 export function ProzentWahl({ vorlagen, wert, setzen }: { vorlagen: Vorlage[]; wert: number; setzen: (p: number) => void }) {
   if (!vorlagen.length) {
-    return <p className="text-[12px] text-tinte-leise">Im Beiträge-Reiter sind noch keine Möglichkeiten angelegt.</p>;
+    return <p className="px-4 py-3 text-[13px] text-tinte-leise">Im Beiträge-Reiter sind noch keine Möglichkeiten angelegt.</p>;
   }
   const passt = vorlagen.some((v) => v.punkte === wert);
   return (
-    <div className="grid gap-1">
+    <>
       {vorlagen.map((v) => (
-        <button
+        <ZeileHaken
           key={v.id}
+          gewaehlt={v.punkte === wert}
           onClick={() => setzen(v.punkte)}
-          className={`flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[12px] font-semibold transition ${
-            v.punkte === wert ? "bg-brand/10 text-brand ring-1 ring-brand/40" : "bg-papier-matt dark:bg-slate-800"
-          }`}
-        >
-          <span className="min-w-0 flex-1 truncate">{v.titel}</span>
-          <span className="zahl shrink-0 font-bold text-brand">+{v.punkte} %</span>
-        </button>
+          label={v.titel}
+          rechts={<span className="zahl shrink-0 text-[15px] font-semibold text-brand-dark dark:text-brand">+{v.punkte} %</span>}
+        />
       ))}
       {!passt && (
-        <p className="text-[11px] font-semibold text-amber-600">
+        <p className="px-4 py-2.5 text-[13px] font-semibold text-amber-700 dark:text-amber-300">
           Zählt gerade +{wert} % – das steht so nicht im Beiträge-Reiter. Bitte eine Zeile wählen.
         </p>
       )}
-    </div>
+    </>
   );
 }
 
@@ -440,30 +497,30 @@ function AktionVerwalten({
   const [offen, setOffen] = useState(false);
   const passt = vorlagen.some((v) => v.punkte === aktion.prozent);
   return (
-    <div className="mb-3 rounded-2xl border border-papier-linie p-3 dark:border-slate-700">
-      <div className="flex items-center gap-2">
-        <span className="min-w-0 flex-1 text-[12px] text-tinte-leise">
-          {schichtenAb > 0 ? `${schichtenAb} kommende Schicht${schichtenAb === 1 ? "" : "en"}` : "keine kommenden Schichten"}
-          {" · zählt "}
-          <span className={`font-bold ${passt ? "text-brand" : "text-amber-600"}`}>+{aktion.prozent} %</span>
-        </span>
-        <button onClick={() => setOffen(!offen)} className="shrink-0 text-[12px] font-bold text-brand">
-          {offen ? "fertig" : "anpassen"}
-        </button>
-      </div>
-      {!passt && !offen && (
-        <p className="mt-1 text-[11px] font-semibold text-amber-600">
-          Passt nicht zum Beiträge-Reiter – unter „anpassen" angleichen.
-        </p>
-      )}
+    <>
+      <Gruppe
+        className="mt-4"
+        fuss={!passt && !offen ? "Passt nicht zum Reiter Beiträge – unter „Anpassen“ angleichen." : undefined}
+      >
+        <Zeile
+          label={schichtenAb > 0 ? `${schichtenAb} kommende Schicht${schichtenAb === 1 ? "" : "en"}` : "Keine kommenden Schichten"}
+          unter={
+            <>
+              zählt <span className={`font-bold ${passt ? "text-brand-dark dark:text-brand" : "text-amber-700 dark:text-amber-300"}`}>+{aktion.prozent} %</span>
+            </>
+          }
+          ohnePfeil
+          onClick={() => setOffen(!offen)}
+        >
+          <span className="text-[15px] font-medium text-brand-dark dark:text-brand">{offen ? "Fertig" : "Anpassen"}</span>
+        </Zeile>
+        {offen && <ProzentWahl vorlagen={vorlagen} wert={aktion.prozent} setzen={onProzent} />}
+      </Gruppe>
       {offen && (
-        <div className="mt-2">
-          <ProzentWahl vorlagen={vorlagen} wert={aktion.prozent} setzen={onProzent} />
-          <button onClick={onEntfernen} className="mt-2 w-full rounded-lg py-2 text-[12px] font-bold text-red-500">
-            {schichtenGesamt === 0 ? "Vorlage löschen" : "Aus der Auswahl nehmen"}
-          </button>
-        </div>
+        <Gruppe className="mt-4">
+          <Zeile rot onClick={onEntfernen} label={schichtenGesamt === 0 ? "Vorlage löschen …" : "Aus der Auswahl nehmen …"} />
+        </Gruppe>
       )}
-    </div>
+    </>
   );
 }

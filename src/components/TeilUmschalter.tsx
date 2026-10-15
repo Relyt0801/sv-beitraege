@@ -1,5 +1,7 @@
-import { useRef, useState, type ReactNode, type TouchEvent } from "react";
-import { TEIL_ERKLAERUNG, TEIL_NAME, type Teil } from "../lib/teile";
+import { useCallback, useRef, useState, type ReactNode, type TouchEvent } from "react";
+import { TEIL_ERKLAERUNG, TEIL_NAME, useVerschiebenNoetig, verschiebenFrage, type Teil } from "../lib/teile";
+import { useRole } from "../auth/RoleProvider";
+import { frage } from "../lib/melder";
 
 /**
  * Umschalter Offiziell ↔ Inoffiziell – überall gleich (Rankings, Zitate,
@@ -46,6 +48,24 @@ export function TeilMarke({ teil, hell }: { teil: Teil; hell?: boolean }) {
       <Symbol teil={teil} size={12} />
       {TEIL_NAME[teil]}
     </span>
+  );
+}
+
+/**
+ * Rückfrage vor einem Verschiebe-Antrag – für Motto, Zitate, Rankings und
+ * Kommentare gleich: nennt die Zahl der nötigen Zustimmungen („du zählst
+ * schon mit“), den Ort des Antrags (Chats → Anfragen) und für Admins, dass
+ * ihre Zustimmung allein reicht. Liefert true, wenn beantragt werden soll.
+ *   const verschieben = useVerschiebenRueckfrage();
+ *   if (await verschieben("offiziell", "Mein Motto")) …
+ */
+export function useVerschiebenRueckfrage() {
+  const noetig = useVerschiebenNoetig();
+  const { isAdmin } = useRole();
+  return useCallback(
+    (nach: Teil, titel?: string): Promise<boolean> =>
+      frage(verschiebenFrage(nach, noetig, isAdmin, titel), isAdmin || noetig <= 1 ? "Verschieben" : "Beantragen"),
+    [noetig, isAdmin],
   );
 }
 

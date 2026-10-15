@@ -408,6 +408,17 @@ export const STUNDEN: { nr: number; von: string; bis: string }[] = [
   ["12:10", "12:55"], ["13:15", "14:00"], ["14:00", "14:45"], ["14:45", "15:30"], ["15:30", "16:15"],
 ].map(([von, bis], i) => ({ nr: i + 1, von, bis }));
 
+/**
+ * Die Pausen zwischen den Stunden – sinnvolle Zeiten für Verkaufsaktionen
+ * (Waffelverkauf in der großen Pause), statt eines ganzen Schultags als Vorgabe.
+ * Ergeben sich aus STUNDEN: Ende der einen, Beginn der nächsten Stunde.
+ */
+export const PAUSEN: { name: string; von: string; bis: string }[] = [
+  { name: "1. Pause", von: "09:10", bis: "09:30" },
+  { name: "2. Pause", von: "11:05", bis: "11:20" },
+  { name: "Mittag", von: "12:55", bis: "13:15" },
+];
+
 /** Welche Stunde beginnt/endet genau zu dieser Uhrzeit? (für die Anzeige "3.–5. Std.") */
 export function stundeAb(von: string | null): number | null {
   const s = STUNDEN.find((x) => x.von === uhr(von));

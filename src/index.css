@@ -181,8 +181,9 @@ button:not(:disabled) {
     @apply inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold;
   }
   /* Runder Glasknopf wie in der Navigationsleiste von iOS 26 */
+  /* 44 px: Mindestgröße für Tippflächen (Apple HIG) */
   .iconbtn {
-    @apply flex h-10 w-10 min-w-10 items-center justify-center rounded-full border border-black/[0.06]
+    @apply flex h-11 w-11 min-w-11 items-center justify-center rounded-full border border-black/[0.06]
            bg-white/80 text-[17px] text-tinte shadow-card backdrop-blur-xl transition duration-200 ease-ios
            active:scale-90 dark:border-white/10 dark:bg-slate-800/80 dark:text-slate-100 dark:shadow-none;
   }
@@ -214,14 +215,23 @@ button:not(:disabled) {
            active:scale-[.97] disabled:opacity-40 dark:bg-[rgb(118_118_128/0.24)] dark:text-brand;
   }
   /* Kleine Kapselknöpfe in Karten (wie „Öffnen“ im App Store) */
+  /* Update 1.4 (U3): sichtbar 40 px hoch, tippbar rund 48 px – die Trefferfläche
+     reicht über ::after 4 px über den Rand hinaus (Knöpfe in Zeilen liegen
+     weit genug auseinander, dass sich die Flächen nicht in die Quere kommen). */
   .btn-klein {
-    @apply inline-flex min-h-[2.25rem] items-center justify-center gap-1.5 rounded-full bg-brand px-4 text-[14px]
+    @apply relative inline-flex min-h-[2.5rem] items-center justify-center gap-1.5 rounded-full bg-brand px-4 text-[14px]
            font-semibold text-white transition duration-200 ease-ios active:scale-95 disabled:opacity-40;
   }
   .btn-klein-grau {
-    @apply inline-flex min-h-[2.25rem] items-center justify-center gap-1.5 rounded-full bg-[rgb(118_118_128/0.12)] px-4
+    @apply relative inline-flex min-h-[2.5rem] items-center justify-center gap-1.5 rounded-full bg-[rgb(118_118_128/0.12)] px-4
            text-[14px] font-semibold text-brand-dark transition duration-200 ease-ios active:scale-95 disabled:opacity-40
            dark:bg-[rgb(118_118_128/0.24)] dark:text-brand;
+  }
+  .btn-klein::after,
+  .btn-klein-grau::after {
+    content: "";
+    position: absolute;
+    inset: -4px;
   }
   /* Farbiges Symbol-Kästchen wie in den iOS-Einstellungen */
   .symbol {
@@ -291,8 +301,23 @@ button:not(:disabled) {
     background-color: rgb(var(--zelle));
   }
   /* Glas-Material fuer Kopf- und Tab-Leiste */
+  /* Update 1.4 (U3): deckender (0,86 statt 0,72) – Text unter der Leiste
+     kollidierte sonst mit den Beschriftungen. Ohne Weichzeichner (ältere
+     Android-WebViews, Energiesparmodus) fast deckend, siehe @supports unten. */
   .glas {
-    @apply bg-[rgb(var(--glas)/0.72)] backdrop-blur-2xl backdrop-saturate-[1.8];
+    @apply bg-[rgb(var(--glas)/0.86)] backdrop-blur-2xl backdrop-saturate-[1.8];
+  }
+  @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    .glas {
+      background-color: rgb(var(--glas) / 0.97);
+    }
+  }
+  /* Fehlertext: auf Weiß und auf Schwarz gut lesbar (red-500 hat nur 3,6:1) */
+  .text-fehler {
+    color: #d70015;
+  }
+  .dark .text-fehler {
+    color: #ff6961;
   }
   /* Gläserne Linse unter dem gewählten Reiter (GlasLeiste.tsx) */
   .glas-linse {
@@ -344,9 +369,16 @@ button:not(:disabled) {
 .melde-haken { stroke-dasharray: 48; stroke-dashoffset: 48; animation: melde-haken 0.35s 0.25s ease-out forwards; }
 .melde-hoch { animation: melde-hoch 0.35s cubic-bezier(.32,.72,0,1) both; }
 .melde-hinein { animation: melde-hinein 0.2s ease-out both; }
+@keyframes melde-puls { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
 @media (prefers-reduced-motion: reduce) {
-  .melde-dreh, .melde-kreis, .melde-hoch, .melde-hinein { animation-duration: 0.01s; }
+  .melde-kreis, .melde-hoch, .melde-hinein { animation-duration: 0.01s; }
   .melde-haken { animation: none; stroke-dashoffset: 0; }
+  /* Der Lade-Kringel würde sonst mit 1 ms „einfrieren“ („Wird gemeldet …“
+     wirkte hängend): ruhig pulsieren statt drehen – das ist keine Bewegung */
+  .melde-dreh { animation: melde-puls 1.4s ease-in-out infinite !important; animation-iteration-count: infinite !important; }
+  /* Die Hervorhebung nach einem Sprung ist ein Aufleuchten, keine Bewegung –
+     sie muss die 2,4 s behalten, sonst ist sie unsichtbar */
+  .sprung-markiert { animation-duration: 2.4s !important; }
 }
 
 /* Sprung aus einer Benachrichtigung: kurz hervorheben (lib/sprung.ts) */
@@ -383,10 +415,15 @@ html.mit-hintergrund .kopf-grund {
   width: 100vw;
   transform: translateX(-50%);
   z-index: -1;
-  background-color: rgb(var(--glas) / 0.72);
+  background-color: rgb(var(--glas) / 0.88);
   -webkit-backdrop-filter: blur(40px) saturate(1.8);
   backdrop-filter: blur(40px) saturate(1.8);
   box-shadow: 0 0.5px 0 rgba(0, 0, 0, 0.18);
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .kopf-band::before {
+    background-color: rgb(var(--glas) / 0.97);
+  }
 }
 .dark .kopf-band::before {
   box-shadow: 0 0.5px 0 rgba(255, 255, 255, 0.15);

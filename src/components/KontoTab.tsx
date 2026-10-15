@@ -4,6 +4,8 @@ import { useEltern } from "../eltern-store";
 import { useRole } from "../auth/RoleProvider";
 import { useStore } from "../store";
 import type { Student } from "../lib/types";
+import { basisOffen } from "../lib/logic";
+import { Icon } from "./Icon";
 
 /**
  * IBAN in Viererblöcken, so wie man sie auf Papier schreibt.
@@ -81,6 +83,12 @@ export function KontoTab({
     }
   }
 
+  // Beträge zeigen wir nur, wo die Person selbst überweist: Eltern (ihre Kinder)
+  // und Schüler (sich selbst) – nicht in der Gesamtliste für Admin/Kassenwart.
+  const mitBetrag = !festerZweck && (role === "eltern" || Boolean(personen));
+  const jahr = jahrgangKurz(settings.aktuelles_halbjahr);
+  const mehrere = kinder.length > 1;
+
   // grid-cols-1 (statt nur grid): Karten duerfen schmaler werden als ihr
   // laengster Inhalt. Sonst schiebt die IBAN auf kleinen iPhones die ganze
   // Seite breiter als den Bildschirm.
@@ -96,50 +104,65 @@ export function KontoTab({
             : "Bitte immer den Verwendungszweck angeben – sonst können wir das Geld nicht zuordnen. Bei mehreren Kindern bitte für jedes Kind einzeln überweisen."}
         </p>
 
-        <div className="mt-4 grid grid-cols-1 gap-2" data-tour="konto-daten">
-          {betrag && <Zeile label="Betrag" wert={betrag} onKopieren={() => kopieren(betrag.replace(/\s*€$/, ""), "betrag")} kopiert={kopiert === "betrag"} />}
-          <Zeile label="Empfänger" wert={konto.inhaber} onKopieren={() => kopieren(konto.inhaber, "inhaber")} kopiert={kopiert === "inhaber"} />
-          <Zeile
+        {/* Wohin das Geld geht */}
+        <div className="gruppe-zellen mt-4" data-tour="konto-daten">
+          <KontoWert label="Empfänger" wert={konto.inhaber} onKopieren={() => kopieren(konto.inhaber, "inhaber")} kopiert={kopiert === "inhaber"} />
+          <KontoWert
             label="IBAN"
             wert={ibanLesbar(konto.iban)}
             gross
             onKopieren={() => kopieren(konto.iban.replace(/\s+/g, ""), "iban")}
             kopiert={kopiert === "iban"}
           />
-          <Zeile label="BIC" wert={konto.bic} onKopieren={() => kopieren(konto.bic, "bic")} kopiert={kopiert === "bic"} />
-          <Zeile label="Bank" wert={konto.bank} />
+          <KontoWert label="BIC" wert={konto.bic} onKopieren={() => kopieren(konto.bic, "bic")} kopiert={kopiert === "bic"} />
+          <KontoWert label="Bank" wert={konto.bank} />
         </div>
 
-        {/* Verwendungszweck zum Kopieren – je Kind eine Zeile */}
-        <ul className="mt-2 grid grid-cols-1 gap-2">
-          {festerZweck ? (
-            <li>
-              <Zeile label="Verwendungszweck" gross wert={festerZweck} onKopieren={() => kopieren(festerZweck, "fest")} kopiert={kopiert === "fest"} />
-            </li>
-          ) : (kinder.length ? kinder : [null]).map((k) => {
-            const jahr = jahrgangKurz(settings.aktuelles_halbjahr);
+        {/* Was überwiesen wird: je Kind Betrag und Verwendungszweck zum Kopieren */}
+        {festerZweck ? (
+          <div className="gruppe-zellen mt-3">
+            {betrag && <KontoWert label="Betrag" wert={betrag} stark onKopieren={() => kopieren(betrag.replace(/\s*€$/, ""), "betrag")} kopiert={kopiert === "betrag"} />}
+            <KontoWert label="Verwendungszweck" gross wert={festerZweck} onKopieren={() => kopieren(festerZweck, "fest")} kopiert={kopiert === "fest"} />
+          </div>
+        ) : (
+          (kinder.length ? kinder : [null]).map((k) => {
             // Kein Komma vor der Stufe: "Adams, Tyler Q2"
             const zweck = k ? `${k.nachname}, ${k.vorname} ${jahr}` : `Nachname, Vorname ${jahr}`;
             const id = k ? `zweck-${k.id}` : "zweck";
+            const offen = mitBetrag && k ? basisOffen(k, settings.aktuelles_halbjahr, settings) : null;
             return (
-              <li key={id}>
-                <Zeile
-                  label={kinder.length > 1 && k ? `Verwendungszweck für ${k.vorname}` : "Verwendungszweck"}
-                  gross
-                  wert={zweck}
-                  onKopieren={() => kopieren(zweck, id)}
-                  kopiert={kopiert === id}
-                />
-              </li>
+              <div key={id} className="mt-3">
+                {mehrere && k && <h3 className="mb-1.5 px-4 text-[13px] uppercase tracking-[0.02em] text-tinte-leise">Für {k.vorname}</h3>}
+                <div className="gruppe-zellen">
+                  {offen !== null &&
+                    (offen > 0 ? (
+                      <KontoWert
+                        label={mehrere && k ? `Betrag für ${k.vorname}` : "Betrag"}
+                        wert={`${offen} €`}
+                        stark
+                        unter="Beitrag, der bis jetzt offen ist"
+                        onKopieren={() => kopieren(String(offen), `betrag-${id}`)}
+                        kopiert={kopiert === `betrag-${id}`}
+                      />
+                    ) : (
+                      <KontoWert label="Betrag" wert="0 € – nichts offen" />
+                    ))}
+                  <KontoWert
+                    label={mehrere && k ? `Verwendungszweck für ${k.vorname}` : "Verwendungszweck"}
+                    gross
+                    wert={zweck}
+                    onKopieren={() => kopieren(zweck, id)}
+                    kopiert={kopiert === id}
+                  />
+                </div>
+              </div>
             );
-          })}
-        </ul>
+          })
+        )}
 
         {/* Der Hinweis ist für Eltern geschrieben („bei mehreren Kindern …“) */}
         {konto.hinweis && !du && (
-          <p className="mt-3 rounded-2xl bg-[rgb(118_118_128/0.1)] p-3.5 text-[13px] leading-relaxed text-tinte-matt dark:text-slate-300">
-            {konto.hinweis}
-          </p>
+          <p className="mt-3 px-1 text-[13px] leading-relaxed text-tinte-matt dark:text-slate-300">{konto.hinweis}</p>
         )}
       </section>
 
@@ -148,39 +171,53 @@ export function KontoTab({
   );
 }
 
-function Zeile({
+/**
+ * Eine Zeile der Kontodaten: kleine Beschriftung oben, Wert darunter,
+ * „kopieren“ rechts (mind. 44 px hoch). Die Beschriftung bricht nur zwischen
+ * Wörtern um, nie mitten im Wort.
+ */
+function KontoWert({
   label,
   wert,
   gross,
+  stark,
+  unter,
   onKopieren,
   kopiert,
 }: {
   label: string;
   wert: string;
+  /** Lange Werte (IBAN, Verwendungszweck): bekommen die volle Breite unter dem Knopf. */
   gross?: boolean;
+  /** Betrag: größere Schrift */
+  stark?: boolean;
+  unter?: string;
   onKopieren?: () => void;
   kopiert?: boolean;
 }) {
-  // Alle Zeilen gleich gebaut: kleine Beschriftung oben, Wert darunter,
-  // Kopieren rechts. Die IBAN bekommt dieselbe Schrift wie der Rest (keine
-  // Schreibmaschinenschrift), steht aber immer in EINER Zeile.
   const knopf = onKopieren && (
     <button
+      type="button"
       onClick={onKopieren}
-      className={`shrink-0 rounded-full px-3.5 py-2 text-[13px] font-semibold transition duration-200 active:scale-95 ${
-        kopiert ? "bg-bezahlt text-white" : "bg-white text-brand-dark shadow-[0_1px_3px_rgba(0,0,0,.08)] dark:bg-slate-700 dark:text-brand-dark"
-      }`}
+      className={`${kopiert ? "btn-klein !bg-[#1E7B34]" : "btn-klein-grau"} shrink-0`}
+      aria-label={`${label} kopieren`}
     >
-      {kopiert ? "✓ kopiert" : "kopieren"}
+      {kopiert ? (
+        <>
+          <Icon name="haken" size={15} strich={2.6} /> kopiert
+        </>
+      ) : (
+        "kopieren"
+      )}
     </button>
   );
-  // Lange Werte (IBAN, Verwendungszweck): Knopf in die Kopfzeile, damit der
-  // Wert die volle Breite hat und nie umbricht.
+  const beschriftung = <div className="min-w-0 flex-1 text-[12px] font-medium leading-tight text-tinte-leise">{label}</div>;
+  // Lange Werte: Knopf in die Kopfzeile, damit der Wert die volle Breite hat.
   if (gross)
     return (
-      <div className="rounded-xl bg-papier-matt px-3.5 py-2.5 dark:bg-slate-800">
+      <div className="px-4 py-2.5">
         <div className="flex items-center gap-3">
-          <div className="min-w-0 flex-1 break-words text-[11px] font-semibold uppercase tracking-wide text-tinte-leise">{label}</div>
+          {beschriftung}
           {knopf}
         </div>
         {/* Ab 12 px passt die IBAN auch aufs iPhone SE (320 px). Reicht es
@@ -191,10 +228,13 @@ function Zeile({
       </div>
     );
   return (
-    <div className="flex items-center gap-3 rounded-xl bg-papier-matt px-3.5 py-2.5 dark:bg-slate-800">
+    <div className="flex min-h-[56px] items-center gap-3 px-4 py-2.5">
       <div className="min-w-0 flex-1">
-        <div className="text-[11px] font-semibold uppercase tracking-wide text-tinte-leise">{label}</div>
-        <div className="mt-0.5 break-words text-[15px] font-semibold text-tinte dark:text-slate-100">{wert}</div>
+        <div className="text-[12px] font-medium leading-tight text-tinte-leise">{label}</div>
+        <div className={`mt-0.5 break-words font-semibold text-tinte dark:text-slate-100 ${stark ? "zahl text-[1.4rem] leading-tight" : "text-[15px]"}`}>
+          {wert}
+        </div>
+        {unter && <div className="text-[12px] text-tinte-leise">{unter}</div>}
       </div>
       {knopf}
     </div>
@@ -222,7 +262,7 @@ function KontoBearbeiten({
           setInfo("");
           setOffen(true);
         }}
-        className="card p-4 text-[13px] font-bold text-tinte-matt transition active:scale-[.99]"
+        className="btn-grau"
       >
         Kontodaten ändern
       </button>
@@ -263,13 +303,13 @@ function KontoBearbeiten({
             if (fehler) setInfo(fehler);
             else setOffen(false);
           }}
-          className="flex-1 rounded-xl bg-brand py-2.5 text-sm font-bold text-white disabled:opacity-50"
+          className="btn-primary flex-1"
         >
           Speichern
         </button>
         <button
           onClick={() => setOffen(false)}
-          className="rounded-xl border border-papier-linie px-4 py-2.5 text-sm font-bold text-tinte-matt dark:border-slate-700"
+          className="btn-grau flex-1"
         >
           Abbrechen
         </button>

@@ -582,6 +582,22 @@ export interface NeuDaten {
 }
 
 /**
+ * Fuß eines Blatts (Haupt-Knopf): bleibt beim Scrollen unten im Blatt sichtbar.
+ * Das Blatt (Sheet.tsx) hat links/rechts 1,25 rem und unten Sicherheitsabstand
+ * + 1,5 rem Innenabstand. Sticky bezieht sich auf die Innenkante (ohne Innenabstand):
+ * mit bottom = -Innenabstand rutscht die Leiste bis an den Blattrand, und mit den
+ * negativen Seitenrändern geht der Hintergrund über die volle Breite – nichts
+ * scheint darunter oder daneben durch. Hintergrund = Blattfarbe.
+ */
+export function BlattFuss({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="sticky bottom-[calc(-1*(env(safe-area-inset-bottom)+1.5rem))] z-10 -mx-5 mt-5 bg-papier px-5 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-3 shadow-[0_-0.5px_0_rgba(0,0,0,0.12)] dark:bg-slate-900 dark:shadow-[0_-0.5px_0_rgba(255,255,255,0.12)]">
+      {children}
+    </div>
+  );
+}
+
+/**
  * Blatt zum Anlegen – aufgebaut wie die iOS-Einstellungen: weiße Gruppen mit
  * Zeilen und Kippschaltern auf grauem Grund.
  */
@@ -649,7 +665,8 @@ export function NeuEintragSheet({ art, onClose, onSave }: { art: NeuArt | null; 
             <div className="px-3 py-2.5">
               <div className="seg" role="radiogroup" aria-label="Art der Antwort">
                 {([null, "kurz", "lang", "zahl"] as (AntwortArt | null)[]).map((a) => (
-                  <button key={a ?? "auswahl"} role="radio" aria-checked={antwortArt === a} className={`seg-item ${antwortArt === a ? "seg-aktiv" : ""}`} onClick={() => setAntwortArt(a)}>
+                  // whitespace-nowrap + schmaler Innenabstand: „Auswahl“ bricht auf 360-px-Handys sonst zu „Auswa/hl“
+                  <button key={a ?? "auswahl"} role="radio" aria-checked={antwortArt === a} className={`seg-item whitespace-nowrap !px-0.5 ${antwortArt === a ? "seg-aktiv" : ""}`} onClick={() => setAntwortArt(a)}>
                     {a ? (a === "kurz" ? "Kurz" : a === "lang" ? "Lang" : "Zahl") : "Auswahl"}
                   </button>
                 ))}
@@ -737,8 +754,10 @@ export function NeuEintragSheet({ art, onClose, onSave }: { art: NeuArt | null; 
         </>
       )}
 
+      {/* Fußknopf bleibt unten im Blatt stehen – auch wenn die Abstimmung lang wird */}
+      <BlattFuss>
       <button
-        className="btn-primary mt-6"
+        className="btn-primary"
         disabled={!gueltig}
         onClick={() =>
           onSave({
@@ -755,6 +774,7 @@ export function NeuEintragSheet({ art, onClose, onSave }: { art: NeuArt | null; 
       >
         {art === "pin" ? "Anpinnen" : art === "todo" ? "To-do anlegen" : "Abstimmung starten"}
       </button>
+      </BlattFuss>
     </Sheet>
   );
 }

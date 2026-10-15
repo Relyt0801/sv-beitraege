@@ -105,6 +105,7 @@ export function WortfilterSchalter({
 }: {
   bereich: WfBereich;
   className?: string;
+  /** Wie `zeile` (nur noch aus Gründen der Abwärtskompatibilität) */
   kompakt?: boolean;
   /** Als Zeile ohne eigene Fläche – für eine Gruppe (Liste.tsx) im Einstellungs-Blatt */
   zeile?: boolean;
@@ -119,44 +120,19 @@ export function WortfilterSchalter({
     const f = await setzen(bereich, v);
     if (f) meldeFehler("Ging nicht: " + f);
   };
-  if (zeile)
-    return (
-      <label className={`flex min-h-[52px] items-center gap-3 px-4 py-2 ${className}`}>
-        <span className="min-w-0 flex-1">
-          <span className="block text-[15px]">{titel ?? `Wortfilter · ${info?.titel}`}</span>
-          <span className="block text-[12.5px] leading-snug text-tinte-leise">
-            {an[bereich] ? "An – beleidigende Wörter werden blockiert" : "Aus – Einträge werden nicht geprüft"}
-          </span>
-        </span>
-        <Schalter an={an[bereich]} label={`Wortfilter für ${info?.titel ?? bereich}`} onChange={(v) => void umschalten(v)} />
-      </label>
-    );
-  if (kompakt)
-    return (
-      <label className={`flex min-h-[36px] items-center gap-3 ${className}`}>
-        <span className="min-w-0 flex-1 text-[13px] leading-snug">
-          <span className="font-semibold">Wortfilter {info?.titel}: </span>
-          <span className="text-tinte-matt dark:text-slate-300">{an[bereich] ? "an" : "aus"}</span>
-        </span>
-        <Schalter an={an[bereich]} label={`Wortfilter für ${info?.titel ?? bereich}`} onChange={(v) => void umschalten(v)} />
-      </label>
-    );
+  // Überall dieselbe zweizeilige Zeile: Titel, darunter der Zustand in Worten.
+  // Mit eigener grauer Fläche (Standard) oder – in einer Gruppe (Liste.tsx) – ohne:
+  // `zeile` und das ältere `kompakt` zeigen beide die flächenlose Variante.
+  const ohneFlaeche = zeile || kompakt;
   return (
-    <label className={`feld-grau flex min-h-[44px] items-center gap-3 px-4 py-2.5 ${className}`}>
+    <label className={`flex min-h-[52px] items-center gap-3 px-4 py-2 ${ohneFlaeche ? "" : "feld-grau"} ${className}`}>
       <span className="min-w-0 flex-1">
-        <span className="block text-[15px] font-semibold">Wortfilter · {info?.titel}</span>
+        <span className="block text-[15px]">{titel ?? `Wortfilter · ${info?.titel}`}</span>
         <span className="block text-[12.5px] leading-snug text-tinte-leise">
-          {an[bereich] ? "An – beleidigende Wörter werden blockiert." : "Aus – Einträge werden nicht geprüft."}
+          {an[bereich] ? "An – beleidigende Wörter werden blockiert" : "Aus – Einträge werden nicht geprüft"}
         </span>
       </span>
-      <Schalter
-        an={an[bereich]}
-        label={`Wortfilter für ${info?.titel ?? bereich}`}
-        onChange={async (v) => {
-          const f = await setzen(bereich, v);
-          if (f) meldeFehler("Ging nicht: " + f);
-        }}
-      />
+      <Schalter an={an[bereich]} label={`Wortfilter für ${info?.titel ?? bereich}`} onChange={(v) => void umschalten(v)} />
     </label>
   );
 }

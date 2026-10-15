@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useWischen } from "../lib/wischen";
 import { SkelettText } from "./Skelett";
 import { useSchichtStatus, useTermine } from "../termine-store";
@@ -23,12 +23,16 @@ export function Wochenstreifen({
   onKalender,
   onOeffnen,
   onNeu,
+  onTag,
 }: {
   onKalender: (tag: string) => void;
   /** Termin antippen: ansehen – und fürs Team ändern oder löschen */
   onOeffnen?: (t: Termin) => void;
-  /** Nur wer Termine eintragen darf: „+“ oben rechts, legt am gewählten Tag an */
+  /** Nur wer Termine eintragen darf: Knopf „＋ Termin“ in der Tageszeile, legt am gewählten Tag an */
   onNeu?: (tag: string) => void;
+  /** Meldet nach oben, welcher Tag gerade gewählt ist – der Events-Reiter blendet
+   *  dann die „Deine Schichten“-Tickets dieses Tages aus (steht schon hier). */
+  onTag?: (tag: string) => void;
 }) {
   const { termine: stufenTermine, meineKomitees, meineStudentIds, ready, neueTermine } = useTermine();
   // Testphase: eigene Termine aus dem Handy-Kalender grau dazu (nur Testkonten).
@@ -43,12 +47,26 @@ export function Wochenstreifen({
   const [syncOffen, setSyncOffen] = useState(false);
   // Das früheste Neue – dorthin springt der Hinweis
   const erstesNeues = useMemo(
-    () => termine.filter((t) => neueTermine.has(t.id)).sort((a, b) => a.datum.localeCompare(b.datum))[0] || null,
+    () => termine.filter((t) => neueTermine.has(t.id) && !t.aktion_id).sort((a, b) => a.datum.localeCompare(b.datum))[0] || null,
+    [termine, neueTermine],
+  );
+  const neueOhneAktion = useMemo(
+    () => termine.filter((t) => neueTermine.has(t.id) && !t.aktion_id).length,
     [termine, neueTermine],
   );
   const heute = heuteKey();
   const [woStart, setWoStart] = useState(() => montagVon(heute));
-  const [gewaehlt, setGewaehlt] = useState(heute);
+  const [gewaehlt, setGewaehltIntern] = useState(heute);
+  // Jede Änderung des gewählten Tags auch nach oben melden (und beim Start)
+  const setGewaehlt = (k: string) => {
+    setGewaehltIntern(k);
+    onTag?.(k);
+  };
+  useEffect(() => {
+    onTag?.(heute);
+    // nur einmal beim Start
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const tage = useMemo(
     () => Array.from({ length: 7 }, (_, i) => plusTage(woStart, i)),
@@ -84,21 +102,24 @@ export function Wochenstreifen({
 
   return (
     <section className="card mb-5 overflow-hidden p-3 sm:p-4" data-tour="wochenstreifen">
-      {/* ------------------------------------------------ Kopfzeile */}
-      <div className="mb-2 flex items-center gap-1">
+      {/* ------------------------------------------------ Kopfzeile
+          Nur Titel, Blättern und „Kalender“ – so bleibt „Diese Woche“ immer
+          ganz lesbar. „Termin eintragen“ (Team) steht unten in der Tageszeile,
+          direkt bei dem Tag, für den es gilt. */}
+      <div className="mb-1 flex items-center gap-1">
         <h2 className="min-w-0 flex-1 truncate pl-1 text-[17px] font-bold tracking-[-0.02em]">
           {dieseWoche ? "Diese Woche" : monatBeschriftung()}
         </h2>
         <button
           onClick={() => woche(-1)}
-          className="flex h-9 w-8 shrink-0 items-center justify-center rounded-full text-[20px] text-brand transition active:scale-90 active:bg-black/[0.04] dark:active:bg-white/[0.06]"
+          className="flex h-11 w-10 shrink-0 items-center justify-center rounded-full text-[22px] text-brand transition active:scale-90 active:bg-black/[0.04] dark:active:bg-white/[0.06]"
           aria-label="Woche zurück"
         >
           ‹
         </button>
         <button
           onClick={() => woche(1)}
-          className="flex h-9 w-8 shrink-0 items-center justify-center rounded-full text-[20px] text-brand transition active:scale-90 active:bg-black/[0.04] dark:active:bg-white/[0.06]"
+          className="flex h-11 w-10 shrink-0 items-center justify-center rounded-full text-[22px] text-brand transition active:scale-90 active:bg-black/[0.04] dark:active:bg-white/[0.06]"
           aria-label="Woche vor"
         >
           ›
@@ -107,28 +128,18 @@ export function Wochenstreifen({
             dass dahinter Monat, Woche und Tag stecken. */}
         <button
           onClick={() => onKalender(gewaehlt)}
-          className="relative flex h-9 shrink-0 items-center gap-1 rounded-full bg-brand/10 px-2.5 text-[14px] font-semibold text-brand transition active:scale-95 dark:bg-brand/20"
+          className="relative flex h-10 shrink-0 items-center gap-1.5 rounded-full bg-brand/10 px-3 text-[14px] font-semibold text-brand-dark transition active:scale-95 dark:bg-brand/20 dark:text-brand"
           aria-label="Ganzen Kalender öffnen"
           title="Ganzen Kalender öffnen – Monat, Woche und Tag"
         >
           <Icon name="kalender" size={16} />
           Kalender
           {neueTermine.size > 0 && (
-            <span className="absolute -right-1 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+            <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[12px] font-bold text-white">
               {neueTermine.size > 9 ? "9+" : neueTermine.size}
             </span>
           )}
         </button>
-        {onNeu && (
-          <button
-            onClick={() => onNeu(gewaehlt)}
-            className="ml-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand text-[20px] font-medium leading-none text-white transition active:scale-90"
-            aria-label="Termin eintragen"
-            title="Termin am gewählten Tag eintragen"
-          >
-            ＋
-          </button>
-        )}
       </div>
 
       {/* Testphase: Kalender-Verbindung, nur für die Testkonten – zurzeit aus
@@ -143,22 +154,23 @@ export function Wochenstreifen({
               ? `Kalender verbunden · ${privat.termine.length} eigene Termine`
               : "Stufen-Termine ins Handy übernehmen"}
           </span>
-          <span className="shrink-0 rounded-full bg-brand/15 px-2 py-0.5 text-[10px] font-bold">Test</span>
+          <span className="shrink-0 rounded-full bg-brand/15 px-2 py-0.5 text-[12px] font-bold">Test</span>
         </button>
       )}
       {kalenderDemo && <KalenderSyncSheet open={syncOffen} onClose={() => setSyncOffen(false)} />}
 
-      {/* Neu dazugekommen? Dann ein Tipp direkt dorthin. */}
+      {/* Neu dazugekommen? Dann ein Tipp direkt dorthin. Schichten einer Aktion
+          stehen schon unter „Mitmachen“ – die melden wir hier nicht noch einmal. */}
       {erstesNeues && (
         <button
           onClick={() => onKalender(erstesNeues.datum)}
-          className="mb-2.5 flex w-full items-center gap-2 rounded-xl bg-red-500/10 px-3 py-2 text-left text-[13px] font-semibold text-red-700 transition active:scale-[0.99] dark:text-red-300"
+          className="mb-2.5 flex min-h-[44px] w-full items-center gap-2 rounded-xl bg-red-500/10 px-3 py-2 text-left text-[13px] font-semibold text-red-700 transition active:scale-[0.99] dark:text-red-300"
         >
           <span className="h-2 w-2 shrink-0 rounded-full bg-red-500" />
-          <span className="min-w-0 flex-1 truncate">
-            {neueTermine.size === 1
-              ? `Neu: ${erstesNeues.icon ? erstesNeues.icon + " " : ""}${erstesNeues.titel} · ${tagLang(erstesNeues.datum)}`
-              : `${neueTermine.size} neue Termine – ab ${tagLang(erstesNeues.datum)}`}
+          <span className="min-w-0 flex-1 leading-snug">
+            {neueOhneAktion === 1
+              ? `Neu: ${erstesNeues.titel} · ${tagLang(erstesNeues.datum)}`
+              : `${neueOhneAktion} neue Termine – ab ${tagLang(erstesNeues.datum)}`}
           </span>
           <span className="shrink-0">ansehen ›</span>
         </button>
@@ -190,7 +202,7 @@ export function Wochenstreifen({
                 ferien && !aktiv ? farbeVon(ferien)?.band ?? "bg-emerald-200/60 dark:bg-emerald-500/20" : ""
               }`}
             >
-              <span className={`text-[11px] font-semibold ${istHeute ? "text-brand" : "text-tinte-leise"}`}>
+              <span className={`text-[12px] font-semibold ${istHeute ? "text-brand" : "text-tinte-leise"}`}>
                 {WOCHENTAGE[(tag.getDay() + 6) % 7]}
               </span>
               <span
@@ -223,21 +235,35 @@ export function Wochenstreifen({
 
       {/* ------------------------------------------------ der gewählte Tag */}
       <div className="mt-2.5 border-t border-black/[0.08] pt-2.5 dark:border-white/[0.1]">
-        <div className="mb-1 flex items-baseline justify-between gap-2 px-1">
-          <span className="truncate text-[13px] font-semibold uppercase tracking-[0.02em] text-tinte-leise">
+        <div className="mb-1 flex min-h-[44px] items-center justify-between gap-2 px-1">
+          <span className="min-w-0 truncate text-[13px] font-semibold uppercase tracking-[0.02em] text-tinte-leise">
             {gewaehlt === heute ? "Heute" : tagLang(gewaehlt)}
           </span>
-          {gewaehlt !== heute && (
-            <button
-              onClick={() => {
-                setWoStart(montagVon(heute));
-                setGewaehlt(heute);
-              }}
-              className="shrink-0 text-[13px] font-semibold text-brand"
-            >
-              Heute
-            </button>
-          )}
+          <span className="flex shrink-0 items-center gap-2">
+            {gewaehlt !== heute && (
+              <button
+                onClick={() => {
+                  setWoStart(montagVon(heute));
+                  setGewaehlt(heute);
+                }}
+                className="btn-klein-grau"
+              >
+                Heute
+              </button>
+            )}
+            {/* Team: Termin am gewählten Tag – beschriftet, damit klar ist, was das „＋“ tut */}
+            {onNeu && (
+              <button
+                onClick={() => onNeu(gewaehlt)}
+                className="btn-klein"
+                aria-label="Termin am gewählten Tag eintragen"
+                title="Termin am gewählten Tag eintragen"
+              >
+                <Icon name="plus" size={14} strich={2.6} />
+                Termin
+              </button>
+            )}
+          </span>
         </div>
 
         {!ready ? (
@@ -314,7 +340,7 @@ export function TerminZeile({
         <SchichtSchild status={status} klein />
       ) : (
         meins && (
-          <span className="shrink-0 rounded-full bg-brand/10 px-2 py-0.5 text-[11px] font-bold text-brand dark:bg-brand/20">
+          <span className="shrink-0 rounded-full bg-brand/10 px-2 py-0.5 text-[12px] font-bold text-brand-dark dark:bg-brand/20 dark:text-brand">
             für dich
           </span>
         )

@@ -26,22 +26,22 @@ export function passwortProblem(pw: string, nutzername?: string): string | null 
 
   const klein = p.toLowerCase();
   if (ZU_BEKANNT.has(klein))
-    return "Dieses Passwort ist zu bekannt. Denk dir etwas Eigenes aus.";
+    return "Dieses Passwort ist zu bekannt. Bitte ein eigenes wählen.";
 
   // Reine Zahlenketten und stures Durchzählen sind schnell geraten.
-  if (/^\d+$/.test(p)) return "Nur Zahlen ist zu wenig. Nimm auch Buchstaben dazu.";
+  if (/^\d+$/.test(p)) return "Nur Zahlen ist zu wenig. Bitte auch Buchstaben verwenden.";
   if (/^(.)\1+$/.test(p)) return "Immer derselbe Buchstabe reicht nicht.";
   if (/^(0123456789|abcdefghij|qwertzuiop)/.test(klein))
-    return "Das ist eine Tastaturreihe. Denk dir etwas Eigenes aus.";
+    return "Das ist eine Tastaturreihe. Bitte ein eigenes Passwort wählen.";
 
   if (nutzername) {
     const n = nutzername.toLowerCase();
     if (klein.includes(n) || n.includes(klein))
-      return "Nimm nicht deinen Nutzernamen als Passwort.";
+      return "Der Nutzername darf nicht als Passwort dienen.";
     // auch Vor- und Nachname einzeln
     for (const teil of n.split(/[._-]/)) {
       if (teil.length >= 4 && klein.includes(teil))
-        return "In deinem Passwort steht dein Name. Nimm lieber etwas anderes.";
+        return "Der Name darf nicht im Passwort stehen. Bitte etwas anderes wählen.";
     }
   }
 

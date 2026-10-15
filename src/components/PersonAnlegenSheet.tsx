@@ -1,7 +1,10 @@
 import { useEffect, useState } from "react";
 import { hasSupabase, supabase } from "../lib/supabase";
 import { HY } from "../lib/types";
-import { Sheet } from "./Sheet";
+import { Sheet, SheetKopf } from "./Sheet";
+import { Gruppe, Zeile, ZeileAuswahl, ZeileEingabe, ZeileMitSchalter } from "./Liste";
+import { Schalter } from "./Schalter";
+import { Icon } from "./Icon";
 
 import { hinweis } from "../lib/melder";
 /**
@@ -90,52 +93,40 @@ export function PersonAnlegenSheet({ open, onClose, onFertig }: { open: boolean;
     <Sheet open={open} onClose={onClose}>
       {!ergebnis ? (
         <>
-          <h2 className="text-xl font-extrabold">Person hinzufügen</h2>
-          <p className="text-[12px] text-tinte-leise">
-            Legt den Eintrag in der Liste und den Login an. Das Startpasswort legst du selbst fest.
-          </p>
-          <div className="mt-3 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-2">
-            <div className="min-w-0">
-              <label className="block text-[12px] font-semibold text-tinte-leise">Vorname</label>
-              <input className="field mt-1" value={vorname} autoFocus onChange={(e) => setVorname(e.target.value)} />
-            </div>
-            <div className="min-w-0">
-              <label className="block text-[12px] font-semibold text-tinte-leise">Nachname</label>
-              <input className="field mt-1" value={nachname} onChange={(e) => setNachname(e.target.value)} />
-            </div>
-          </div>
-          <div className="mt-3 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-2">
-            <div className="min-w-0">
-              <label className="block text-[12px] font-semibold text-tinte-leise">Dabei ab</label>
-              <select className="field mt-1" value={ab} onChange={(e) => setAb(e.target.value)}>
+          <SheetKopf titel="Person hinzufügen" unter="Legt den Eintrag in der Liste und den Login an. Das Startpasswort legst du selbst fest." onClose={onClose} />
+
+          {/* Name, Beitritt und Rolle als Gruppe wie in den iOS-Einstellungen –
+              vorher native Auswahlfelder und ein natives Kästchen */}
+          <Gruppe titel="Person" className="">
+            <ZeileEingabe label="Vorname" value={vorname} onChange={setVorname} placeholder="Pflicht" autoFocus />
+            <ZeileEingabe label="Nachname" value={nachname} onChange={setNachname} placeholder="Pflicht" />
+            <Zeile label="Dabei ab">
+              <ZeileAuswahl label="Dabei ab" value={ab} onChange={setAb}>
                 {HY.map((h) => (
                   <option key={h} value={h}>
                     {h}
                   </option>
                 ))}
-              </select>
-            </div>
-            <div className="min-w-0">
-              <label className="block text-[12px] font-semibold text-tinte-leise">Rolle</label>
-              <select className="field mt-1" value={rolle} onChange={(e) => setRolle(e.target.value)}>
-                <option value="schueler">Schüler*in</option>
+              </ZeileAuswahl>
+            </Zeile>
+            <Zeile label="Rolle">
+              <ZeileAuswahl label="Rolle" value={rolle} onChange={setRolle}>
+                <option value="schueler">Schüler</option>
                 <option value="stufenteam">Stufenteam</option>
                 <option value="kassenwart">Kassenwart</option>
-              </select>
-            </div>
-          </div>
-          <label className="mt-3 flex cursor-pointer items-center gap-2 text-[13px] text-tinte-matt dark:text-slate-300">
-            <input
-              type="checkbox"
-              className="h-4 w-4 accent-brand"
-              checked={mitEltern}
-              onChange={(e) => setMitEltern(e.target.checked)}
-            />
-            Elternzugang gleich mit anlegen
-          </label>
-          <PwFeld label="Startpasswort Schülerzugang" wert={pw} setzen={setPw} />
-          {mitEltern && <PwFeld label="Startpasswort Elternzugang" wert={elternPw} setzen={setElternPw} />}
-          {fehler && <p className="mt-2 text-[13px] font-semibold text-amber-600">{fehler}</p>}
+              </ZeileAuswahl>
+            </Zeile>
+          </Gruppe>
+
+          <Gruppe titel="Zugang" fuss="Mindestens 8 Zeichen. „Vorschlag“ erzeugt ein Passwort ohne Verwechsler wie 0/O oder 1/l.">
+            <PwZeile label="Passwort Schüler" wert={pw} setzen={setPw} />
+            <ZeileMitSchalter label="Elternzugang gleich mit anlegen">
+              <Schalter an={mitEltern} onChange={setMitEltern} label="Elternzugang gleich mit anlegen" />
+            </ZeileMitSchalter>
+            {mitEltern && <PwZeile label="Passwort Eltern" wert={elternPw} setzen={setElternPw} />}
+          </Gruppe>
+
+          {fehler && <p className="mt-3 px-4 text-[13px] font-semibold text-amber-700 dark:text-amber-400">{fehler}</p>}
           {doppelt ? (
             <button disabled={busy} onClick={() => void anlegen(true)} className="btn-primary mt-4 disabled:opacity-50">
               {busy ? "…" : "Trotzdem neu anlegen"}
@@ -148,40 +139,33 @@ export function PersonAnlegenSheet({ open, onClose, onFertig }: { open: boolean;
         </>
       ) : (
         <>
-          <h2 className="text-xl font-extrabold">✓ {ergebnis.name} ist angelegt</h2>
-          <p className="mt-1 text-[13px] text-tinte-matt dark:text-slate-300">
+          <SheetKopf titel="Person angelegt" unter={ergebnis.name} onClose={onClose} />
+          <p className="mb-3 px-1 text-[14px] leading-snug text-tinte-matt dark:text-slate-300">
             Gib diese Zugangsdaten persönlich weiter. Das Passwort wird <b>nur jetzt</b> angezeigt und muss beim ersten
             Login geändert werden.
           </p>
-          <div className="mt-3 grid gap-1 rounded-xl bg-papier-matt p-3 font-mono text-[15px] dark:bg-slate-800">
-            <div>
-              <span className="text-tinte-leise">Nutzername </span>
-              <b className="select-all">{ergebnis.username}</b>
-            </div>
-            <div>
-              <span className="text-tinte-leise">Passwort </span>
-              <b className="select-all">{ergebnis.passwort}</b>
-            </div>
-          </div>
+          <Gruppe titel="Schülerzugang" className="">
+            <Zeile label="Nutzername">
+              <span className="select-all font-mono text-[15px]">{ergebnis.username}</span>
+            </Zeile>
+            <Zeile label="Passwort">
+              <span className="select-all font-mono text-[15px] font-semibold">{ergebnis.passwort}</span>
+            </Zeile>
+          </Gruppe>
           {ergebnis.eltern && (
-            <>
-              <div className="mt-3 text-[12px] font-bold uppercase tracking-wide text-tinte-leise">Elternzugang</div>
-              <div className="mt-1 grid gap-1 rounded-xl bg-papier-matt p-3 font-mono text-[15px] dark:bg-slate-800">
-                <div>
-                  <span className="text-tinte-leise">Nutzername </span>
-                  <b className="select-all">{ergebnis.eltern.username}</b>
-                </div>
-                <div>
-                  <span className="text-tinte-leise">Passwort </span>
-                  <b className="select-all">{ergebnis.eltern.passwort}</b>
-                </div>
-              </div>
-            </>
+            <Gruppe titel="Elternzugang">
+              <Zeile label="Nutzername">
+                <span className="select-all font-mono text-[15px]">{ergebnis.eltern.username}</span>
+              </Zeile>
+              <Zeile label="Passwort">
+                <span className="select-all font-mono text-[15px] font-semibold">{ergebnis.eltern.passwort}</span>
+              </Zeile>
+            </Gruppe>
           )}
           {ergebnis.elternFehler && (
-            <p className="mt-2 text-[13px] font-semibold text-amber-600">{ergebnis.elternFehler}</p>
+            <p className="mt-3 px-4 text-[13px] font-semibold text-amber-700 dark:text-amber-400">{ergebnis.elternFehler}</p>
           )}
-          <div className="mt-3 grid grid-cols-2 gap-2">
+          <div className="mt-4 grid grid-cols-2 gap-2">
             <button
               onClick={async () => {
                 try {
@@ -192,9 +176,9 @@ export function PersonAnlegenSheet({ open, onClose, onFertig }: { open: boolean;
                   void hinweis(zugang);
                 }
               }}
-              className="rounded-xl border border-papier-linie py-3 text-[14px] font-bold dark:border-slate-700"
+              className="btn-grau"
             >
-              {kopiert ? "✓ Kopiert" : "Kopieren"}
+              {kopiert ? "Kopiert" : "Kopieren"}
             </button>
             <button onClick={onClose} className="btn-primary">
               Fertig
@@ -214,28 +198,31 @@ function vorschlag(): string {
   return Array.from(a, (x) => z[x % z.length]).join("");
 }
 
-function PwFeld({ label, wert, setzen }: { label: string; wert: string; setzen: (v: string) => void }) {
+/**
+ * Passwort-Zeile: oben Bezeichnung und „Vorschlag“, darunter das Feld über die
+ * volle Breite (so wird auch ein 8-stelliges Passwort nie abgeschnitten).
+ */
+function PwZeile({ label, wert, setzen }: { label: string; wert: string; setzen: (v: string) => void }) {
   return (
-    <div className="mt-3">
-      <label className="block text-[12px] font-semibold text-tinte-leise">{label}</label>
-      <div className="mt-1 flex gap-2">
-        <input
-          className="field min-w-0 flex-1 font-mono"
-          placeholder="mindestens 8 Zeichen"
-          value={wert}
-          autoComplete="off"
-          spellCheck={false}
-          onChange={(e) => setzen(e.target.value)}
-        />
-        <button
-          type="button"
-          onClick={() => setzen(vorschlag())}
-          className="shrink-0 rounded-xl border border-papier-linie px-3 text-[13px] font-bold text-tinte-matt dark:border-slate-700 dark:text-slate-300"
-          title="Zufälliges Passwort vorschlagen"
-        >
-          🎲 Vorschlag
+    <div className="px-4 py-2.5">
+      <div className="flex min-h-[36px] items-center gap-2">
+        <label htmlFor={`pw-${label}`} className="min-w-0 flex-1 text-[15px]">
+          {label}
+        </label>
+        <button type="button" onClick={() => setzen(vorschlag())} className="btn-klein-grau shrink-0 !px-3" title="Zufälliges Passwort vorschlagen">
+          <Icon name="funke" size={15} />
+          Vorschlag
         </button>
       </div>
+      <input
+        id={`pw-${label}`}
+        className="mt-1 w-full bg-transparent font-mono text-[16px] outline-none placeholder:font-sans placeholder:text-tinte-leise"
+        placeholder="mindestens 8 Zeichen"
+        value={wert}
+        autoComplete="off"
+        spellCheck={false}
+        onChange={(e) => setzen(e.target.value)}
+      />
     </div>
   );
 }

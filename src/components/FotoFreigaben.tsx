@@ -6,6 +6,7 @@ import { fotoEntscheiden, useAlbumFotos } from "../lib/album-fotos";
 import { useZustimmungen } from "../lib/zustimmung";
 import { melde, meldeFehler } from "../lib/melder";
 import { ZustimmungsMarke } from "./ZustimmungsMarke";
+import { Icon } from "./Icon";
 
 /**
  * Stufenteam: neue Steckbrief-Fotos freigeben oder ablehnen. Freigeben
@@ -33,7 +34,7 @@ export function FotoFreigaben({ onAnzahl }: { onAnzahl?: (n: number) => void } =
   };
 
   return (
-    <div id="sprung-foto" className="grid gap-2.5">
+    <div id="sprung-foto" className="grid gap-2.5 lg:col-span-2 lg:grid-cols-2">
       {fotos.offene.map((f) => {
         const url = fotos.urlVon(f.pfad);
         const entscheiden = async (frei: boolean) => {
@@ -45,32 +46,29 @@ export function FotoFreigaben({ onAnzahl }: { onAnzahl?: (n: number) => void } =
           melde(frei ? "Foto freigegeben" : "Foto abgelehnt", "erfolg");
         };
         return (
-          <div key={f.id} className="card flex gap-3 p-3">
-            {url ? (
-              <img src={url} alt={`Foto von ${name(f.student_id)}`} className="h-24 w-24 shrink-0 rounded-xl object-cover" />
-            ) : (
-              <span className="flex h-24 w-24 shrink-0 items-center justify-center rounded-xl bg-black/[0.06] text-[24px] dark:bg-white/10">📷</span>
-            )}
-            <div className="flex min-w-0 flex-1 flex-col">
-              <div className="text-[15px] font-semibold leading-snug">Steckbrief-Foto</div>
-              <div className="truncate text-[13px] text-tinte-leise">{name(f.student_id)}</div>
-              <ZustimmungsMarke className="mt-1.5 self-start" zahl={zu.zahl(f.id)} noetig={zu.noetig} ichSchon={zu.ichSchon(f.id)} />
-              <div className="mt-auto flex justify-end gap-2 pt-2">
-                <button
-                  aria-label="Ablehnen"
-                  disabled={busy === f.id}
-                  onClick={() => void entscheiden(false)}
-                  className="flex h-10 w-10 items-center justify-center rounded-full bg-[#FFEDEC] text-[16px] font-bold text-[#D70015] transition active:scale-90 disabled:opacity-40 dark:bg-red-500/15"
-                >
-                  ✕
+          // Eine Zelle je Foto: Bild links, Name und Stand rechts, darunter beschriftete Knöpfe
+          <div key={f.id} className="gruppe-zellen">
+            <div className="px-4 py-3.5">
+              <div className="flex gap-3">
+                {url ? (
+                  <img src={url} alt={`Foto von ${name(f.student_id)}`} className="h-24 w-24 shrink-0 rounded-xl object-cover" />
+                ) : (
+                  <span aria-hidden className="flex h-24 w-24 shrink-0 items-center justify-center rounded-xl bg-[rgb(118_118_128/0.12)] text-tinte-leise dark:bg-[rgb(118_118_128/0.24)]">
+                    <Icon name="bild" size={28} />
+                  </span>
+                )}
+                <div className="min-w-0 flex-1">
+                  <div className="text-[15px] font-semibold leading-snug">Steckbrief-Foto</div>
+                  <div className="truncate text-[13.5px] text-tinte-matt dark:text-slate-300">{name(f.student_id)}</div>
+                  <ZustimmungsMarke className="mt-1.5" zahl={zu.zahl(f.id)} noetig={zu.noetig} ichSchon={zu.ichSchon(f.id)} />
+                </div>
+              </div>
+              <div className="mt-3 flex gap-2">
+                <button disabled={busy === f.id} onClick={() => void entscheiden(false)} className="btn-klein-grau flex-1">
+                  Ablehnen
                 </button>
-                <button
-                  aria-label="Freigeben"
-                  disabled={busy === f.id}
-                  onClick={() => void entscheiden(true)}
-                  className="flex h-10 w-10 items-center justify-center rounded-full bg-[#EAF6EC] text-[16px] font-bold text-[#248A3D] transition active:scale-90 disabled:opacity-40 dark:bg-green-500/15"
-                >
-                  ✓
+                <button disabled={busy === f.id} onClick={() => void entscheiden(true)} className="btn-klein flex-1">
+                  Freigeben
                 </button>
               </div>
             </div>

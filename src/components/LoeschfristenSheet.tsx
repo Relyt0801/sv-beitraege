@@ -178,7 +178,7 @@ export function LoeschfristenSheet({ open, onClose }: { open: boolean; onClose: 
 
   return (
     <Sheet open={open} onClose={onClose}>
-      <div className="mx-auto max-w-md">
+      <div>
         <SheetKopf titel="Speicher & Löschen" unter="Gilt für alle. Nur Admin bzw. „Rechte verwalten“." onClose={onClose} />
 
         <SpeicherKarte stand={stand} fehler={standFehler} />

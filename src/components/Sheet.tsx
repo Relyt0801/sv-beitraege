@@ -3,23 +3,54 @@ import { createPortal } from "react-dom";
 import { scrollSperren } from "../lib/scrollsperre";
 
 /**
+ * Escape schliesst immer nur das OBERSTE Fenster (Update 1.4, U3).
+ *
+ * Vorher hing jedes offene Blatt mit einem eigenen Tasten-Griff am Fenster –
+ * bei Profil → Funktionen → Einstellungen schloss ein einziges Escape alle
+ * drei auf einmal. Jetzt tragen sich alle Fenster (Blätter, Patch-Notes,
+ * „Du bist gemeldet“ …) in einen gemeinsamen Stapel ein; reagieren darf nur
+ * das zuletzt geöffnete. Die Rückfragen (Melder.tsx) und die Einführung
+ * (Tour.tsx) greifen noch davor ab (capture) und sind damit ohnehin obenauf.
+ */
+const stapel: number[] = [];
+let naechsteKennung = 1;
+
+export function useEscapeSchliesst(aktiv: boolean, onClose: () => void) {
+  // Immer die neueste Funktion aufrufen, ohne den Stapel-Platz zu verlieren
+  const zu = useRef(onClose);
+  zu.current = onClose;
+  useEffect(() => {
+    if (!aktiv) return;
+    const id = naechsteKennung++;
+    stapel.push(id);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || e.defaultPrevented) return;
+      if (stapel[stapel.length - 1] !== id) return;
+      zu.current();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      const i = stapel.indexOf(id);
+      if (i >= 0) stapel.splice(i, 1);
+    };
+  }, [aktiv]);
+}
+
+/**
  * Ein Blatt, das von unten hochfaehrt – wie auf dem iPhone.
  *
  * Auf dem Handy: Griff oben, nach unten wischen schliesst. Auf dem Rechner
- * steht es als Fenster in der Mitte. Escape und ein Tipp daneben schliessen
- * immer.
+ * steht es als Fenster in der Mitte. Escape (nur das oberste Blatt) und ein
+ * Tipp daneben schliessen immer. Der Kopf (SheetKopf) bleibt beim Scrollen
+ * oben stehen, damit das ✕ immer erreichbar ist.
  */
 export function Sheet({ open, onClose, children }: { open: boolean; onClose: () => void; children: ReactNode }) {
   const [zug, setZug] = useState(0);
   const [ziehend, setZiehend] = useState(false);
   const start = useRef(0);
 
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
+  useEscapeSchliesst(open, onClose);
 
   // Die Seite dahinter scrollt nicht mit.
   useEffect(() => {
@@ -60,7 +91,7 @@ export function Sheet({ open, onClose, children }: { open: boolean; onClose: () 
       >
         {/* Griff: nach unten ziehen schliesst */}
         <div
-          className="-mx-5 -mt-1.5 mb-2 flex h-6 cursor-grab touch-none items-center justify-center sm:hidden"
+          className="-mx-5 -mt-1.5 flex h-6 cursor-grab touch-none items-center justify-center sm:hidden"
           onPointerDown={(e) => {
             start.current = e.clientY;
             setZiehend(true);
@@ -79,7 +110,13 @@ export function Sheet({ open, onClose, children }: { open: boolean; onClose: () 
   );
 }
 
-/** Überschrift im Blatt – links der Titel, rechts ein runder Schließen-Knopf. */
+/**
+ * Überschrift im Blatt – links der Titel, rechts ein runder Schließen-Knopf.
+ *
+ * Bleibt beim Scrollen oben stehen (sticky, leicht milchig): In langen Blättern
+ * (Funktionen, Einstellungen, Rechte) war nach einem Bildschirm kein ✕ mehr zu
+ * sehen. Wirkt, wenn der Kopf direkt im Blatt steht – Sheet scrollt als Ganzes.
+ */
 export function SheetKopf({
   titel,
   unter,
@@ -99,7 +136,7 @@ export function SheetKopf({
   zurueck?: { text: string; onClick: () => void };
 }) {
   return (
-    <div className="mb-4 flex items-start gap-3">
+    <div className="sticky top-0 z-10 -mx-5 mb-2 flex items-start gap-3 bg-papier px-5 pb-2 pt-2 shadow-[0_-24px_0_0_rgb(var(--papier))] dark:bg-slate-900 dark:shadow-[0_-24px_0_0_#1C1C1E]">
       <div className="min-w-0 flex-1">
         {zurueck && (
           <button

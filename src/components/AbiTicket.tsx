@@ -15,11 +15,12 @@ import {
 import { KontoTab, jahrgangKurz } from "./KontoTab";
 import { Sheet, SheetKopf } from "./Sheet";
 import { Gruppe, Zeile } from "./Liste";
+import { Icon } from "./Icon";
 
 /**
  * Das Abiball-Ticket – personalisiert, so wie es später auch aussehen soll.
  *
- * Auf dem eigenen Ticket steht der Listenpreis (Grundpreis + Helferzuschuss
+ * Auf dem eigenen Ticket steht der Listenpreis (Grundpreis + Aufschlag
  * bei 0 %) durchgestrichen und darunter, was es bei diesem Stand wirklich
  * kostet. Das zweite Ticket (schwarz-gold) zeigt den Preis für jedes weitere –
  * Eltern und Gäste. Rechts daneben (am Handy darunter) liegt die Kasse.
@@ -124,7 +125,7 @@ export function AbiTicket({
 
       {/* ------------------------------------------ linker Teil */}
       <div className={`relative min-w-0 flex-1 ${klein ? "px-4 py-3" : "px-4 py-4 sm:px-5"}`}>
-        <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.22em] text-[#E9C460]">
+        <div className="flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-[0.16em] text-[#E9C460]">
           <span aria-hidden>✦</span> Abiball{jahrVon(a.datum)}
         </div>
         <div
@@ -133,12 +134,12 @@ export function AbiTicket({
         >
           {erstes ? `${student.vorname} ${student.nachname}` : "Eltern & Gäste"}
         </div>
-        <div className="mt-0.5 truncate text-[11.5px] text-white/60">
+        <div className="mt-0.5 truncate text-[12px] text-white/60">
           {erstes ? "Persönliches Ticket · 1. Karte" : "Jedes weitere Ticket"}
         </div>
 
         {(a.ort || wann) && (
-          <div className={`grid gap-0.5 text-white/85 ${klein ? "mt-1.5 text-[11.5px]" : "mt-2.5 text-[12px]"}`}>
+          <div className={`grid gap-0.5 text-white/85 ${klein ? "mt-1.5 text-[12px]" : "mt-2.5 text-[12px]"}`}>
             {wann && (
               <span className="truncate">
                 <span aria-hidden className="mr-1.5 text-[#E9C460]">◷</span>
@@ -164,7 +165,7 @@ export function AbiTicket({
 
       {/* ------------------------------------------ Abriss mit Preis */}
       <div className="relative flex w-[36%] shrink-0 flex-col items-center justify-center px-2 py-3 text-center sm:w-[32%]">
-        <div className="text-[9.5px] font-bold uppercase tracking-[0.18em] text-white/55">
+        <div className="text-[12px] font-bold uppercase tracking-[0.1em] text-white/60">
           {erstes ? (fuerEltern ? "1. Ticket" : "Dein Preis") : "je Karte"}
         </div>
         {!p.preisSteht ? (
@@ -182,7 +183,7 @@ export function AbiTicket({
               {p.erstes}&nbsp;€
             </div>
             {p.gespart > 0 && (
-              <div className="mt-1.5 whitespace-nowrap rounded-full bg-[#E2B744]/20 px-2 py-0.5 text-[10.5px] font-bold text-[#F6DD8B]">
+              <div className="mt-1.5 whitespace-nowrap rounded-full bg-[#E2B744]/20 px-2 py-0.5 text-[12px] font-bold text-[#F6DD8B]">
                 −{p.gespart} € gespart
               </div>
             )}
@@ -208,7 +209,7 @@ const STATUS_TEXT: Record<TicketBestellung["status"], string> = {
 /** Kleine Info-Zeile statt großer Kästen */
 function Info({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex items-center gap-2 rounded-xl zelle px-3 py-2 text-[12.5px] text-tinte-matt dark:text-slate-300">
+    <div className="flex items-center gap-2 rounded-xl zelle px-3 py-2 text-[12px] text-tinte-matt dark:text-slate-300">
       {children}
     </div>
   );
@@ -274,7 +275,7 @@ export function TicketKasse({
     <div className="grid content-start gap-2.5">
       {status === "bald" && (
         <div className="rounded-2xl zelle p-4 text-center">
-          <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-tinte-leise">Verkauf startet in</div>
+          <div className="text-[12px] font-bold uppercase tracking-[0.16em] text-tinte-leise">Verkauf startet in</div>
           <div className="zahl mt-1 text-[1.9rem] font-extrabold leading-none tracking-[-0.02em]">{countdown(abMs - jetzt)}</div>
           <div className="mt-1 text-[12px] text-tinte-leise">{zeitpunktSchoen(a.verkaufAb!)}</div>
           {!fuerEltern && (
@@ -282,7 +283,7 @@ export function TicketKasse({
               disabled
               className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl bg-slate-300 py-3 text-[15px] font-bold text-white dark:bg-slate-700 dark:text-slate-400"
             >
-              <span aria-hidden>🔒</span> Bestellen
+              Bestellen (ab Start möglich)
             </button>
           )}
         </div>
@@ -291,9 +292,9 @@ export function TicketKasse({
       {status === "laeuft" && !fuerEltern && (
         <div className="rounded-2xl bg-gradient-to-b from-[#12284D] to-[#0A1730] p-4 text-white ring-1 ring-[#E2B744]/40">
           <div className="flex items-center justify-between gap-2">
-            <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#E9C460]">Tickets bestellen</span>
+            <span className="text-[12px] font-bold uppercase tracking-[0.16em] text-[#E9C460]">Tickets bestellen</span>
             {a.kontingent > 0 && (
-              <span className="text-[11px] font-semibold text-white/60">noch {Math.max(0, a.kontingent - verkauft)} frei</span>
+              <span className="text-[12px] font-semibold text-white/60">noch {Math.max(0, a.kontingent - verkauft)} frei</span>
             )}
           </div>
 
@@ -311,7 +312,7 @@ export function TicketKasse({
                     onClick={() => setAnzahl(Math.max(1, n - 1))}
                     disabled={n <= 1}
                     aria-label="Ein Ticket weniger"
-                    className="flex h-9 w-9 items-center justify-center rounded-full text-xl font-bold transition active:scale-90 disabled:opacity-30"
+                    className="flex h-11 w-11 items-center justify-center rounded-full text-xl font-bold transition active:scale-90 disabled:opacity-30"
                   >
                     −
                   </button>
@@ -320,14 +321,14 @@ export function TicketKasse({
                     onClick={() => setAnzahl(Math.min(moeglich, n + 1))}
                     disabled={n >= moeglich}
                     aria-label="Ein Ticket mehr"
-                    className="flex h-9 w-9 items-center justify-center rounded-full text-xl font-bold transition active:scale-90 disabled:opacity-30"
+                    className="flex h-11 w-11 items-center justify-center rounded-full text-xl font-bold transition active:scale-90 disabled:opacity-30"
                   >
                     +
                   </button>
                 </div>
                 <div className="text-right">
                   <div className={`zahl text-[1.7rem] font-extrabold leading-none ${GOLD_TEXT}`}>{betrag} €</div>
-                  <div className="mt-0.5 text-[11px] text-white/55">
+                  <div className="mt-0.5 text-[12px] text-white/55">
                     {schon === 0 ? (n > 1 ? `${p.erstes} € + ${n - 1} × ${p.weiteres} €` : "dein 1. Ticket") : `${n} × ${p.weiteres} €`}
                   </div>
                 </div>
@@ -339,22 +340,22 @@ export function TicketKasse({
               >
                 {busy ? "Einen Moment …" : `${n} ${n === 1 ? "Ticket" : "Tickets"} bestellen`}
               </button>
-              <div className="mt-1.5 text-center text-[11px] text-white/50">
+              <div className="mt-1.5 text-center text-[12px] text-white/50">
                 Max. {a.maxProPerson} je Person{schon > 0 ? ` · du hast ${schon}` : ""}
               </div>
             </>
           )}
-          {fehler && <p className="mt-2 text-center text-[12.5px] font-semibold text-red-300">Das hat nicht geklappt: {fehler}</p>}
+          {fehler && <p className="mt-2 text-center text-[12px] font-semibold text-red-300">Das hat nicht geklappt: {fehler}</p>}
         </div>
       )}
 
       {status === "laeuft" && fuerEltern && aktiv.length === 0 && (
-        <Info>🎟️ Verkauf läuft – {student.vorname} bestellt über den eigenen Zugang.</Info>
+        <Info>Verkauf läuft – {student.vorname} bestellt über den eigenen Zugang.</Info>
       )}
 
       {meine.length > 0 && (
         <div className="overflow-hidden rounded-2xl zelle">
-          <div className="px-4 pb-1 pt-2.5 text-[11px] font-bold uppercase tracking-[0.14em] text-tinte-leise">
+          <div className="px-4 pb-1 pt-2.5 text-[12px] font-bold uppercase tracking-[0.14em] text-tinte-leise">
             {fuerEltern ? `Bestellungen von ${student.vorname}` : "Deine Bestellungen"}
           </div>
           {meine.map((b) => (
@@ -364,7 +365,7 @@ export function TicketKasse({
                   {b.anzahl} {b.anzahl === 1 ? "Ticket" : "Tickets"} · {euroAusCent(b.betrag_cent)}
                 </div>
                 <div
-                  className={`text-[11.5px] font-semibold ${
+                  className={`text-[12px] font-semibold ${
                     b.status === "bezahlt" ? "text-bezahlt" : b.status === "offen" ? "text-offen" : "text-tinte-leise"
                   }`}
                 >
@@ -375,7 +376,7 @@ export function TicketKasse({
               {b.status === "offen" && (
                 <button
                   onClick={() => setZahlen(b)}
-                  className="shrink-0 rounded-full bg-brand px-3.5 py-1.5 text-[13px] font-bold text-white transition active:scale-95"
+                  className="btn-klein shrink-0"
                 >
                   Überweisen
                 </button>
@@ -413,7 +414,7 @@ export function TicketUeberweisen({
         onClose={onClose}
       />
       <div className="mb-4 flex flex-col items-center rounded-2xl bg-gradient-to-b from-[#12284D] to-[#0A1730] px-4 py-5 text-center text-white ring-1 ring-[#E2B744]/40">
-        <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#E9C460]">Zu überweisen</div>
+        <div className="text-[12px] font-bold uppercase tracking-[0.16em] text-[#E9C460]">Zu überweisen</div>
         <div className={`zahl mt-1 text-[2.6rem] font-extrabold leading-none tracking-[-0.03em] ${GOLD_TEXT}`}>
           {euroAusCent(bestellung.betrag_cent)}
         </div>
@@ -455,7 +456,7 @@ function TicketAnsicht({
 
       <Gruppe titel="1. Ticket">
         <Zeile label="Grundpreis">{wert(p.preisSteht ? `${p.grund} €` : "folgt", "text-tinte-matt dark:text-slate-300")}</Zeile>
-        <Zeile label={`Helferzuschuss (${Math.min(prozent, 100)} %)`}>{wert(`+${p.aufschlag} €`, "text-tinte-matt dark:text-slate-300")}</Zeile>
+        <Zeile label={`Aufschlag bei ${Math.min(prozent, 100)} % Mithilfe`}>{wert(`+${p.aufschlag} €`, "text-tinte-matt dark:text-slate-300")}</Zeile>
         {a.ueber100 && (
           <Zeile label="✦ Bonus">{wert(p.rabatt > 0 ? `−${p.rabatt} €` : "0 €", "text-[#8A650A] dark:text-[#E9C460]")}</Zeile>
         )}
@@ -520,8 +521,8 @@ export function TicketBereich({
       <AusHinweis funktion="abiball" className="mb-2" />
       <div className="flex items-baseline justify-between gap-2">
         <h2 className="text-[15px] font-semibold">Abiball-Ticket</h2>
-        <button onClick={() => setAuf(true)} className="-my-2 py-2 text-[13px] font-semibold text-brand-dark dark:text-brand">
-          Details ›
+        <button onClick={() => setAuf(true)} className="-my-3 -mr-3 flex min-h-[44px] items-center gap-0.5 px-3 text-[14px] font-semibold text-brand-dark dark:text-brand">
+          Details <Icon name="chevron" size={14} strich={2.4} />
         </button>
       </div>
       <div className={`mt-3 grid gap-4 ${mitKasse ? "lg:grid-cols-[minmax(0,1.4fr)_minmax(280px,1fr)]" : ""}`}>
@@ -537,7 +538,7 @@ export function TicketBereich({
               {gaeste}
             </>
           )}
-          {!mitKasse && <Info>🎟️ Der Ticketverkauf ist noch nicht gestartet.</Info>}
+          {!mitKasse && <Info>Der Ticketverkauf ist noch nicht gestartet.</Info>}
         </div>
         {mitKasse && <TicketKasse student={student} settings={settings} prozent={prozent} fuerEltern={fuerEltern} />}
       </div>

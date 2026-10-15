@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Sheet, SheetKopf } from "./Sheet";
 import { Icon } from "./Icon";
+import { Gruppe, Zeile } from "./Liste";
 import { useRole } from "../auth/RoleProvider";
 import { hasSupabase, supabase } from "../lib/supabase";
 import { frage, melde, meldeFehler } from "../lib/melder";
@@ -52,16 +53,14 @@ export function usePasswortNeu() {
       {ergebnis && (
         <>
           <SheetKopf titel="Neues Passwort" unter={`Für ${ergebnis.name}. Wird nur jetzt angezeigt – danach nirgends mehr.`} onClose={() => setErgebnis(null)} />
-          <div className="liste zelle">
-            <div className="zeile">
-              <span className="min-w-0 flex-1 text-[15px] text-tinte-leise">Nutzername</span>
+          <Gruppe className="">
+            <Zeile label="Nutzername">
               <span className="select-all font-mono text-[15px]">{ergebnis.username}</span>
-            </div>
-            <div className="zeile">
-              <span className="min-w-0 flex-1 text-[15px] text-tinte-leise">Passwort</span>
+            </Zeile>
+            <Zeile label="Passwort">
               <span className="select-all font-mono text-[16px] font-semibold">{ergebnis.passwort}</span>
-            </div>
-          </div>
+            </Zeile>
+          </Gruppe>
           <button
             className="btn-grau mt-4"
             onClick={async () => {
@@ -75,7 +74,7 @@ export function usePasswortNeu() {
           >
             Kopieren
           </button>
-          <p className="mt-3 px-1 text-[12.5px] leading-snug text-tinte-leise">
+          <p className="mt-3 px-1 text-[13px] leading-snug text-tinte-leise">
             Gib es der Person persönlich weiter. Sie muss es beim nächsten Anmelden durch ein eigenes ersetzen.
           </p>
           <button className="btn-primary mt-4" onClick={() => setErgebnis(null)}>
@@ -100,7 +99,7 @@ export function PasswortNeuKnopf({ userId, name, className = "" }: { userId: str
         type="button"
         disabled={busy}
         onClick={() => void zuruecksetzen(userId, name)}
-        className={`flex w-full items-center justify-center gap-2 rounded-xl bg-[rgb(118_118_128/0.12)] py-2.5 font-semibold text-brand-dark transition active:scale-[.98] disabled:opacity-40 dark:bg-[rgb(118_118_128/0.24)] dark:text-brand ${className}`}
+        className={`btn-grau gap-2 ${className}`}
       >
         <Icon name="schluessel" size={17} />
         {busy ? "Wird erzeugt …" : "Neues Passwort generieren"}

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Sheet, SheetKopf } from "./Sheet";
 import { Schalter } from "./Schalter";
 import { Icon } from "./Icon";
+import { FussLeiste } from "./Kachel";
 import { frage, melde, meldeFehler } from "../lib/melder";
 import { GESPERRT_TEXT } from "./Gesperrt";
 import type { Kandidat, KandidatEingabe, Runde, RundenStand } from "../lib/runden";
@@ -17,11 +18,11 @@ import type { Kandidat, KandidatEingabe, Runde, RundenStand } from "../lib/runde
 export function Stepper({ wert, min = 1, max = 20, onChange, label }: { wert: number; min?: number; max?: number; onChange: (n: number) => void; label: string }) {
   return (
     <span className="inline-flex shrink-0 items-center overflow-hidden rounded-[9px] bg-[rgb(118_118_128/0.12)] dark:bg-[rgb(118_118_128/0.24)]" role="group" aria-label={label}>
-      <button type="button" aria-label="Weniger" disabled={wert <= min} onClick={() => onChange(wert - 1)} className="flex h-8 w-10 items-center justify-center text-[18px] font-semibold disabled:opacity-30">
+      <button type="button" aria-label="Weniger" disabled={wert <= min} onClick={() => onChange(wert - 1)} className="relative flex h-8 w-10 items-center justify-center text-[18px] font-semibold after:absolute after:-inset-y-1.5 after:inset-x-0 after:content-[''] disabled:opacity-30">
         −
       </button>
       <span className="zahl w-7 border-x border-black/10 text-center text-[15px] font-semibold dark:border-white/15">{wert}</span>
-      <button type="button" aria-label="Mehr" disabled={wert >= max} onClick={() => onChange(wert + 1)} className="flex h-8 w-10 items-center justify-center text-[18px] font-semibold disabled:opacity-30">
+      <button type="button" aria-label="Mehr" disabled={wert >= max} onClick={() => onChange(wert + 1)} className="relative flex h-8 w-10 items-center justify-center text-[18px] font-semibold after:absolute after:-inset-y-1.5 after:inset-x-0 after:content-[''] disabled:opacity-30">
         +
       </button>
     </span>
@@ -43,7 +44,7 @@ export function RundenMarke({ runde, className = "", hell = false }: { runde: Ru
   );
 }
 
-/** Farben für den Sieger der Herzen – bewusst anders als die eigentliche Wahl */
+/** Farben für den Gewinner der Herzen – bewusst anders als die eigentliche Wahl */
 const HERZ = {
   rahmen: "border-[#FF2D55]/30",
   flaeche: "bg-[#FF2D55]/[0.05] dark:bg-[#FF2D55]/[0.10]",
@@ -66,13 +67,17 @@ export function SichtbarkeitWahl({
   titel?: string;
 }) {
   return (
-    <div className={`flex min-h-[44px] items-center gap-3 ${className}`}>
-      <span className="min-w-0 flex-1 whitespace-nowrap text-[15px]">{titel}</span>
-      <div className="seg w-[178px] shrink-0" role="radiogroup" aria-label="Ergebnisse sehen">
-        <button type="button" role="radio" aria-checked={!alle} className={`seg-item !px-1.5 !text-[12.5px] whitespace-nowrap ${!alle ? "seg-aktiv" : ""}`} onClick={() => onChange(false)}>
+    // Beschriftung links darf umbrechen, der Umschalter hat seine natürliche
+    // Breite; reicht der Platz nicht, rutscht er unter die Beschriftung
+    // (vorher: feste Breite von 178 px, die die Beschriftung überdeckte). Die Punkte
+    // bleiben bei ihrer Textbreite (flex-none), sonst wird die weiße Fläche schmaler als „Nur Komitee“.
+    <div className={`flex min-h-[44px] flex-wrap items-center gap-x-3 gap-y-1.5 py-1.5 ${className}`}>
+      <span className="min-w-[8.5rem] flex-1 text-[15px] leading-snug">{titel}</span>
+      <div className="seg shrink-0" role="radiogroup" aria-label={titel}>
+        <button type="button" role="radio" aria-checked={!alle} className={`seg-item !flex-none whitespace-nowrap !px-3 !text-[13px] ${!alle ? "seg-aktiv" : ""}`} onClick={() => onChange(false)}>
           Nur Komitee
         </button>
-        <button type="button" role="radio" aria-checked={alle} className={`seg-item !px-1.5 !text-[12.5px] whitespace-nowrap ${alle ? "seg-aktiv" : ""}`} onClick={() => onChange(true)}>
+        <button type="button" role="radio" aria-checked={alle} className={`seg-item !flex-none whitespace-nowrap !px-4 !text-[13px] ${alle ? "seg-aktiv" : ""}`} onClick={() => onChange(true)}>
           Alle
         </button>
       </div>
@@ -125,7 +130,7 @@ export function stimmenSatz(stand: RundenStand, runde: Runde, gesperrt = false):
 
 /**
  * Kandidaten für die nächste Runde aus einer laufenden: nach Stimmen
- * sortiert, nur die eigentliche Wahl (Honorable Mentions bleiben draußen).
+ * sortiert, nur die eigentliche Wahl (Herzens-Kandidaten bleiben draußen).
  */
 export function naechsteRundeQuellen(stand: RundenStand, runde: Runde): (KandidatEingabe & { punkte?: number })[] {
   return stand
@@ -154,8 +159,8 @@ function zurRunde(rundeId: string) {
  * Die offene Runde eines Bereichs bzw. einer Gruppe – oder, für wer leitet,
  * der Knopf, eine zu starten. Steht oben in der Liste des Bereichs.
  *
- * mitHerz: beim Starten lassen sich Honorable Mentions für den „Sieger der
- * Herzen“ auswählen (Motto, Zitate). wahlTitel benennt die eigentliche Wahl.
+ * mitHerz: beim Starten lassen sich Herzens-Kandidaten für den „Gewinner der
+ * Herzen“ auswählen (Motto, Zitate, Rankings). wahlTitel benennt die eigentliche Wahl.
  *
  * nurWahl: Stand, Start-Knopf, Kurz-Ergebnis und Steuerung zeigt schon eine
  * RundenStandKarte oben (bzw. RundenEinstellungen im Zahnrad-Blatt) – hier
@@ -168,10 +173,11 @@ export function RundenAbschnitt({
   quellen,
   leitet,
   gesperrt,
-  startText = "Engere Auswahl starten",
+  startText = "Runde starten",
   wahlTitel = "Wahl",
   mitHerz = false,
   nurWahl = false,
+  standardName,
 }: {
   stand: RundenStand;
   gruppe?: string;
@@ -185,6 +191,8 @@ export function RundenAbschnitt({
   mitHerz?: boolean;
   /** nur die Wahl-Liste (Stand und Steuerung stehen woanders) */
   nurWahl?: boolean;
+  /** Name der ersten Runde, z. B. „Stichwahl“ (Standard „Engere Auswahl“) */
+  standardName?: string;
 }) {
   const [starten, setStarten] = useState<null | (KandidatEingabe & { punkte?: number })[]>(null);
   const offen = stand.offeneVon(gruppe);
@@ -219,6 +227,7 @@ export function RundenAbschnitt({
         stand={stand}
         mitHerz={mitHerz}
         wahlTitel={wahlTitel}
+        standardName={standardName}
         onClose={() => setStarten(null)}
       />
     </>
@@ -307,7 +316,7 @@ function RundenKarte({
       {herzLaeuft && (
         <div className="feld-grau overflow-hidden shadow-[0_1px_3px_rgba(0,0,0,.05)]">
           <div className="px-4 pb-2.5 pt-3.5">
-            <AbschnittKopf titel="Sieger der Herzen" unter="Honorable Mentions" chip="1 Stimme" herz />
+            <AbschnittKopf titel="Gewinner der Herzen" unter="Herzens-Kandidaten" chip="1 Stimme" herz />
           </div>
           <KandidatenListe stand={stand} runde={runde} ks={sortiere(herz)} zahlenDa={zahlenDa} onTippen={tippen} herz />
         </div>
@@ -418,10 +427,10 @@ function SteuerZeilen({ stand, runde, hatHerz, onWeiter }: { stand: RundenStand;
       </div>
       {hatHerz && (
         <div className="flex min-h-[48px] items-center gap-3 px-4 py-2">
-          <span className="min-w-0 flex-1 text-[15px]">Sieger der Herzen</span>
+          <span className="min-w-0 flex-1 text-[15px]">Gewinner der Herzen</span>
           <Schalter
             an={!!runde.hm_aktiv}
-            label="Sieger der Herzen"
+            label="Gewinner der Herzen"
             onChange={async (v) => {
               const f = await stand.aendern(runde.id, { hm: v });
               if (f) meldeFehler("Ging nicht: " + f);
@@ -444,7 +453,7 @@ function SteuerZeilen({ stand, runde, hatHerz, onWeiter }: { stand: RundenStand;
   );
 }
 
-/** Rangliste einer Runde (Wahl und, falls vorhanden, Sieger der Herzen) */
+/** Rangliste einer Runde (Wahl und, falls vorhanden, Gewinner der Herzen) */
 function RundenRangliste({ stand, runde, wahlTitel }: { stand: RundenStand; runde: Runde; wahlTitel: string }) {
   const alle = stand
     .kandidatenVon(runde.id)
@@ -479,7 +488,7 @@ function RundenRangliste({ stand, runde, wahlTitel }: { stand: RundenStand; rund
       {herz.length >= 2 && (
         <div>
           <h3 className={`mb-1.5 flex items-center gap-1.5 px-4 text-[13px] uppercase tracking-[0.02em] ${HERZ.text}`}>
-            <Icon name="herz" size={12} strich={2.4} /> Sieger der Herzen
+            <Icon name="herz" size={12} strich={2.4} /> Gewinner der Herzen
           </h3>
           <Liste ks={herz} rosa />
         </div>
@@ -574,6 +583,7 @@ export function RundenStandKarte({
   startText = "Runde starten",
   wahlTitel = "Wahl",
   mitHerz = false,
+  standardName,
   onAbstimmen,
   onErgebnis,
   verlauf = "from-[#0A84FF] to-[#0062CC]",
@@ -590,6 +600,8 @@ export function RundenStandKarte({
   startText?: string;
   wahlTitel?: string;
   mitHerz?: boolean;
+  /** Name der ersten Runde, z. B. „Stichwahl“ (Standard „Engere Auswahl“) */
+  standardName?: string;
   /** „Abstimmen“: Standard = zur Wahl-Liste (RundenAbschnitt) scrollen */
   onAbstimmen?: (runde: Runde) => void;
   /** „Ergebnis“: Standard = Ergebnis-Blatt dieser Karte */
@@ -621,7 +633,7 @@ export function RundenStandKarte({
           </span>
         </div>
         <div className="relative mt-2 text-[1.2rem] font-bold leading-tight tracking-[-0.01em]">
-          {fertig ? "Deine Stimmen sind drin" : `${wahlTitel} läuft`}
+          {fertig ? "Deine Stimmen sind drin" : "Abstimmung läuft"}
         </div>
         <div className="relative mt-0.5 text-[13.5px] leading-snug text-white/85">
           {gruppeTitel || offen.gruppe_titel ? `${gruppeTitel || offen.gruppe_titel} · ` : ""}
@@ -647,7 +659,7 @@ export function RundenStandKarte({
               Nächste Runde
             </button>
             <button onClick={() => rundeBeenden(stand, offen)} className="rounded-full bg-black/25 px-3.5 py-1.5 text-[13px] font-semibold text-white transition active:scale-95">
-              Beenden
+              Runde beenden
             </button>
           </div>
         )}
@@ -715,6 +727,7 @@ export function RundenStandKarte({
         stand={stand}
         mitHerz={mitHerz}
         wahlTitel={wahlTitel}
+        standardName={standardName}
         onClose={() => setStarten(null)}
       />
       <RundenErgebnisBlatt stand={stand} runde={ergebnis} wahlTitel={wahlTitel} onClose={() => setErgebnis(null)} />
@@ -724,7 +737,7 @@ export function RundenStandKarte({
 
 /**
  * Gruppe „Abstimmung“ für das Einstellungs-Blatt (Zahnrad) eines Bereichs:
- * läuft eine Runde → Stimmen je Person, wer das Ergebnis sieht, Sieger der
+ * läuft eine Runde → Stimmen je Person, wer das Ergebnis sieht, Gewinner der
  * Herzen, nächste Runde, beenden. Sonst → „Runde starten …“.
  * Nur für wer leitet (sonst nichts).
  */
@@ -738,6 +751,7 @@ export function RundenEinstellungen({
   startText = "Runde starten",
   wahlTitel = "Wahl",
   mitHerz = false,
+  standardName,
   fuss,
   className = "mt-4",
 }: {
@@ -750,6 +764,8 @@ export function RundenEinstellungen({
   startText?: string;
   wahlTitel?: string;
   mitHerz?: boolean;
+  /** Name der ersten Runde, z. B. „Stichwahl“ (Standard „Engere Auswahl“) */
+  standardName?: string;
   fuss?: ReactNode;
   className?: string;
 }) {
@@ -805,6 +821,7 @@ export function RundenEinstellungen({
         stand={stand}
         mitHerz={mitHerz}
         wahlTitel={wahlTitel}
+        standardName={standardName}
         onClose={() => setStarten(null)}
       />
     </section>
@@ -819,6 +836,7 @@ export function RundeStartenSheet({
   stand,
   mitHerz = false,
   wahlTitel = "Wahl",
+  standardName,
   onClose,
 }: {
   offen: boolean;
@@ -828,6 +846,8 @@ export function RundeStartenSheet({
   stand: RundenStand;
   mitHerz?: boolean;
   wahlTitel?: string;
+  /** Name der ersten Runde (Standard „Engere Auswahl“, bei Rankings „Stichwahl“) */
+  standardName?: string;
   onClose: () => void;
 }) {
   const sortiert = useMemo(() => [...quellen].sort((a, b) => (b.punkte ?? 0) - (a.punkte ?? 0)), [quellen]);
@@ -849,12 +869,12 @@ export function RundeStartenSheet({
     setHerz(new Set());
     setHerzAn(false);
     setHerzZahl(3);
-    setTitel(stand.letzteBeendete(gruppe) || stand.offeneVon(gruppe) ? "Finale" : "Engere Auswahl");
+    setTitel(stand.letzteBeendete(gruppe) || stand.offeneVon(gruppe) ? "Finale" : standardName ?? "Engere Auswahl");
     setStimmen(1);
     setFuerAlle(false);
-  }, [offen, sortiert, mitPunkten, stand, gruppe]);
+  }, [offen, sortiert, mitPunkten, stand, gruppe, standardName]);
 
-  /** Die nächsten n hinter der Wahl werden Honorable Mentions */
+  /** Die nächsten n hinter der Wahl werden Herzens-Kandidaten */
   const herzAuffuellen = (n: number, w: Set<string> = wahl) =>
     setHerz(new Set(sortiert.filter((q) => !w.has(q.id)).slice(0, n).map((q) => q.id)));
 
@@ -885,14 +905,14 @@ export function RundeStartenSheet({
   return (
     <Sheet open={offen} onClose={onClose}>
       <SheetKopf
-        titel="Neue Abstimmungsrunde"
+        titel="Neue Runde"
         unter={`${gruppeTitel ? gruppeTitel + " · " : ""}Wähle aus, was weiterkommt. Eine laufende Runde wird dabei beendet.`}
         onClose={onClose}
       />
       <div className="liste mb-3 zelle">
         <label className="zeile">
           <span className="min-w-0 flex-1 text-[15px]">Name der Runde</span>
-          <input className="w-36 bg-transparent text-right text-[15px] text-tinte-matt outline-none" maxLength={40} value={titel} onChange={(e) => setTitel(e.target.value)} />
+          <input className="w-40 min-w-0 bg-transparent text-right text-[15px] font-medium text-tinte outline-none placeholder:text-tinte-leise" maxLength={40} placeholder="z. B. Finale" value={titel} onChange={(e) => setTitel(e.target.value)} />
         </label>
         <div className="zeile">
           <span className="min-w-0 flex-1 text-[15px]">Stimmen je Person</span>
@@ -904,12 +924,12 @@ export function RundeStartenSheet({
         {mitHerz && (
           <div className="zeile">
             <span className="min-w-0 flex-1">
-              <span className="block text-[15px]">Sieger der Herzen</span>
-              <span className={`block text-[12px] font-semibold ${HERZ.text}`}>Honorable Mentions · 1 Stimme</span>
+              <span className="block text-[15px]">Gewinner der Herzen</span>
+              <span className={`block text-[12.5px] font-semibold ${HERZ.text}`}>Herzens-Kandidaten · 1 Stimme</span>
             </span>
             <Schalter
               an={herzAn}
-              label="Sieger der Herzen"
+              label="Gewinner der Herzen"
               onChange={(v) => {
                 setHerzAn(v);
                 const n = Math.max(2, Math.min(herzZahl, sortiert.length - wahl.size));
@@ -922,12 +942,12 @@ export function RundeStartenSheet({
         )}
         {herzAktiv && (
           <div className="zeile">
-            <span className="min-w-0 flex-1 text-[15px]">Honorable Mentions</span>
+            <span className="min-w-0 flex-1 text-[15px]">Herzens-Kandidaten</span>
             <Stepper
               wert={herzZahl}
               min={2}
               max={Math.max(2, Math.min(20, sortiert.length - wahl.size))}
-              label="Anzahl Honorable Mentions"
+              label="Anzahl Herzens-Kandidaten"
               onChange={(n) => {
                 setHerzZahl(n);
                 herzAuffuellen(n);
@@ -937,9 +957,10 @@ export function RundeStartenSheet({
         )}
       </div>
       {mitPunkten && (
-        <div className="mb-2 flex flex-wrap gap-1.5">
+        <div className="mb-2 flex flex-wrap items-center gap-1.5">
+          <span className="mr-1 px-1 text-[13px] text-tinte-leise">Auswahl:</span>
           {[3, 5, 10].filter((n) => n < sortiert.length).map((n) => (
-            <button key={n} onClick={() => top(n)} className="btn-klein-grau !min-h-[2rem] !px-3 !text-[13px]">
+            <button key={n} onClick={() => top(n)} className="btn-klein-grau !px-3 !text-[13px]">
               Top {n}
             </button>
           ))}
@@ -948,7 +969,7 @@ export function RundeStartenSheet({
               setWahl(new Set());
               setHerz(new Set());
             }}
-            className="btn-klein-grau !min-h-[2rem] !px-3 !text-[13px]"
+            className="btn-klein-grau !px-3 !text-[13px]"
           >
             Keine
           </button>
@@ -992,7 +1013,7 @@ export function RundeStartenSheet({
                 <button
                   type="button"
                   aria-pressed={istHerz}
-                  aria-label={`${q.label}: Honorable Mention`}
+                  aria-label={`${q.label}: Herzens-Kandidat`}
                   onClick={() => umschalten(q.id, "herz")}
                   className={`-my-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition active:scale-90 ${
                     istHerz ? "bg-[#FF2D55] text-white" : "bg-[rgb(118_118_128/0.12)] text-tinte-leise dark:bg-[rgb(118_118_128/0.24)]"
@@ -1005,18 +1026,27 @@ export function RundeStartenSheet({
           );
         })}
       </div>
-      {herzAktiv && !herzOk && (
-        <p className={`mt-2 px-1 text-[13px] font-semibold ${HERZ.text}`}>Mindestens zwei Honorable Mentions mit ♥ auswählen.</p>
+      {/* Was sind Herzens-Kandidaten? – ein Satz, solange der Schalter an ist */}
+      {herzAktiv && (
+        <p className="mt-2 px-1 text-[13px] leading-snug text-tinte-leise">
+          Herzens-Kandidaten sind Vorschläge, die es nicht in die Runde schaffen, aber trotzdem gefallen. Tippe bei mindestens zwei Vorschlägen auf das{" "}
+          <span className={HERZ.text}>♥</span> – darüber wird zusätzlich abgestimmt (eine Stimme je Person).
+        </p>
       )}
+      {herzAktiv && !herzOk && (
+        <p className={`mt-2 px-1 text-[13px] font-semibold ${HERZ.text}`}>Mindestens zwei Herzens-Kandidaten mit ♥ auswählen.</p>
+      )}
+      {/* Fußknopf bleibt am unteren Rand des Blatts sichtbar, auch bei langer Liste */}
+      <FussLeiste>
       <button
-        className="btn-primary mt-4"
+        className="btn-primary"
         disabled={wahl.size < 2 || !herzOk || sendet}
         onClick={async () => {
           setSendet(true);
           const f = await stand.starten({
             gruppe,
             gruppeTitel,
-            titel: titel.trim() || "Engere Auswahl",
+            titel: titel.trim() || (standardName ?? "Engere Auswahl"),
             stimmen: Math.min(stimmen, Math.max(1, wahl.size - 1)),
             ergebnis: fuerAlle,
             kandidaten: [
@@ -1032,6 +1062,8 @@ export function RundeStartenSheet({
       >
         {sendet ? "Wird gestartet …" : `Runde mit ${wahl.size} starten${herzAktiv && herz.size ? ` · ${herz.size} ♥` : ""}`}
       </button>
+        {wahl.size < 2 && <p className="mt-1.5 text-center text-[12.5px] text-tinte-leise">Wähle mindestens zwei Möglichkeiten aus.</p>}
+      </FussLeiste>
     </Sheet>
   );
 }

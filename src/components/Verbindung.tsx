@@ -1,12 +1,52 @@
+import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useNetz } from "../lib/netz";
 
 /**
- * Das Offline-Band (Update 1.4): eine kleine Glas-Kapsel oben unter der
- * Statusleiste – wie die Hinweise von iOS („Kein Internet“), nicht wie ein
- * roter Warnbalken.
+ * Wo unten ist Platz für kurze Hinweise (Offline-Kapsel, Meldungen)?
  *
- *   - Gerät offline:          „Offline – Änderungen werden nicht gespeichert“
+ * Update 1.4 (U3): Beides lag vorher oben und überdeckte genau die Kopfleiste
+ * (Nachtragen, Hell/Dunkel, Profil – im Chat sogar Zurück-Pfeil und Name).
+ * Jetzt stehen sie unten, knapp über der Reiterleiste:
+ *   - normal:    `calc(var(--leiste) + 12px)` (die Höhe misst App.tsx)
+ *   - Vollbild-Chat (ChatEbene, ChatBlasen.tsx): die Reiterleiste ist dort
+ *     weg, dafür sitzt unten die Eingabe. Deren Höhe steht als Innenabstand am
+ *     Verlauf (data-chat-scroller); die Kapsel rückt darüber – auch wenn die
+ *     Tastatur offen ist (die Ebene folgt dem sichtbaren Ausschnitt).
+ * `aktiv`: nur messen, solange wirklich etwas angezeigt wird.
+ */
+export function useUnterkante(aktiv: boolean): string {
+  const [px, setPx] = useState<number | null>(null);
+  useEffect(() => {
+    if (!aktiv) return;
+    const messen = () => {
+      let wert: number | null = null;
+      document.querySelectorAll<HTMLElement>("[data-chat-scroller]").forEach((el) => {
+        // Nur der sichtbare Chat zählt (versteckte bleiben im DOM, display:none)
+        if (!el.getClientRects().length) return;
+        const r = el.getBoundingClientRect();
+        const fuss = parseFloat(getComputedStyle(el).paddingBottom) || 0;
+        wert = Math.max(0, window.innerHeight - r.bottom) + fuss;
+      });
+      setPx(wert);
+    };
+    messen();
+    const t = setInterval(messen, 250);
+    window.addEventListener("resize", messen);
+    return () => {
+      clearInterval(t);
+      window.removeEventListener("resize", messen);
+    };
+  }, [aktiv]);
+  return px === null ? "calc(var(--leiste) + 12px)" : `${Math.round(px) + 12}px`;
+}
+
+/**
+ * Das Offline-Band (Update 1.4): eine kleine Glas-Kapsel unten, mittig über
+ * der Reiterleiste – wie die Hinweise von iOS („Kein Internet“), nicht wie ein
+ * roter Warnbalken. Oben würde sie die Kopfleiste verdecken.
+ *
+ *   - Gerät offline:          „Offline – nichts wird gespeichert“
  *   - Server nicht erreichbar: „Keine Verbindung zum Server“
  *     (Gerät meint online zu sein, aber Anfragen scheitern – z. B. Schul-WLAN
  *     ohne Internet; erkannt in lib/netz.ts über den fetch-Wrapper)
@@ -20,18 +60,21 @@ import { useNetz } from "../lib/netz";
  */
 export function OfflineBand() {
   const { zustand, wieder } = useNetz();
-  if (zustand === "online" && !wieder) return null;
+  const zeigen = zustand !== "online" || wieder;
+  const unten = useUnterkante(zeigen);
+  if (!zeigen) return null;
 
   const offline = zustand === "offline";
   const text = offline
-    ? "Offline – Änderungen werden nicht gespeichert"
+    ? "Offline – nichts wird gespeichert"
     : zustand === "server"
       ? "Keine Verbindung zum Server"
       : "Wieder online";
 
   return createPortal(
     <div
-      className="pointer-events-none fixed inset-x-0 top-[calc(env(safe-area-inset-top)+0.5rem)] z-[86] flex justify-center px-4"
+      className="pointer-events-none fixed inset-x-0 z-[86] flex justify-center px-4"
+      style={{ bottom: unten }}
       role="status"
       aria-live="polite"
     >
@@ -40,7 +83,7 @@ export function OfflineBand() {
         className="glas flex max-w-full animate-aufsteigen items-center gap-2 rounded-full px-3.5 py-[7px] text-[13px] font-semibold leading-tight text-tinte shadow-[0_8px_24px_-6px_rgba(0,0,0,0.22),0_0_0_0.5px_rgba(0,0,0,0.08)] dark:text-slate-100 dark:shadow-[0_8px_24px_-6px_rgba(0,0,0,0.7),0_0_0_0.5px_rgba(255,255,255,0.12)]"
       >
         {zustand === "online" ? <SymbolHaken /> : <SymbolKeinNetz warn={!offline} />}
-        <span className="truncate">{text}</span>
+        <span>{text}</span>
       </div>
     </div>,
     document.body,

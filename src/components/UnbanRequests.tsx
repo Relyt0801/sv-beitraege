@@ -9,6 +9,7 @@ import { entscheide, ladeAnfragen, type UnbanRequest } from "../lib/unban";
 import { meldeFehler } from "../lib/melder";
 import { useZustimmungen } from "../lib/zustimmung";
 import { ZustimmungsMarke } from "./ZustimmungsMarke";
+import { Icon } from "./Icon";
 /** Entbannungsanfragen – erscheinen für die Moderation oben in den Events. */
 export function UnbanRequests({ onAnzahl }: { onAnzahl?: (n: number) => void } = {}) {
   const { can, profiles, uid, isStaff } = useRole();
@@ -50,49 +51,41 @@ export function UnbanRequests({ onAnzahl }: { onAnzahl?: (n: number) => void } =
     return st ? `${st.vorname} ${st.nachname}` : p?.username || "Unbekannt";
   };
 
+  async function entscheiden(r: UnbanRequest, entsperren: boolean) {
+    setBusy(r.id);
+    const res = await entscheide(r, entsperren);
+    setBusy(null);
+    if (!res.ok) meldeFehler(entsperren && res.error?.startsWith("Deine Zustimmung") ? res.error : "Fehler: " + res.error);
+    if (entsperren) void zu.laden();
+    laden();
+  }
+
   return (
-    <div id="sprung-entsperren" className="mb-4 grid gap-2.5">
+    <div id="sprung-entsperren" className="grid gap-2.5 lg:col-span-2 lg:grid-cols-2">
       {liste.map((r) => (
-        <div key={r.id} className="card border-amber-300 p-4 dark:border-amber-500/40">
-          <div className="flex items-start gap-2">
-            <span className="text-lg">🔓</span>
-            <div className="min-w-0 flex-1">
-              <div className="text-[15px] font-bold">Entbannungsanfrage {nameVon(r.user_id)}</div>
-              <div className="mt-0.5 text-[13px] text-tinte-matt dark:text-slate-300">{r.nachricht}</div>
-              <div className="mt-1 text-[11px] text-tinte-leise">
-                {new Date(r.created_at).toLocaleString("de-DE")}
+        // Eine Zelle je Anfrage; Schloss-Symbol statt Emoji
+        <div key={r.id} className="gruppe-zellen">
+          <div className="px-4 py-3.5">
+            <div className="flex items-start gap-3">
+              <span aria-hidden className="symbol bg-[#E8590C]">
+                <Icon name="schluessel" size={17} strich={2.2} />
+              </span>
+              <div className="min-w-0 flex-1">
+                <div className="text-[15px] font-semibold leading-snug">{nameVon(r.user_id)}</div>
+                <div className="text-[12.5px] text-tinte-leise">möchte entsperrt werden</div>
+                {r.nachricht && <div className="mt-1 text-[14px] leading-snug text-tinte-matt dark:text-slate-300 [overflow-wrap:anywhere]">{r.nachricht}</div>}
+                <div className="mt-1 text-[12px] text-tinte-leise">{new Date(r.created_at).toLocaleString("de-DE")}</div>
+                <ZustimmungsMarke className="mt-1.5" zahl={zu.zahl(r.id)} noetig={zu.noetig} ichSchon={zu.ichSchon(r.id)} />
               </div>
-              <ZustimmungsMarke className="mt-1.5" zahl={zu.zahl(r.id)} noetig={zu.noetig} ichSchon={zu.ichSchon(r.id)} />
             </div>
-          </div>
-          <div className="mt-3 flex gap-2">
-            <button
-              disabled={busy === r.id}
-              onClick={async () => {
-                setBusy(r.id);
-                const res = await entscheide(r, false);
-                setBusy(null);
-                if (!res.ok) meldeFehler("Fehler: " + res.error);
-                laden();
-              }}
-              className="flex-1 rounded-xl border border-papier-linie py-2 text-sm font-bold text-tinte-matt dark:border-slate-700"
-            >
-              Ablehnen
-            </button>
-            <button
-              disabled={busy === r.id}
-              onClick={async () => {
-                setBusy(r.id);
-                const res = await entscheide(r, true);
-                setBusy(null);
-                if (!res.ok) meldeFehler(res.error?.startsWith("Deine Zustimmung") ? res.error : "Fehler: " + res.error);
-                void zu.laden();
-                laden();
-              }}
-              className="flex-1 rounded-xl bg-emerald-500 py-2 text-sm font-bold text-white"
-            >
-              Entsperren
-            </button>
+            <div className="mt-3 flex gap-2">
+              <button disabled={busy === r.id} onClick={() => void entscheiden(r, false)} className="btn-klein-grau flex-1">
+                Ablehnen
+              </button>
+              <button disabled={busy === r.id} onClick={() => void entscheiden(r, true)} className="btn-klein flex-1">
+                Entsperren
+              </button>
+            </div>
           </div>
         </div>
       ))}

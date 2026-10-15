@@ -15,7 +15,7 @@ export function Kuerzel({ text, auf = false, klein = false }: { text: string; au
   return (
     <span
       className={`mr-1 inline-flex items-center justify-center rounded font-zahl font-extrabold uppercase leading-none tracking-tight ${
-        klein ? "min-w-[1.35rem] px-1 py-[3px] text-[9px]" : "min-w-[1.6rem] px-1 py-[3px] text-[10px]"
+        klein ? "min-w-[1.4rem] px-1 py-[3px] text-[12px]" : "min-w-[1.6rem] px-1.5 py-[3px] text-[12px]"
       } ${auf ? "bg-white/25 text-white" : "bg-tinte/85 text-white dark:bg-slate-200 dark:text-slate-900"}`}
     >
       {text}
@@ -37,7 +37,7 @@ export function KuerzelLeiste({ liste, max = 3, klein = false }: { liste: Termin
         <Kuerzel key={k} text={k} klein={klein} />
       ))}
       {kuerzel.length > max && (
-        <span className="text-[10px] font-bold text-tinte-leise">+{kuerzel.length - max}</span>
+        <span className="text-[12px] font-bold text-tinte-leise">+{kuerzel.length - max}</span>
       )}
     </span>
   );
@@ -55,7 +55,7 @@ export function chipKlasse(t: Termin, meins: boolean, status: SchichtStatus = nu
   if (status === "eingeteilt") return "bg-emerald-600 text-white dark:bg-emerald-600";
   if (status === "nicht")
     return "border border-dashed border-tinte-leise/60 bg-transparent text-tinte-leise opacity-60 dark:border-slate-500 dark:text-slate-400";
-  const grund = meins ? "bg-brand text-white" : farbeVon(t)?.chip ?? "bg-papier-matt text-tinte-matt dark:bg-slate-800 dark:text-slate-300";
+  const grund = meins ? "bg-brand text-white" : farbeVon(t)?.chip ?? "bg-[rgb(118_118_128/0.14)] text-tinte-matt dark:bg-[rgb(118_118_128/0.28)] dark:text-slate-200";
   return status === "gemeldet" ? `${grund} ring-1 ring-inset ring-brand/70` : grund;
 }
 
@@ -80,17 +80,17 @@ export function schichtVorzeichen(status: SchichtStatus): string {
  */
 export function SchichtSchild({ status, klein = false }: { status: SchichtStatus; klein?: boolean }) {
   if (!status) return null;
-  const groesse = klein ? "px-2 py-0.5 text-[10px]" : "px-2.5 py-1 text-[11px]";
+  const groesse = klein ? "px-2 py-0.5 text-[12px]" : "px-2.5 py-1 text-[12px]";
   if (status === "eingeteilt")
     return (
       <span className={`inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-600 font-bold text-white shadow-sm ${groesse}`}>
-        <Haken /> deine Schicht
+        <Haken /> Eingeteilt
       </span>
     );
   if (status === "gemeldet")
     return (
       <span className={`shrink-0 whitespace-nowrap rounded-full border border-brand/50 font-bold text-brand ${groesse}`}>
-        ⏳ gemeldet
+        ⏳ angemeldet
       </span>
     );
   return (
@@ -120,12 +120,12 @@ function Haken() {
 /** Kleine Erklärung im Kalender – nur, wenn man überhaupt Schichten hat. */
 export function SchichtLegende() {
   return (
-    <div className="mb-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-tinte-matt dark:text-slate-300">
+    <div className="mb-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-tinte-matt dark:text-slate-300">
       <span className="inline-flex items-center gap-1.5">
-        <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-emerald-500/30" aria-hidden /> Schicht bekommen
+        <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-emerald-500/30" aria-hidden /> Eingeteilt
       </span>
       <span className="inline-flex items-center gap-1.5">
-        <span className="h-2.5 w-2.5 rounded-full ring-1 ring-inset ring-brand" aria-hidden /> gemeldet, wartet
+        <span className="h-2.5 w-2.5 rounded-full ring-1 ring-inset ring-brand" aria-hidden /> angemeldet, wartet
       </span>
       <span className="inline-flex items-center gap-1.5 opacity-70">
         <span className="h-2.5 w-2.5 rounded-full border border-dashed border-tinte-leise" aria-hidden /> nicht bekommen

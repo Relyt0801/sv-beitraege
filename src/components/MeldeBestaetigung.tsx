@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { useEscapeSchliesst } from "./Sheet";
+import { scrollSperren } from "../lib/scrollsperre";
 
 /**
  * Bestätigung nach „eintragen“ bei einer Schicht – aufgebaut wie ein
@@ -37,6 +39,14 @@ export function MeldeBestaetigung({
     return () => {
       aktiv = false;
     };
+  }, [auftrag]);
+
+  // Escape schließt – aber erst, wenn „Du bist gemeldet“ da ist (während des
+  // Meldens soll nichts abgebrochen wirken). Die Seite dahinter bleibt stehen.
+  useEscapeSchliesst(Boolean(auftrag) && fertig, onFertig);
+  useEffect(() => {
+    if (!auftrag) return;
+    return scrollSperren();
   }, [auftrag]);
 
   if (!auftrag) return null;
@@ -88,7 +98,7 @@ export function MeldeBestaetigung({
         </div>
 
         <div className="mt-4 text-[1.3rem] font-bold tracking-[-0.02em]">
-          {fertig ? "Du bist gemeldet" : "Wird gemeldet …"}
+          {fertig ? "Du bist angemeldet" : "Wird angemeldet …"}
         </div>
         <div className="mt-0.5 text-[14px] text-tinte-matt dark:text-slate-400">
           {titel}

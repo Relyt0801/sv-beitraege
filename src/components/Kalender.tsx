@@ -93,24 +93,31 @@ export function Kalender({
   // Nach links wischen = weiter, nach rechts = zurück (Monat, Woche, Tag)
   const { handler: wischen, zug } = useWischen(weiter);
 
+  /** „12.–18. Oktober“ bzw. „29. Sep. – 5. Okt.“ – kurz genug für schmale Handys. */
+  function wochenTitel(mo: Date): string {
+    const so = new Date(mo.getFullYear(), mo.getMonth(), mo.getDate() + 6);
+    if (mo.getMonth() === so.getMonth()) return `${mo.getDate()}.–${so.getDate()}. ${MONATE[so.getMonth()]}`;
+    return `${mo.getDate()}. ${MONATE[mo.getMonth()].slice(0, 3)}. – ${so.getDate()}. ${MONATE[so.getMonth()].slice(0, 3)}.`;
+  }
+
   const titel =
     ansicht === "monat"
       ? monatLang(anker)
       : ansicht === "woche"
-        ? `Woche ab ${ausKey(montagVon(anker)).getDate()}. ${MONATE[ausKey(montagVon(anker)).getMonth()]}`
+        ? wochenTitel(ausKey(montagVon(anker)))
         : tagLang(anker);
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-papier dark:bg-slate-950">
       {/* ------------------------------------------------ Kopfzeile */}
-      <header className="shrink-0 border-b border-papier-linie bg-white px-3 pt-[calc(env(safe-area-inset-top)+0.6rem)] dark:border-slate-800 dark:bg-slate-900 sm:px-5">
+      <header className="shrink-0 border-b border-black/[0.08] bg-[rgb(var(--zelle))] px-3 pt-[calc(env(safe-area-inset-top)+0.6rem)] dark:border-white/[0.1] sm:px-5">
         <div className="mx-auto flex max-w-5xl items-center gap-2 pb-2.5">
           <button className="iconbtn shrink-0" onClick={onSchliessen} aria-label="Kalender schließen">
             ✕
           </button>
           <div className="min-w-0 flex-1">
             <div className="truncate font-zahl text-[1.25rem] font-extrabold tracking-[-0.02em]">{titel}</div>
-            <div className="truncate text-[11px] text-tinte-leise">{ANSICHT_LANG[ansicht]} · Termine der Stufe</div>
+            <div className="truncate text-[12px] text-tinte-leise">{ANSICHT_LANG[ansicht]} · Termine der Stufe</div>
           </div>
           <button
             onClick={() => weiter(-1)}
@@ -147,7 +154,7 @@ export function Kalender({
           </div>
           <button
             onClick={() => setAnker(heute)}
-            className="btn-klein-grau ml-auto shrink-0 !min-h-[2rem] !px-3 !text-[13px]"
+            className="btn-klein-grau ml-auto shrink-0 !px-3"
           >
             Heute
           </button>
@@ -155,11 +162,12 @@ export function Kalender({
             <button
               onClick={() => onNeu!(anker)}
               aria-label="Termin eintragen"
-              className="btn-klein shrink-0 !min-h-[2rem] gap-1 whitespace-nowrap !px-3 !text-[13px]"
+              className="btn-klein shrink-0 gap-1 whitespace-nowrap !px-3"
             >
-              {/* Auf schmalen Handys (iPhone SE) nur das Plus – sonst fällt der
-                  Knopf rechts aus dem Bild. */}
-              ＋<span className="hidden min-[380px]:inline">Termin</span>
+              {/* Beschriftung bleibt auch auf schmalen Handys – ein „＋“ allein
+                  sagt nicht, was es tut. Dafür sind die Abstände knapp. */}
+              <Icon name="plus" size={14} strich={2.6} />
+              Termin
             </button>
           )}
         </div>
@@ -180,7 +188,7 @@ export function Kalender({
           {kalenderDemo && (
             <button
               onClick={() => setSyncOffen(true)}
-              className="mb-2.5 flex w-full items-center gap-2 rounded-xl border border-dashed border-brand/40 px-3 py-2 text-left text-[12px] font-semibold text-brand-dark transition active:scale-[0.99] dark:text-brand-soft"
+              className="mb-2.5 flex min-h-[44px] w-full items-center gap-2 rounded-xl bg-brand/10 px-3 py-2 text-left text-[13px] font-semibold text-brand-dark transition active:scale-[0.99] dark:bg-brand/20 dark:text-brand-soft"
             >
               <span aria-hidden>📱⇄</span>
               <span className="min-w-0 flex-1 truncate">
@@ -188,7 +196,7 @@ export function Kalender({
                   ? `Kalender verbunden · eigene Termine gestrichelt`
                   : "Stufen-Termine ins Handy übernehmen"}
               </span>
-              <span className="shrink-0 rounded-full bg-brand/10 px-2 py-0.5 text-[10px] font-bold">Test</span>
+              <span className="shrink-0 rounded-full bg-brand/15 px-2 py-0.5 text-[12px] font-bold">Test</span>
             </button>
           )}
           {hatSchichten && <SchichtLegende />}
@@ -263,7 +271,7 @@ function MonatsAnsicht({
     <div>
       <div className="mb-1 grid grid-cols-7 gap-1 sm:gap-1.5">
         {WOCHENTAGE.map((w) => (
-          <div key={w} className="text-center text-[11px] font-bold uppercase tracking-[0.04em] text-tinte-leise">
+          <div key={w} className="text-center text-[12px] font-bold uppercase tracking-[0.04em] text-tinte-leise">
             {w}
           </div>
         ))}
@@ -290,16 +298,16 @@ function MonatsAnsicht({
                   key={k}
                   onClick={() => onTag(k)}
                   aria-label={`${tagLang(k)}${ferien ? `, ${ferien.titel}` : ""}${alle.length ? `, ${alle.length} Termine` : ""}`}
-                  className={`flex min-h-[4.25rem] min-w-0 flex-col gap-0.5 rounded-xl border p-1 sm:p-1.5 text-left transition active:scale-[.98] sm:min-h-[6.5rem] sm:p-2 ${
+                  className={`flex min-h-[5rem] min-w-0 flex-col gap-0.5 rounded-xl p-1 text-left transition active:scale-[.98] sm:min-h-[7.5rem] sm:p-2 ${
                     istHeute
-                      ? `border-brand ${ferien ? band : "bg-brand/5 dark:bg-brand/10"}`
+                      ? `ring-2 ring-inset ring-brand ${ferien ? band : "zelle"}`
                       : ferien
-                        ? `border-transparent ${band}`
-                        : "border-papier-linie bg-white hover:bg-papier-matt dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
+                        ? band
+                        : "zelle"
                   } ${imMonat ? "" : "opacity-40"}`}
                 >
                   <span
-                    className={`zahl text-[12px] font-bold leading-none sm:text-[13px] ${
+                    className={`zahl text-[13px] font-bold leading-none sm:text-[14px] ${
                       istHeute ? "text-brand" : ""
                     }`}
                   >
@@ -313,7 +321,7 @@ function MonatsAnsicht({
                     {liste.slice(0, klausuren.length ? 1 : 2).map((t) => (
                       <span
                         key={t.id}
-                        className={`block min-w-0 overflow-hidden whitespace-nowrap rounded-[4px] px-[3px] py-[2px] text-[9px] font-semibold leading-[1.1] ${chipKlasse(t, meins(t), st(t))}`}
+                        className={`block min-w-0 overflow-hidden whitespace-nowrap rounded-[4px] px-[3px] py-[2px] text-[12px] font-semibold leading-[1.1] ${chipKlasse(t, meins(t), st(t))}`}
                       >
                         {st(t) === "eingeteilt" && <span className="mr-[1px] font-extrabold">✓</span>}
                         {t.icon && <span className="mr-[1px]">{t.icon}</span>}
@@ -321,14 +329,14 @@ function MonatsAnsicht({
                       </span>
                     ))}
                     {liste.length > (klausuren.length ? 1 : 2) && (
-                      <span className="px-[2px] text-[9px] font-bold leading-none text-tinte-leise">
+                      <span className="px-[2px] text-[12px] font-bold leading-none text-tinte-leise">
                         +{liste.length - (klausuren.length ? 1 : 2)}
                       </span>
                     )}
                   </span>
                   <span className="hidden min-w-0 flex-1 flex-col gap-0.5 overflow-hidden sm:flex">
                     {ferienName && (
-                      <span className="truncate text-[10px] font-bold leading-tight text-tinte-matt dark:text-slate-200">
+                      <span className="truncate text-[12px] font-bold leading-tight text-tinte-matt dark:text-slate-200">
                         {ferien?.icon && !istKlausur(ferien) ? `${ferien.icon} ` : ""}
                         {ferienName}
                       </span>
@@ -337,7 +345,7 @@ function MonatsAnsicht({
                     {liste.slice(0, platz).map((t) => (
                       <span
                         key={t.id}
-                        className={`truncate rounded px-1 py-0.5 text-[10px] font-semibold leading-tight ${chipKlasse(t, meins(t), st(t))}`}
+                        className={`truncate rounded px-1 py-0.5 text-[12px] font-semibold leading-tight ${chipKlasse(t, meins(t), st(t))}`}
                       >
                         {schichtVorzeichen(st(t))}
                         {t.icon ? `${t.icon} ` : t.von ? `${uhr(t.von)} ` : ""}
@@ -345,7 +353,7 @@ function MonatsAnsicht({
                       </span>
                     ))}
                     {liste.length > platz && (
-                      <span className="px-1 text-[10px] font-semibold text-tinte-leise">
+                      <span className="px-1 text-[12px] font-semibold text-tinte-leise">
                         +{liste.length - platz} weitere
                       </span>
                     )}
@@ -363,17 +371,18 @@ function MonatsAnsicht({
 /** Handy-Monat: die Klausur-Kürzel eines Tages in einer winzigen Zeile. */
 function MiniKuerzel({ liste }: { liste: Termin[] }) {
   const kuerzel = [...new Set(liste.map((t) => (t.icon || "").toUpperCase()).filter(Boolean))];
+  // In der schmalen Handy-Zelle passt bei 12 px Schrift nur ein Kürzel; der Rest als „+n“
   return (
     <span className="flex min-w-0 items-center gap-[2px] overflow-hidden">
-      {kuerzel.slice(0, 2).map((k) => (
+      {kuerzel.slice(0, 1).map((k) => (
         <span
           key={k}
-          className="shrink-0 rounded-[3px] bg-tinte/85 px-[2px] py-[2px] font-zahl text-[8px] font-extrabold uppercase leading-none text-white dark:bg-slate-200 dark:text-slate-900"
+          className="shrink-0 rounded-[3px] bg-tinte/85 px-[3px] py-[2px] font-zahl text-[12px] font-extrabold uppercase leading-none text-white dark:bg-slate-200 dark:text-slate-900"
         >
           {k}
         </span>
       ))}
-      {kuerzel.length > 2 && <span className="text-[8px] font-bold leading-none text-tinte-leise">+{kuerzel.length - 2}</span>}
+      {kuerzel.length > 1 && <span className="text-[12px] font-bold leading-none text-tinte-leise">+{kuerzel.length - 1}</span>}
     </span>
   );
 }
@@ -409,34 +418,34 @@ function WochenAnsicht({
         return (
           <div
             key={k}
-            className={`flex min-w-0 gap-2 rounded-xl border p-2 lg:flex-col ${
+            className={`flex min-w-0 gap-2 rounded-xl p-2 lg:flex-col ${
               istHeute
-                ? `border-brand ${ferien ? farbeVon(ferien)?.band ?? "bg-emerald-200/60 dark:bg-emerald-500/20" : "bg-brand/5 dark:bg-brand/10"}`
+                ? `ring-2 ring-inset ring-brand ${ferien ? farbeVon(ferien)?.band ?? "bg-emerald-200/60 dark:bg-emerald-500/20" : "zelle"}`
                 : ferien
-                  ? `border-transparent ${farbeVon(ferien)?.band ?? "bg-emerald-200/60 dark:bg-emerald-500/20"}`
-                  : "border-papier-linie bg-white dark:border-slate-800 dark:bg-slate-900"
+                  ? farbeVon(ferien)?.band ?? "bg-emerald-200/60 dark:bg-emerald-500/20"
+                  : "zelle"
             }`}
           >
             <button
               onClick={() => onTag(k)}
               className="flex w-14 shrink-0 items-baseline gap-1.5 text-left lg:mb-1.5 lg:w-auto lg:flex-col lg:gap-0"
             >
-              <span className="text-[11px] font-bold uppercase tracking-[0.04em] text-tinte-leise">
+              <span className="text-[12px] font-bold uppercase tracking-[0.04em] text-tinte-leise">
                 {WOCHENTAGE[(d.getDay() + 6) % 7]}
               </span>
-              <span className={`zahl text-[15px] font-bold leading-none ${istHeute ? "text-brand" : ""}`}>
+              <span className={`zahl text-[16px] font-bold leading-none ${istHeute ? "text-brand-dark dark:text-brand" : ""}`}>
                 {d.getDate()}.
               </span>
             </button>
 
             {liste.length === 0 && klausuren.length === 0 && !ferien ? (
-              <span className="flex-1 self-center text-[11px] text-tinte-leise lg:py-2 lg:text-center">–</span>
+              <span className="flex-1 self-center text-[13px] text-tinte-leise lg:py-2 lg:text-center">–</span>
             ) : (
               <div className="flex min-w-0 flex-1 flex-col gap-1">
                 {ferien && (
                   <button
                     onClick={() => onOeffnen(ferien)}
-                    className="min-w-0 truncate text-left text-[11px] font-bold text-tinte-matt dark:text-slate-200"
+                    className="min-h-[24px] min-w-0 truncate text-left text-[13px] font-bold text-tinte-matt dark:text-slate-200"
                   >
                     {ferien.icon && !istKlausur(ferien) ? `${ferien.icon} ` : ""}
                     {ferien.titel}
@@ -449,22 +458,22 @@ function WochenAnsicht({
                   <button
                     key={t.id}
                     onClick={() => onOeffnen(t)}
-                    className={`min-w-0 rounded-lg px-1.5 py-1 text-left transition active:scale-[.98] ${chipKlasse(t, meins(t), st(t))}`}
+                    className={`min-h-[44px] min-w-0 rounded-lg px-2 py-1.5 text-left transition active:scale-[.98] ${chipKlasse(t, meins(t), st(t))}`}
                   >
-                    <span className="block truncate text-[11px] font-bold leading-tight">
+                    <span className="block truncate text-[13px] font-bold leading-tight">
                       {schichtVorzeichen(st(t))}
                       {t.privat ? "📱 " : <Zeichen icon={t.icon} auf={meins(t) || st(t) === "eingeteilt"} klein />}
                       {t.titel}
                     </span>
                     <span
-                      className={`block truncate text-[10px] ${
-                        (meins(t) && st(t) !== "nicht") || st(t) === "eingeteilt" ? "text-white/90" : "opacity-75"
+                      className={`block truncate text-[12px] ${
+                        (meins(t) && st(t) !== "nicht") || st(t) === "eingeteilt" ? "text-white" : "opacity-80"
                       }`}
                     >
                       {[
                         t.von ? zeitText(t) : "ganztägig",
                         t.ort,
-                        st(t) === "eingeteilt" ? "deine Schicht" : st(t) === "nicht" ? "nicht bekommen" : "",
+                        st(t) === "eingeteilt" ? "eingeteilt" : st(t) === "nicht" ? "nicht bekommen" : "",
                       ].filter(Boolean).join(" · ")}
                     </span>
                   </button>
@@ -495,12 +504,12 @@ function TagesAnsicht({
   return (
     <div className="mx-auto max-w-2xl">
       {mehrtaegig.length > 0 && (
-        <p className="mb-2 text-[11px] text-tinte-leise">
+        <p className="mb-2 text-[12px] text-tinte-leise">
           Mehrtägige Termine stehen an jedem Tag, an dem sie laufen.
         </p>
       )}
       {liste.length === 0 ? (
-        <div className="card p-10 text-center text-sm text-tinte-leise">
+        <div className="card p-10 text-center text-[15px] text-tinte-leise">
           An diesem Tag steht nichts an.
         </div>
       ) : (
@@ -533,7 +542,7 @@ function TagesAnsicht({
                 >
                   {t.von ? uhr(t.von) : "ganztägig"}
                   {t.von && t.bis && (
-                    <span className="block text-[11px] font-semibold text-tinte-leise">bis {uhr(t.bis)}</span>
+                    <span className="block text-[12px] font-semibold text-tinte-leise">bis {uhr(t.bis)}</span>
                   )}
                 </span>
                 <span className="min-w-0 flex-1">
@@ -549,7 +558,7 @@ function TagesAnsicht({
                     )}
                     {t.titel}
                   </span>
-                  <span className="mt-0.5 block text-[12px] text-tinte-matt">
+                  <span className="mt-0.5 block text-[13px] text-tinte-matt dark:text-slate-300">
                     {[
                       t.ort,
                       t.privat
@@ -569,13 +578,13 @@ function TagesAnsicht({
                     </span>
                   )}
                   {t.beschreibung && (
-                    <span className="mt-1 block line-clamp-2 text-[12px] leading-relaxed text-tinte-leise">
+                    <span className="mt-1 block line-clamp-2 text-[13px] leading-relaxed text-tinte-leise">
                       {t.beschreibung}
                     </span>
                   )}
                 </span>
                 {!st(t) && meins(t) && (
-                  <span className="shrink-0 rounded-full bg-brand/10 px-2 py-0.5 text-[10px] font-bold text-brand dark:bg-brand/20">
+                  <span className="shrink-0 rounded-full bg-brand/10 px-2 py-0.5 text-[12px] font-bold text-brand-dark dark:bg-brand/20 dark:text-brand">
                     für dich
                   </span>
                 )}
@@ -598,17 +607,17 @@ function KlausurKarte({ liste, onOeffnen }: { liste: Termin[]; onOeffnen: (t: Te
   }
   const beginn = liste.map((t) => uhr(t.von)).filter(Boolean).sort()[0];
   return (
-    <div className="min-w-0 rounded-lg bg-papier-matt px-1.5 py-1 dark:bg-slate-800">
-      <span className="mb-0.5 block text-[10px] font-bold text-tinte-leise">
+    <div className="min-w-0 rounded-lg bg-[rgb(118_118_128/0.12)] px-2 py-1.5 dark:bg-[rgb(118_118_128/0.24)]">
+      <span className="mb-1 block text-[12px] font-bold text-tinte-leise">
         {liste.length === 1 ? "Klausur" : `${liste.length} Klausuren`}
         {beginn ? ` · ab ${beginn}` : ""}
       </span>
-      <span className="flex flex-wrap gap-0.5">
+      <span className="flex flex-wrap gap-1">
         {[...je.entries()].map(([k, t]) => (
           <button
             key={k}
             onClick={() => onOeffnen(t)}
-            className="rounded bg-tinte/85 px-1 py-[3px] font-zahl text-[10px] font-extrabold leading-none text-white transition active:scale-95 dark:bg-slate-200 dark:text-slate-900"
+            className="min-h-[28px] rounded bg-tinte/85 px-2 py-1 font-zahl text-[12px] font-extrabold leading-none text-white transition active:scale-95 dark:bg-slate-200 dark:text-slate-900"
             aria-label={t.titel}
             title={`${t.titel} · ${zeitText(t)}`}
           >

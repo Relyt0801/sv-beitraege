@@ -66,7 +66,7 @@ export function KinderSheet({
   return (
     <Sheet open onClose={onClose}>
       <SheetKopf
-        titel="Kinder zuordnen"
+        titel="Kinder verknüpfen"
         unter={<>Elternzugang <span className="font-semibold text-tinte dark:text-slate-100">{profil.username}</span></>}
         onClose={onClose}
       />
@@ -160,7 +160,7 @@ export function KinderSheet({
           </div>
         </>
       ) : (
-        <p className="px-1 text-[13px] text-tinte-leise">Kinder zuordnen darf nur der Admin.</p>
+        <p className="px-1 text-[13px] text-tinte-leise">Kinder verknüpfen darf nur der Admin.</p>
       )}
     </Sheet>
   );

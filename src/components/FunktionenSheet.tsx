@@ -91,7 +91,7 @@ export function FunktionenSheet({ open, onClose }: { open: boolean; onClose: () 
   const links: Record<FunktionKey, { l: string; f: Fenster; darf: boolean }[]> = {
     abiball: [],
     album: [{ l: "Steckbrief-Kategorien", f: "steckbrief", darf: Boolean(album) && can("album.kategorien") }],
-    zitate: [{ l: "Lehrerliste", f: "lehrer", darf: can("lehrer.verwalten") }],
+    zitate: [{ l: "Lehrkräfte", f: "lehrer", darf: can("lehrer.verwalten") }],
     rankings: [{ l: "Ranking-Kategorien & Lehrer", f: "rankings", darf: can("rankings.verwalten") || can("lehrer.verwalten") }],
     spotify: [],
     motto: [],
@@ -103,13 +103,14 @@ export function FunktionenSheet({ open, onClose }: { open: boolean; onClose: () 
   return (
     <>
       <Sheet open={open && !fenster} onClose={onClose}>
-        <SheetKopf titel="Funktionen" unter="Nach Thema sortiert. Antippen klappt auf: an/aus, wer es nutzen darf, Wortfilter und Einstellungen." onClose={onClose} />
+        <SheetKopf titel="Funktionen" unter="Pro Funktion ein Schalter: an oder aus für alle. Darunter, wer sie nutzen darf." onClose={onClose} />
         <div className="space-y-2.5">
           {sichtbareThemen.map((t) => {
             const anZahl = t.funktionen.filter((k) => an[k]).length;
             return (
-              <details key={t.titel} className="card group overflow-hidden" open={sichtbareThemen.length === 1}>
-                <summary className="flex min-h-[56px] cursor-pointer list-none items-center gap-3 px-4 py-3 [&::-webkit-details-marker]:hidden">
+              <details key={t.titel} className="group" open={sichtbareThemen.length === 1}>
+                {/* Thema als Zeile (weiß auf grau); aufklappen zeigt je Funktion eine Gruppe */}
+                <summary className="gruppe-zellen flex min-h-[56px] cursor-pointer list-none items-center gap-3 px-4 py-2 [&::-webkit-details-marker]:hidden [&>*::before]:!hidden">
                   <span className="min-w-0 flex-1">
                     <span className="block text-[16px] font-semibold">{t.titel}</span>
                     <span className="block text-[12.5px] text-tinte-leise">{t.text}</span>
@@ -121,7 +122,7 @@ export function FunktionenSheet({ open, onClose }: { open: boolean; onClose: () 
                     <Icon name="chevron" size={16} />
                   </span>
                 </summary>
-                <div className="divide-y divide-black/[0.06] border-t border-black/[0.06] dark:divide-white/[0.08] dark:border-white/[0.08]">
+                <div className="mt-2.5 space-y-3">
                   {t.funktionen.map((k) => {
                     const f = FUNKTIONEN.find((x) => x.key === k)!;
                     const perm = NUTZEN[k];
@@ -130,13 +131,14 @@ export function FunktionenSheet({ open, onClose }: { open: boolean; onClose: () 
                     const verwalten = links[k].filter((x) => x.darf);
                     const sym = SYMBOL[k];
                     return (
-                      <div key={k} className="px-4 py-3">
-                        <label className="flex items-center gap-3">
+                      <div key={k} className="gruppe-zellen">
+                        {/* EIN Hauptschalter je Funktion: an oder aus für alle */}
+                        <label className="flex min-h-[56px] cursor-pointer items-center gap-3 px-4 py-2">
                           <span aria-hidden className={`symbol ${sym.farbe}`}>
                             <Icon name={sym.icon} size={17} strich={2.2} />
                           </span>
                           <span className="min-w-0 flex-1">
-                            <span className="block text-[15px] font-semibold">{f.titel}</span>
+                            <span className="block text-[16px] font-semibold leading-snug">{f.titel}</span>
                             <span className="block text-[12.5px] leading-snug text-tinte-leise">{f.text}</span>
                           </span>
                           <Schalter
@@ -149,31 +151,31 @@ export function FunktionenSheet({ open, onClose }: { open: boolean; onClose: () 
                             }}
                           />
                         </label>
-                        {(perm || WF[k].length > 0 || verwalten.length > 0) && (
-                          <div className="ml-[42px] mt-2 space-y-2">
-                            {perm && (
-                              <div className="flex min-h-[36px] items-center gap-3">
-                                <span className="min-w-0 flex-1 text-[13px] leading-snug">
-                                  <span className="font-semibold">Nutzen dürfen: </span>
-                                  <span className="text-tinte-matt dark:text-slate-300">
-                                    {alleDa ? "alle Schüler und das Team" : wer.length ? wer.map(rolleName).join(", ") : "nur Admin"}
-                                  </span>
-                                </span>
-                                {can("perms.manage") && <Schalter an={alleDa} label={`${f.titel}: alle Schüler und das Team`} onChange={(v) => void fuerAlle(perm, v)} />}
-                              </div>
+                        {/* Unterpunkte eingerückt unter dem Hauptschalter. Der Zustand
+                            steht einmal – im Schalter und im Text darunter, nicht doppelt. */}
+                        {perm && (
+                          <label className="flex min-h-[52px] items-center gap-3 py-2 pl-[58px] pr-4">
+                            <span className="min-w-0 flex-1">
+                              <span className="block text-[15px] leading-snug">Alle dürfen sie nutzen</span>
+                              <span className="block text-[12.5px] leading-snug text-tinte-leise">
+                                {alleDa ? "Alle Schüler und das Team" : wer.length ? `Nur ${wer.map(rolleName).join(", ")}` : "Nur Admin"}
+                              </span>
+                            </span>
+                            {can("perms.manage") && (
+                              <Schalter an={alleDa} label={`${f.titel}: alle Schüler und das Team dürfen nutzen`} onChange={(v) => void fuerAlle(perm, v)} />
                             )}
-                            {WF[k].map((b) => (
-                              <WortfilterSchalter key={b} bereich={b} kompakt />
+                          </label>
+                        )}
+                        {WF[k].map((b) => (
+                          <WortfilterSchalter key={b} bereich={b} zeile className="!pl-[58px]" />
+                        ))}
+                        {verwalten.length > 0 && (
+                          <div className="flex flex-wrap gap-2 py-2.5 pl-[58px] pr-4">
+                            {verwalten.map((x) => (
+                              <button key={x.l} onClick={() => setFenster(x.f)} className="btn-klein-grau">
+                                {x.l}
+                              </button>
                             ))}
-                            {verwalten.length > 0 && (
-                              <div className="flex flex-wrap gap-2">
-                                {verwalten.map((x) => (
-                                  <button key={x.l} onClick={() => setFenster(x.f)} className="btn-klein-grau !min-h-[2rem] !px-3 !text-[13px]">
-                                    {x.l}
-                                  </button>
-                                ))}
-                              </div>
-                            )}
                           </div>
                         )}
                       </div>
@@ -184,14 +186,14 @@ export function FunktionenSheet({ open, onClose }: { open: boolean; onClose: () 
             );
           })}
         </div>
-        <p className="mt-3 px-1 text-[12px] leading-snug text-tinte-leise">
-          Ausgeschaltetes sehen nur, wer es schalten darf (mit Hinweis). Einzelne Bereiche lassen sich Komitees geben: Rollen &amp; Rechte → Rechte → Komitee-Rechte.
+        <p className="mt-3 px-4 text-[13px] leading-snug text-tinte-leise">
+          Ausgeschaltetes sehen nur, wer es schalten darf (mit Hinweis). Einzelne Bereiche lassen sich auch Komitees geben: Rollen &amp; Rechte → Rechte → Komitee-Rechte.
         </p>
       </Sheet>
 
       {album && <KategorienSheet open={open && fenster === "steckbrief"} album={album} onClose={() => setFenster(null)} />}
       <Sheet open={open && fenster === "lehrer"} onClose={() => setFenster(null)}>
-        <SheetKopf titel="Lehrerliste" unter="Zum Auswählen bei Zitaten und im Lehrer-Ranking." onClose={() => setFenster(null)} />
+        <SheetKopf titel="Lehrkräfte" unter="Zum Auswählen bei Zitaten und im Lehrer-Ranking." onClose={() => setFenster(null)} />
         <LehrerListe aktiv={open && fenster === "lehrer"} />
       </Sheet>
       <RankingVerwaltungSheet open={open && fenster === "rankings"} onClose={() => setFenster(null)} />

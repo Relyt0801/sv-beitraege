@@ -124,7 +124,7 @@ export function ProtokollSheet({
 
       {/* ---------------- Sicherung ---------------- */}
       <div className={`mb-5 ${kasten}`}>
-        <div className="mb-1 text-sm font-bold">🗄️ Speicherstände</div>
+        <div className="mb-1 text-sm font-bold">Speicherstände</div>
         <p className="mb-3 text-[12.5px] leading-relaxed text-tinte-matt">
           Jede Nacht um 0:00 Uhr sichert sich der Stand von Personen, Beiträgen, Kassenbuch,
           Komitees und Rechten von selbst.{" "}
@@ -186,8 +186,8 @@ export function ProtokollSheet({
         </div>
 
         {/* Die Datei enthält Namen, Beiträge und die Bankverbindung. Das muss dastehen. */}
-        <p className="mt-2.5 text-[11.5px] leading-relaxed text-tinte-leise">
-          ⚠️ In der Datei stehen Namen, Zahlungsstände und die Bankverbindung der Stufenkasse.
+        <p className="mt-2.5 text-[12px] leading-relaxed text-tinte-leise">
+          In der Datei stehen Namen, Zahlungsstände und die Bankverbindung der Stufenkasse.
           Sie gehört nicht in eine Cloud, einen Chat oder auf einen fremden Rechner.
         </p>
 
@@ -285,7 +285,7 @@ export function ProtokollSheet({
       {!nurSicherung && (
         <>
           <div className="mb-2 flex items-center gap-2">
-            <span className="text-sm font-bold">📋 Was geändert wurde</span>
+            <span className="text-sm font-bold">Was geändert wurde</span>
             <button
               disabled={!zeilen.length}
               onClick={() => protokollAlsCsv(zeilen)}
@@ -336,7 +336,7 @@ export function ProtokollSheet({
             </button>
           )}
 
-          <p className="mt-3 text-[11.5px] leading-relaxed text-tinte-leise">
+          <p className="mt-3 text-[12px] leading-relaxed text-tinte-leise">
             Das Protokoll schreibt die Datenbank selbst. Es lässt sich von niemandem ändern oder löschen –
             auch nicht von dir. Einträge, die älter als zwei Jahre sind, verschwinden von allein.
           </p>
@@ -364,10 +364,10 @@ function ProtokollZeile({ z }: { z: LogZeile }) {
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline gap-2">
           <span className="min-w-0 flex-1 truncate text-[14.5px] font-semibold">{name || "—"}</span>
-          <span className="zahl shrink-0 text-[11.5px] text-tinte-leise">{wann}</span>
+          <span className="zahl shrink-0 text-[12px] text-tinte-leise">{wann}</span>
         </div>
         <div className="truncate text-[13.5px] text-tinte-matt dark:text-slate-300">{was}</div>
-        <div className="truncate text-[11.5px] text-tinte-leise">von {z.akteur_name || "System"}</div>
+        <div className="truncate text-[12px] text-tinte-leise">von {z.akteur_name || "System"}</div>
       </div>
     </div>
   );

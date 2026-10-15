@@ -60,7 +60,7 @@ export function PostenBereiche({ d, fin }: { d: FinanzUebersicht; fin?: Finanzen
     <>
       <section className="card p-5">
         <BereichKopf titel="Aktionen, Beiträge und Sonstiges" onNeu={fin ? () => setNeu(true) : undefined} neuText="Kategorie" />
-        <ul className="grid gap-1.5">
+        <ul className="divide-y divide-papier-linie dark:divide-slate-800">
           <PostenZeile
             hex={farbHex("blau", dunkel)}
             name="Elternbeiträge"
@@ -137,7 +137,7 @@ function BereichKopf({ titel, onNeu, neuText = "Neu" }: { titel: string; onNeu?:
           type="button"
           onClick={onNeu}
           aria-label={`${neuText} anlegen`}
-          className="flex shrink-0 items-center gap-1 rounded-full bg-brand/10 px-3 py-1.5 text-[13px] font-bold text-brand active:scale-95 dark:bg-brand/20 dark:text-blue-300"
+          className="btn-klein shrink-0 gap-1"
         >
           <Icon name="plus" size={14} strich={2.4} />
           {neuText}
@@ -170,7 +170,7 @@ function PostenZeile({
       <button
         type="button"
         onClick={onClick}
-        className="flex w-full items-center gap-3 rounded-xl bg-papier-matt px-3 py-2.5 text-left transition active:scale-[.98] dark:bg-slate-800"
+        className="flex min-h-[52px] w-full items-center gap-3 py-2 text-left transition active:opacity-60"
       >
         <Punkt hex={hex} />
         <span className="min-w-0 flex-1">
@@ -209,7 +209,7 @@ function BeitraegeDetail({ open, d, onClose }: { open: boolean; d: FinanzUebersi
   return (
     <Sheet open={open} onClose={onClose}>
       <Kopf hex={farbHex("blau", dunkel)} titel="Elternbeiträge" onClose={onClose} />
-      <div className="rounded-2xl bg-papier-matt p-4 dark:bg-slate-800">
+      <div className="rounded-2xl border border-papier-linie p-4 dark:border-slate-700">
         <ul className="grid gap-2.5">
           {PHASEN.map((k) => {
             const c = d.beitraege.find((b) => b.phase === k)?.cent ?? 0;
@@ -280,7 +280,7 @@ function PostenDetail({
         onClose={onClose}
         rechts={
           umbenennbar && !bearbeiten ? (
-            <button type="button" onClick={() => setBearbeiten(true)} className="ml-auto shrink-0 rounded-full px-2.5 py-1 text-[13px] font-bold text-brand">
+            <button type="button" onClick={() => setBearbeiten(true)} className="ml-auto min-h-[44px] shrink-0 rounded-full px-3 text-[14px] font-bold text-brand">
               Ändern
             </button>
           ) : null
@@ -290,7 +290,7 @@ function PostenDetail({
       {bearbeiten && fin && <Bearbeiten p={x} fin={fin} onFertig={() => setBearbeiten(false)} onUmgezogen={onUmgezogen} onGeloescht={onClose} />}
 
       {/* Die Rechnung: Einnahmen − Ausgaben = Gewinn */}
-      <div className="rounded-2xl bg-papier-matt p-4 dark:bg-slate-800">
+      <div className="rounded-2xl border border-papier-linie p-4 dark:border-slate-700">
         <Balken ein={x.ein_cent} aus={x.aus_cent} hex={hex} />
         <dl className="mt-3 grid gap-1.5 text-[15px]">
           <div className="flex items-baseline gap-3">
@@ -314,7 +314,7 @@ function PostenDetail({
             <button
               type="button"
               onClick={() => start("ein")}
-              className="flex min-h-[3rem] items-center justify-center gap-1.5 rounded-full bg-bezahlt/[0.12] text-[15px] font-semibold text-bezahlt active:scale-[.97]"
+              className="flex min-h-[3rem] items-center justify-center gap-1.5 rounded-full bg-[#1E7B34] text-[15px] font-semibold text-white active:scale-[.97]"
             >
               <Icon name="plus" size={16} strich={2.4} />
               Einnahme
@@ -324,7 +324,7 @@ function PostenDetail({
             <button
               type="button"
               onClick={() => start("aus")}
-              className="flex min-h-[3rem] items-center justify-center gap-1.5 rounded-full bg-red-500/[0.12] text-[15px] font-semibold text-red-600 active:scale-[.97] dark:text-red-400"
+              className="flex min-h-[3rem] items-center justify-center gap-1.5 rounded-full bg-red-600 text-[15px] font-semibold text-white active:scale-[.97]"
             >
               <span className="text-[18px] leading-none">−</span>
               Ausgabe
@@ -387,7 +387,7 @@ function Unterpunkte({ p, fin }: { p: FinanzPosten; fin: FinanzenValue | null })
                   const f = await fin.loeschen(e.buchung!.id);
                   if (f) meldeFehler("Löschen hat nicht geklappt: " + f);
                 }}
-                className="-mr-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-tinte-leise active:bg-papier-matt dark:active:bg-slate-800"
+                className="-mr-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-tinte-leise active:bg-papier-matt dark:active:bg-slate-800"
               >
                 <Icon name="muell" size={16} />
               </button>
@@ -442,10 +442,10 @@ function Bearbeiten({
       <input className="field" aria-label="Name" maxLength={40} value={name} onChange={(e) => setName(e.target.value)} />
       <FarbWahl wert={farbe} setzen={setFarbe} />
       <div className="mt-3 flex items-center gap-2">
-        <button type="button" disabled={busy} onClick={() => void speichern()} className="flex-1 rounded-xl bg-brand py-2.5 text-[14px] font-bold text-white disabled:opacity-50">
+        <button type="button" disabled={busy} onClick={() => void speichern()} className="btn-primary flex-1 disabled:opacity-50">
           {busy ? "…" : "Speichern"}
         </button>
-        <button type="button" onClick={onFertig} className="rounded-xl px-3 py-2.5 text-[14px] font-semibold text-tinte-leise">
+        <button type="button" onClick={onFertig} className="btn-grau flex-1">
           Abbrechen
         </button>
         {r.typ === "kategorie" && (
@@ -458,7 +458,7 @@ function Bearbeiten({
               if (f) return meldeFehler("Löschen hat nicht geklappt: " + f);
               onGeloescht();
             }}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-red-500"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-red-600 dark:text-red-400"
           >
             <Icon name="muell" size={18} />
           </button>
@@ -593,7 +593,7 @@ export function BuchungSheet({ start, fin, onClose }: { start: BuchungStart | nu
   }
 
   const chip = (aktiv: boolean) =>
-    `flex items-center gap-1.5 rounded-full border px-3 py-2 text-[14px] font-semibold transition active:scale-95 ${
+    `flex min-h-[44px] items-center gap-1.5 rounded-full border px-3 py-2 text-[14px] font-semibold transition active:scale-95 ${
       aktiv ? "border-brand bg-brand/10 text-tinte dark:text-white" : "border-papier-linie dark:border-slate-700"
     }`;
 
@@ -645,7 +645,7 @@ export function BuchungSheet({ start, fin, onClose }: { start: BuchungStart | nu
           <button
             type="button"
             onClick={() => { setNeuOffen(true); setNeuFarbe(freieFarbe(fin)); }}
-            className="flex items-center gap-1 rounded-full px-3 py-2 text-[14px] font-bold text-brand"
+            className="flex min-h-[44px] items-center gap-1 rounded-full px-3 py-2 text-[14px] font-bold text-brand"
           >
             <Icon name="plus" size={14} strich={2.4} />
             Neue Kategorie
@@ -657,10 +657,10 @@ export function BuchungSheet({ start, fin, onClose }: { start: BuchungStart | nu
           <input className="field" placeholder="z. B. Lehrerkarten" maxLength={40} value={neuName} autoFocus onChange={(e) => setNeuName(e.target.value)} />
           <FarbWahl wert={neuFarbe} setzen={setNeuFarbe} />
           <div className="mt-2 flex gap-2">
-            <button type="button" disabled={!neuName.trim()} onClick={() => void neueKategorie()} className="flex-1 rounded-xl bg-brand py-2 text-[14px] font-bold text-white disabled:opacity-40">
+            <button type="button" disabled={!neuName.trim()} onClick={() => void neueKategorie()} className="btn-primary flex-1 disabled:opacity-40">
               Anlegen
             </button>
-            <button type="button" onClick={() => setNeuOffen(false)} className="rounded-xl px-3 text-[14px] font-semibold text-tinte-leise">
+            <button type="button" onClick={() => setNeuOffen(false)} className="btn-grau flex-1">
               Abbrechen
             </button>
           </div>
@@ -715,7 +715,7 @@ export function FarbWahl({ wert, setzen }: { wert: string; setzen: (f: string) =
           aria-label={f.name}
           title={f.name}
           onClick={() => setzen(f.key)}
-          className={`flex h-8 w-8 items-center justify-center rounded-full text-white transition ${wert === f.key ? "ring-2 ring-tinte/70 ring-offset-2 ring-offset-white dark:ring-white/80 dark:ring-offset-slate-900" : ""}`}
+          className={`flex h-11 w-11 items-center justify-center rounded-full text-white transition ${wert === f.key ? "ring-2 ring-tinte/70 ring-offset-2 ring-offset-white dark:ring-white/80 dark:ring-offset-slate-900" : ""}`}
           style={{ background: dunkel ? f.dunkel : f.hell }}
         >
           {wert === f.key && <Icon name="haken" size={15} strich={3} />}
@@ -744,7 +744,7 @@ function GeplantKarte({ darf, fin }: { darf: boolean; fin: FinanzenValue | null 
       {sichtbar.length === 0 ? (
         <p className="text-[13px] text-tinte-leise">Gerade ist nichts geplant.</p>
       ) : (
-        <ul className="grid gap-1.5">
+        <ul className="divide-y divide-papier-linie dark:divide-slate-800">
           {sichtbar.map((g) => {
             const vorbei = Boolean(g.datum && g.datum < h);
             const d = g.datum ? new Date(g.datum + "T12:00:00") : null;
@@ -754,10 +754,10 @@ function GeplantKarte({ darf, fin }: { darf: boolean; fin: FinanzenValue | null 
                 <button
                   type="button"
                   onClick={() => setOffen(g)}
-                  className={`flex w-full items-center gap-3 rounded-xl bg-papier-matt px-3 py-2.5 text-left transition active:scale-[.98] dark:bg-slate-800 ${vorbei ? "opacity-60" : ""}`}
+                  className={`flex min-h-[52px] w-full items-center gap-3 py-2 text-left transition active:opacity-60 ${vorbei ? "opacity-60" : ""}`}
                 >
-                  <span className="flex w-11 shrink-0 flex-col items-center rounded-lg bg-white py-1 leading-none dark:bg-slate-900">
-                    <span className="text-[10px] font-bold uppercase text-red-600 dark:text-red-400">
+                  <span className="flex w-11 shrink-0 flex-col items-center rounded-lg border border-papier-linie py-1 leading-none dark:border-slate-700">
+                    <span className="text-[12px] font-bold uppercase text-red-600 dark:text-red-400">
                       {d ? d.toLocaleDateString("de-DE", { month: "short" }).replace(".", "") : "–"}
                     </span>
                     <span className="zahl mt-0.5 text-[17px] font-bold">{d ? d.getDate() : "?"}</span>
@@ -843,7 +843,7 @@ function GeplantSheet({
           onClose={onClose}
         />
         {bestehend.erwartet_cent != null && bestehend.erwartet_cent !== 0 && (
-          <div className="mb-3 flex items-baseline gap-3 rounded-2xl bg-papier-matt p-4 dark:bg-slate-800">
+          <div className="mb-3 flex items-baseline gap-3 rounded-2xl border border-papier-linie p-4 dark:border-slate-700">
             <span className="min-w-0 flex-1 text-[15px] font-semibold">Erwartet</span>
             <span className="zahl shrink-0 text-[1.4rem] font-bold">ca. {mitVorzeichen(bestehend.erwartet_cent)}</span>
           </div>
@@ -909,7 +909,7 @@ function GeplantSheet({
                 key={k.id}
                 aria-pressed={kategorie === k.id}
                 onClick={() => setKategorie(kategorie === k.id ? null : k.id)}
-                className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[13px] font-semibold ${
+                className={`flex min-h-[44px] items-center gap-1.5 rounded-full border px-3 py-1.5 text-[14px] font-semibold ${
                   kategorie === k.id ? "border-brand bg-brand/10" : "border-papier-linie dark:border-slate-700"
                 }`}
               >
@@ -934,7 +934,7 @@ function GeplantSheet({
               if (f) return meldeFehler("Löschen hat nicht geklappt: " + f);
               onClose();
             }}
-            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-red-500"
+            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-red-600 dark:text-red-400"
           >
             <Icon name="muell" size={19} />
           </button>
@@ -964,7 +964,7 @@ export function Kennzahlen({
         <Kachel icon="pfeil-raus" titel="Ausgaben" wert={mitVorzeichen(-aus, true)} />
       </dl>
       {offen && (
-        <div className="flex items-center gap-3 rounded-xl bg-papier-matt px-3 py-2.5 dark:bg-slate-800">
+        <div className="flex items-center gap-3 rounded-xl border border-papier-linie px-3 py-2.5 dark:border-slate-700">
           <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[rgb(118_118_128/0.14)] text-tinte-matt dark:text-slate-300">
             <Icon name="kalender" size={16} />
           </span>
@@ -984,7 +984,7 @@ export function Kennzahlen({
 
 function Kachel({ icon, titel, wert }: { icon: "pfeil-rein" | "pfeil-raus"; titel: string; wert: string }) {
   return (
-    <div className="min-w-0 rounded-xl bg-papier-matt px-3 py-2.5 dark:bg-slate-800">
+    <div className="min-w-0 rounded-xl border border-papier-linie px-3 py-2.5 dark:border-slate-700">
       <dt className="flex items-center gap-1 text-[12px] font-medium text-tinte-leise">
         <Icon name={icon} size={13} strich={2.2} />
         {titel}

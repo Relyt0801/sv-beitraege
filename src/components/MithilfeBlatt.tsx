@@ -1,9 +1,10 @@
 import { useMemo, useState, type ReactNode } from "react";
-import { Sheet } from "./Sheet";
+import { Sheet, SheetKopf } from "./Sheet";
+import { Icon } from "./Icon";
 import { useStore } from "../store";
 import { normalize } from "../lib/logic";
 import { heuteKey } from "../lib/termine";
-import { Gruppe, Zeile } from "./Liste";
+import { Gruppe, Zeile, ZeileHaken } from "./Liste";
 
 /**
  * Mithilfe eintragen – aufgebaut wie eine Rechnung (wie „Mithilfe nachtragen“):
@@ -67,46 +68,39 @@ export function MithilfeBlatt({
         {waehlen ? (
           /* ------------------------------------------ Auswahl der Aktion */
           <>
-            <div className="mb-2 flex items-center gap-2">
-              <button onClick={() => setWaehlen(false)} className="-ml-1 rounded-full px-2 py-1.5 text-[15px] font-semibold text-brand-dark dark:text-brand">
-                ‹ Zurück
-              </button>
-              <div className="flex-1 text-center text-[15px] font-semibold">Aktion wählen</div>
-              <span className="w-16" />
-            </div>
+            <SheetKopf titel="Aktion wählen" zurueck={{ text: "Zurück", onClick: () => setWaehlen(false) }} onClose={() => setWaehlen(false)} />
             <input
               autoFocus
               type="search"
               placeholder="Suchen"
+              aria-label="Aktion suchen"
               value={suche}
               onChange={(e) => setSuche(e.target.value)}
-              className="w-full rounded-xl bg-[rgb(118_118_128/0.12)] px-3 py-2 text-[15px] outline-none placeholder:text-tinte-leise dark:bg-[rgb(118_118_128/0.24)]"
+              className="field"
             />
-            <div className="mt-3 divide-y divide-black/[0.06] overflow-hidden rounded-2xl zelle dark:divide-white/[0.08]">
+            <Gruppe className="mt-3">
               {treffer.length === 0 && (
-                <div className="px-4 py-4 text-center text-[13px] text-tinte-leise">
+                <div className="px-4 py-4 text-center text-[14px] text-tinte-leise">
                   {vorlagen.length === 0 ? "Noch keine Aktionen – im Reiter „Beiträge“ anlegen." : "Nichts gefunden."}
                 </div>
               )}
               {treffer.map((v) => (
-                <button
+                <ZeileHaken
                   key={v.id}
+                  gewaehlt={wahl === v.id}
                   onClick={() => nimm(v.id)}
-                  className="flex min-h-[48px] w-full items-center gap-3 px-4 py-2 text-left transition active:bg-black/[0.04] dark:active:bg-white/[0.06]"
-                >
-                  <span className="min-w-0 flex-1 truncate text-[15px]">{v.titel}</span>
-                  <span className="zahl shrink-0 text-[14px] font-bold text-brand">{v.variabel ? "% frei" : `+${v.punkte} %`}</span>
-                  {wahl === v.id && <span className="text-brand">✓</span>}
-                </button>
+                  label={v.titel}
+                  rechts={<span className="zahl shrink-0 text-[14px] font-bold text-brand-dark dark:text-brand">{v.variabel ? "% frei" : `+${v.punkte} %`}</span>}
+                />
               ))}
-            </div>
+            </Gruppe>
           </>
         ) : (
           /* ------------------------------------------ Rechnung */
           <>
             <div className="flex flex-col items-center pt-1 text-center">
-              <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand text-2xl">
-                🙌
+              <span aria-hidden className="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand text-white">
+                <Icon name="rollen" size={26} strich={2} />
               </span>
               <div className="mt-2 text-[13px] font-semibold text-tinte-leise">Mithilfe eintragen</div>
               <div className="zahl mt-1 text-[2.6rem] font-extrabold leading-none tracking-[-0.03em]">
@@ -136,7 +130,7 @@ export function MithilfeBlatt({
                       autoFocus
                       aria-label="Wert in Prozent"
                       placeholder="?"
-                      className="w-16 rounded-lg bg-white px-2 py-1 text-right text-[15px] font-bold text-brand outline-none dark:bg-slate-800"
+                      className="w-16 rounded-lg bg-[rgb(118_118_128/0.12)] px-2 py-1.5 text-right text-[16px] font-bold text-brand-dark outline-none dark:bg-[rgb(118_118_128/0.24)] dark:text-brand"
                       value={wert}
                       onChange={(e) => setWert(e.target.value)}
                     />

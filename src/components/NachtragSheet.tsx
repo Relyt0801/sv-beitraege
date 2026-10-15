@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
-import { Sheet } from "./Sheet";
-import { Gruppe, Zeile } from "./Liste";
+import { Sheet, SheetKopf } from "./Sheet";
+import { Icon } from "./Icon";
+import { Gruppe, Zeile, ZeileHaken } from "./Liste";
 import { useStore } from "../store";
 import { useRole } from "../auth/RoleProvider";
 import { heuteKey, tagLang } from "../lib/termine";
@@ -102,8 +103,8 @@ export function NachtragSheet({ open, onClose }: { open: boolean; onClose: () =>
         <>
         {/* ------------------------------------------------ Kopf wie eine Rechnung */}
         <div className="flex flex-col items-center pt-1 text-center">
-          <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#34C759] text-2xl">
-            🙌
+          <span aria-hidden className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#1E7B34] text-white">
+            <Icon name="rollen" size={26} strich={2} />
           </span>
           <div className="mt-2 text-[13px] font-semibold text-tinte-leise">Mithilfe nachtragen</div>
           {fertig ? (
@@ -117,7 +118,7 @@ export function NachtragSheet({ open, onClose }: { open: boolean; onClose: () =>
                 {titel || <span className="text-tinte-leise">Wähle aus, wobei du geholfen hast</span>}
               </div>
               {(sonstiges || vorlage?.variabel) && (
-                <div className="mt-0.5 text-[12px] text-tinte-leise">Den Wert legt das Stufenteam fest.</div>
+                <div className="mt-0.5 text-[13px] text-tinte-leise">Den Wert legt das Stufenteam fest.</div>
               )}
             </>
           )}
@@ -125,7 +126,7 @@ export function NachtragSheet({ open, onClose }: { open: boolean; onClose: () =>
 
         {fertig ? (
           <div className="mt-5 grid gap-2">
-            <p className="text-center text-[13.5px] leading-relaxed text-tinte-matt dark:text-slate-300">
+            <p className="text-center text-[14px] leading-relaxed text-tinte-matt dark:text-slate-300">
               Das Stufenteam prüft deinen Antrag. Du bekommst Bescheid, sobald entschieden ist.
             </p>
             <button onClick={zuruecksetzen} className="btn-primary mt-2">
@@ -188,7 +189,7 @@ export function NachtragSheet({ open, onClose }: { open: boolean; onClose: () =>
             </Gruppe>
 
             {!ich && (
-              <p className="mt-3 text-center text-[12.5px] text-amber-700 dark:text-amber-300">
+              <p className="mt-3 text-center text-[13px] text-amber-700 dark:text-amber-300">
                 Dein Zugang ist mit keinem Eintrag in der Stufe verknüpft – frag das Stufenteam.
               </p>
             )}
@@ -198,7 +199,7 @@ export function NachtragSheet({ open, onClose }: { open: boolean; onClose: () =>
             <button disabled={!geht || sendet} onClick={() => void senden()} className="btn-primary mt-4 w-full disabled:opacity-40">
               {sendet ? "Wird gesendet …" : "Antrag senden"}
             </button>
-            <p className="mt-2 text-center text-[11.5px] text-tinte-leise">
+            <p className="mt-2 text-center text-[12px] text-tinte-leise">
               Das Stufenteam sieht deinen Namen, die Aktion, das Datum und deinen Text.
             </p>
           </>
@@ -236,42 +237,34 @@ function AktionWahl({
   onNimm: (id: string) => void;
   onZurueck: () => void;
 }) {
-  const zeile = "flex min-h-[48px] w-full items-center gap-3 px-4 py-2 text-left transition active:bg-black/[0.04] dark:active:bg-white/[0.06]";
   return (
     <>
-      <div className="mb-2 flex items-center gap-2">
-        <button onClick={onZurueck} className="-ml-1 rounded-full px-2 py-1.5 text-[15px] font-semibold text-brand-dark dark:text-brand">
-          ‹ Zurück
-        </button>
-        <div className="flex-1 text-center text-[15px] font-semibold">Aktion wählen</div>
-        <span className="w-16" />
-      </div>
+      <SheetKopf titel="Aktion wählen" zurueck={{ text: "Zurück", onClick: onZurueck }} onClose={onZurueck} />
       <input
         type="search"
         placeholder="Suchen"
+        aria-label="Aktion suchen"
         value={suche}
         onChange={(e) => setSuche(e.target.value)}
-        className="w-full rounded-xl bg-[rgb(118_118_128/0.12)] px-3 py-2 text-[15px] outline-none placeholder:text-tinte-leise dark:bg-[rgb(118_118_128/0.24)]"
+        className="field"
       />
-      <div className="mt-3 divide-y divide-black/[0.06] overflow-hidden rounded-2xl zelle dark:divide-white/[0.08]">
+      <Gruppe className="mt-3">
         {vorlagen.length === 0 && (
-          <div className="px-4 py-4 text-center text-[13px] text-tinte-leise">{leer ? "Noch keine Aktionen angelegt." : "Nichts gefunden."}</div>
+          <div className="px-4 py-4 text-center text-[14px] text-tinte-leise">{leer ? "Noch keine Aktionen angelegt." : "Nichts gefunden."}</div>
         )}
         {vorlagen.map((v) => (
-          <button key={v.id} onClick={() => onNimm(v.id)} className={zeile}>
-            <span className="min-w-0 flex-1 truncate text-[15px]">{v.titel}</span>
-            <span className="zahl w-[4.5rem] shrink-0 text-right text-[14px] font-bold text-brand">{v.variabel ? "% frei" : `+${v.punkte} %`}</span>
-            <span className={`w-4 shrink-0 text-brand ${wahl === v.id ? "" : "invisible"}`}>✓</span>
-          </button>
+          <ZeileHaken
+            key={v.id}
+            gewaehlt={wahl === v.id}
+            onClick={() => onNimm(v.id)}
+            label={v.titel}
+            rechts={<span className="zahl shrink-0 text-[14px] font-bold text-brand-dark dark:text-brand">{v.variabel ? "% frei" : `+${v.punkte} %`}</span>}
+          />
         ))}
-      </div>
-      <div className="mt-3 overflow-hidden rounded-2xl zelle">
-        <button onClick={() => onNimm(SONSTIGES)} className={zeile}>
-          <span className="min-w-0 flex-1 truncate text-[15px]">Sonstiges …</span>
-          <span className="shrink-0 text-[13px] text-tinte-leise">eigene Aktion</span>
-          <span className={`w-4 shrink-0 text-brand ${wahl === SONSTIGES ? "" : "invisible"}`}>✓</span>
-        </button>
-      </div>
+      </Gruppe>
+      <Gruppe className="mt-3">
+        <ZeileHaken gewaehlt={wahl === SONSTIGES} onClick={() => onNimm(SONSTIGES)} label="Sonstiges …" rechts={<span className="shrink-0 text-[13px] text-tinte-leise">eigene Aktion</span>} />
+      </Gruppe>
     </>
   );
 }
@@ -299,28 +292,28 @@ function Erfolg() {
 function EigeneZeile({ n, onZurueck }: { n: Nachtrag; onZurueck: () => void }) {
   const stand =
     n.status === "offen"
-      ? { text: "⏳ wird geprüft", klasse: "text-tinte-leise" }
+      ? { text: "wird geprüft", klasse: "text-tinte-leise" }
       : n.status === "angenommen"
-        ? { text: `✓ +${n.vergeben ?? n.punkte ?? 0} %`, klasse: "text-emerald-700 dark:text-emerald-300" }
+        ? { text: `✓ +${n.vergeben ?? n.punkte ?? 0} %`, klasse: "text-bezahlt" }
         : { text: "abgelehnt", klasse: "text-red-600 dark:text-red-400" };
   return (
     <div className="px-4 py-3">
       <div className="flex items-center gap-2">
-        <span className="min-w-0 flex-1 truncate text-[14.5px] font-semibold">{n.titel}</span>
+        <span className="min-w-0 flex-1 truncate text-[15px] font-semibold">{n.titel}</span>
         <span className={`shrink-0 text-[13px] font-bold ${stand.klasse}`}>{stand.text}</span>
       </div>
-      <div className="mt-0.5 flex items-center gap-2 text-[12px] text-tinte-leise">
+      <div className="mt-0.5 flex items-center gap-2 text-[13px] text-tinte-leise">
         <span className="min-w-0 flex-1 truncate">{tagLang(n.datum)}</span>
         {n.status === "offen" && (
           <button
             onClick={() => void frage("Antrag zurückziehen?", "Zurückziehen", true).then((ok) => ok && onZurueck())}
-            className="shrink-0 font-semibold text-red-600 dark:text-red-400"
+            className="-my-3 min-h-[44px] shrink-0 py-3 pl-3 font-semibold text-red-600 dark:text-red-400"
           >
             zurückziehen
           </button>
         )}
       </div>
-      {n.antwort && <div className="mt-1 text-[12.5px] italic text-tinte-matt dark:text-slate-300">„{n.antwort}“</div>}
+      {n.antwort && <div className="mt-1 text-[13px] italic text-tinte-matt dark:text-slate-300">„{n.antwort}“</div>}
     </div>
   );
 }

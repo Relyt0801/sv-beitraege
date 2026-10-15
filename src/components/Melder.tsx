@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import { createPortal } from "react-dom";
 import { melderEinhaengen, type MeldeArt } from "../lib/melder";
 import { useNetz } from "../lib/netz";
+import { useUnterkante } from "./Verbindung";
 
 /**
  * Zeichnet Meldungen und Rückfragen selbst, statt die Fenster des Browsers zu
@@ -36,14 +37,21 @@ export function MelderProvider({ children }: { children: ReactNode }) {
   const [warteschlange, setWarteschlange] = useState<Rueckfrage[]>([]);
   const naechsteId = useRef(1);
   const rueckfrage = warteschlange[0] ?? null;
-  // Steht oben das Offline-Band (components/Verbindung.tsx), rücken die
-  // Meldungen darunter – sonst lägen beide Kapseln übereinander.
+  // Steht unten das Offline-Band (components/Verbindung.tsx), rücken die
+  // Meldungen darüber – sonst lägen beide Kapseln übereinander.
   const netz = useNetz();
   const bandDa = netz.zustand !== "online" || netz.wieder;
+  // Meldungen stehen UNTEN knapp über der Reiterleiste (im Vollbild-Chat über
+  // der Eingabe), nicht oben: Oben lagen sie auf der Kopfleiste und deckten
+  // Nachtragen, Hell/Dunkel und Profil zu. Entscheidung (U3): unten, weil
+  // (1) dort die Daumen und die eben gedrückte Schaltfläche sind, (2) keine
+  // Navigation verdeckt wird und (3) Meldung und Offline-Kapsel am selben Ort
+  // wohnen. Zusätzlich lassen die Meldungen alle Tipps durch.
+  const unten = useUnterkante(toasts.length > 0);
 
   const zeigeToast = useCallback((text: string, art: MeldeArt) => {
     const id = naechsteId.current++;
-    setToasts((v) => [...v.filter((t) => t.text !== text).slice(-2), { id, text, art }]);
+    setToasts((v) => [...v.filter((t) => t.text !== text).slice(-3), { id, text, art }]);
     // Fehler bleiben länger stehen – die will man wirklich lesen.
     const dauer = art === "fehler" ? 7000 : 3500;
     setTimeout(() => setToasts((v) => v.filter((t) => t.id !== id)), dauer);
@@ -92,21 +100,22 @@ export function MelderProvider({ children }: { children: ReactNode }) {
         <>
           {toasts.length > 0 && (
             <div
-              className={`pointer-events-none fixed inset-x-0 z-[85] flex flex-col items-center gap-2 px-4 transition-[top] duration-300 ease-ios ${
-                bandDa ? "top-[calc(env(safe-area-inset-top)+3.25rem)]" : "top-[calc(env(safe-area-inset-top)+0.75rem)]"
-              }`}
+              className="pointer-events-none fixed inset-x-0 z-[85] flex justify-center px-4 transition-[bottom] duration-300 ease-ios"
+              style={{ bottom: bandDa ? `calc(${unten} + 46px)` : unten }}
               role="status"
               aria-live="polite"
             >
-              {toasts.map((t) => (
-                <div
-                  key={t.id}
-                  className="pointer-events-auto flex max-w-md animate-aufsteigen items-start gap-2.5 rounded-[1.25rem] bg-[#1c1c1e]/90 px-4 py-3 text-[14px] font-semibold leading-snug text-white shadow-2xl backdrop-blur-xl"
-                >
-                  <span className={`mt-[5px] h-2 w-2 shrink-0 rounded-full ${PUNKT[t.art]}`} />
-                  <span className="min-w-0 whitespace-pre-line break-words">{t.text}</span>
-                </div>
-              ))}
+              {/* Mehrere gleichzeitige Meldungen stehen in EINER Kapsel (je Zeile
+                  eine, mit eigenem Punkt), statt sich zu stapeln und die Seite
+                  zu verdecken. Gleiche Texte werden schon in zeigeToast zusammengelegt. */}
+              <div className="flex max-w-md animate-aufsteigen flex-col divide-y divide-white/10 rounded-[1.25rem] bg-[#1c1c1e]/95 px-4 py-1 text-[14px] font-semibold leading-snug text-white shadow-2xl backdrop-blur-xl">
+                {toasts.map((t) => (
+                  <div key={t.id} className="flex items-start gap-2.5 py-2">
+                    <span className={`mt-[5px] h-2 w-2 shrink-0 rounded-full ${PUNKT[t.art]}`} />
+                    <span className="min-w-0 whitespace-pre-line break-words">{t.text}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 

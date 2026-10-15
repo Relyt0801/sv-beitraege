@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
 import { Sheet, SheetKopf } from "./Sheet";
 import { Gruppe } from "./Liste";
+import { Icon } from "./Icon";
+import { FussLeiste } from "./Kachel";
+import { melde } from "../lib/melder";
 import type { Gewinner, GewinnerArt } from "../lib/teile";
 
 /**
@@ -111,6 +114,7 @@ export function KuerenBlatt({
   onKueren,
   onZuruecknehmen,
   hinweis,
+  onFertig,
 }: {
   open: boolean;
   onClose: () => void;
@@ -118,10 +122,16 @@ export function KuerenBlatt({
   kandidaten: Kandidat[];
   gewinner: Gewinner | null;
   herzen: Gewinner | null;
-  onKueren: (art: GewinnerArt, k: Kandidat) => Promise<boolean>;
+  /** leise = true: keine eigene Meldung zeigen – das Blatt meldet am Ende EINMAL für alles */
+  onKueren: (art: GewinnerArt, k: Kandidat, leise: boolean) => Promise<boolean>;
   onZuruecknehmen: (art: GewinnerArt) => Promise<void>;
   /** z. B. „Das Motto wird danach allen gezeigt – auch Eltern.“ */
   hinweis?: string;
+  /**
+   * Nach einem erfolgreichen Küren (Blatt ist dann schon zu): Hier schließt der
+   * Aufrufer das Einstellungsblatt dahinter und zeigt die Gewinner-Bühne.
+   */
+  onFertig?: () => void;
 }) {
   const [g, setG] = useState<string | null>(null);
   const [h, setH] = useState<string | null>(null);
@@ -137,12 +147,31 @@ export function KuerenBlatt({
     setBusy(true);
     const kg = kandidaten.find((k) => k.id === g);
     const kh = kandidaten.find((k) => k.id === h);
-    if (kg && kg.id !== gewinner?.ziel_id) await onKueren("gewinner", kg);
-    if (!kg && gewinner) await onZuruecknehmen("gewinner");
-    if (kh && kh.id !== herzen?.ziel_id) await onKueren("herzen", kh);
-    if (!kh && herzen) await onZuruecknehmen("herzen");
+    let neuG = false;
+    let neuH = false;
+    let geaendert = false;
+    if (kg && kg.id !== gewinner?.ziel_id) {
+      neuG = await onKueren("gewinner", kg, true);
+      // Schlägt etwas fehl, zeigt der Aufrufer den Fehler – das Blatt bleibt offen
+      if (!neuG) return setBusy(false);
+    }
+    if (!kg && gewinner) {
+      await onZuruecknehmen("gewinner");
+      geaendert = true;
+    }
+    if (kh && kh.id !== herzen?.ziel_id) {
+      neuH = await onKueren("herzen", kh, true);
+      if (!neuH) return setBusy(false);
+    }
+    if (!kh && herzen) {
+      await onZuruecknehmen("herzen");
+      geaendert = true;
+    }
     setBusy(false);
+    // Eine einzige Meldung (vorher kamen zwei übereinander)
+    if (neuG || neuH) melde(neuG && neuH ? "Gewinner und Gewinner der Herzen gekürt" : neuH ? "Gewinner der Herzen gekürt" : "Gewinner gekürt", "erfolg");
     onClose();
+    if (neuG || neuH || geaendert) onFertig?.();
   }
 
   const zeile = (k: Kandidat, wahl: string | null, setWahl: (id: string | null) => void, farbe: string, platz: number) => {
@@ -162,11 +191,11 @@ export function KuerenBlatt({
         </span>
         {k.stimmen != null && <span className="zahl shrink-0 text-[13px] text-tinte-leise">{k.stimmen}</span>}
         <span
-          className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[13px] text-white transition ${
+          className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-white transition ${
             an ? farbe : "border-[1.5px] border-black/20 dark:border-white/25"
           }`}
         >
-          {an ? "✓" : ""}
+          {an && <Icon name="haken" size={14} strich={3} />}
         </span>
       </button>
     );
@@ -174,7 +203,7 @@ export function KuerenBlatt({
 
   return (
     <Sheet open={open} onClose={onClose}>
-      <SheetKopf titel={titel} unter="Das Ergebnis erscheint danach groß oben im Bereich." onClose={onClose} />
+      <SheetKopf titel={titel} unter="Danach steht der Gewinner groß oben – für alle sichtbar." onClose={onClose} />
       {kandidaten.length === 0 ? (
         <p className="py-8 text-center text-[14px] text-tinte-leise">Noch nichts zum Küren – erst abstimmen lassen.</p>
       ) : (
@@ -186,9 +215,12 @@ export function KuerenBlatt({
             {kandidaten.filter((k) => k.id !== g).map((k, i) => zeile(k, h, setH, "bg-[#FF4F7B]", i + 1))}
           </Gruppe>
           {hinweis && <p className="mt-4 px-1 text-[13px] leading-snug text-tinte-leise">{hinweis}</p>}
-          <button className="btn-primary mt-5" disabled={busy} onClick={() => void speichern()}>
-            Küren
-          </button>
+          {/* Fußknopf immer sichtbar – vorher musste man bis ans Ende der Liste scrollen */}
+          <FussLeiste>
+            <button className="btn-primary" disabled={busy} onClick={() => void speichern()}>
+              {busy ? "Wird gekürt …" : gewinner || herzen ? "Änderung speichern" : "Küren"}
+            </button>
+          </FussLeiste>
         </>
       )}
     </Sheet>

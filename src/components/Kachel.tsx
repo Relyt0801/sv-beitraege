@@ -1,5 +1,71 @@
-import type { ReactNode } from "react";
+import type { KeyboardEvent, MouseEvent, ReactNode } from "react";
 import { Icon, type IconName } from "./Icon";
+import { useRole } from "../auth/RoleProvider";
+
+/**
+ * Macht eine ganze Karte antippbar (Startseite: Motto, Zitate, Rankings, Album).
+ * Gibt die Eigenschaften zurück, die auf das Karten-Element gehören:
+ * role=button, Tastatur (Enter/Leertaste) und der Klick. Knöpfe, Links und
+ * Eingaben IN der Karte behalten ihre eigene Wirkung – ein Tipp darauf löst
+ * nicht zusätzlich die Karte aus.
+ */
+export function karteKlick(onClick?: () => void, label?: string) {
+  if (!onClick) return {};
+  return {
+    role: "button" as const,
+    tabIndex: 0,
+    "aria-label": label,
+    onClick: (e: MouseEvent<HTMLElement>) => {
+      const ziel = (e.target as HTMLElement).closest("button, a, input, select, textarea");
+      if (ziel && ziel !== e.currentTarget) return;
+      onClick();
+    },
+    onKeyDown: (e: KeyboardEvent<HTMLElement>) => {
+      if (e.target !== e.currentTarget) return;
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        onClick();
+      }
+    },
+  };
+}
+
+/** Rückmeldung für antippbare Karten: leicht einsinken, Fokusring für die Tastatur */
+export const KARTE_KLICK_KLASSE =
+  "cursor-pointer transition duration-200 ease-ios active:scale-[.985] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:ring-offset-2 focus-visible:ring-offset-papier";
+
+/**
+ * Feste Fußleiste am Ende eines Blatts („Runde starten“, „Küren“, „Anlegen“):
+ * bleibt am unteren Rand sichtbar, auch wenn die Liste darüber lang ist, und
+ * reicht bis an den Rand des Blatts (das Blatt hat unten 1,5 rem Polster plus
+ * Home-Indikator – die Leiste zieht sich darüber, damit nichts durchscheint).
+ */
+export function FussLeiste({ children, className = "" }: { children: ReactNode; className?: string }) {
+  return (
+    <div
+      className={`sticky bottom-0 z-10 -mx-5 -mb-[calc(env(safe-area-inset-bottom)+1.5rem)] mt-4 bg-papier/95 px-5 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-3 shadow-[0_-10px_14px_-12px_rgba(0,0,0,.18)] backdrop-blur dark:bg-slate-900/95 ${className}`}
+    >
+      {children}
+    </div>
+  );
+}
+
+/**
+ * Hinweis für das Stufenteam, wenn es in diesem Bereich nichts einstellen darf:
+ * statt einfach kein Zahnrad zu sehen, steht da, wer es verwaltet. Die Angabe
+ * gilt für die Startwerte (Rechte → Komitee-Rechte) und ist darum vorsichtig
+ * formuliert. Alle anderen Rollen sehen nichts.
+ */
+export function VerwaltetVon({ bereich, komitee, darf, className = "" }: { bereich: string; komitee: string; darf: boolean; className?: string }) {
+  const { role } = useRole();
+  const team = role === "stufenteam" || role === "sprecher" || role === "stv_sprecher" || role === "kassenwart";
+  if (darf || !team) return null;
+  return (
+    <p className={`mt-5 px-4 text-center text-[12.5px] leading-snug text-tinte-leise ${className}`}>
+      {bereich} verwaltet in der Regel das Komitee „{komitee}“. Fragen dazu am besten dort stellen.
+    </p>
+  );
+}
 
 /**
  * Karte für einen Bereich auf der Startseite (Abi-Album, Motto, Zitate,
@@ -91,6 +157,8 @@ export function FarbKarte({
   children,
   knoepfe,
   className = "",
+  onClick,
+  label,
 }: {
   /** z. B. "from-[#FF375F] to-[#E0164A]" – beide Töne derselben Farbe */
   verlauf: string;
@@ -104,9 +172,16 @@ export function FarbKarte({
   children?: ReactNode;
   knoepfe?: ReactNode;
   className?: string;
+  /** Ganze Karte antippbar (öffnet das Blatt); Knöpfe darin behalten ihre eigene Wirkung */
+  onClick?: () => void;
+  /** Vorlesetext für die ganze Karte, z. B. „Abimotto öffnen“ */
+  label?: string;
 }) {
   return (
-    <section className={`relative flex flex-1 flex-col overflow-hidden rounded-[1.4rem] bg-gradient-to-br p-4 text-white sm:p-5 ${verlauf} ${schatten} ${className}`}>
+    <section
+      {...karteKlick(onClick, label)}
+      className={`relative flex flex-1 flex-col overflow-hidden rounded-[1.4rem] bg-gradient-to-br p-4 text-white sm:p-5 ${verlauf} ${schatten} ${onClick ? KARTE_KLICK_KLASSE : ""} ${className}`}
+    >
       {deko && (
         <div aria-hidden className="pointer-events-none absolute right-0 top-0">
           {deko}
@@ -211,7 +286,13 @@ export function FarbKachel({
 /** Weißer Hauptknopf auf einer FarbKarte; text = Farbe der Schrift */
 export function KnopfHell({ onClick, text, children }: { onClick: () => void; text: string; children: ReactNode }) {
   return (
-    <button onClick={onClick} className={`rounded-full bg-white px-4 py-2 text-[14px] font-semibold shadow-sm transition active:scale-95 ${text}`}>
+    <button
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick();
+      }}
+      className={`inline-flex min-h-[44px] items-center rounded-full bg-white px-4 text-[14px] font-semibold shadow-sm transition active:scale-95 ${text}`}
+    >
       {children}
     </button>
   );
@@ -221,8 +302,11 @@ export function KnopfHell({ onClick, text, children }: { onClick: () => void; te
 export function KnopfGlas({ onClick, children, dunkel = false }: { onClick: () => void; children: ReactNode; dunkel?: boolean }) {
   return (
     <button
-      onClick={onClick}
-      className={`rounded-full px-4 py-2 text-[14px] font-semibold text-white transition active:scale-95 ${dunkel ? "bg-black/25" : "bg-white/20"}`}
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick();
+      }}
+      className={`inline-flex min-h-[44px] items-center rounded-full px-4 text-[14px] font-semibold text-white transition active:scale-95 ${dunkel ? "bg-black/25" : "bg-white/20"}`}
     >
       {children}
     </button>

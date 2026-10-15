@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Sheet, SheetKopf } from "./Sheet";
 import { Gruppe, Zeile, ZeileAuswahl, ZeileEingabe } from "./Liste";
+import { BlattFuss } from "./Freitext";
 import { Schalter } from "./Schalter";
 import { useRole } from "../auth/RoleProvider";
 import { useStore } from "../store";
@@ -865,7 +866,7 @@ function UmfrageEditor({
               <div className="px-3 py-2.5">
                 <div className="seg" role="radiogroup" aria-label="Art der Antwort">
                   {(["kurz", "lang", "zahl"] as TextArt[]).map((a) => (
-                    <button key={a} role="radio" aria-checked={textArt(f) === a} className={`seg-item ${textArt(f) === a ? "seg-aktiv" : ""}`} onClick={() => aendern(i, { optionen: [a] })}>
+                    <button key={a} role="radio" aria-checked={textArt(f) === a} className={`seg-item whitespace-nowrap !px-0.5 ${textArt(f) === a ? "seg-aktiv" : ""}`} onClick={() => aendern(i, { optionen: [a] })}>
                       {TEXT_ART_NAME[a]}
                     </button>
                   ))}
@@ -897,62 +898,68 @@ function UmfrageEditor({
         </Zeile>
       </Gruppe>
 
-      {fehler && <p className="mt-3 text-center text-[13px] font-medium text-tinte-leise">{fehler}</p>}
-      <div className="mt-3 flex gap-2">
-        <button
-          className="btn-grau flex-1"
-          disabled={busy || !titel.trim()}
-          onClick={async () => {
-            setBusy(true);
-            const id = await sichern();
-            setBusy(false);
-            if (id) {
-              melde("Entwurf gespeichert", "erfolg");
-              onClose();
-            }
-          }}
-        >
-          Entwurf
-        </button>
-        <button
-          className="btn-primary flex-[1.5] disabled:opacity-40"
-          disabled={busy || Boolean(fehler)}
-          onClick={async () => {
-            const ok = await fragen_(`„${titel}“ jetzt starten?\n\n${ZIEL_NAME[ziel]} sehen sie beim nächsten Öffnen der App. Danach lassen sich die Fragen nicht mehr ändern.`, "Starten");
-            if (!ok) return;
-            setBusy(true);
-            const id = await sichern();
-            const f = id ? await verwaltung.status(id, "aktiv") : "Speichern fehlgeschlagen";
-            setBusy(false);
-            if (f) return meldeFehler("Ging nicht: " + f);
-            if (benachrichtigen) {
-              const body = pflicht ? "Kurze Umfrage – öffne die App, um teilzunehmen." : "Neue Umfrage – mach gern mit.";
-              if (ziel === "team") void pushAnTeam(`📊 ${titel}`, body, "./");
-              else if (ziel !== "eltern")
-                void pushAnPersonen(students.map((s) => ({ student_id: s.id, title: `📊 ${titel}`, body })), "./", { ohneEltern: ziel === "schueler" });
-            }
-            melde("Umfrage läuft", "erfolg");
-            onClose();
-          }}
-        >
-          {busy ? "…" : "Starten"}
-        </button>
-      </div>
+      {/* Entwurf löschen: eigene rote Zeile weit weg von „Starten“, nicht als loser Text darunter */}
       {umfrage && (
-        <button
-          className="mt-4 w-full text-[15px] font-semibold text-red-600"
-          onClick={() =>
-            void fragen_("Entwurf löschen?", "Löschen", true).then(async (ok) => {
-              if (!ok) return;
-              const f = await verwaltung.loeschen(umfrage.id);
-              if (f) return meldeFehler(f);
-              onClose();
-            })
-          }
-        >
-          Entwurf löschen
-        </button>
+        <Gruppe className="mt-5">
+          <Zeile
+            rot
+            label="Entwurf löschen"
+            onClick={() =>
+              void fragen_("Entwurf löschen?", "Löschen", true).then(async (ok) => {
+                if (!ok) return;
+                const f = await verwaltung.loeschen(umfrage.id);
+                if (f) return meldeFehler(f);
+                onClose();
+              })
+            }
+          />
+        </Gruppe>
       )}
+
+      {/* Fußleiste bleibt unten im Blatt sichtbar: Hinweis, was noch fehlt, und die beiden Knöpfe */}
+      <BlattFuss>
+        {fehler && <p className="mb-2 text-center text-[13px] font-medium text-tinte-leise">{fehler}</p>}
+        <div className="flex gap-2">
+          <button
+            className="btn-grau flex-1"
+            disabled={busy || !titel.trim()}
+            onClick={async () => {
+              setBusy(true);
+              const id = await sichern();
+              setBusy(false);
+              if (id) {
+                melde("Entwurf gespeichert", "erfolg");
+                onClose();
+              }
+            }}
+          >
+            Entwurf
+          </button>
+          <button
+            className="btn-primary flex-[1.5] disabled:opacity-40"
+            disabled={busy || Boolean(fehler)}
+            onClick={async () => {
+              const ok = await fragen_(`„${titel}“ jetzt starten?\n\n${ZIEL_NAME[ziel]} sehen sie beim nächsten Öffnen der App. Danach lassen sich die Fragen nicht mehr ändern.`, "Starten");
+              if (!ok) return;
+              setBusy(true);
+              const id = await sichern();
+              const f = id ? await verwaltung.status(id, "aktiv") : "Speichern fehlgeschlagen";
+              setBusy(false);
+              if (f) return meldeFehler("Ging nicht: " + f);
+              if (benachrichtigen) {
+                const body = pflicht ? "Kurze Umfrage – öffne die App, um teilzunehmen." : "Neue Umfrage – mach gern mit.";
+                if (ziel === "team") void pushAnTeam(`📊 ${titel}`, body, "./");
+                else if (ziel !== "eltern")
+                  void pushAnPersonen(students.map((s) => ({ student_id: s.id, title: `📊 ${titel}`, body })), "./", { ohneEltern: ziel === "schueler" });
+              }
+              melde("Umfrage läuft", "erfolg");
+              onClose();
+            }}
+          >
+            {busy ? "…" : "Starten"}
+          </button>
+        </div>
+      </BlattFuss>
     </Sheet>
   );
 }
@@ -1094,8 +1101,8 @@ function ErgebnisSheet({
                         .map(([k, v]) => ({ id: k.slice(0, 100), label: f.typ === "person" ? pName[k] || "Unbekannt" : k, punkte: v }))}
                       leitet
                       gesperrt={false}
-                      startText="Stichwahl starten"
-                      wahlTitel="Stichwahl"
+                      startText="Runde starten"
+                      wahlTitel="Runde"
                     />
                   </div>
                 )}

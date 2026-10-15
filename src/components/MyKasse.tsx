@@ -61,7 +61,7 @@ export function MyKasse({
   if (!student)
     return (
       <div className="card mx-auto max-w-2xl p-6 text-center text-sm text-tinte-matt">
-        Zu deinem Konto ist noch keine Person zugeordnet.
+        Zu deinem Konto ist noch keine Person verknüpft.
         <br />
         Sag dem Stufenteam Bescheid, dann schalten sie dich frei.
       </div>
@@ -89,7 +89,7 @@ export function MyKasse({
         <div className="mt-1.5 flex flex-wrap items-baseline gap-x-3 gap-y-1">
           <span className={`leitwert ${offen > 0 ? "text-white" : "text-[#30D158]"}`}>{offen} €</span>
           <span className="text-[13px] text-white/60">
-            {offen > 0 ? `fällig bis ${settings.aktuelles_halbjahr}` : "Alles bezahlt. Danke!"}
+            {offen > 0 ? `fällig bis ${settings.aktuelles_halbjahr}` : "Aktuell ist nichts fällig. Danke!"}
           </span>
         </div>
         <div className="mt-2 text-[12px] text-white/50">
@@ -98,7 +98,7 @@ export function MyKasse({
         {/* Überweisen – falls Schüler selbst zahlen (sonst die Eltern) */}
         <button
           onClick={() => setUeberweisen(true)}
-          className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3.5 py-2 text-[13px] font-semibold text-white transition active:scale-95"
+          className="mt-3 inline-flex min-h-[44px] items-center gap-1.5 rounded-full bg-white/15 px-4 text-[14px] font-semibold text-white transition active:scale-95"
         >
           <Icon name="bank" size={15} />
           Überweisen – Kontodaten
@@ -111,7 +111,8 @@ export function MyKasse({
 
       {/* ------------------------------------------ Abi-Album (nur mit Recht) */}
       {/* Abizeitung & Co. als ruhige Kacheln: Handy untereinander, ab iPad zwei nebeneinander */}
-      <div className="grid gap-3 sm:grid-cols-2 lg:col-span-2 [&:empty]:hidden">
+      {/* data-tour: Einführung zeigt hier auf die Kacheln (Tour.tsx) */}
+      <div data-tour="kacheln" className="grid gap-3 sm:grid-cols-2 lg:col-span-2 [&:empty]:hidden">
         <AlbumKarte />
         <MottoKarte />
         <ZitateKarte />
@@ -135,7 +136,7 @@ export function MyKasse({
         </div>
         <div className="mt-1.5 flex gap-1.5">
           {HY.map((h) => (
-            <div key={h} className="zahl flex-1 basis-0 text-center text-[11px] font-semibold text-tinte-leise">
+            <div key={h} className="zahl flex-1 basis-0 text-center text-[12px] font-semibold text-tinte-leise">
               {beitragFuer(h, settings)} €
             </div>
           ))}

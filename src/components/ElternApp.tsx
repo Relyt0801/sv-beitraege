@@ -1,4 +1,5 @@
-import { MottoEnthuellung } from "./MottoEnthuellung";
+import { MottoEnthuellung, MottoFeststehend } from "./MottoEnthuellung";
+import { GlasLeiste } from "./GlasLeiste";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { SkelettKarten } from "./Skelett";
 import { HY } from "../lib/types";
@@ -138,14 +139,18 @@ export function ElternApp() {
           <div className="flex h-20 w-20 items-center justify-center rounded-[1.4rem] bg-white text-tinte-leise shadow-card dark:bg-slate-900">
             <Icon name="kind" size={38} strich={1.6} />
           </div>
-          <h1 className="mt-6 text-[1.75rem] font-bold leading-tight tracking-[-0.02em]">Noch kein Kind zugeordnet</h1>
+          <h1 className="mt-6 text-[1.75rem] font-bold leading-tight tracking-[-0.02em]">Noch kein Kind verknüpft</h1>
           <p className="mt-3 text-[16px] leading-relaxed text-tinte-matt dark:text-slate-300">
-            Sobald das Stufenteam Ihrem Zugang ein Kind zuordnet, sehen Sie hier Beiträge, Mithilfe und
+            Sobald das Stufenteam Ihren Zugang mit Ihrem Kind verknüpft, sehen Sie hier Beiträge, Mithilfe und
             Kontodaten. Das erscheint von selbst – Sie müssen nichts neu laden.
           </p>
-          <p className="mt-3 text-[14px] text-tinte-leise">
-            Dauert es länger? Bitte melden Sie sich über Ihr Kind beim Stufenteam der Stufe.
-          </p>
+          <div className="mt-5 w-full rounded-2xl zelle p-4 text-left">
+            <div className="text-[15px] font-semibold">Dauert es länger?</div>
+            <p className="mt-1 text-[14px] leading-relaxed text-tinte-matt dark:text-slate-300">
+              Ihr Kind kann dem Stufenteam in der App Bescheid geben. Sie können das Stufenteam auch direkt
+              ansprechen, zum Beispiel am Elternabend oder über die Schule.
+            </p>
+          </div>
         </div>
         <div className="mx-auto grid w-full max-w-sm gap-2">
           <button className="btn-grau" onClick={() => setProfilOffen(true)}>
@@ -192,28 +197,13 @@ export function ElternApp() {
         </div>
 
         {/* Am Rechner: schwebende Reiterleiste oben, auf dem Handy unten. */}
-        <nav className="glas mx-auto mt-3 hidden w-fit items-center gap-0.5 rounded-full border border-black/[0.06] p-1 shadow-glas dark:border-white/10 lg:flex">
-          {NAV.map((n) => (
-            <button
-              key={n.key}
-              data-tour={`tab-${n.key}`}
-              onClick={() => setReiter(n.key)}
-              aria-current={reiter === n.key ? "page" : undefined}
-              className={`relative flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[14px] font-semibold transition duration-300 ease-ios active:scale-95 ${
-                reiter === n.key
-                  ? "bg-white text-brand-dark shadow-[0_2px_8px_rgba(0,0,0,.1)] dark:bg-slate-700 dark:text-white"
-                  : "text-tinte-matt hover:text-tinte dark:text-slate-300 dark:hover:text-white"
-              }`}
-            >
-              <Icon name={n.icon} size={16} />
-              {n.label}
-              {Boolean(n.zahl) && (
-                <span className="flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#FF3B30] px-1 text-[11px] font-semibold text-white">
-                  {n.zahl}
-                </span>
-              )}
-            </button>
-          ))}
+        <nav className="glas mx-auto mt-3 hidden w-fit max-w-full rounded-full border border-black/[0.06] p-1 shadow-glas dark:border-white/10 lg:flex">
+          <GlasLeiste
+            variante="oben"
+            aktiv={reiter}
+            onWahl={setReiter}
+            reiter={NAV.map((n) => ({ key: n.key, label: n.label, badge: n.zahl, tour: `tab-${n.key}`, icon: <Icon name={n.icon} size={16} /> }))}
+          />
         </nav>
       </header>
 
@@ -235,12 +225,12 @@ export function ElternApp() {
               <section className="leitkarte sm:flex sm:items-end sm:justify-between sm:gap-6" data-tour="familie-offen">
                 <div className="min-w-0">
                   <div className="text-[13px] font-medium text-white/60">
-                    {kinder.length > 1 ? "Offen für Ihre Kinder" : "Noch offen"}
+                    {kinder.length > 1 ? "Offen für Ihre Kinder zusammen" : kinder[0] ? `Noch offen für ${kinder[0].vorname}` : "Noch offen"}
                   </div>
                   <div className="mt-1.5 flex flex-wrap items-baseline gap-x-3 gap-y-1">
                     <span className={`leitwert ${familieOffen > 0 ? "text-white" : "text-[#30D158]"}`}>{familieOffen} €</span>
                     <span className="text-[14px] text-white/60">
-                      {familieOffen > 0 ? (kinder.length > 1 ? "je Kind einzeln überweisen" : "") : "Alles bezahlt. Danke!"}
+                      {familieOffen > 0 ? (kinder.length > 1 ? "insgesamt – bitte je Kind einzeln überweisen" : "") : "Alles bezahlt. Danke!"}
                     </span>
                   </div>
                 </div>
@@ -254,6 +244,9 @@ export function ElternApp() {
                   </button>
                 )}
               </section>
+
+              {/* Feststehendes Abimotto – antippen spielt die Enthüllung noch einmal ab */}
+              <MottoFeststehend />
 
               {kinder.map((kind, i) => (
                 <KindKarte
@@ -286,30 +279,21 @@ export function ElternApp() {
         )}
       </main>
 
-      {/* Tab-Leiste wie in iOS: unten angedockt, volle Breite, deckend */}
-      <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-black/[0.08] bg-[rgb(var(--glas))] pb-[env(safe-area-inset-bottom)] dark:border-white/[0.08] lg:hidden">
-        <div className="mx-auto flex max-w-md px-1">
-          {NAV.map((n) => (
-            <button
-              key={n.key}
-              data-tour={`tab-${n.key}`}
-              onClick={() => setReiter(n.key)}
-              aria-current={reiter === n.key ? "page" : undefined}
-              className={`relative flex flex-1 flex-col items-center gap-[3px] pb-1 pt-[7px] text-[10px] font-medium transition duration-200 ease-ios active:scale-90 ${
-                reiter === n.key ? "text-brand dark:text-brand-dark" : "text-[#6E6E73] dark:text-[#A1A1A6]"
-              }`}
-            >
-              <span className="relative flex h-[24px] items-center leading-none">
-                <Icon name={n.icon} size={24} strich={reiter === n.key ? 2.2 : 1.7} />
-                {Boolean(n.zahl) && (
-                  <span className="absolute -right-3 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#FF3B30] px-1 text-[11px] font-semibold text-white ring-2 ring-[rgb(var(--glas))]">
-                    {n.zahl}
-                  </span>
-                )}
-              </span>
-              {n.label}
-            </button>
-          ))}
+      {/* Reiterleiste wie in der Schüler-App: schwebende Glas-Kapsel (GlasLeiste) */}
+      <nav className="pointer-events-none fixed inset-x-0 bottom-0 z-20 px-3 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] lg:hidden">
+        <div className="pointer-events-auto mx-auto max-w-md rounded-[2rem] border border-white/60 p-1 shadow-[0_8px_32px_-8px_rgba(0,0,0,.28),0_0_0_.5px_rgba(0,0,0,.08)] glas !bg-[rgb(var(--glas)/0.92)] dark:border-white/10 dark:shadow-[0_8px_32px_-8px_rgba(0,0,0,.8),0_0_0_.5px_rgba(255,255,255,.08)]">
+          <GlasLeiste
+            variante="unten"
+            aktiv={reiter}
+            onWahl={setReiter}
+            reiter={NAV.map((n) => ({
+              key: n.key,
+              label: n.label,
+              badge: n.zahl,
+              tour: `tab-${n.key}`,
+              icon: <Icon name={n.icon} size={24} strich={reiter === n.key ? 2.2 : 1.7} />,
+            }))}
+          />
         </div>
       </nav>
 
@@ -383,12 +367,17 @@ function KindKarte({
         </div>
         <div className="mt-1.5 flex gap-1.5">
           {HY.map((h) => (
-            <div key={h} className="zahl flex-1 basis-0 text-center text-[11px] font-medium text-tinte-leise">
+            <div key={h} className="zahl flex-1 basis-0 text-center text-[12px] font-medium text-tinte-leise">
               {beitragFuer(h, settings)} €
             </div>
           ))}
         </div>
         <HalbjahrLegende />
+        <p className="mt-3 text-[12px] leading-relaxed text-tinte-leise">
+          „erlassen“ heißt: muss nicht gezahlt werden. „später fällig“: kommt erst in einem späteren Halbjahr dran.
+          EF ist die Einführungsphase (Klasse 11), Q1 und Q2 sind die beiden Qualifikationsjahre (Klasse 12 und 13) –
+          die Zahl dahinter (.1 / .2) ist das Halbjahr.
+        </p>
       </section>
 
       {/* Abiball-Ticket: Preis, Bestellungen des Kindes, überweisen */}

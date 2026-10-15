@@ -32,7 +32,7 @@ export function StaffelKacheln({ pct, settings }: { pct: number; settings: Setti
   const grenze = bonusGrenze(a);
   return (
     <div className="mt-4">
-      <div className="mb-1.5 text-[12px] text-tinte-leise">Helferzuschuss aufs erste Ticket</div>
+      <div className="mb-1.5 text-[12px] text-tinte-leise">Aufschlag aufs 1. Ticket – je mehr Mithilfe, desto weniger</div>
       <div className={`grid gap-1 ${a.ueber100 ? "grid-cols-6" : "grid-cols-5"}`}>
         {stufen.map((stufe) => {
           const erreicht = pct >= stufe.ab;
@@ -48,7 +48,7 @@ export function StaffelKacheln({ pct, settings }: { pct: number; settings: Setti
               }`}
             >
               <div className="zahl text-[13px] font-bold leading-none">{stufe.ab} %</div>
-              <div className="zahl mt-1 text-[11px] font-medium leading-none">+{stufe.betrag} €</div>
+              <div className="zahl mt-1 text-[12px] font-medium leading-none">+{stufe.betrag} €</div>
             </div>
           );
         })}
@@ -62,14 +62,14 @@ export function StaffelKacheln({ pct, settings }: { pct: number; settings: Setti
             title={`Alle ${a.bonusSchritt} % über 100: −${a.bonusProSchritt} €, höchstens −${a.bonusMax} €`}
           >
             <div className="zahl text-[13px] font-bold leading-none">✦{grenze}</div>
-            <div className="zahl mt-1 text-[11px] font-medium leading-none">
+            <div className="zahl mt-1 text-[12px] font-medium leading-none">
               −{imBonus ? rabatt : a.bonusMax} €
             </div>
           </div>
         )}
       </div>
       {a.ueber100 && (
-        <div className="mt-1.5 text-[11.5px] text-tinte-leise">
+        <div className="mt-1.5 text-[12px] text-tinte-leise">
           ✦ Über 100 %: alle {a.bonusSchritt} % <b className="text-[#8A650A] dark:text-[#E9C460]">−{a.bonusProSchritt} €</b>, höchstens −{a.bonusMax} €
         </div>
       )}

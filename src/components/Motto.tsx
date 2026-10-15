@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Sheet, SheetKopf } from "./Sheet";
 import { Schalter } from "./Schalter";
 import { AusHinweis } from "./Funktionen";
@@ -13,13 +13,13 @@ import { frage, melde, meldeFehler } from "../lib/melder";
 import { useRunden, type Runde, type RundenStand, type KandidatEingabe } from "../lib/runden";
 import { RundenAbschnitt, RundenEinstellungen, RundenMarke, RundeStartenSheet, SichtbarkeitWahl } from "./Runden";
 import { useErgebnisSichtbarkeit } from "../lib/ergebnisse";
-import { FarbKarte, KnopfGlas, KnopfHell } from "./Kachel";
+import { FarbKarte, KnopfGlas, KnopfHell, VerwaltetVon } from "./Kachel";
 import { AutorInfo, WortfilterSchalter } from "./AutorInfo";
 import { Gruppe, Zeile, Wert } from "./Liste";
 import { Icon } from "./Icon";
 import { KachelVerwaltung } from "./KachelVerwaltung";
 import { GewinnerBuehne, GewinnerMarke, KuerenBlatt, type Kandidat } from "./Gewinner";
-import { TeilUmschalter, TeilWischer, TEIL_FARBE } from "./TeilUmschalter";
+import { TeilUmschalter, TeilWischer, TEIL_FARBE, useVerschiebenRueckfrage } from "./TeilUmschalter";
 import { TEIL_NAME, useGewinner, useTeil, useVerschiebungen, type Gewinner, type GewinnerArt, type Teil, type Verschiebung } from "../lib/teile";
 import { useWfRecht } from "../lib/wortfilter-bereiche";
 import { hasSupabase } from "../lib/supabase";
@@ -38,6 +38,8 @@ import { zeigeMottoEnthuellung } from "./MottoEnthuellung";
  *   Zahnrad      EIN Blatt „Einstellungen“ mit allen Schaltern in fester
  *                Reihenfolge: Abstimmung, Ergebnisse, Gewinner, Offiziell &
  *                Inoffiziell, Wer darf was?
+ *                „Runde steuern“ in der Stand-Karte öffnet dasselbe Blatt,
+ *                nennt es aber „Runde steuern“ und springt zur Gruppe Runden.
  *
  * Offiziell/Inoffiziell: jeder Vorschlag liegt in einem Teil (Spalte bereich).
  * Runden laufen je Teil (Runden-Gruppe = Teil). Alte Runden aus der Zeit vor
@@ -83,6 +85,22 @@ function rundeVon(teil: Teil, r: RundenStand, teilVon: Map<string, Teil>): Runde
 
 const teilKarte = (mottos: Motto[]) => new Map(mottos.map((x) => [x.id, x.bereich] as const));
 
+/**
+ * Verschieben beantragen – mit der gemeinsamen Rückfrage (Zahl der nötigen
+ * Zustimmungen, Hinweis auf Chats → Anfragen). Ohne Datenbank (Demo) wird
+ * direkt verschoben. Gibt zurück, ob der Vorschlag jetzt im anderen Teil liegt.
+ */
+function useMottoVerschieben(m: MottoWahl, vs: ReturnType<typeof useVerschiebungen>) {
+  const rueckfrage = useVerschiebenRueckfrage();
+  return async (x: Motto): Promise<boolean> => {
+    const nach: Teil = x.bereich === "offiziell" ? "inoffiziell" : "offiziell";
+    if (!(await rueckfrage(nach, x.text))) return false;
+    const fertig = await vs.beantragen(x.id, nach);
+    if (!hasSupabase) m.demoVerschieben(x.id, nach);
+    return fertig || !hasSupabase;
+  };
+}
+
 /* ====================================================================== */
 /* Karte auf der Startseite                                               */
 /* ====================================================================== */
@@ -115,15 +133,17 @@ export function MottoKarte({ className = "" }: { className?: string }) {
       <FarbKarte
         verlauf="from-[#FF9500] to-[#F26B00]"
         schatten="shadow-[0_12px_28px_-14px_rgba(242,107,0,.8)]"
+        onClick={() => oeffnen("liste")}
+        label="Abimotto öffnen"
         marke={
           runde && !gewaehlt ? (
             <span className="flex flex-wrap gap-1.5">
               <RundenMarke runde={runde} hell />
-              {runde.hm_aktiv && <span className="inline-flex items-center rounded-full bg-white/20 px-2.5 py-1 text-[12px] font-semibold">♥ Sieger der Herzen</span>}
+              {runde.hm_aktiv && <span className="inline-flex items-center rounded-full bg-white/20 px-2.5 py-1 text-[12px] font-semibold">♥ Gewinner der Herzen</span>}
             </span>
           ) : undefined
         }
-        oben={gewaehlt ? "Unser Abimotto" : runde ? "Abimotto · Engere Auswahl" : m.abstimmung ? "Abimotto · Abstimmung läuft" : "Abimotto · Vorschläge"}
+        oben={gewaehlt ? "Unser Abimotto" : runde ? `Abimotto · Runde ${runde.nr}` : m.abstimmung ? "Abimotto · Abstimmung läuft" : "Abimotto · Vorschläge"}
         titel={
           gewaehlt ? (
             <button onClick={() => oeffnen("liste")} className="text-left text-[1.45rem] font-extrabold leading-tight [overflow-wrap:anywhere]">
@@ -207,9 +227,12 @@ function MottoSheet({
   const gw = useGewinner("motto", offen);
   // m.laden ist stabil (useCallback) – der Live-Kanal wird nicht bei jedem Zeichnen neu gebaut
   const vs = useVerschiebungen("motto_vorschlaege", offen && darfVerwalten, m.laden);
+  const verschieben = useMottoVerschieben(m, vs);
 
   const [reiter, setReiter] = useState<Reiter>("vorschlaege");
   const [einstellungen, setEinstellungen] = useState(false);
+  // true = geöffnet über „Runde steuern“ (Titel „Runde steuern“, springt zur Gruppe Runden)
+  const [fokusRunde, setFokusRunde] = useState(false);
   const [kuer, setKuer] = useState<KuerStand | null>(null);
   const [starten, setStarten] = useState<null | Quelle[]>(null);
   const [bearbeite, setBearbeite] = useState<string | null>(null);
@@ -217,6 +240,18 @@ function MottoSheet({
   const schliessen = () => {
     setAnsicht(null);
     setEinstellungen(false);
+    setFokusRunde(false);
+  };
+  const einstellungenOeffnen = (fokus: boolean) => {
+    setFokusRunde(fokus);
+    setEinstellungen(true);
+  };
+  /** Nach dem Küren: Einstellungen zu, oben im Blatt steht die Gewinner-Bühne */
+  const nachKueren = () => {
+    setEinstellungen(false);
+    setFokusRunde(false);
+    setReiter("vorschlaege");
+    window.setTimeout(() => document.getElementById("motto-gewinner")?.scrollIntoView({ behavior: "smooth", block: "start" }), 380);
   };
 
   // ---------------------------------------------------------------- Stand des Teils
@@ -259,11 +294,11 @@ function MottoSheet({
       for (const k of ks) if (k.hm && k.n != null) herz.set(k.ziel_id, k.n);
       kandidaten = [
         ...sortiert(ks.filter((k) => !k.hm)).map((k) => ({ id: k.ziel_id, label: k.label, unter: k.unter || undefined, stimmen: k.n })),
-        // Honorable Mentions aus dem Sieger-der-Herzen-Voting – mit ihren Herzstimmen
+        // Herzens-Kandidaten aus dem Voting „Gewinner der Herzen“ – mit ihren Herzstimmen
         ...sortiert(ks.filter((k) => k.hm)).map((k) => ({
           id: k.ziel_id,
           label: k.label,
-          unter: `Honorable Mention${k.n != null ? ` · ${k.n} ♥` : ""}`,
+          unter: `Herzens-Kandidat${k.n != null ? ` · ${k.n} ♥` : ""}`,
           stimmen: null,
         })),
       ];
@@ -275,10 +310,10 @@ function MottoSheet({
     setKuer({ kandidaten, herz });
   };
 
-  const kueren = async (art: GewinnerArt, k: Kandidat): Promise<boolean> => {
+  const kueren = async (art: GewinnerArt, k: Kandidat, leise: boolean): Promise<boolean> => {
     const x = m.mottos.find((y) => y.id === k.id);
     const stimmen = art === "herzen" ? (kuer?.herz.get(k.id) ?? null) : (k.stimmen ?? null);
-    const ok = await gw.kueren({ gruppe: teil, art, ziel_id: k.id, label: x?.text ?? k.label, unter: x?.erklaerung ?? "", stimmen });
+    const ok = await gw.kueren({ gruppe: teil, art, ziel_id: k.id, label: x?.text ?? k.label, unter: x?.erklaerung ?? "", stimmen }, leise);
     // Mit Datenbank setzt gewinner_kueren „gewaehlt“ selbst – im Demo-Modus die App
     if (ok && !hasSupabase && teil === "offiziell" && art === "gewinner") await m.aendern(k.id, { gewaehlt: true });
     if (ok) void m.laden();
@@ -320,7 +355,7 @@ function MottoSheet({
               onClose={schliessen}
               extra={
                 <>
-                  {darfEinstellungen && <ZahnradKnopf label="Einstellungen" onClick={() => setEinstellungen(true)} />}
+                  {darfEinstellungen && <ZahnradKnopf label="Einstellungen" onClick={() => einstellungenOeffnen(false)} />}
                   {darfVorschlagen && (
                     <button
                       type="button"
@@ -341,7 +376,7 @@ function MottoSheet({
             <TeilWischer teil={teil} setTeil={setTeil}>
               {/* ------------------------------------------ Gewinner oder aktueller Stand */}
               {(gewinner || herzen) && (
-                <div className="mb-3">
+                <div className="mb-3 scroll-mt-2" id="motto-gewinner">
                   <GewinnerBuehne gewinner={gewinner} herzen={herzen} titel={teil === "offiziell" ? "Unser Abimotto" : TEIL_NAME[teil]} />
                 </div>
               )}
@@ -362,7 +397,7 @@ function MottoSheet({
                   onRundeStarten={() => setStarten(quellen)}
                   onKueren={kuerenOeffnen}
                   onErgebnis={() => setReiter("ergebnis")}
-                  onSteuern={() => setEinstellungen(true)}
+                  onSteuern={() => einstellungenOeffnen(true)}
                   onAbstimmen={(id) => {
                     // Zur Wahl-Liste (RundenAbschnitt trägt die id „runde-<id>“)
                     setReiter("vorschlaege");
@@ -394,6 +429,7 @@ function MottoSheet({
                   herzenId={herzen?.ziel_id ?? null}
                   antragZu={vs.antragZu}
                   onBearbeiten={(x) => setBearbeite(x.id)}
+                  onVerschieben={(x) => void verschieben(x)}
                   onVorschlag={darfVorschlagen ? () => setAnsicht("neu") : undefined}
                 />
               ) : (
@@ -411,6 +447,8 @@ function MottoSheet({
                 />
               )}
             </TeilWischer>
+            {/* Stufenteam ohne Recht: sagen, wer das verwaltet (statt kein Zahnrad ohne Erklärung) */}
+            <VerwaltetVon bereich="Das Abimotto" komitee="Motto & Pullis" darf={darfEinstellungen} />
           </>
         )}
       </Sheet>
@@ -418,7 +456,11 @@ function MottoSheet({
       {/* ------------------------------------------ Einstellungen (Zahnrad) */}
       <EinstellungenBlatt
         offen={offen && einstellungen}
-        onClose={() => setEinstellungen(false)}
+        fokusRunde={fokusRunde}
+        onClose={() => {
+          setEinstellungen(false);
+          setFokusRunde(false);
+        }}
         m={m}
         r={r}
         teil={teil}
@@ -463,8 +505,9 @@ function MottoSheet({
             ? "Danach sehen alle – auch Eltern – beim nächsten Öffnen die Enthüllung."
             : "Der inoffizielle Gewinner bleibt in der Stufe – keine Enthüllung, Eltern sehen ihn nie."
         }
+        onFertig={nachKueren}
       />
-      <VorschlagBlatt x={offen ? bearbeiteMotto : null} onClose={() => setBearbeite(null)} m={m} vs={vs} />
+      <VorschlagBlatt x={offen ? bearbeiteMotto : null} onClose={() => setBearbeite(null)} m={m} verschieben={verschieben} vs={vs} />
     </>
   );
 }
@@ -550,7 +593,7 @@ function StandKarte({
     text = vorn ? `Vorn liegt „${vorn.label}“. ${darfKueren ? "Jetzt das Motto küren." : "Das Komitee kürt bald das Motto."}` : "Das Komitee wertet aus und kürt bald das Motto.";
     if (darfKueren) knoepfe.push(haupt("kueren", "Gewinner küren …", onKueren));
     if (rundeZahlenDa) knoepfe.push(neben("ergebnis", "Ergebnis ansehen", onErgebnis));
-    if (darfRunden && anzahl >= 2) knoepfe.push(neben("neu", `Runde ${runde.nr + 1} starten`, onRundeStarten));
+    if (darfRunden && anzahl >= 2) knoepfe.push(neben("neu", `Nächste Runde (${runde.nr + 1}) starten`, onRundeStarten));
   } else if (m.abstimmung) {
     // Runde 1: alle liken
     const meine = m.mottos.filter((x) => x.bereich === teil && !x.ausgeblendet && m.meine(x.id, "like")).length;
@@ -606,6 +649,7 @@ function VorschlagListe({
   herzenId,
   antragZu,
   onBearbeiten,
+  onVerschieben,
   onVorschlag,
 }: {
   m: MottoWahl;
@@ -620,6 +664,7 @@ function VorschlagListe({
   herzenId: string | null;
   antragZu: (id: string) => Verschiebung | null;
   onBearbeiten: (x: Motto) => void;
+  onVerschieben: (x: Motto) => void;
   onVorschlag?: () => void;
 }) {
   // Sind die Likes sichtbar und läuft die Abstimmung, lässt sich nach Likes sortieren
@@ -671,6 +716,7 @@ function VorschlagListe({
             gewinner={x.id === gewinnerId ? "gewinner" : x.id === herzenId ? "herzen" : null}
             antrag={darfVerwalten ? antragZu(x.id) : null}
             onBearbeiten={() => onBearbeiten(x)}
+            onVerschieben={() => onVerschieben(x)}
           />
         ))}
         {sortiert.length === 0 && (
@@ -702,6 +748,7 @@ function MottoZeile({
   gewinner,
   antrag,
   onBearbeiten,
+  onVerschieben,
 }: {
   x: Motto;
   m: MottoWahl;
@@ -710,7 +757,9 @@ function MottoZeile({
   gewinner: GewinnerArt | null;
   antrag: Verschiebung | null;
   onBearbeiten: () => void;
+  onVerschieben: () => void;
 }) {
+  const nach: Teil = x.bereich === "offiziell" ? "inoffiziell" : "offiziell";
   const an = m.meine(x.id, "like");
   const tippen = async () => {
     if (gesperrt) return meldeFehler(GESPERRT_TEXT);
@@ -743,7 +792,18 @@ function MottoZeile({
           <div className="text-[16px] font-bold leading-snug [overflow-wrap:anywhere]">{x.text}</div>
           {x.erklaerung && <div className="mt-0.5 text-[13px] leading-snug text-tinte-matt dark:text-slate-300">{x.erklaerung}</div>}
           <div className="mt-1 flex items-center gap-3">
-            {m.istMeins(x.id) ? <span className="text-[11.5px] text-tinte-leise">Dein Vorschlag</span> : <MeldenKnopf onClick={() => melden("motto", x.id)} />}
+            {m.istMeins(x.id) ? (
+              <span className="text-[12px] text-tinte-leise">Dein Vorschlag</span>
+            ) : (
+              // Tippfläche größer als das Symbol, ohne die Zeile höher zu machen
+              <MeldenKnopf onClick={() => melden("motto", x.id)} className="-my-2.5 min-h-[44px] -mx-1 px-1" />
+            )}
+            {/* Verschieben sichtbar an der Zeile (nicht nur hinter „···“) – wie bei den Zitaten */}
+            {darfVerwalten && !antrag && (
+              <button type="button" onClick={onVerschieben} className={`-my-2.5 inline-flex min-h-[44px] items-center gap-1 text-[12.5px] font-semibold ${TEIL_FARBE[nach].text}`}>
+                Nach {TEIL_NAME[nach]}
+              </button>
+            )}
             {darfVerwalten && <AutorInfo art="motto" id={x.id} />}
           </div>
         </div>
@@ -769,17 +829,28 @@ function MottoZeile({
   );
 }
 
+/** Herz als Linienzeichen (gefüllt = gelikt) – ein Symbol für „Like“ im ganzen Bereich */
+function HerzZeichen({ gefuellt, size = 16 }: { gefuellt?: boolean; size?: number }) {
+  return (
+    <svg viewBox="0 0 24 24" width={size} height={size} fill={gefuellt ? "currentColor" : "none"} stroke="currentColor" strokeWidth={2.2} strokeLinejoin="round" aria-hidden>
+      <path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z" />
+    </svg>
+  );
+}
+
 function StimmKnopf({ an, zahl, onClick }: { an: boolean; zahl?: number; onClick: () => void }) {
   return (
     <button
       onClick={onClick}
       aria-pressed={an}
       aria-label={an ? "Gefällt mir – zurücknehmen" : "Gefällt mir"}
-      className={`flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-2 text-[14px] font-semibold transition active:scale-90 ${
+      className={`flex min-h-[44px] shrink-0 items-center gap-1.5 rounded-full px-3.5 text-[14px] font-semibold transition active:scale-90 ${
         an ? "bg-brand text-white shadow-[0_4px_12px_-4px_rgb(var(--brand)/.8)]" : "bg-[rgb(118_118_128/0.12)] text-tinte dark:bg-[rgb(118_118_128/0.24)] dark:text-slate-100"
       }`}
     >
-      <span className={an ? "animate-herz" : ""}>👍</span>
+      <span className={an ? "animate-herz" : ""}>
+        <HerzZeichen gefuellt={an} />
+      </span>
       {zahl !== undefined ? <span className="zahl">{zahl}</span> : an ? "Gefällt mir" : "Like"}
     </button>
   );
@@ -832,7 +903,7 @@ function ErgebnisAnsicht({
               <RangListe eintraege={wahl} />
             </Gruppe>
             {herz.length >= 2 && (
-              <Gruppe className="" titel="Sieger der Herzen" fuss={`${r.teilnehmerHerz(runde.id)} Herzstimmen`}>
+              <Gruppe className="" titel="Gewinner der Herzen" fuss={`${r.teilnehmerHerz(runde.id)} Herzstimmen`}>
                 <RangListe eintraege={herz} herz />
               </Gruppe>
             )}
@@ -912,7 +983,7 @@ function RangListe({ eintraege, herz, likes }: { eintraege: { id: string; label:
               </span>
             </span>
             <span className="zahl shrink-0 text-right text-[15px] font-bold">
-              <span className="mr-1 text-[12px] font-semibold text-tinte-leise">{likes ? "👍" : herz ? "♥" : ""}</span>
+              <span className="mr-1 inline-flex align-middle text-tinte-leise">{likes ? <HerzZeichen size={13} /> : herz ? <span className="text-[12px] font-semibold">♥</span> : null}</span>
               {e.n}
             </span>
           </div>
@@ -927,6 +998,7 @@ function RangListe({ eintraege, herz, likes }: { eintraege: { id: string; label:
 /* ====================================================================== */
 function EinstellungenBlatt({
   offen,
+  fokusRunde,
   onClose,
   m,
   r,
@@ -943,6 +1015,8 @@ function EinstellungenBlatt({
   onKueren,
 }: {
   offen: boolean;
+  /** Geöffnet über „Runde steuern“: passender Titel, springt zur Gruppe Runden */
+  fokusRunde: boolean;
   onClose: () => void;
   m: MottoWahl;
   r: RundenStand;
@@ -965,14 +1039,25 @@ function EinstellungenBlatt({
   const wfRecht = useWfRecht();
   const darfWortfilter = wfRecht("motto") || wfRecht("motto_inoffiziell");
 
+  // „Runde steuern“ → direkt zur Gruppe Runden springen (das Blatt ist lang)
+  useEffect(() => {
+    if (!offen || !fokusRunde) return;
+    const t = window.setTimeout(() => document.getElementById("motto-runden")?.scrollIntoView({ behavior: "smooth", block: "start" }), 120);
+    return () => window.clearTimeout(t);
+  }, [offen, fokusRunde]);
+
   return (
     <Sheet open={offen} onClose={onClose}>
-      <SheetKopf titel="Einstellungen" unter="Abimotto · Runden, Ergebnis und Gewinner gelten je Teil" onClose={onClose} />
+      <SheetKopf
+        titel={fokusRunde ? "Runde steuern" : "Einstellungen"}
+        unter={fokusRunde ? "Abimotto · weitere Einstellungen findest du weiter unten" : "Abimotto · Runden, Ergebnis und Gewinner gelten je Teil"}
+        onClose={onClose}
+      />
       <TeilUmschalter teil={teil} setTeil={setTeil} ohneErklaerung />
 
       {/* 1) Abstimmung – Likes für beide Teile, Runden je Teil */}
       {darfVerwalten && (
-        <Gruppe titel="Abstimmung" fuss="Gilt für beide Teile. Danach geht es mit einer engeren Auswahl (Runde 2) weiter.">
+        <Gruppe titel="Abstimmung" fuss="Gilt für beide Teile. Danach geht es mit Runde 2 weiter – einer engeren Auswahl.">
           <label className="flex min-h-[52px] items-center gap-3 px-4 py-2">
             <span className="symbol bg-[#FF375F]">
               <Icon name="herz" size={16} strich={2.2} />
@@ -995,17 +1080,19 @@ function EinstellungenBlatt({
           </label>
         </Gruppe>
       )}
-      <RundenEinstellungen
-        stand={r}
-        gruppe={rundenGruppe}
-        quellen={quellen}
-        leitet={darfRunden}
-        titel={darfVerwalten ? `Runden · ${TEIL_NAME[teil]}` : `Abstimmung · ${TEIL_NAME[teil]}`}
-        startText="Engere Auswahl starten"
-        wahlTitel="Abimotto-Wahl"
-        mitHerz
-        className={darfVerwalten ? "mt-5" : "mt-4"}
-      />
+      <div id="motto-runden" className="scroll-mt-2">
+        <RundenEinstellungen
+          stand={r}
+          gruppe={rundenGruppe}
+          quellen={quellen}
+          leitet={darfRunden}
+          titel={darfVerwalten ? `Runden · ${TEIL_NAME[teil]}` : `Abstimmung · ${TEIL_NAME[teil]}`}
+          startText="Runde starten"
+          wahlTitel="Abimotto-Wahl"
+          mitHerz
+          className={darfVerwalten ? "mt-5" : "mt-4"}
+        />
+      </div>
 
       {/* 2) Ergebnisse */}
       {darfKueren && (
@@ -1052,7 +1139,7 @@ function EinstellungenBlatt({
           </Zeile>
           {herzen && (
             <Zeile
-              label="Der Herzen"
+              label="Gewinner der Herzen"
               symbol={
                 <span className="symbol bg-[#FF4F7B]">
                   <Icon name="herz" size={16} strich={2.2} />
@@ -1078,7 +1165,7 @@ function EinstellungenBlatt({
 
       {/* 4) Offiziell & Inoffiziell */}
       {(darfWortfilter || darfVerwalten) && (
-        <Gruppe titel="Offiziell & Inoffiziell" fuss="Verschieben beantragt man am Vorschlag (···). Es braucht Zustimmungen (Profil → Freigaben → Verschieben); Admins allein reichen.">
+        <Gruppe titel="Offiziell & Inoffiziell" fuss="Verschieben beantragt man am Vorschlag („Nach Offiziell“). Es braucht Zustimmungen aus dem Team; Admins allein reichen. Offene Anträge stehen auch unter Chats → Anfragen.">
           <WortfilterSchalter zeile bereich="motto" titel="Wortfilter · Offiziell" />
           <WortfilterSchalter zeile bereich="motto_inoffiziell" titel="Wortfilter · Inoffiziell" />
           {darfVerwalten &&
@@ -1116,7 +1203,20 @@ function EinstellungenBlatt({
 /* ====================================================================== */
 /* Einen Vorschlag verwalten (···)                                        */
 /* ====================================================================== */
-function VorschlagBlatt({ x, onClose, m, vs }: { x: Motto | null; onClose: () => void; m: MottoWahl; vs: ReturnType<typeof useVerschiebungen> }) {
+function VorschlagBlatt({
+  x,
+  onClose,
+  m,
+  vs,
+  verschieben,
+}: {
+  x: Motto | null;
+  onClose: () => void;
+  m: MottoWahl;
+  vs: ReturnType<typeof useVerschiebungen>;
+  /** gemeinsame Rückfrage + Antrag (useMottoVerschieben) */
+  verschieben: (x: Motto) => Promise<boolean>;
+}) {
   const [text, setText] = useState("");
   const [erkl, setErkl] = useState("");
   const [fuer, setFuer] = useState<string | null>(null);
@@ -1191,7 +1291,7 @@ function VorschlagBlatt({ x, onClose, m, vs }: { x: Motto | null; onClose: () =>
                   {antrag.stimmen} von {antrag.noetig}
                 </Wert>
                 {!antrag.ich && (
-                  <button type="button" className="btn-klein !min-h-[2rem] !px-3 !text-[13px]" onClick={() => void vs.zustimmen(antrag.id)}>
+                  <button type="button" className="btn-klein !px-3 !text-[13px]" onClick={() => void vs.zustimmen(antrag.id)}>
                     Zustimmen
                   </button>
                 )}
@@ -1199,17 +1299,7 @@ function VorschlagBlatt({ x, onClose, m, vs }: { x: Motto | null; onClose: () =>
             ) : (
               <Zeile
                 label={<span className={TEIL_FARBE[nach].text}>Nach {TEIL_NAME[nach]} verschieben …</span>}
-                onClick={() =>
-                  void frage(`„${x.text}“ nach ${TEIL_NAME[nach]} verschieben? Das braucht Zustimmungen aus dem Komitee (Admins allein reichen).`, "Beantragen").then(
-                    async (ok) => {
-                      if (!ok) return;
-                      const fertig = await vs.beantragen(x.id, nach);
-                      // Ohne Datenbank gibt es keine Anträge – dort direkt verschieben
-                      if (!hasSupabase) m.demoVerschieben(x.id, nach);
-                      if (fertig || !hasSupabase) onClose();
-                    },
-                  )
-                }
+                onClick={() => void verschieben(x).then((fertig) => fertig && onClose())}
               />
             )}
           </Gruppe>

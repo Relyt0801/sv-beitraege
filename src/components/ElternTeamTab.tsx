@@ -9,6 +9,8 @@ import { datumLang } from "./BeitragsListe";
 
 import { frage } from "../lib/melder";
 import { ChatEbene, ChatKopf } from "./ChatBlasen";
+import { Icon } from "./Icon";
+import { Schalter } from "./Schalter";
 /**
  * Was das Stufenteam mit den Eltern zu tun hat: Infos anheften und die
  * Anfragen der Eltern beantworten. Erscheint im Reiter Chats.
@@ -57,10 +59,10 @@ export function ElternTeamTab({ glocke, nur }: { glocke?: ReactNode; nur?: "info
       {/* -------------------------------------------- Infos anheften */}
       {nur !== "gespraeche" && <section className="card p-4 sm:p-5">
         <div className="flex items-center gap-2">
-          <h2 className="min-w-0 flex-1 text-lg font-bold">Infos für die Eltern</h2>
+          <h2 className={`min-w-0 flex-1 text-lg font-bold ${nur === "infos" ? "sr-only" : ""}`}>Infos für die Eltern</h2>
           <button
             onClick={() => setNeuOffen((v) => !v)}
-            className="shrink-0 rounded-lg bg-brand px-3 py-1.5 text-sm font-bold text-white"
+            className={`${neuOffen ? "btn-klein-grau" : "btn-klein"} ml-auto shrink-0`}
           >
             {neuOffen ? "Abbrechen" : "Neue Info"}
           </button>
@@ -84,14 +86,9 @@ export function ElternTeamTab({ glocke, nur }: { glocke?: ReactNode; nur?: "info
               value={text}
               onChange={(e) => setText(e.target.value)}
             />
-            <label className="flex cursor-pointer items-center gap-2 text-[13px] text-tinte-matt">
-              <input
-                type="checkbox"
-                className="h-4 w-4 accent-brand"
-                checked={anheften}
-                onChange={(e) => setAnheften(e.target.checked)}
-              />
-              Ganz oben anheften
+            <label className="flex min-h-[44px] cursor-pointer items-center gap-3 text-[15px]">
+              <span className="min-w-0 flex-1">Ganz oben anheften</span>
+              <Schalter an={anheften} onChange={setAnheften} label="Ganz oben anheften" />
             </label>
             <button
               disabled={!titel.trim() || !text.trim() || sendet}
@@ -109,7 +106,7 @@ export function ElternTeamTab({ glocke, nur }: { glocke?: ReactNode; nur?: "info
                   setSendet(false);
                 }
               }}
-              className="rounded-xl bg-brand py-2.5 text-sm font-bold text-white disabled:opacity-40"
+              className="btn-primary disabled:opacity-40"
             >
               {sendet ? "Wird veröffentlicht …" : "Veröffentlichen"}
             </button>
@@ -127,18 +124,18 @@ export function ElternTeamTab({ glocke, nur }: { glocke?: ReactNode; nur?: "info
               >
                 <div className="min-w-0 flex-1">
                   <div className="flex items-baseline gap-1.5">
-                    {i.angeheftet && <span className="text-[12px]">📌</span>}
+                    {i.angeheftet && <span className="shrink-0 self-center text-brand-dark dark:text-brand" title="Angeheftet"><Icon name="pin" size={13} /></span>}
                     <span className="truncate text-[14px] font-bold">{i.titel}</span>
                   </div>
                   <p className="mt-0.5 line-clamp-2 text-[12px] text-tinte-matt">{i.text}</p>
-                  <span className="text-[11px] text-tinte-leise">{datumLang(i.created_at.slice(0, 10))}</span>
+                  <span className="text-[12px] text-tinte-leise">{datumLang(i.created_at.slice(0, 10))}</span>
                 </div>
                 <button
                   onClick={() => void frage(`„${i.titel}" wirklich löschen?`, "Löschen", true).then((ok) => { if (ok) void infoLoeschen(i.id); })}
-                  className="shrink-0 rounded-lg px-2 py-1.5 text-tinte-leise transition active:scale-90"
+                  className="-mr-1 -mt-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-tinte-leise transition active:scale-90"
                   aria-label="Löschen"
                 >
-                  🗑
+                  <Icon name="muell" size={18} />
                 </button>
               </li>
             ))}
@@ -149,17 +146,17 @@ export function ElternTeamTab({ glocke, nur }: { glocke?: ReactNode; nur?: "info
       {/* -------------------------------------------- Anfragen */}
       {nur !== "infos" && <section className="card p-4 sm:p-5">
         <div className="flex items-center gap-2">
-          <h2 className="min-w-0 flex-1 text-lg font-bold">
+          <h2 className={`min-w-0 flex-1 text-lg font-bold ${nur === "gespraeche" ? "sr-only" : ""}`}>
             Gespräche mit Eltern{offeneTickets.length > 0 && ` (${offeneTickets.length} offen)`}
             {tickets.filter(neu).length > 0 && (
-              <span className="ml-2 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 align-middle text-[11px] font-bold text-white">
+              <span className="ml-2 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 align-middle text-[12px] font-bold text-white">
                 {tickets.filter(neu).length} neu
               </span>
             )}
           </h2>
           <button
             onClick={() => setSchreibOffen((v) => !v)}
-            className="shrink-0 rounded-lg bg-brand px-3 py-1.5 text-sm font-bold text-white"
+            className={`${schreibOffen ? "btn-klein-grau" : "btn-klein"} ml-auto shrink-0`}
           >
             {schreibOffen ? "Abbrechen" : "Anschreiben"}
           </button>
@@ -195,12 +192,12 @@ export function ElternTeamTab({ glocke, nur }: { glocke?: ReactNode; nur?: "info
                           {neu(t) && <span className="mr-1.5 inline-block h-2 w-2 rounded-full bg-red-500 align-middle" />}
                           {t.betreff}
                         </span>
-                        <span className="block truncate text-[11px] text-tinte-leise">
+                        <span className="block truncate text-[12px] text-tinte-leise">
                           {absender(t.user_id)} · {verlauf.length}{" "}
                           {verlauf.length === 1 ? "Nachricht" : "Nachrichten"}
                         </span>
                       </span>
-                      <span className="shrink-0 text-tinte-leise">{auf ? "▾" : "▸"}</span>
+                      <span className={`shrink-0 text-tinte-leise transition-transform ${auf ? "rotate-90" : ""}`}><Icon name="chevron" size={16} strich={2.4} /></span>
                     </button>
                     {/* Weg damit: geloeschte Gespraeche sind endgueltig weg, auch
                         fuer die Eltern. Deshalb die Rueckfrage. */}
@@ -212,11 +209,11 @@ export function ElternTeamTab({ glocke, nur }: { glocke?: ReactNode; nur?: "info
                           true,
                         ).then((ok) => { if (ok) void ticketLoeschen(t.id); })
                       }
-                      className="mr-2 shrink-0 rounded-lg px-2 py-2 text-tinte-leise transition hover:text-red-500 active:scale-90"
+                      className="mr-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-tinte-leise transition hover:text-red-500 active:scale-90"
                       aria-label="Gespräch löschen"
                       title="Gespräch löschen"
                     >
-                      🗑
+                      <Icon name="muell" size={18} />
                     </button>
                   </div>
 
@@ -230,7 +227,7 @@ export function ElternTeamTab({ glocke, nur }: { glocke?: ReactNode; nur?: "info
                               n.user_id === uid ? "bg-brand/10" : "bg-papier-matt dark:bg-slate-800"
                             }`}
                           >
-                            <div className="mb-0.5 text-[11px] font-semibold text-tinte-leise">{wer(n.user_id)}</div>
+                            <div className="mb-0.5 text-[12px] font-semibold text-tinte-leise">{wer(n.user_id)}</div>
                             <div className="whitespace-pre-wrap">{n.text}</div>
                           </li>
                         ))}
@@ -239,7 +236,7 @@ export function ElternTeamTab({ glocke, nur }: { glocke?: ReactNode; nur?: "info
                       <div className="mt-2 flex gap-2">
                         <button
                           onClick={() => ticketSchliessen(t.id, !t.erledigt)}
-                          className="min-w-0 flex-1 rounded-xl border border-papier-linie py-2 text-[13px] font-bold text-tinte-matt dark:border-slate-700"
+                          className="btn-klein-grau min-w-0 flex-1"
                         >
                           {t.erledigt ? "Wieder öffnen" : "Als erledigt markieren"}
                         </button>
@@ -251,7 +248,7 @@ export function ElternTeamTab({ glocke, nur }: { glocke?: ReactNode; nur?: "info
                               true,
                             ).then((ok) => { if (ok) void ticketLoeschen(t.id); })
                           }
-                          className="shrink-0 rounded-xl border border-red-300 px-3 py-2 text-[13px] font-bold text-red-500 dark:border-red-500/40"
+                          className="btn-klein-grau shrink-0 !text-red-600 dark:!text-red-400"
                         >
                           Löschen
                         </button>
@@ -291,7 +288,7 @@ function Antwort({ onSenden }: { onSenden: (text: string) => void }) {
           onSenden(text);
           setText("");
         }}
-        className="shrink-0 rounded-xl bg-brand px-4 text-sm font-bold text-white disabled:opacity-40"
+        className="btn-klein shrink-0"
       >
         Senden
       </button>
@@ -358,7 +355,7 @@ function AnEltern({
                   >
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-[14px] font-semibold">{k.anzeigename}</span>
-                      <span className="block truncate text-[11px] text-tinte-leise">
+                      <span className="block truncate text-[12px] text-tinte-leise">
                         {kindNamen(k.kinder) || k.username}
                       </span>
                     </span>
@@ -434,12 +431,25 @@ export function useElternZahlen(aktiv: boolean) {
   return { offen: offene.length, neu, infos: infos.length };
 }
 
+/**
+ * Die Karten in ElternTeamTab bringen ihre eigene Überschrift mit (für den Fall, dass
+ * sie nicht in einer Ebene stehen). In den Vollbild-Ebenen steht der Titel schon oben
+ * in der Kopfleiste – dort wird die Überschrift der Karte nur für Vorlesegeräte
+ * behalten (sr-only), und der Knopf daneben rückt nach rechts. So steht der Titel
+ * nicht zweimal da.
+ */
+const OHNE_DOPPELTITEL = "[&_section>div:first-child]:justify-end [&_section>div:first-child>h2]:sr-only";
+
 /** Eigene Ebene „Gespräche mit Eltern“ (aus der Kachel im Chats-Reiter) */
 export function ElternGespraecheEbene({ onBack, glocke }: { onBack: () => void; glocke?: ReactNode }) {
   const z = useElternZahlen(true);
   return (
-    <ChatEbene label="Gespräche mit Eltern" kopf={<ChatKopf onBack={onBack} symbol="👪" titel="Gespräche mit Eltern" unter={z.offen ? `${z.offen} offen` : "Nichts offen"} />}>
-      <div className="grid gap-3 py-4">
+    <ChatEbene
+      label="Gespräche mit Eltern"
+      start="oben"
+      kopf={<ChatKopf onBack={onBack} symbol={<Icon name="rollen" size={17} strich={2.2} />} titel="Gespräche mit Eltern" unter={z.offen ? `${z.offen} offen` : "Nichts offen"} />}
+    >
+      <div className={`grid gap-3 py-4 ${OHNE_DOPPELTITEL}`}>
         <ElternTeamTab nur="gespraeche" glocke={glocke} />
       </div>
     </ChatEbene>
@@ -450,8 +460,12 @@ export function ElternGespraecheEbene({ onBack, glocke }: { onBack: () => void; 
 export function ElternInfosEbene({ onBack }: { onBack: () => void }) {
   const z = useElternZahlen(true);
   return (
-    <ChatEbene label="Infos für Eltern" kopf={<ChatKopf onBack={onBack} symbol="📌" titel="Infos für Eltern" unter={`${z.infos} veröffentlicht`} />}>
-      <div className="grid gap-3 py-4">
+    <ChatEbene
+      label="Infos für Eltern"
+      start="oben"
+      kopf={<ChatKopf onBack={onBack} symbol={<Icon name="info" size={17} strich={2.2} />} titel="Infos für Eltern" unter={`${z.infos} veröffentlicht`} />}
+    >
+      <div className={`grid gap-3 py-4 ${OHNE_DOPPELTITEL}`}>
         <ElternTeamTab nur="infos" />
       </div>
     </ChatEbene>

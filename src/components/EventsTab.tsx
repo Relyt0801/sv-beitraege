@@ -5,7 +5,7 @@ import { useRole } from "../auth/RoleProvider";
 import { WerHatGestimmt } from "./WerHatGestimmt";
 import { Avatar } from "./Avatar";
 import { committeeLabel } from "../lib/committees";
-import { AELTER_AB_TAGEN, TYPE_META, gruppiereAehnliche, nachAlter, type EventItem } from "../lib/events";
+import { AELTER_AB_TAGEN, TYPE_META, gruppiereAehnliche, nachAlter, titelSchluessel, type EventItem } from "../lib/events";
 import { Wochenstreifen } from "./Wochenstreifen";
 import { Kalender } from "./Kalender";
 import { TerminSheet, TerminAnsehen } from "./TerminSheet";
@@ -21,7 +21,7 @@ import { frage } from "../lib/melder";
 export function EventsTab() {
   const { events, ready, myVotes, voteCounts, voters, reads, vote, deleteEvent, markRead } = useEvents();
   const { isStaff, can } = useRole();
-  const { anfrageEntscheiden, termineGesehen } = useTermine();
+  const { anfrageEntscheiden, termineGesehen, aktionen } = useTermine();
 
   // Kalender und Terminformular liegen ueber dem Reiter, nicht darin.
   const [kalenderOffen, setKalenderOffen] = useState(false);
@@ -34,6 +34,9 @@ export function EventsTab() {
   const privatAngesehen = angesehenRoh?.privat ? angesehenRoh : null;
   const [startDatum, setStartDatum] = useState(heuteKey());
   const [kalenderTag, setKalenderTag] = useState(heuteKey());
+  // Der im Wochenstreifen gewählte Tag: „Deine Schichten“ zeigt diesen Tag nicht
+  // noch einmal (steht ja schon direkt darüber in der Tagesliste).
+  const [streifenTag, setStreifenTag] = useState(heuteKey());
   // Aus einer übernommenen Anfrage vorausgefüllt – und die Anfrage, die
   // danach abgehakt wird.
   const [entwurf, setEntwurf] = useState<NeuerTermin | null>(null);
@@ -59,18 +62,35 @@ export function EventsTab() {
   // ----------------------------------------------------------- Feed ordnen
   // 1. Ältere Beiträge (> 14 Tage) wandern in den eingeklappten Teil – außer
   //    Abstimmungen, bei denen man noch nicht abgestimmt hat.
-  // 2. Offene Abstimmungen und Wichtiges nach oben: das ist die Aktion, die
+  // 2. Ebenso Infos, die zu einer laufenden Aktion gehören (z. B. „Waffelverkauf
+  //    – neue Schichten“): Die Aktion steht schon unter „Mitmachen“, die Infos
+  //    dazu nicht noch einmal ganz oben (Prüfung 15.10.2026: Waffelverkauf
+  //    stand an vier Stellen). Wichtiges (rot) und Abstimmungen bleiben oben.
+  // 3. Offene Abstimmungen und Wichtiges nach oben: das ist die Aktion, die
   //    man hier tun soll.
-  // 3. Gleichartige Beiträge (ab drei, z. B. „Waffelverkauf …“) zu einer
-  //    aufklappbaren Gruppe – siehe gruppiereAehnliche in lib/events.ts.
+  // 4. Gleichartige Beiträge (ab drei) zu einer aufklappbaren Gruppe – siehe
+  //    gruppiereAehnliche in lib/events.ts.
   const [aelterOffen, setAelterOffen] = useState(false);
-  const { feed, aelter } = useMemo(() => {
+  const aktionsSchluessel = useMemo(
+    () => new Set(aktionen.filter((a) => !a.geschlossen).map((a) => titelSchluessel(a.titel))),
+    [aktionen],
+  );
+  const { feed, aelter, nurAktion } = useMemo(() => {
     const offen = (e: EventItem) => e.type === "umfrage" && !(myVotes[e.id] || []).length;
-    const { aktuell, aelter } = nachAlter(events, offen);
+    const { aktuell, aelter: alt } = nachAlter(events, offen);
+    const zuAktion = (e: EventItem) =>
+      e.type !== "umfrage" && !e.is_warning && aktionsSchluessel.has(titelSchluessel(e.title));
+    const oben = aktuell.filter((e) => !zuAktion(e));
+    const beiAktion = aktuell.filter(zuAktion);
     const vorne = (e: EventItem) => (offen(e) ? 0 : e.is_warning ? 1 : 2);
-    const sortiert = [...aktuell].sort((a, b) => vorne(a) - vorne(b) || b.created_at.localeCompare(a.created_at));
-    return { feed: gruppiereAehnliche(sortiert, (e) => e.title), aelter };
-  }, [events, myVotes]);
+    const sortiert = [...oben].sort((a, b) => vorne(a) - vorne(b) || b.created_at.localeCompare(a.created_at));
+    return {
+      feed: gruppiereAehnliche(sortiert, (e) => e.title),
+      // Neueste zuerst, dann die wirklich alten
+      aelter: [...beiAktion, ...alt],
+      nurAktion: beiAktion.length,
+    };
+  }, [events, myVotes, aktionsSchluessel]);
 
   // Beim Ansehen als gelesen markieren
   useEffect(() => {
@@ -95,6 +115,7 @@ export function EventsTab() {
         }}
         onOeffnen={(t) => setAngesehen(t)}
         onNeu={darfTermine ? terminNeu : undefined}
+        onTag={setStreifenTag}
       />
 
       <MeineAnfragen />
@@ -103,7 +124,7 @@ export function EventsTab() {
       {/* Offene Schichten zum Bestätigen – bleibt, auch wenn das Pop-up weggewischt wurde */}
       <AbschlussHinweis />
 
-      <MeineSchichten />
+      <MeineSchichten ausserTag={streifenTag} />
       <AktionenListe />
 
       {/* Pop-up-Umfragen: laufende auf einen Blick (Team mit Recht) */}
@@ -172,7 +193,7 @@ export function EventsTab() {
         <div className="card px-5 py-6 text-center">
           <div className="text-[15px] font-semibold">Noch keine Infos</div>
           <div className="mt-1 text-[13px] text-tinte-leise">
-            {isStaff ? "Mit „+“ unten rechts schreibst du die erste Info oder Abstimmung." : "Sobald das Stufenteam etwas schreibt, steht es hier."}
+            {isStaff ? "Mit „Neu“ unten rechts schreibst du die erste Info oder Abstimmung." : "Sobald das Stufenteam etwas schreibt, steht es hier."}
           </div>
         </div>
       </section>,
@@ -200,28 +221,34 @@ export function EventsTab() {
   return rahmen(
     <section className="mb-5">
       <h3 className="mb-1.5 px-4 text-[13px] uppercase tracking-[0.02em] text-tinte-leise">Infos & Abstimmungen</h3>
-      <div className="grid items-start gap-3 lg:grid-cols-2">
-        {feed.map((g) =>
-          g.art === "einzeln" ? (
-            karte(g.eintrag)
-          ) : (
-            <EventGruppe key={`g-${g.schluessel}`} titel={g.titel} events={g.eintraege} karte={(e) => karte(e, true)} />
-          ),
-        )}
-      </div>
+      {feed.length > 0 ? (
+        <div className="grid items-start gap-3 lg:grid-cols-2">
+          {feed.map((g) =>
+            g.art === "einzeln" ? (
+              karte(g.eintrag)
+            ) : (
+              <EventGruppe key={`g-${g.schluessel}`} titel={g.titel} events={g.eintraege} karte={(e) => karte(e, true)} />
+            ),
+          )}
+        </div>
+      ) : (
+        <div className="card px-5 py-5 text-center text-[14px] text-tinte-leise">Gerade nichts Neues.</div>
+      )}
 
-      {/* Ältere Beiträge: eingeklappt, damit oben nur Aktuelles steht */}
+      {/* Weitere Beiträge: eingeklappt, damit oben nur Aktuelles steht */}
       {aelter.length > 0 && (
         <div className="mt-3">
           <button
             onClick={() => setAelterOffen(!aelterOffen)}
             aria-expanded={aelterOffen}
-            className="liste flex w-full items-center gap-3 px-4 py-3 text-left transition active:scale-[.99]"
+            className="liste flex min-h-[56px] w-full items-center gap-3 px-4 py-3 text-left transition active:scale-[.99]"
           >
             <span className="min-w-0 flex-1">
-              <span className="block text-[15px] font-semibold">Ältere Beiträge</span>
+              <span className="block text-[15px] font-semibold">Weitere Beiträge</span>
               <span className="block text-[13px] text-tinte-leise">
-                {aelter.length} {aelter.length === 1 ? "Beitrag" : "Beiträge"} älter als {AELTER_AB_TAGEN} Tage
+                {aelter.length} {aelter.length === 1 ? "Beitrag" : "Beiträge"}
+                {nurAktion > 0 ? ` · ${nurAktion} zu Aktionen oben` : ""}
+                {aelter.length > nurAktion ? ` · älter als ${AELTER_AB_TAGEN} Tage` : ""}
               </span>
             </span>
             <span className="text-tinte-leise">

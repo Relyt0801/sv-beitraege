@@ -42,7 +42,7 @@ export const PATCH: PatchVersion = {
       eintraege: [
         {
           titel: "Neue Reiterleiste",
-          text: "Unten jetzt aus Glas – der gewählte Reiter schwebt sichtbar hervor.",
+          text: "Aus Glas – am Handy unten, am Laptop und iPad quer oben. Der gewählte Reiter schwebt sichtbar hervor.",
           icon: "haus",
           farbe: "bg-brand",
         },
@@ -72,9 +72,15 @@ export const PATCH: PatchVersion = {
         },
         {
           titel: "Klarere Meldungen",
-          text: "Ohne Internet sagt dir die App genau, was gerade nicht geht.",
+          text: "Ohne Internet sagt dir die App genau, was gerade nicht geht – unten, ohne etwas zu verdecken.",
           icon: "info",
           farbe: "bg-[#32ADE6]",
+        },
+        {
+          titel: "Hell, Dunkel oder Automatisch",
+          text: "Im Profil unter „Darstellung“ – Automatisch folgt deinem Gerät.",
+          icon: "mond",
+          farbe: "bg-[#5856D6]",
         },
         {
           titel: "Kalender kurz pausiert",

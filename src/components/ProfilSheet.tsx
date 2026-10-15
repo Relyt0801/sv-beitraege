@@ -12,7 +12,8 @@ import { farbwert, lesbarerName, namensfarbe, speichereProfil, waehlbareFarben }
 import { passwortProblem } from "../lib/passwort";
 import { SELECTABLE_COMMITTEES, committeeIcon, rolleUndKomitees } from "../lib/committees";
 import { ladeKomiteeAntraege, stelleKomiteeAntrag } from "../lib/komitee-antrag";
-import { useTheme } from "../lib/theme";
+import { useTheme, type Modus } from "../lib/theme";
+import { fehlerText } from "../lib/netz";
 import { abmelden, enablePush, pushConfigured, pushDiagnose, pushPermission } from "../lib/push";
 import { ProtokollSheet } from "./ProtokollSheet";
 import { RechtLinks } from "./Rechtliches";
@@ -26,16 +27,19 @@ import { darfSchalten } from "../lib/funktionen";
 import { hintergrundEntfernen, hintergrundSetzen, useHintergrund } from "../lib/hintergrund";
 
 import { frage, melde, meldeFehler } from "../lib/melder";
-/** Das eigene Profil: Bild, Namensfarbe, Passwort, Komitee-Wechsel, Hilfe. */
+/** Das eigene Profil: Bild, Namensfarbe, Erscheinungsbild, Passwort, Komitee-Wechsel, Hilfe. */
 export function ProfilSheet({
   open,
   onClose,
   onTutorial,
+  onNeu,
 }: {
   open: boolean;
   onClose: () => void;
   /** Fehlt in der Elternansicht – dort gibt es keine Einführung. */
   onTutorial?: () => void;
+  /** „Was ist neu“ – öffnet die Patch-Notes wieder (fehlt bei Eltern). */
+  onNeu?: () => void;
 }) {
   const { mein, uid, aktualisiere, neuLaden } = useProfiles();
   const { isStaff, isOp, role, can } = useRole();
@@ -43,7 +47,7 @@ export function ProfilSheet({
   // In der Elternansicht laeuft kein Chat-Speicher – dann bleibt die Komiteeliste leer.
   const topics = useTopicsOptional();
   const committeesOf = topics?.committeesOf ?? (() => [] as string[]);
-  const { theme } = useTheme();
+  const { theme, modus, setModus } = useTheme();
   const [wunsch, setWunsch] = useState("");
   const [grund, setGrund] = useState("");
   const [antragOffen, setAntragOffen] = useState(false);
@@ -89,7 +93,8 @@ export function ProfilSheet({
     const { error } = await supabase!.auth.updateUser({ password: pw1 });
     setPwBusy(false);
     if (error) {
-      setPwInfo("Hat nicht geklappt: " + error.message);
+      // fehlerText macht aus „Failed to fetch“ & Co. verständliche deutsche Sätze
+      setPwInfo("Hat nicht geklappt: " + fehlerText(error));
       return;
     }
     // Der graue Punkt in den Listen bedeutet "nutzt noch das Startpasswort".
@@ -102,7 +107,10 @@ export function ProfilSheet({
     setPw1("");
     setPw2("");
     setPwOffen(false);
-    setPwInfo("Passwort geändert.");
+    setPwInfo("");
+    // Der Bereich klappt zu – die Bestätigung muss deshalb außerhalb davon
+    // erscheinen (vorher stand sie nur im zugeklappten Teil und war unsichtbar)
+    melde("Passwort geändert", "erfolg");
   }
 
   const darfFunktionen = (["abiball", "album", "zitate", "rankings", "spotify", "motto", "umfragen"] as const).some((k) => darfSchalten(can, k));
@@ -138,10 +146,40 @@ export function ProfilSheet({
        </div>
       </div>
 
-      {farbFehler && <div className="mt-3 rounded-xl bg-red-500/10 px-3 py-2 text-[13px] font-semibold text-red-500">{farbFehler}</div>}
+      {farbFehler && <div className="mt-3 rounded-xl bg-red-500/10 px-3 py-2 text-[13px] font-semibold text-fehler">{farbFehler}</div>}
 
       {/* ------------------------------------------------ Darstellung */}
-      <Gruppe titel="Darstellung" className="mt-6">
+      <Gruppe
+        titel="Darstellung"
+        className="mt-6"
+        fuss={`„Automatisch“ folgt der Einstellung ${istEltern ? "Ihres" : "deines"} Geräts – abends also von selbst dunkel, wenn es dort so eingestellt ist.`}
+      >
+        {/* Erscheinungsbild: Hell / Dunkel / Automatisch (lib/theme.ts). Der Mond-
+            Knopf oben in der Kopfleiste bleibt als Abkürzung. */}
+        <div className="px-4 py-3">
+          <div className="mb-2.5 flex items-center gap-3">
+            <Sym icon={theme === "dark" ? "mond" : "sonne"} farbe="bg-[#5856D6]" />
+            <span className="text-[15px]">Erscheinungsbild</span>
+          </div>
+          <div className="seg" role="radiogroup" aria-label="Erscheinungsbild">
+            {([
+              ["light", "Hell"],
+              ["dark", "Dunkel"],
+              ["auto", "Automatisch"],
+            ] as [Modus, string][]).map(([wert, text]) => (
+              <button
+                key={wert}
+                type="button"
+                role="radio"
+                aria-checked={modus === wert}
+                onClick={() => setModus(wert)}
+                className={`seg-item whitespace-nowrap !px-1 !py-2 !text-[13px] ${modus === wert ? "seg-aktiv" : ""}`}
+              >
+                {text}
+              </button>
+            ))}
+          </div>
+        </div>
         {!istEltern && (
           <AufZeile
             symbol={<Sym icon="person" farbe="bg-[#FF9500]" />}
@@ -194,7 +232,7 @@ export function ProfilSheet({
           fuss={
             <>
               {!istEltern && "Wichtiges – Angepinntes, Team und Events – kommt immer. "}
-              {hasSupabase && perm === "denied" && "Dein Browser blockiert Mitteilungen – in den Browser-Einstellungen wieder erlauben. "}
+              {hasSupabase && perm === "denied" && `${istEltern ? "Ihr" : "Dein"} Browser blockiert Mitteilungen – in den Browser-Einstellungen wieder erlauben. `}
               {hasSupabase && <Pushpruefung />}
             </>
           }
@@ -214,7 +252,7 @@ export function ProfilSheet({
             </ZeileMitSchalter>
           )}
           {hasSupabase && (
-            <Zeile label="Aufs Gerät" symbol={<Sym icon="info" farbe="bg-[#FF3B30]" />}>
+            <Zeile label="Auf diesem Gerät" symbol={<Sym icon="info" farbe="bg-[#FF3B30]" />}>
               {pushConfigured() && perm !== "granted" && perm !== "denied" ? (
                 <button
                   disabled={pushBusy}
@@ -225,7 +263,7 @@ export function ProfilSheet({
                     setPerm(pushPermission());
                     if (!r.ok && r.error) meldeFehler("Hat nicht geklappt: " + r.error);
                   }}
-                  className="btn-klein !min-h-[2rem] !px-3.5 !text-[13px]"
+                  className="btn-klein !px-3.5 !text-[13px]"
                 >
                   {pushBusy ? "…" : "Anschalten"}
                 </button>
@@ -257,7 +295,7 @@ export function ProfilSheet({
                 type="password"
                 autoComplete="new-password"
                 className={EINGABE}
-                placeholder="Neues Passwort"
+                placeholder="Neues Passwort (mindestens 8 Zeichen)"
                 value={pw1}
                 autoFocus
                 onChange={(e) => setPw1(e.target.value)}
@@ -271,7 +309,7 @@ export function ProfilSheet({
                 onChange={(e) => setPw2(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && void passwortSpeichern()}
               />
-              {pwInfo && <div className="px-4 py-2.5 text-[13px] font-medium text-red-500">{pwInfo}</div>}
+              {pwInfo && <div className="px-4 py-2.5 text-[13px] font-medium text-fehler">{pwInfo}</div>}
               <Zeile label={pwBusy ? "Wird gespeichert …" : "Passwort speichern"} blau disabled={pwBusy || !pw1} onClick={() => void passwortSpeichern()} />
             </>
           )}
@@ -326,7 +364,7 @@ export function ProfilSheet({
       {verwaltung && (
         <Gruppe titel="Verwaltung">
           {darfFunktionen && <Zeile label="Funktionen" symbol={<Sym icon="auswahl" farbe="bg-brand" />} onClick={() => setFunktionenOffen(true)} />}
-          {darfFreigaben && <Zeile label="Freigaben & Nachträge" symbol={<Sym icon="stimme" farbe="bg-[#34C759]" />} onClick={() => setFreigabenOffen(true)} />}
+          {darfFreigaben && <Zeile label="Freigaben" symbol={<Sym icon="stimme" farbe="bg-[#34C759]" />} onClick={() => setFreigabenOffen(true)} />}
           {darfWortfilter && <Zeile label="Wortfilter" symbol={<Sym icon="schild" farbe="bg-[#FF3B30]" />} onClick={() => setWortfilterOffen(true)} />}
         </Gruppe>
       )}
@@ -336,7 +374,7 @@ export function ProfilSheet({
         <Gruppe titel="Daten">
           {istAdmin && <Zeile label="Protokoll & Sicherung" symbol={<Sym icon="beitraege" farbe="bg-[#8E8E93]" />} onClick={() => setProtokollOffen(true)} />}
           {istKassenwart && <Zeile label="Sicherheitskopie" symbol={<Sym icon="beitraege" farbe="bg-[#8E8E93]" />} onClick={() => setProtokollOffen(true)} />}
-          {darfLoeschfristen && <Zeile label="Automatisch löschen" symbol={<Sym icon="muell" farbe="bg-[#FF9500]" />} onClick={() => setLoeschOffen(true)} />}
+          {darfLoeschfristen && <Zeile label="Speicher & Löschen" symbol={<Sym icon="muell" farbe="bg-[#FF9500]" />} onClick={() => setLoeschOffen(true)} />}
           {darfLoeschfristen && (
             <Zeile
               label="Update bei allen erzwingen"
@@ -355,9 +393,10 @@ export function ProfilSheet({
       )}
 
       {/* ------------------------------------------------ Hilfe */}
-      {onTutorial && (
+      {(onTutorial || onNeu) && (
         <Gruppe titel="Hilfe">
-          <Zeile label="Einführung noch mal ansehen" symbol={<Sym icon="info" farbe="bg-brand" />} onClick={onTutorial} />
+          {onNeu && <Zeile label="Was ist neu" symbol={<Sym icon="funke" farbe="bg-[#FF9500]" />} onClick={onNeu} />}
+          {onTutorial && <Zeile label="Einführung noch mal ansehen" symbol={<Sym icon="info" farbe="bg-brand" />} onClick={onTutorial} />}
         </Gruppe>
       )}
 
@@ -391,7 +430,7 @@ export function ProfilSheet({
 }
 
 /** Eingabe als eigene Zeile in einer Gruppe (Passwort, Begründung) */
-const EINGABE = "block min-h-[48px] w-full bg-transparent px-4 text-[15px] outline-none placeholder:text-tinte-leise";
+const EINGABE = "block min-h-[48px] w-full bg-transparent px-4 text-[16px] outline-none placeholder:text-tinte-leise";
 
 /** Farbiges Symbol-Kästchen mit Icon */
 function Sym({ icon, farbe }: { icon: IconName; farbe: string }) {
@@ -442,43 +481,49 @@ function AufZeile({
 
 /** Eigenes Hintergrundbild: auswählen, ersetzen, entfernen */
 function HintergrundZeile() {
-  const { uid } = useRole();
+  const { uid, role } = useRole();
   const bild = useHintergrund();
   const [busy, setBusy] = useState(false);
   const ref = useRef<HTMLInputElement>(null);
   return (
-    <Zeile label="Hintergrundbild" unter="Nur für dich sichtbar" symbol={<Sym icon="bild" farbe="bg-[#32ADE6]" />}>
-      <input
-        ref={ref}
-        type="file"
-        accept="image/*"
-        className="hidden"
-        onChange={async (e) => {
-          const d = e.target.files?.[0];
-          e.target.value = "";
-          if (!d) return;
-          setBusy(true);
-          const f = await hintergrundSetzen(uid, d);
-          setBusy(false);
-          if (f) meldeFehler("Ging nicht: " + f);
-          else melde("Hintergrund gesetzt", "erfolg");
-        }}
-      />
+    <>
+      <Zeile
+        label="Hintergrundbild"
+        unter={role === "eltern" ? "Nur für Sie sichtbar" : "Nur für dich sichtbar"}
+        symbol={<Sym icon="bild" farbe="bg-[#32ADE6]" />}
+      >
+        <input
+          ref={ref}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={async (e) => {
+            const d = e.target.files?.[0];
+            e.target.value = "";
+            if (!d) return;
+            setBusy(true);
+            const f = await hintergrundSetzen(uid, d);
+            setBusy(false);
+            if (f) meldeFehler("Ging nicht: " + f);
+            else melde("Hintergrund gesetzt", "erfolg");
+          }}
+        />
+        <button className="btn-klein-grau !px-3 !text-[13px]" disabled={busy} onClick={() => ref.current?.click()}>
+          {busy ? "…" : bild ? "Ändern" : "Auswählen"}
+        </button>
+      </Zeile>
+      {/* „Entfernen“ als eigene Zeile: neben „Ändern“ brach vorher der Text der Zeile um */}
       {bild && (
-        <button
-          className="px-1 text-[15px] text-red-600 dark:text-red-400"
+        <Zeile
+          label="Hintergrundbild entfernen"
+          rot
           onClick={async () => {
             const f = await hintergrundEntfernen(uid);
             if (f) meldeFehler("Ging nicht: " + f);
           }}
-        >
-          Entfernen
-        </button>
+        />
       )}
-      <button className="btn-klein-grau !min-h-[2rem] !px-3 !text-[13px]" disabled={busy} onClick={() => ref.current?.click()}>
-        {busy ? "…" : bild ? "Ändern" : "Auswählen"}
-      </button>
-    </Zeile>
+    </>
   );
 }
 

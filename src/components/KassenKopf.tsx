@@ -133,13 +133,16 @@ function KassenKopfRoh({
       <div className="card p-3 sm:p-4">
         <div className="mb-2.5 flex items-baseline justify-between gap-2">
           <h2 className="text-[13px] font-semibold text-tinte-matt">Die sechs Halbjahre</h2>
-          <span className="text-[11px] text-tinte-leise">Anteil bezahlt</span>
+          <span className="text-[12px] text-tinte-leise">Anteil bezahlt</span>
         </div>
-        <div tabIndex={0} aria-label="Die sechs Halbjahre" className="no-scrollbar -mx-3 flex gap-1.5 overflow-x-auto px-3 sm:mx-0 sm:grid sm:grid-cols-6 sm:overflow-visible sm:px-0">
+        {/* Handy: 3 × 2 Kacheln, ab Tablet 6 in einer Reihe. Früher eine Leiste, die
+            nur durch (unsichtbares) Seitwärtswischen ganz zu sehen war – Q2.1/Q2.2
+            fand man nicht (Update 1.4, U3). */}
+        <div aria-label="Die sechs Halbjahre" className="grid grid-cols-3 gap-1.5 sm:grid-cols-6">
           {halbjahre.map((h) => (
             <div
               key={h.name}
-              className={`min-w-[5.6rem] shrink-0 rounded-xl border p-2 sm:min-w-0 ${
+              className={`min-w-0 rounded-xl border p-2 ${
                 h.laeuft
                   ? "border-brand/40 bg-brand/[0.06]"
                   : "border-transparent bg-papier dark:bg-slate-800/60"
@@ -147,12 +150,12 @@ function KassenKopfRoh({
             >
               <div className="flex items-baseline justify-between gap-1">
                 <span className={`text-[12px] font-bold ${h.laeuft ? "text-brand" : ""}`}>{h.name}</span>
-                <span className="zahl text-[11px] font-semibold text-tinte-leise">{h.preis} €</span>
+                <span className="zahl text-[12px] font-semibold text-tinte-leise">{h.preis} €</span>
               </div>
               <div className={`zahl mt-1.5 text-[17px] font-bold leading-none ${h.laeuft ? "text-brand" : ""}`}>
                 {h.kommtNoch ? "–" : `${h.quote} %`}
               </div>
-              <div className="mt-1 truncate text-[10px] text-tinte-leise">
+              <div className="mt-1 truncate text-[12px] text-tinte-leise">
                 {h.kommtNoch ? "später" : h.rest === 0 ? "alle bezahlt" : `${h.rest} offen`}
               </div>
             </div>

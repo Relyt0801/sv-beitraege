@@ -197,14 +197,15 @@ export function useGewinner(bereich: GewinnerBereich, aktiv: boolean) {
   const von = useCallback((gruppe: string, art: GewinnerArt) => liste.find((g) => g.gruppe === gruppe && g.art === art) || null, [liste]);
 
   const kueren = useCallback(
-    async (g: { gruppe: string; art: GewinnerArt; ziel_id: string; label: string; unter?: string; stimmen?: number | null }) => {
+    async (g: { gruppe: string; art: GewinnerArt; ziel_id: string; label: string; unter?: string; stimmen?: number | null }, leise = false) => {
+      // leise = true: keine eigene Meldung – das Küren-Blatt zeigt am Ende EINE für alles
       if (!hasSupabase) {
         const i = demoGewinner.findIndex((x) => x.bereich === bereich && x.gruppe === g.gruppe && x.art === g.art);
         const neu: Gewinner = { bereich, unter: "", stimmen: null, gekuert_at: new Date().toISOString(), ...g } as Gewinner;
         if (i >= 0) demoGewinner[i] = neu;
         else demoGewinner.push(neu);
         void laden();
-        melde(g.art === "herzen" ? "Gewinner der Herzen gekürt" : "Gewinner gekürt");
+        if (!leise) melde(g.art === "herzen" ? "Gewinner der Herzen gekürt" : "Gewinner gekürt");
         return true;
       }
       const { error } = await supabase!.rpc("gewinner_kueren", {
@@ -220,7 +221,7 @@ export function useGewinner(bereich: GewinnerBereich, aktiv: boolean) {
         meldeFehler(error.message);
         return false;
       }
-      melde(g.art === "herzen" ? "Gewinner der Herzen gekürt" : "Gewinner gekürt");
+      if (!leise) melde(g.art === "herzen" ? "Gewinner der Herzen gekürt" : "Gewinner gekürt");
       void laden();
       return true;
     },
@@ -255,6 +256,19 @@ export const TABELLE_NAME: Record<TeilTabelle, string> = {
   motto_vorschlaege: "Motto",
   album_kommentare: "Kommentar",
 };
+
+/**
+ * Rückfrage vor einem Verschiebe-Antrag – in Motto, Zitaten, Rankings und
+ * Kommentaren wörtlich gleich, mit der Zahl der nötigen Zustimmungen.
+ *   noetig  aus useVerschiebenNoetig()
+ *   admin   Admins brauchen keine weiteren Zustimmungen
+ */
+export function verschiebenFrage(nach: Teil, noetig: number, admin: boolean, titel?: string): string {
+  const kopf = titel ? `„${titel}“ nach „${TEIL_NAME[nach]}“ verschieben?` : `Nach „${TEIL_NAME[nach]}“ verschieben?`;
+  if (admin) return `${kopf} Als Admin reicht deine Zustimmung – es wird sofort verschoben.`;
+  if (noetig <= 1) return `${kopf} Dafür reicht eine Zustimmung (deine). Du siehst den Antrag unter Chats → Anfragen.`;
+  return `${kopf} Das braucht ${noetig} Zustimmungen aus dem Team (du zählst schon mit). Du siehst den Antrag unter Chats → Anfragen.`;
+}
 
 /**
  * Wie viele Zustimmungen braucht ein Verschieben? (Profil → Freigaben →
