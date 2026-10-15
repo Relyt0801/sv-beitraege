@@ -28,6 +28,58 @@ import { scrollSperren } from "../lib/scrollsperre";
  */
 const stapel: number[] = [];
 let naechsteKennung = 1;
+const stapelZu = new Map<number, MutableRefObject<() => void>>();
+
+/*
+ * Zurück-Taste (Android, Browser, Wischgeste) wie Escape (Rollen-Prüfung
+ * Okt. 2026: sie verliess die App, statt Chat, Kalender oder Blatt zu
+ * schliessen). Solange irgendeine Ebene offen ist, liegt GENAU EIN eigener
+ * Eintrag („Wache“) in der Browser-History. Zurück entfernt ihn – das
+ * schliesst die oberste Ebene; liegen darunter noch welche, kommt eine neue
+ * Wache. Schliesst sich die letzte Ebene anders (✕, Esc, Tipp daneben),
+ * wird die Wache wieder entfernt – aber nur, wenn sie noch oben liegt (ein
+ * Sprung per #reiter darüber bleibt unangetastet). Gleiche Adresse, daher
+ * kein hashchange.
+ */
+let wache = false;
+let wacheIgnorieren = false;
+function wacheSetzen() {
+  if (wache) return;
+  try {
+    history.pushState({ svEbene: 1 }, "");
+    wache = true;
+  } catch {
+    /* z. B. in eingebetteten Ansichten ohne History */
+  }
+}
+function wacheLoesen() {
+  // Erst nach dem Zug: schliesst ein Blatt und öffnet im selben Zug ein
+  // anderes (Neu erstellen → Aktion), bleibt die Wache einfach stehen
+  setTimeout(() => {
+    if (stapel.length || !wache) return;
+    wache = false;
+    if ((history.state as { svEbene?: number } | null)?.svEbene) {
+      wacheIgnorieren = true;
+      history.back();
+    }
+  }, 0);
+}
+if (typeof window !== "undefined") {
+  window.addEventListener("popstate", () => {
+    if (wacheIgnorieren) {
+      wacheIgnorieren = false;
+      return;
+    }
+    if (!wache) return;
+    wache = false;
+    const oben = stapel[stapel.length - 1];
+    if (oben !== undefined) stapelZu.get(oben)?.current();
+    // Noch Ebenen offen (oder die oberste blieb, z. B. Entwurfsschutz): neue Wache
+    setTimeout(() => {
+      if (stapel.length) wacheSetzen();
+    }, 60);
+  });
+}
 
 export function useEscapeSchliesst(aktiv: boolean, onClose: () => void) {
   // Immer die neueste Funktion aufrufen, ohne den Stapel-Platz zu verlieren
@@ -37,6 +89,8 @@ export function useEscapeSchliesst(aktiv: boolean, onClose: () => void) {
     if (!aktiv) return;
     const id = naechsteKennung++;
     stapel.push(id);
+    stapelZu.set(id, zu);
+    wacheSetzen();
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape" || e.defaultPrevented) return;
       if (stapel[stapel.length - 1] !== id) return;
@@ -47,8 +101,24 @@ export function useEscapeSchliesst(aktiv: boolean, onClose: () => void) {
       window.removeEventListener("keydown", onKey);
       const i = stapel.indexOf(id);
       if (i >= 0) stapel.splice(i, 1);
+      stapelZu.delete(id);
+      if (!stapel.length) wacheLoesen();
     };
   }, [aktiv]);
+}
+
+/**
+ * Entwurfsschutz für Escape/Zurück: Steht im fokussierten Textfeld des
+ * Bereichs noch Text, nimmt der erste Druck nur den Fokus heraus (wie in
+ * ChatEbene) – sonst wäre Getipptes mit einem Tastendruck weg.
+ */
+function entwurfZuerst(bereich: HTMLElement | null): boolean {
+  const f = document.activeElement;
+  if (!bereich || !f || !bereich.contains(f)) return false;
+  const text = f instanceof HTMLTextAreaElement || (f instanceof HTMLInputElement && /^(text|search|email|url|tel|number|password)$/.test(f.type));
+  if (!text || !(f as HTMLInputElement | HTMLTextAreaElement).value.trim()) return false;
+  (f as HTMLElement).blur();
+  return true;
 }
 
 /* ====================================================================== */
@@ -142,6 +212,24 @@ type BlattLage = {
   titelId: string;
 };
 const BlattKontext = createContext<BlattLage | null>(null);
+/**
+ * Unterseite im SELBEN Blatt (SheetKopf/RechnungKopf mit `zurueck`): der Kopf
+ * trägt hier seine Zurück-Funktion ein – Escape und die Zurück-Taste gehen
+ * dann eine Seite zurück statt das ganze Blatt zu schliessen.
+ */
+const ZurueckKontext = createContext<MutableRefObject<(() => void) | null> | null>(null);
+
+/** Für Köpfe mit eigenem `zurueck` (siehe ZurueckKontext) */
+export function useZurueckKanal(zurueck: (() => void) | undefined) {
+  const kanal = useContext(ZurueckKontext);
+  useLayoutEffect(() => {
+    if (!kanal || !zurueck) return;
+    kanal.current = zurueck;
+    return () => {
+      if (kanal.current === zurueck) kanal.current = null;
+    };
+  }, [kanal, zurueck]);
+}
 /** Kopf meldet sich im Blatt an – stabil je Blatt, damit nichts im Kreis läuft */
 const KopfKontext = createContext<((titel: string | undefined) => () => void) | null>(null);
 const ElternKontext = createContext<Blatt | null>(null);
@@ -251,7 +339,13 @@ export function Sheet({ open, onClose, children, hoch }: { open: boolean; onClos
   // Neu zeichnen, wenn sich der Stapel ändert (nur solange offen)
   useSyncExternalStore(blattAbo, open ? blattStandLesen : nichtsLesen, nichtsLesen);
 
-  useEscapeSchliesst(open, onClose);
+  // Escape/Zurück: erst Entwurf schützen, dann eine Unterseite im selben
+  // Blatt zurück (ZurueckKontext), sonst das Blatt schliessen
+  const zurueckRef = useRef<(() => void) | null>(null);
+  useEscapeSchliesst(open, () => {
+    if (entwurfZuerst(panel.current)) return;
+    (zurueckRef.current ?? zu.current)();
+  });
 
   // Die Seite dahinter scrollt nicht mit.
   useEffect(() => {
@@ -379,6 +473,8 @@ export function Sheet({ open, onClose, children, hoch }: { open: boolean; onClos
       wegAnim.current?.cancel();
       wegAnim.current = null;
       setVersteckt(false);
+      // Höhe der Unterseite übernehmen (der Beobachter wächst nur mit eigener Höhe)
+      p?.style.setProperty("--blatt-min", `${ich.hoehe}px`);
       einblenden(p, null, "zurueck");
     }
     warVerdeckt.current = verdeckt;
@@ -439,7 +535,9 @@ export function Sheet({ open, onClose, children, hoch }: { open: boolean; onClos
         </div>
         <ElternKontext.Provider value={ich}>
           <KopfKontext.Provider value={kopf}>
-            <BlattKontext.Provider value={lage}>{children}</BlattKontext.Provider>
+            <ZurueckKontext.Provider value={zurueckRef}>
+              <BlattKontext.Provider value={lage}>{children}</BlattKontext.Provider>
+            </ZurueckKontext.Provider>
           </KopfKontext.Provider>
         </ElternKontext.Provider>
       </div>
@@ -496,10 +594,13 @@ export function SheetKopf({
   onClose,
   extra,
   zurueck,
+  name,
 }: {
   titel: ReactNode;
   unter?: ReactNode;
   onClose: () => void;
+  /** Kurzname für „‹ …“ der nächsten Unterseite, wenn der Titel kein reiner Text ist */
+  name?: string;
   /** Weitere runde Knöpfe links neben dem Schließen (z. B. Einstellungen) */
   extra?: ReactNode;
   /**
@@ -508,7 +609,8 @@ export function SheetKopf({
    */
   zurueck?: { text: string; onClick: () => void };
 }) {
-  const lage = useBlattKopf(titel);
+  const lage = useBlattKopf(name ?? titel);
+  useZurueckKanal(zurueck?.onClick);
   const zurueckJetzt = zurueck ?? (lage?.kind ? { text: lage.zurueckText, onClick: onClose } : undefined);
   return (
     <div className="sticky top-0 z-10 -mx-5 mb-2 flex items-start gap-3 bg-papier px-5 pb-2 pt-2 shadow-[0_-24px_0_0_rgb(var(--papier))] dark:bg-slate-900 dark:shadow-[0_-24px_0_0_#1C1C1E]">

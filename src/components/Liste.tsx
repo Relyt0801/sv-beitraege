@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { SchliessenKnopf, ZurueckKnopf, useBlattKopf } from "./Sheet";
+import { SchliessenKnopf, ZurueckKnopf, useBlattKopf, useZurueckKanal } from "./Sheet";
 
 /**
  * Bausteine im Stil der iOS-Einstellungen – überall in der App gleich:
@@ -249,6 +249,7 @@ export function RechnungKopf({
 }) {
   // Für „‹ …“ einer Unterseite zählt die kleine Zeile („Mithilfe nachtragen“)
   const lage = useBlattKopf(oben ?? titel);
+  useZurueckKanal(zurueck?.onClick);
   const zurueckJetzt = zurueck ?? (lage?.kind && onClose ? { text: lage.zurueckText, onClick: onClose } : undefined);
   return (
     <div className="relative flex flex-col items-center pt-1 text-center">
