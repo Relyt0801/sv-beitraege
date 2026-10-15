@@ -162,7 +162,9 @@ export function RoleProvider({ children }: { children: ReactNode }) {
     if (hasSupabase || !students.length) return;
     setUid(demoUid(demo));
     setProfiles((vorher) => (vorher.length ? vorher : demoProfile(students)));
-    if (demo && !STAFF.includes(role) && role !== "eltern") setStudentId(students[0].id);
+    // Auch Stufenteam und Admin sind in echt meist selbst Schüler der Stufe
+    // (mit eigenem Steckbrief und Profil-Reiter) – in der Demo genauso.
+    if (demo && role !== "eltern") setStudentId(STAFF.includes(role) ? (students[1] ?? students[0]).id : students[0].id);
   }, [students, demo, role]);
 
   useEffect(() => {
