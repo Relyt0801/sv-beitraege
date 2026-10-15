@@ -245,3 +245,83 @@ export function useGewinner(bereich: GewinnerBereich, aktiv: boolean) {
 
   return { liste, von, kueren, zuruecknehmen, laden };
 }
+
+/* ====================================================================== */
+/* Für alle Bereiche zusammen (Chats → Anfragen) und die nötige Zahl      */
+/* ====================================================================== */
+export const TABELLE_NAME: Record<TeilTabelle, string> = {
+  zitate: "Zitat",
+  ranking_kategorien: "Ranking",
+  motto_vorschlaege: "Motto",
+  album_kommentare: "Kommentar",
+};
+
+/**
+ * Wie viele Zustimmungen braucht ein Verschieben? (Profil → Freigaben →
+ * „Verschieben“, Standard 3). Für die Rückfrage vor dem Antrag.
+ */
+export function useVerschiebenNoetig(): number {
+  const [n, setN] = useState(3);
+  useEffect(() => {
+    if (!hasSupabase) return;
+    void supabase!
+      .from("app_settings")
+      .select("bestaetigungen")
+      .eq("id", 1)
+      .maybeSingle()
+      .then(({ data }) => {
+        const b = (data as { bestaetigungen?: Record<string, number> } | null)?.bestaetigungen;
+        if (b?.verschieben) setN(b.verschieben);
+      });
+  }, []);
+  return n;
+}
+
+/**
+ * Alle offenen Verschiebe-Anträge, denen ich zustimmen darf – über alle vier
+ * Tabellen. Für die Kachel „Anfragen“ im Chats-Reiter, damit Anträge nicht
+ * nur zufällig gefunden werden.
+ */
+export function useAlleVerschiebungen(aktiv: boolean) {
+  const [liste, setListe] = useState<(Verschiebung & { tabelle: TeilTabelle })[]>([]);
+  const laden = useCallback(async () => {
+    if (!aktiv || !hasSupabase) return;
+    const tabellen: TeilTabelle[] = ["zitate", "ranking_kategorien", "motto_vorschlaege", "album_kommentare"];
+    const teile = await Promise.all(
+      tabellen.map(async (t) => {
+        const { data } = await supabase!.rpc("verschiebungen_offen", { p_tabelle: t });
+        return ((data as Verschiebung[]) || []).map((v) => ({ ...v, tabelle: t }));
+      }),
+    );
+    setListe(teile.flat().sort((a, b) => a.created_at.localeCompare(b.created_at)));
+  }, [aktiv]);
+  useEffect(() => {
+    void laden();
+    if (!aktiv || !hasSupabase) return;
+    return abonniere({
+      name: "sv-verschieben-alle",
+      nachholen: laden,
+      aufbauen: (k) => k.on("postgres_changes", { event: "*", schema: "public", table: "verschiebungen" }, () => void laden()),
+    });
+  }, [aktiv, laden]);
+  const zustimmen = useCallback(
+    async (id: string) => {
+      const { data, error } = await supabase!.rpc("verschieben_zustimmen", { p_id: id });
+      if (error) return meldeFehler(error.message);
+      const r = data as { fertig: boolean; stimmen: number; noetig: number };
+      melde(r.fertig ? "Verschoben" : `Zugestimmt – ${r.stimmen} von ${r.noetig}`);
+      void laden();
+    },
+    [laden],
+  );
+  const ablehnen = useCallback(
+    async (id: string) => {
+      const { error } = await supabase!.rpc("verschieben_ablehnen", { p_id: id });
+      if (error) return meldeFehler(error.message);
+      melde("Antrag verworfen");
+      void laden();
+    },
+    [laden],
+  );
+  return { liste, zustimmen, ablehnen, laden };
+}
