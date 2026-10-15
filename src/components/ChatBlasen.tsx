@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { useChatEnde } from "../lib/gescrollt";
+import { scrollSperren } from "../lib/scrollsperre";
+import { Icon } from "./Icon";
 import { REAKTIONEN, erstesEmoji, useTopicsOptional, type Reaktion, type TopicItem } from "../topics-store";
 import { Avatar, PersonName } from "./Avatar";
 import { MuteKnopf } from "./MuteKnopf";
@@ -396,23 +397,78 @@ export function ChatBlasen({
   onDelete: (id: string) => void;
   leerText?: string;
 }) {
-  const ende = useChatEnde(liste.length, liste[liste.length - 1]?.created_by === uid);
+  const ende = useChatEndeIn(liste.length, liste[liste.length - 1]?.created_by === uid);
 
   return (
     <div className="space-y-2 py-3">
-      {liste.length === 0 && <p className="py-12 text-center text-sm text-tinte-leise">{leerText}</p>}
+      {liste.length === 0 && <LeererChat text={leerText} />}
       {liste.map((m) => {
         if (m.type === "system") return <SystemZeile key={m.id} m={m} darfLoeschen={darfLoeschen} onDelete={onDelete} />;
         return <ChatBlase key={m.id} m={m} meins={m.created_by === uid} darfLoeschen={darfLoeschen} onDelete={onDelete} />;
       })}
-      {/* Platz für Eingabezeile und Tab-Leiste. Die Marke fürs Scrollen steht
-          dahinter – so landet die letzte Nachricht über der Eingabe statt
-          dahinter. Zusammen mit dem unteren Rand der Seite genau so hoch wie
-          Eingabe + Tab-Leiste – kein Leerraum mehr unter der letzten Nachricht. */}
-      <div aria-hidden className="h-8 lg:h-4" />
+      {/* Scroll-Marke: Den Platz für Kopf- und Eingabeleiste hält die
+          ChatEbene selbst frei – hier braucht es keinen Abstandhalter mehr. */}
       <div ref={ende} />
     </div>
   );
+}
+
+/** Leerer Verlauf: sagt, was als Nächstes zu tun ist – mittig, ruhig. */
+export function LeererChat({ text }: { text: string }) {
+  return (
+    <div className="flex flex-col items-center px-8 py-16 text-center">
+      <span aria-hidden className="flex h-14 w-14 items-center justify-center rounded-full bg-brand/10 text-brand dark:bg-brand/20">
+        <Icon name="chats" size={26} />
+      </span>
+      <p className="mt-3 max-w-xs text-[14px] leading-snug text-tinte-leise">{text}</p>
+    </div>
+  );
+}
+
+/**
+ * Automatisch nach unten scrollen – in der ChatEbene (eigener Scroll-Bereich,
+ * erkennbar an data-chat-scroller) statt im ganzen Fenster.
+ *
+ * Wie bei iMessage: Beim Öffnen steht man ganz unten. Kommt eine neue
+ * Nachricht, geht es nur dann mit nach unten, wenn man ohnehin unten war
+ * (sonst reißt es einen beim Nachlesen weg) – oder wenn man selbst
+ * geschrieben hat. Liegt die Liste (noch) nicht in einer ChatEbene, wird wie
+ * früher das Fenster gescrollt.
+ */
+export function useChatEndeIn(anzahl: number, letzteIstMeine: boolean) {
+  const ende = useRef<HTMLDivElement | null>(null);
+  const erstes = useRef(true);
+  const warUnten = useRef(true);
+
+  // Merken, ob man unten ist – VOR der nächsten Nachricht, nicht danach
+  useEffect(() => {
+    const el = ende.current;
+    if (!el) return;
+    const sc = el.closest<HTMLElement>("[data-chat-scroller]");
+    const ziel: HTMLElement | Window = sc ?? window;
+    const pruefen = () => {
+      const rest = sc
+        ? sc.scrollHeight - sc.scrollTop - sc.clientHeight
+        : document.documentElement.scrollHeight - window.scrollY - window.innerHeight;
+      warUnten.current = rest < 120;
+    };
+    ziel.addEventListener("scroll", pruefen, { passive: true });
+    return () => ziel.removeEventListener("scroll", pruefen);
+  }, []);
+
+  // Vor dem Zeichnen springen: kein sichtbares Zucken beim Öffnen
+  useLayoutEffect(() => {
+    const el = ende.current;
+    if (!el) return;
+    if (erstes.current || warUnten.current || letzteIstMeine) {
+      const sc = el.closest<HTMLElement>("[data-chat-scroller]");
+      if (sc) sc.scrollTop = sc.scrollHeight;
+      else window.scrollTo({ top: document.documentElement.scrollHeight, behavior: "auto" });
+      warUnten.current = true;
+    }
+    if (anzahl > 0) erstes.current = false;
+  }, [anzahl, letzteIstMeine]);
+  return ende;
 }
 
 /**
@@ -442,23 +498,41 @@ export function SystemZeile({
   );
 }
 
-/** Eingabezeile, fest unten über der Reiter-Leiste. */
+/**
+ * Eingabezeile wie in iMessage: rundes Feld, daneben der runde blaue
+ * Senden-Knopf mit Pfeil nach oben. Sie sitzt NICHT mehr selbst fest am
+ * Bildschirmrand, sondern im Fuß der ChatEbene – die schiebt sie über die
+ * Tastatur bzw. an den unteren Rand (Sicherheitsabstand fürs iPhone).
+ * Das Feld wächst mit bis zu fünf Zeilen mit. Enter sendet, Umschalt+Enter
+ * macht eine neue Zeile (am Rechner).
+ */
 export function ChatEingabe({
   wert,
   setWert,
   onSenden,
-  platzhalter = "Nachricht…",
+  platzhalter = "Nachricht",
 }: {
   wert: string;
   setWert: (v: string) => void;
   onSenden: () => void;
   platzhalter?: string;
 }) {
+  const feld = useRef<HTMLTextAreaElement>(null);
+  // Höhe an den Inhalt anpassen (auch nach dem Senden wieder einzeilig)
+  useLayoutEffect(() => {
+    const el = feld.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 132)}px`;
+  }, [wert]);
+  const leer = !wert.trim();
   return (
-    <div className="glas fixed inset-x-0 bottom-[var(--leiste)] z-30 flex items-end gap-2 border-t border-black/[0.06] px-3 py-2 dark:border-white/10 sm:px-5 lg:bottom-0 lg:pb-[calc(env(safe-area-inset-bottom)+0.75rem)]">
+    <div className="flex items-end gap-2">
       <textarea
+        ref={feld}
         rows={1}
-        className="field max-h-28 flex-1 resize-none py-2.5"
+        aria-label={platzhalter}
+        className="max-h-[8.25rem] min-h-[2.375rem] flex-1 resize-none rounded-[1.2rem] border-0 bg-[rgb(var(--zelle))] px-4 py-[0.5rem] text-[16px] leading-[1.35] text-tinte shadow-[0_0_0_0.5px_rgba(0,0,0,0.14)] outline-none transition placeholder:text-tinte-leise focus:shadow-[0_0_0_1px_rgb(var(--brand)/0.6)] dark:bg-[rgb(118_118_128/0.24)] dark:text-slate-100 dark:shadow-[0_0_0_0.5px_rgba(255,255,255,0.12)]"
         placeholder={platzhalter}
         value={wert}
         onChange={(e) => setWert(e.target.value)}
@@ -470,13 +544,242 @@ export function ChatEingabe({
         }}
       />
       <button
+        type="button"
         onClick={onSenden}
-        disabled={!wert.trim()}
-        className="flex h-11 w-11 items-center justify-center rounded-xl bg-brand text-lg text-white disabled:opacity-40"
+        disabled={leer}
+        // Feld behält beim Tippen auf Senden den Fokus – die Tastatur bleibt offen
+        onPointerDown={(e) => e.preventDefault()}
+        className="mb-[3px] flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand text-white transition duration-200 ease-ios active:scale-90 disabled:bg-[rgb(118_118_128/0.24)] disabled:text-white/90 dark:disabled:bg-[rgb(118_118_128/0.32)]"
         aria-label="Senden"
       >
-        ➤
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <path d="M12 19V5M6 11l6-6 6 6" />
+        </svg>
       </button>
     </div>
+  );
+}
+
+/* ======================================================================
+ * Chat als eigene Ebene (Vollbild) – wie ein geöffneter Chat in iMessage
+ * ====================================================================== */
+
+/**
+ * Sichtbarer Bereich des Fensters (ohne Tastatur).
+ *
+ * iPhone: Geht die Tastatur auf, bleibt das Fenster selbst gleich hoch; nur
+ * der sichtbare Ausschnitt (visualViewport) wird kleiner und verschiebt sich.
+ * Eine feste Ebene mit „inset-0“ ragte dann unter die Tastatur, und Safari
+ * schob die ganze Ebene samt Kopfleiste nach oben aus dem Bild. Deshalb
+ * folgt die Ebene genau dem sichtbaren Ausschnitt: Höhe und Abstand oben
+ * kommen von hier. Am Rechner (ab 1024 px) gibt es keine Bildschirmtastatur –
+ * dort gelten die CSS-Klassen allein.
+ */
+function useSichtfenster(aktiv: boolean) {
+  const [s, setS] = useState<{ hoehe?: number; oben?: number; tastatur: boolean }>({ tastatur: false });
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!aktiv || !vv) return;
+    let raf = 0;
+    const messen = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        if (window.innerWidth >= 1024) return setS({ tastatur: false });
+        setS({
+          hoehe: Math.round(vv.height),
+          oben: Math.max(0, Math.round(vv.offsetTop)),
+          // Deutlich kleiner als das Fenster = Tastatur ist offen
+          tastatur: window.innerHeight - vv.height > 120,
+        });
+      });
+    };
+    messen();
+    vv.addEventListener("resize", messen);
+    vv.addEventListener("scroll", messen);
+    window.addEventListener("resize", messen);
+    return () => {
+      cancelAnimationFrame(raf);
+      vv.removeEventListener("resize", messen);
+      vv.removeEventListener("scroll", messen);
+      window.removeEventListener("resize", messen);
+    };
+  }, [aktiv]);
+  return s;
+}
+
+/** Höhe eines Elements in Pixeln, laufend gemessen (Kopf/Fuß der Ebene). */
+function useHoehe() {
+  const [el, setEl] = useState<HTMLElement | null>(null);
+  const [h, setH] = useState(0);
+  useEffect(() => {
+    if (!el) return setH(0);
+    const ro = new ResizeObserver(() => setH(el.offsetHeight));
+    ro.observe(el);
+    setH(el.offsetHeight);
+    return () => ro.disconnect();
+  }, [el]);
+  return [setEl, h] as const;
+}
+
+/**
+ * Ein geöffneter Chat (oder eine Unterseite wie „Anfragen“) als Vollbild-Ebene.
+ *
+ * Vorher hing der Chat mitten in der Seite: oben die App-Kopfleiste mit
+ * Profilbild, darunter der große Titel „Chats“ und erst dann – etwa im
+ * zweiten Fünftel des Bildschirms – der dunkle Balken mit „Chat | Übersicht“.
+ * Jetzt liegt der Chat wie in iMessage/WhatsApp als eigene Ebene ÜBER allem:
+ *
+ *   - oben EINE Glas-Kopfleiste (Zurück, Name, Umschalter) – der Verlauf
+ *     scrollt milchig darunter durch,
+ *   - unten die Eingabezeile als Glas-Leiste; die Reiterleiste ist im Chat
+ *     ausgeblendet (wie bei WhatsApp), zurück geht es mit dem Pfeil,
+ *   - die Ebene folgt dem sichtbaren Bereich, damit die Eingabe genau über
+ *     der Tastatur sitzt und die Kopfleiste oben bleibt (useSichtfenster).
+ *
+ * Ebenen-Reihenfolge: über App-Kopf (z-20) und Reiterleiste (z-40), unter
+ * Blättern (Sheet, z-50) und Rückfragen (z-90). Am Rechner/iPad quer
+ * beginnt die Ebene unter der App-Kopfleiste, damit die Reiter oben
+ * erreichbar bleiben.
+ *
+ * Direkt an <body> gehängt (Portal): sonst sperrt eine animierte Elternebene
+ * (animate-fadeIn am <main>) die Ebene in ihren eigenen Stapel ein, und die
+ * App-Kopfleiste läge doch wieder darüber.
+ *
+ * sichtbar=false: bleibt eingehängt, aber unsichtbar – z. B. damit die
+ * Anfragen im Hintergrund weiter zählen und auf Benachrichtigungen reagieren.
+ */
+export function ChatEbene({
+  kopf,
+  fuss,
+  children,
+  sichtbar = true,
+  label,
+}: {
+  kopf: ReactNode;
+  fuss?: ReactNode;
+  children: ReactNode;
+  sichtbar?: boolean;
+  /** Vorlesetext der Ebene, z. B. der Chat-Name */
+  label?: string;
+}) {
+  const sicht = useSichtfenster(sichtbar);
+  const [kopfRef, kopfH] = useHoehe();
+  const [fussRef, fussH] = useHoehe();
+  const scroller = useRef<HTMLDivElement>(null);
+  const warUnten = useRef(true);
+
+  // Die Seite dahinter scrollt nicht mit
+  useEffect(() => {
+    if (!sichtbar) return;
+    return scrollSperren();
+  }, [sichtbar]);
+
+  // Wird der sichtbare Bereich kleiner (Tastatur geht auf) oder wächst die
+  // Eingabe, bleibt man unten, wenn man unten war – wie in iMessage.
+  useEffect(() => {
+    const sc = scroller.current;
+    if (!sc) return;
+    const merken = () => {
+      warUnten.current = sc.scrollHeight - sc.scrollTop - sc.clientHeight < 120;
+    };
+    sc.addEventListener("scroll", merken, { passive: true });
+    return () => sc.removeEventListener("scroll", merken);
+  }, []);
+  useLayoutEffect(() => {
+    const sc = scroller.current;
+    if (sc && warUnten.current) sc.scrollTop = sc.scrollHeight;
+  }, [sicht.hoehe, fussH]);
+
+  return createPortal(
+    <div
+      role="region"
+      aria-label={label}
+      className={`fixed inset-x-0 top-0 z-[45] flex h-[100dvh] flex-col bg-papier dark:bg-slate-950 lg:bottom-0 lg:top-[var(--kopf)] lg:z-[15] lg:h-auto ${
+        sichtbar ? "animate-vonRechts" : "hidden"
+      }`}
+      style={sicht.hoehe ? { height: sicht.hoehe, top: sicht.oben } : undefined}
+    >
+      {/* Verlauf: läuft unter Kopf- und Fußleiste durch (Glas) */}
+      <div
+        ref={scroller}
+        data-chat-scroller
+        className="min-h-0 flex-1 overflow-y-auto overscroll-contain"
+        style={{
+          paddingTop: kopfH,
+          paddingBottom: fuss ? fussH : "calc(env(safe-area-inset-bottom) + 1.5rem)",
+        }}
+      >
+        <div className="mx-auto max-w-5xl px-3 sm:px-5">{children}</div>
+      </div>
+
+      <div
+        ref={kopfRef}
+        className="glas absolute inset-x-0 top-0 z-10 !bg-[rgb(var(--glas)/0.9)] pb-2 pt-[calc(env(safe-area-inset-top)+0.5rem)] shadow-[0_0.5px_0_rgba(0,0,0,0.16)] dark:shadow-[0_0.5px_0_rgba(255,255,255,0.14)] lg:pt-2"
+      >
+        <div className="mx-auto max-w-5xl px-3 sm:px-5">{kopf}</div>
+      </div>
+
+      {fuss && (
+        <div
+          ref={fussRef}
+          className={`glas absolute inset-x-0 bottom-0 z-10 pt-2 shadow-[0_-0.5px_0_rgba(0,0,0,0.16)] dark:shadow-[0_-0.5px_0_rgba(255,255,255,0.14)] ${
+            sicht.tastatur ? "pb-2" : "pb-[calc(env(safe-area-inset-bottom)+0.5rem)]"
+          }`}
+        >
+          <div className="mx-auto max-w-5xl px-3 sm:px-5">{fuss}</div>
+        </div>
+      )}
+    </div>,
+    document.body,
+  );
+}
+
+/**
+ * Kopfleiste einer ChatEbene: links der runde Zurück-Knopf, in der Mitte
+ * Symbol + Name (+ eine kleine Zeile, z. B. „8 Mitglieder“), rechts Platz
+ * für Knöpfe. Darunter optional z. B. der Umschalter „Chat | Übersicht“.
+ * Der Name steht mittig wie in iOS – die Spalten links/rechts sind gleich
+ * breit, solange rechts nicht mehr Knöpfe stehen als links.
+ */
+export function ChatKopf({
+  onBack,
+  symbol,
+  titel,
+  unter,
+  rechts,
+  children,
+}: {
+  onBack: () => void;
+  symbol?: ReactNode;
+  titel: ReactNode;
+  unter?: ReactNode;
+  rechts?: ReactNode;
+  children?: ReactNode;
+}) {
+  return (
+    <>
+      <div className="grid grid-cols-[minmax(min-content,1fr)_minmax(0,max-content)_minmax(min-content,1fr)] items-center gap-2">
+        <div className="flex">
+          <button type="button" className="iconbtn" onClick={onBack} aria-label="Zurück" title="Zurück">
+            <span className="block rotate-180">
+              <Icon name="chevron" size={20} strich={2.4} />
+            </span>
+          </button>
+        </div>
+        <div className="flex min-w-0 items-center justify-center gap-2">
+          {symbol && (
+            <span aria-hidden className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[rgb(118_118_128/0.12)] text-[17px] leading-none dark:bg-[rgb(118_118_128/0.24)]">
+              {symbol}
+            </span>
+          )}
+          <div className="min-w-0">
+            <div className="truncate text-[16px] font-semibold leading-tight tracking-[-0.01em]">{titel}</div>
+            {unter && <div className="truncate text-[11.5px] leading-tight text-tinte-leise">{unter}</div>}
+          </div>
+        </div>
+        <div className="flex items-center justify-end gap-1.5">{rechts}</div>
+      </div>
+      {children && <div className="mt-2">{children}</div>}
+    </>
   );
 }

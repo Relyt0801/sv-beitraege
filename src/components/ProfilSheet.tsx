@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { neuLadenErzwingen } from "../lib/neuladen";
 import { LoeschfristenSheet } from "./LoeschfristenSheet";
 import { Sheet, SheetKopf } from "./Sheet";
@@ -10,7 +10,7 @@ import { useRole } from "../auth/RoleProvider";
 import { hasSupabase, supabase } from "../lib/supabase";
 import { farbwert, lesbarerName, namensfarbe, speichereProfil, waehlbareFarben } from "../lib/profil";
 import { passwortProblem } from "../lib/passwort";
-import { SELECTABLE_COMMITTEES, committeeIcon, committeeLabel, rolleUndKomitees } from "../lib/committees";
+import { SELECTABLE_COMMITTEES, committeeIcon, rolleUndKomitees } from "../lib/committees";
 import { ladeKomiteeAntraege, stelleKomiteeAntrag } from "../lib/komitee-antrag";
 import { useTheme } from "../lib/theme";
 import { abmelden, enablePush, pushConfigured, pushDiagnose, pushPermission } from "../lib/push";
@@ -20,6 +20,7 @@ import { FunktionenSheet } from "./FunktionenSheet";
 import { WortfilterSheet } from "./Melden";
 import { FreigabenSheet } from "./FreigabenSheet";
 import { Schalter } from "./Schalter";
+import { Gruppe, Symbol, Wert, Zeile, ZeileAuswahl, ZeileMitSchalter } from "./Liste";
 import { Icon, type IconName } from "./Icon";
 import { darfSchalten } from "../lib/funktionen";
 import { hintergrundEntfernen, hintergrundSetzen, useHintergrund } from "../lib/hintergrund";
@@ -104,107 +105,116 @@ export function ProfilSheet({
     setPwInfo("Passwort geändert.");
   }
 
-  // Zeilen wie in den iOS-Einstellungen: gruppierte Listen mit Symbol links
-  const row =
-    "flex min-h-[2.75rem] w-full items-center gap-3 px-4 py-2 text-left text-[16px] transition active:bg-black/[0.05] dark:active:bg-white/[0.07]";
   const darfFunktionen = (["abiball", "album", "zitate", "rankings", "spotify", "motto", "umfragen"] as const).some((k) => darfSchalten(can, k));
-  const verwaltung =
-    darfFunktionen || (hasSupabase && (can("wortfilter.verwalten") || istAdmin || istKassenwart || can("perms.manage")));
+  // Freigaben gibt es auch in der Demo (dort nur auf diesem Gerät) – so lässt
+  // sich das Blatt ohne Datenbank ansehen. Alles andere braucht die Datenbank.
+  const darfFreigaben = istAdmin;
+  const darfWortfilter = hasSupabase && can("wortfilter.verwalten");
+  const verwaltung = darfFunktionen || darfFreigaben || darfWortfilter;
+  const darfLoeschfristen = hasSupabase && (istAdmin || can("perms.manage"));
+  const daten = hasSupabase && (istAdmin || istKassenwart || can("perms.manage"));
+  const pushText = !pushConfigured() ? "Nicht eingerichtet" : perm === "granted" ? "An" : perm === "denied" ? "Blockiert" : "Aus";
 
   return (
     <Sheet open={open} onClose={onClose}>
       <SheetKopf titel="Mein Profil" onClose={onClose} />
 
-      {/* Kopf: Namenskreis + Name. Elternzugaenge tragen kein Bild. */}
-      <div className="mb-5 flex items-center gap-4">
-        {!istEltern && <Avatar userId={uid} size={64} />}
+      {/* Kopf: wie die Account-Zelle ganz oben in den iOS-Einstellungen.
+          Elternzugaenge tragen kein Bild. */}
+      <div className="gruppe-zellen">
+       <div className="flex items-center gap-4 px-4 py-3.5">
+        {!istEltern && <Avatar userId={uid} size={60} />}
         <div className="min-w-0 flex-1">
-          <div className="truncate text-lg font-bold" style={istEltern ? undefined : { color: namensfarbe(mein?.farbe, theme === "dark") }}>
+          <div
+            className="truncate text-[19px] font-semibold tracking-[-0.01em]"
+            style={istEltern ? undefined : { color: namensfarbe(mein?.farbe, theme === "dark") }}
+          >
             {istEltern ? mein?.anzeigename || "Ihr Zugang" : `${personIcon(role, meine)} | ${lesbarerName(mein?.anzeigename || "") || "Dein Name"}`}
           </div>
-          <div className="text-[12px] text-tinte-leise">{istEltern ? "Elternzugang" : rolleUndKomitees(role, meine) || "noch kein Komitee"}</div>
+          <div className="mt-0.5 truncate text-[13px] text-tinte-leise">
+            {istEltern ? "Elternzugang" : rolleUndKomitees(role, meine) || "Noch kein Komitee"}
+          </div>
         </div>
+       </div>
       </div>
 
-      {farbFehler && <div className="mb-4 rounded-xl bg-red-500/10 px-3 py-2 text-[13px] font-semibold text-red-500">{farbFehler}</div>}
+      {farbFehler && <div className="mt-3 rounded-xl bg-red-500/10 px-3 py-2 text-[13px] font-semibold text-red-500">{farbFehler}</div>}
 
       {/* ------------------------------------------------ Darstellung */}
-      <h3 className="abschnitt">Darstellung</h3>
-      <div className="liste mb-5 zelle">
+      <Gruppe titel="Darstellung" className="mt-6">
         {!istEltern && (
-          <div>
-            <button className={row} onClick={() => setFarbenOffen((o) => !o)} aria-expanded={farbenOffen}>
-              <span className="symbol bg-[#FF9500]">
-                <Icon name="person" size={16} strich={2.2} />
-              </span>
-              <span className="min-w-0 flex-1">Farbe deines Namens</span>
-              <span className="h-5 w-5 rounded-full" style={{ backgroundColor: farbwert(mein?.farbe, theme === "dark"), border: "1px solid rgba(100,116,139,.35)" }} />
-              <Pfeil auf={farbenOffen} />
-            </button>
-            {farbenOffen && (
-              <div className="grid max-w-sm grid-cols-8 gap-2 px-4 pb-3 pt-1 sm:gap-2.5">
-                {waehlbareFarben({ staff: isStaff, op: isOp }).map((f) => {
-                  const aktiv = (mein?.farbe || "indigo") === f.key;
-                  return (
-                    <button
-                      key={f.key}
-                      title={f.label}
-                      aria-label={f.label}
-                      onClick={async () => {
-                        aktualisiere({ farbe: f.key });
-                        setFarbFehler("");
-                        const r = await speichereProfil({ farbe: f.key });
-                        if (!r.ok) {
-                          setFarbFehler("Farbe konnte nicht gespeichert werden: " + r.error);
-                          return;
-                        }
-                        neuLaden();
-                      }}
-                      style={{ backgroundColor: theme === "dark" ? f.dunkel : f.hell, border: f.kontur ? "1px solid rgba(100,116,139,.5)" : undefined }}
-                      className={`aspect-square w-full rounded-full transition active:scale-90 ${
-                        aktiv ? "ring-2 ring-slate-900 ring-offset-2 dark:ring-white dark:ring-offset-slate-900" : ""
-                      }`}
-                    />
-                  );
-                })}
-              </div>
-            )}
+          <AufZeile
+            symbol={<Sym icon="person" farbe="bg-[#FF9500]" />}
+            label="Farbe deines Namens"
+            auf={farbenOffen}
+            onClick={() => setFarbenOffen((o) => !o)}
+          >
+            <span
+              className="h-[22px] w-[22px] rounded-full"
+              style={{ backgroundColor: farbwert(mein?.farbe, theme === "dark"), boxShadow: "inset 0 0 0 1px rgba(100,116,139,.3)" }}
+            />
+          </AufZeile>
+        )}
+        {!istEltern && farbenOffen && (
+          <div className="grid animate-fadeIn grid-cols-8 gap-2.5 px-4 pb-3.5 pt-3">
+            {waehlbareFarben({ staff: isStaff, op: isOp }).map((f) => {
+              const aktiv = (mein?.farbe || "indigo") === f.key;
+              return (
+                <button
+                  key={f.key}
+                  title={f.label}
+                  aria-label={f.label}
+                  aria-pressed={aktiv}
+                  onClick={async () => {
+                    aktualisiere({ farbe: f.key });
+                    setFarbFehler("");
+                    const r = await speichereProfil({ farbe: f.key });
+                    if (!r.ok) {
+                      setFarbFehler("Farbe konnte nicht gespeichert werden: " + r.error);
+                      return;
+                    }
+                    neuLaden();
+                  }}
+                  style={{ backgroundColor: theme === "dark" ? f.dunkel : f.hell, boxShadow: f.kontur ? "inset 0 0 0 1px rgba(100,116,139,.5)" : undefined }}
+                  className={`aspect-square w-full rounded-full transition duration-200 ease-ios active:scale-90 ${
+                    aktiv ? "ring-[2.5px] ring-brand ring-offset-2 ring-offset-[rgb(var(--zelle))]" : ""
+                  }`}
+                />
+              );
+            })}
           </div>
         )}
-        <HintergrundZeile row={row} />
-      </div>
+        <HintergrundZeile />
+      </Gruppe>
 
       {/* ------------------------------------------------ Mitteilungen */}
-      {(hasSupabase || !istEltern) && <h3 className="abschnitt">Mitteilungen</h3>}
-      <div className="liste mb-5 zelle [&:empty]:hidden">
-        {!istEltern && (
-          <label className={row}>
-            <span className="symbol bg-[#34C759]">
-              <Icon name="chats" size={16} strich={2.2} />
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block">Chats</span>
-              <span className="block text-[12px] text-tinte-leise">Wichtiges (Angepinntes, Team, Events) kommt immer.</span>
-            </span>
-            <Schalter
-              an={mein?.push_chats ?? true}
-              label="Mitteilungen für Chats"
-              onChange={async (neu) => {
-                aktualisiere({ push_chats: neu });
-                const r = await speichereProfil({ push_chats: neu });
-                if (!r.ok) setFarbFehler("Einstellung konnte nicht gespeichert werden: " + r.error);
-                else neuLaden();
-              }}
-            />
-          </label>
-        )}
-        {hasSupabase && (
-          <div className="px-4 py-2.5">
-            <div className="flex items-center gap-3">
-              <span className="symbol bg-[#FF3B30]">
-                <Icon name="info" size={16} strich={2.2} />
-              </span>
-              <span className="min-w-0 flex-1 text-[16px]">Aufs Gerät</span>
+      {(hasSupabase || !istEltern) && (
+        <Gruppe
+          titel="Mitteilungen"
+          fuss={
+            <>
+              {!istEltern && "Wichtiges – Angepinntes, Team und Events – kommt immer. "}
+              {hasSupabase && perm === "denied" && "Dein Browser blockiert Mitteilungen – in den Browser-Einstellungen wieder erlauben. "}
+              {hasSupabase && <Pushpruefung />}
+            </>
+          }
+        >
+          {!istEltern && (
+            <ZeileMitSchalter label="Chats" symbol={<Sym icon="chats" farbe="bg-[#34C759]" />}>
+              <Schalter
+                an={mein?.push_chats ?? true}
+                label="Mitteilungen für Chats"
+                onChange={async (neu) => {
+                  aktualisiere({ push_chats: neu });
+                  const r = await speichereProfil({ push_chats: neu });
+                  if (!r.ok) setFarbFehler("Einstellung konnte nicht gespeichert werden: " + r.error);
+                  else neuLaden();
+                }}
+              />
+            </ZeileMitSchalter>
+          )}
+          {hasSupabase && (
+            <Zeile label="Aufs Gerät" symbol={<Sym icon="info" farbe="bg-[#FF3B30]" />}>
               {pushConfigured() && perm !== "granted" && perm !== "denied" ? (
                 <button
                   disabled={pushBusy}
@@ -215,153 +225,161 @@ export function ProfilSheet({
                     setPerm(pushPermission());
                     if (!r.ok && r.error) meldeFehler("Hat nicht geklappt: " + r.error);
                   }}
-                  className="btn-klein"
+                  className="btn-klein !min-h-[2rem] !px-3.5 !text-[13px]"
                 >
                   {pushBusy ? "…" : "Anschalten"}
                 </button>
               ) : (
-                <span className={`text-[14px] ${perm === "granted" ? "font-semibold text-emerald-600 dark:text-emerald-400" : "text-tinte-leise"}`}>
-                  {!pushConfigured() ? "nicht eingerichtet" : perm === "granted" ? "An" : "blockiert"}
-                </span>
+                <Wert>{pushText}</Wert>
               )}
-            </div>
-            {perm === "denied" && (
-              <p className="ml-[42px] mt-1 text-[12px] leading-snug text-tinte-leise">Dein Browser blockiert sie. In den Browser-Einstellungen wieder erlauben.</p>
-            )}
-            <div className="ml-[42px]">
-              <Pushpruefung />
-            </div>
-          </div>
-        )}
-      </div>
+            </Zeile>
+          )}
+        </Gruppe>
+      )}
 
       {/* ------------------------------------------------ Konto */}
-      {(hasSupabase || (!isStaff && !istEltern)) && <h3 className="abschnitt">Konto</h3>}
-      <div className="liste mb-5 [&:empty]:hidden zelle">
-        {hasSupabase && (
-          <div>
-            <button className={row} onClick={() => { setPwOffen((o) => !o); setPwInfo(""); }} aria-expanded={pwOffen}>
-              <span className="symbol bg-[#8E8E93]">
-                <Icon name="schluessel" size={16} strich={2.2} />
-              </span>
-              <span className="min-w-0 flex-1">Passwort ändern</span>
-              <Pfeil auf={pwOffen} />
-            </button>
-            {pwOffen && (
-              <div className="px-4 pb-3">
-                <input type="password" autoComplete="new-password" className="field mb-2" placeholder="Neues Passwort" value={pw1} onChange={(e) => setPw1(e.target.value)} />
-                <input
-                  type="password"
-                  autoComplete="new-password"
-                  className="field mb-2"
-                  placeholder="Noch einmal zur Sicherheit"
-                  value={pw2}
-                  onChange={(e) => setPw2(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && void passwortSpeichern()}
-                />
-                {pwInfo && <div className="mb-2 text-[13px] font-medium text-red-500">{pwInfo}</div>}
-                <button disabled={pwBusy} onClick={passwortSpeichern} className="btn-klein w-full">
-                  {pwBusy ? "…" : "Speichern"}
-                </button>
-              </div>
-            )}
-          </div>
-        )}
-        {!isStaff && !istEltern && (
-          <div>
-            <button className={row} onClick={() => !hatAntrag && setAntragOffen((o) => !o)} aria-expanded={antragOffen}>
-              <span className="symbol bg-[#32ADE6]">
-                <Icon name="rollen" size={16} strich={2.2} />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block">{meine.length ? "Komitee wechseln" : "Komitee wählen"}</span>
-                {hatAntrag && <span className="block text-[12px] text-tinte-leise">Dein Wunsch liegt beim Stufenteam.</span>}
-              </span>
-              {!hatAntrag && <Pfeil auf={antragOffen} />}
-            </button>
-            {antragOffen && !hatAntrag && (
-              <div className="px-4 pb-3">
-                <select className="field mb-2" value={wunsch} onChange={(e) => setWunsch(e.target.value)}>
-                  <option value="">— Wunsch-Komitee —</option>
+      {(hasSupabase || (!isStaff && !istEltern)) && (
+        <Gruppe titel="Konto" fuss={hatAntrag && !isStaff && !istEltern ? "Dein Komitee-Wunsch liegt beim Stufenteam." : undefined}>
+          {hasSupabase && (
+            <AufZeile
+              symbol={<Sym icon="schluessel" farbe="bg-[#8E8E93]" />}
+              label="Passwort ändern"
+              auf={pwOffen}
+              onClick={() => {
+                setPwOffen((o) => !o);
+                setPwInfo("");
+              }}
+            />
+          )}
+          {hasSupabase && pwOffen && (
+            <>
+              <input
+                type="password"
+                autoComplete="new-password"
+                className={EINGABE}
+                placeholder="Neues Passwort"
+                value={pw1}
+                autoFocus
+                onChange={(e) => setPw1(e.target.value)}
+              />
+              <input
+                type="password"
+                autoComplete="new-password"
+                className={EINGABE}
+                placeholder="Noch einmal zur Sicherheit"
+                value={pw2}
+                onChange={(e) => setPw2(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && void passwortSpeichern()}
+              />
+              {pwInfo && <div className="px-4 py-2.5 text-[13px] font-medium text-red-500">{pwInfo}</div>}
+              <Zeile label={pwBusy ? "Wird gespeichert …" : "Passwort speichern"} blau disabled={pwBusy || !pw1} onClick={() => void passwortSpeichern()} />
+            </>
+          )}
+          {!isStaff && !istEltern && (
+            <AufZeile
+              symbol={<Sym icon="rollen" farbe="bg-[#32ADE6]" />}
+              label={meine.length ? "Komitee wechseln" : "Komitee wählen"}
+              auf={antragOffen}
+              onClick={() => !hatAntrag && setAntragOffen((o) => !o)}
+              wert={hatAntrag ? "Angefragt" : undefined}
+              ohnePfeil={hatAntrag}
+            />
+          )}
+          {!isStaff && !istEltern && antragOffen && !hatAntrag && (
+            <>
+              <Zeile label="Wunsch">
+                <ZeileAuswahl label="Wunsch-Komitee" value={wunsch} onChange={setWunsch}>
+                  <option value="">Auswählen</option>
                   {SELECTABLE_COMMITTEES.filter((c) => !meine.includes(c.slug)).map((c) => (
                     <option key={c.slug} value={c.slug}>
                       {committeeIcon(c.slug)} {c.label}
                     </option>
                   ))}
-                </select>
-                <textarea rows={2} maxLength={300} className="field mb-2 resize-none" placeholder="Warum? Ein Satz reicht" value={grund} onChange={(e) => setGrund(e.target.value)} />
-                <button
-                  disabled={!wunsch}
-                  onClick={async () => {
-                    const r = await stelleKomiteeAntrag(wunsch, grund);
-                    if (r.ok) {
-                      setHatAntrag(true);
-                      setAntragOffen(false);
-                    } else meldeFehler(r.error || "Das hat nicht geklappt.");
-                  }}
-                  className="btn-klein w-full"
-                >
-                  Antrag senden
-                </button>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
+                </ZeileAuswahl>
+              </Zeile>
+              <textarea
+                rows={2}
+                maxLength={300}
+                className={`${EINGABE} resize-none py-3`}
+                placeholder="Warum? Ein Satz reicht"
+                value={grund}
+                onChange={(e) => setGrund(e.target.value)}
+              />
+              <Zeile
+                label="Antrag senden"
+                blau
+                disabled={!wunsch}
+                onClick={async () => {
+                  const r = await stelleKomiteeAntrag(wunsch, grund);
+                  if (r.ok) {
+                    setHatAntrag(true);
+                    setAntragOffen(false);
+                  } else meldeFehler(r.error || "Das hat nicht geklappt.");
+                }}
+              />
+            </>
+          )}
+        </Gruppe>
+      )}
 
       {/* ------------------------------------------------ Verwaltung */}
       {verwaltung && (
-        <>
-          <h3 className="abschnitt">Verwaltung</h3>
-          <div className="liste mb-5 zelle">
-            {darfFunktionen && (
-              <VZeile row={row} icon="auswahl" farbe="bg-brand" text="Funktionen" onClick={() => setFunktionenOffen(true)} />
-            )}
-            {hasSupabase && can("wortfilter.verwalten") && (
-              <VZeile row={row} icon="schild" farbe="bg-[#FF3B30]" text="Wortfilter" onClick={() => setWortfilterOffen(true)} />
-            )}
-            {hasSupabase && istAdmin && (
-              <VZeile row={row} icon="stimme" farbe="bg-[#34C759]" text="Freigaben & Nachträge" onClick={() => setFreigabenOffen(true)} />
-            )}
-            {hasSupabase && istAdmin && (
-              <VZeile row={row} icon="beitraege" farbe="bg-[#8E8E93]" text="Protokoll & Sicherung" onClick={() => setProtokollOffen(true)} />
-            )}
-            {hasSupabase && istKassenwart && (
-              <VZeile row={row} icon="beitraege" farbe="bg-[#8E8E93]" text="Sicherheitskopie der Daten" onClick={() => setProtokollOffen(true)} />
-            )}
-            {hasSupabase && (istAdmin || can("perms.manage")) && (
-              <VZeile row={row} icon="muell" farbe="bg-[#FF9500]" text="Automatisch löschen" onClick={() => setLoeschOffen(true)} />
-            )}
-            {hasSupabase && (istAdmin || can("perms.manage")) && (
-              <VZeile
-                row={row}
-                icon="pfeile"
-                farbe="bg-[#32ADE6]"
-                text="Update bei allen erzwingen"
-                onClick={() =>
-                  void frage("Alle offenen Apps jetzt neu laden?\n\nWer gerade tippt, wird erst danach neu geladen.", "Neu laden").then(async (ok) => {
-                    if (!ok) return;
-                    const f = await neuLadenErzwingen();
-                    if (f) meldeFehler("Ging nicht: " + f);
-                    else melde("Alle Apps laden jetzt neu");
-                  })
-                }
-              />
-            )}
-          </div>
-        </>
+        <Gruppe titel="Verwaltung">
+          {darfFunktionen && <Zeile label="Funktionen" symbol={<Sym icon="auswahl" farbe="bg-brand" />} onClick={() => setFunktionenOffen(true)} />}
+          {darfFreigaben && <Zeile label="Freigaben & Nachträge" symbol={<Sym icon="stimme" farbe="bg-[#34C759]" />} onClick={() => setFreigabenOffen(true)} />}
+          {darfWortfilter && <Zeile label="Wortfilter" symbol={<Sym icon="schild" farbe="bg-[#FF3B30]" />} onClick={() => setWortfilterOffen(true)} />}
+        </Gruppe>
       )}
 
-      <div className="liste mb-5 zelle [&:empty]:hidden">
-        {onTutorial && <VZeile row={row} icon="info" farbe="bg-brand" text="Einführung noch mal ansehen" onClick={onTutorial} />}
-        {hasSupabase && (
-          <button className={`${row} justify-center font-semibold text-red-600 dark:text-red-400`} onClick={() => void frage("Wirklich abmelden?", "Abmelden", true).then((ok) => { if (ok) void abmelden(); })}>
+      {/* ------------------------------------------------ Daten (Admin, Kassenwart) */}
+      {daten && (
+        <Gruppe titel="Daten">
+          {istAdmin && <Zeile label="Protokoll & Sicherung" symbol={<Sym icon="beitraege" farbe="bg-[#8E8E93]" />} onClick={() => setProtokollOffen(true)} />}
+          {istKassenwart && <Zeile label="Sicherheitskopie" symbol={<Sym icon="beitraege" farbe="bg-[#8E8E93]" />} onClick={() => setProtokollOffen(true)} />}
+          {darfLoeschfristen && <Zeile label="Automatisch löschen" symbol={<Sym icon="muell" farbe="bg-[#FF9500]" />} onClick={() => setLoeschOffen(true)} />}
+          {darfLoeschfristen && (
+            <Zeile
+              label="Update bei allen erzwingen"
+              symbol={<Sym icon="pfeile" farbe="bg-[#32ADE6]" />}
+              onClick={() =>
+                void frage("Alle offenen Apps jetzt neu laden?\n\nWer gerade tippt, wird erst danach neu geladen.", "Neu laden").then(async (ok) => {
+                  if (!ok) return;
+                  const f = await neuLadenErzwingen();
+                  if (f) meldeFehler("Ging nicht: " + f);
+                  else melde("Alle Apps laden jetzt neu");
+                })
+              }
+            />
+          )}
+        </Gruppe>
+      )}
+
+      {/* ------------------------------------------------ Hilfe */}
+      {onTutorial && (
+        <Gruppe titel="Hilfe">
+          <Zeile label="Einführung noch mal ansehen" symbol={<Sym icon="info" farbe="bg-brand" />} onClick={onTutorial} />
+        </Gruppe>
+      )}
+
+      {/* Abmelden: gefährlich, deshalb rot, allein und ganz unten */}
+      {hasSupabase && (
+        <div className="gruppe-zellen mt-6">
+          <button
+            className="flex min-h-[48px] w-full items-center justify-center px-4 text-[15px] text-red-600 transition active:bg-black/[0.04] dark:text-red-400 dark:active:bg-white/[0.06]"
+            onClick={() =>
+              void frage("Wirklich abmelden?", "Abmelden", true).then((ok) => {
+                if (ok) void abmelden();
+              })
+            }
+          >
             Abmelden
           </button>
-        )}
-      </div>
+        </div>
+      )}
 
-      <RechtLinks />
+      <div className="mt-5">
+        <RechtLinks />
+      </div>
 
       <LoeschfristenSheet open={loeschOffen} onClose={() => setLoeschOffen(false)} />
       <FunktionenSheet open={funktionenOffen} onClose={() => setFunktionenOffen(false)} />
@@ -372,41 +390,64 @@ export function ProfilSheet({
   );
 }
 
-function Pfeil({ auf }: { auf: boolean }) {
+/** Eingabe als eigene Zeile in einer Gruppe (Passwort, Begründung) */
+const EINGABE = "block min-h-[48px] w-full bg-transparent px-4 text-[15px] outline-none placeholder:text-tinte-leise";
+
+/** Farbiges Symbol-Kästchen mit Icon */
+function Sym({ icon, farbe }: { icon: IconName; farbe: string }) {
   return (
-    <span className={`text-tinte-leise transition ${auf ? "rotate-90" : ""}`} aria-hidden>
-      <Icon name="chevron" size={16} />
-    </span>
+    <Symbol farbe={farbe}>
+      <Icon name={icon} size={16} strich={2.2} />
+    </Symbol>
   );
 }
 
-function VZeile({ row, icon, farbe, text, onClick }: { row: string; icon: IconName; farbe: string; text: string; onClick: () => void }) {
+/** Zeile, die darunter etwas aufklappt – der Pfeil dreht sich mit. */
+function AufZeile({
+  symbol,
+  label,
+  auf,
+  onClick,
+  wert,
+  ohnePfeil,
+  children,
+}: {
+  symbol: ReactNode;
+  label: string;
+  auf: boolean;
+  onClick: () => void;
+  wert?: string;
+  ohnePfeil?: boolean;
+  children?: ReactNode;
+}) {
   return (
-    <button className={row} onClick={onClick}>
-      <span className={`symbol ${farbe}`}>
-        <Icon name={icon} size={16} strich={2.2} />
-      </span>
-      <span className="min-w-0 flex-1">{text}</span>
-      <Pfeil auf={false} />
+    <button
+      type="button"
+      onClick={onClick}
+      aria-expanded={auf}
+      className="flex min-h-[48px] w-full items-center gap-3 px-4 py-2 text-left transition active:bg-black/[0.04] dark:active:bg-white/[0.06]"
+    >
+      {symbol}
+      <span className="min-w-0 flex-1 text-[15px]">{label}</span>
+      {children}
+      {wert && <Wert>{wert}</Wert>}
+      {!ohnePfeil && (
+        <span className={`text-tinte-leise transition duration-200 ease-ios ${auf ? "rotate-90" : ""}`} aria-hidden>
+          <Icon name="chevron" size={16} />
+        </span>
+      )}
     </button>
   );
 }
 
 /** Eigenes Hintergrundbild: auswählen, ersetzen, entfernen */
-function HintergrundZeile({ row }: { row: string }) {
+function HintergrundZeile() {
   const { uid } = useRole();
   const bild = useHintergrund();
   const [busy, setBusy] = useState(false);
   const ref = useRef<HTMLInputElement>(null);
   return (
-    <div className={row}>
-      <span className="symbol bg-[#32ADE6]">
-        <Icon name="bild" size={16} strich={2.2} />
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="block">Hintergrundbild</span>
-        <span className="block text-[12px] text-tinte-leise">Nur für dich sichtbar</span>
-      </span>
+    <Zeile label="Hintergrundbild" unter="Nur für dich sichtbar" symbol={<Sym icon="bild" farbe="bg-[#32ADE6]" />}>
       <input
         ref={ref}
         type="file"
@@ -423,22 +464,21 @@ function HintergrundZeile({ row }: { row: string }) {
           else melde("Hintergrund gesetzt", "erfolg");
         }}
       />
-      <button className="btn-klein-grau !min-h-[2rem] !px-3 !text-[13px]" disabled={busy} onClick={() => ref.current?.click()}>
-        {busy ? "…" : bild ? "Ändern" : "Auswählen"}
-      </button>
       {bild && (
         <button
-          aria-label="Hintergrundbild entfernen"
-          className="flex h-8 w-8 items-center justify-center rounded-full text-red-600 dark:text-red-400"
+          className="px-1 text-[15px] text-red-600 dark:text-red-400"
           onClick={async () => {
             const f = await hintergrundEntfernen(uid);
             if (f) meldeFehler("Ging nicht: " + f);
           }}
         >
-          <Icon name="x" size={16} strich={2.4} />
+          Entfernen
         </button>
       )}
-    </div>
+      <button className="btn-klein-grau !min-h-[2rem] !px-3 !text-[13px]" disabled={busy} onClick={() => ref.current?.click()}>
+        {busy ? "…" : bild ? "Ändern" : "Auswählen"}
+      </button>
+    </Zeile>
   );
 }
 
@@ -462,12 +502,11 @@ function Pushpruefung() {
   }, [offen]);
 
   return (
-    <div className="mt-2">
-      <button onClick={() => setOffen((v) => !v)} className="text-[12px] font-semibold text-tinte-leise underline">
+    <>
+      <button onClick={() => setOffen((v) => !v)} className="font-medium text-brand-dark dark:text-brand">
         {offen ? "Prüfung ausblenden" : "Kommt nichts an? Hier prüfen"}
       </button>
-      {offen && <p className="mt-1.5 text-[12px] leading-relaxed text-tinte-matt">{text}</p>}
-    </div>
+      {offen && <span className="mt-1.5 block leading-relaxed text-tinte-matt dark:text-slate-300">{text}</span>}
+    </>
   );
 }
-

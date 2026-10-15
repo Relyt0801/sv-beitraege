@@ -4,10 +4,10 @@ import { SkelettText } from "./Skelett";
 import { useSchichtStatus, useTermine } from "../termine-store";
 import { committeeIcon, committeeLabel } from "../lib/committees";
 import {
-  WOCHENTAGE, anTag, ausKey, betrifftMich, farbeVon, freiAn, heuteKey, montagVon, plusTage, tagKey,
+  WOCHENTAGE, anTag, ausKey, betrifftMich, farbeVon, freiAn, heuteKey, istKlausur, montagVon, plusTage, tagKey,
   tagLang, umfangText, zeitText, type SchichtStatus, type Termin,
 } from "../lib/termine";
-import { SchichtSchild, Zeichen, punktKlasse, schichtRahmen } from "./TerminZeichen";
+import { SchichtSchild, Zeichen, punktKlasse } from "./TerminZeichen";
 import { Icon } from "./Icon";
 import { usePrivatTermine, useKalenderDemo } from "../lib/kalender-sync";
 import { KalenderSyncSheet } from "./KalenderSyncSheet";
@@ -22,13 +22,18 @@ import { KalenderSyncSheet } from "./KalenderSyncSheet";
 export function Wochenstreifen({
   onKalender,
   onOeffnen,
+  onNeu,
 }: {
   onKalender: (tag: string) => void;
   /** Termin antippen: ansehen – und fürs Team ändern oder löschen */
   onOeffnen?: (t: Termin) => void;
+  /** Nur wer Termine eintragen darf: „+“ oben rechts, legt am gewählten Tag an */
+  onNeu?: (tag: string) => void;
 }) {
   const { termine: stufenTermine, meineKomitees, meineStudentIds, ready, neueTermine } = useTermine();
-  // Testphase: eigene Termine aus dem Handy-Kalender grau dazu (nur Testkonten)
+  // Testphase: eigene Termine aus dem Handy-Kalender grau dazu (nur Testkonten).
+  // Solange KALENDER_SYNC_AN (lib/kalender-sync.ts) aus ist, ist kalenderDemo
+  // immer false – dann gibt es weder den Einstieg noch die grauen Termine.
   const kalenderDemo = useKalenderDemo();
   const privat = usePrivatTermine(kalenderDemo);
   const termine = useMemo(
@@ -70,29 +75,30 @@ export function Wochenstreifen({
   const monatBeschriftung = () => {
     const a = ausKey(tage[0]);
     const b = ausKey(tage[6]);
-    const kurz = (d: Date) => d.toLocaleDateString("de-DE", { month: "short" });
+    const kurz = (d: Date) => d.toLocaleDateString("de-DE", { month: "long" });
     return a.getMonth() === b.getMonth()
       ? `${kurz(a)} ${a.getFullYear()}`
-      : `${kurz(a)}–${kurz(b)} ${b.getFullYear()}`;
+      : `${kurz(a).slice(0, 3)}–${kurz(b).slice(0, 3)} ${b.getFullYear()}`;
   };
+  const dieseWoche = woStart === montagVon(heute);
 
   return (
-    <section className="card mb-3 p-3 sm:p-4" data-tour="wochenstreifen">
+    <section className="card mb-5 overflow-hidden p-3 sm:p-4" data-tour="wochenstreifen">
       {/* ------------------------------------------------ Kopfzeile */}
-      <div className="mb-2.5 flex items-center gap-1.5">
-        <h2 className="min-w-0 flex-1 truncate text-[13px] font-semibold text-tinte-matt">
-          {woStart === montagVon(heute) ? "Diese Woche" : monatBeschriftung()}
+      <div className="mb-2 flex items-center gap-1">
+        <h2 className="min-w-0 flex-1 truncate pl-1 text-[17px] font-bold tracking-[-0.02em]">
+          {dieseWoche ? "Diese Woche" : monatBeschriftung()}
         </h2>
         <button
           onClick={() => woche(-1)}
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-tinte-leise transition hover:bg-black/[0.04] active:scale-90 dark:hover:bg-white/[0.06]"
+          className="flex h-9 w-8 shrink-0 items-center justify-center rounded-full text-[20px] text-brand transition active:scale-90 active:bg-black/[0.04] dark:active:bg-white/[0.06]"
           aria-label="Woche zurück"
         >
           ‹
         </button>
         <button
           onClick={() => woche(1)}
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-tinte-leise transition hover:bg-black/[0.04] active:scale-90 dark:hover:bg-white/[0.06]"
+          className="flex h-9 w-8 shrink-0 items-center justify-center rounded-full text-[20px] text-brand transition active:scale-90 active:bg-black/[0.04] dark:active:bg-white/[0.06]"
           aria-label="Woche vor"
         >
           ›
@@ -101,33 +107,43 @@ export function Wochenstreifen({
             dass dahinter Monat, Woche und Tag stecken. */}
         <button
           onClick={() => onKalender(gewaehlt)}
-          className="flex h-8 shrink-0 items-center gap-1.5 rounded-lg bg-brand/10 px-2.5 text-[12px] font-semibold text-brand-dark transition active:scale-95 dark:bg-brand/20 dark:text-brand-soft"
+          className="relative flex h-9 shrink-0 items-center gap-1 rounded-full bg-brand/10 px-2.5 text-[14px] font-semibold text-brand transition active:scale-95 dark:bg-brand/20"
           aria-label="Ganzen Kalender öffnen"
           title="Ganzen Kalender öffnen – Monat, Woche und Tag"
         >
-          <Icon name="kalender" size={15} />
+          <Icon name="kalender" size={16} />
           Kalender
           {neueTermine.size > 0 && (
-            <span className="flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+            <span className="absolute -right-1 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
               {neueTermine.size > 9 ? "9+" : neueTermine.size}
             </span>
           )}
         </button>
+        {onNeu && (
+          <button
+            onClick={() => onNeu(gewaehlt)}
+            className="ml-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand text-[20px] font-medium leading-none text-white transition active:scale-90"
+            aria-label="Termin eintragen"
+            title="Termin am gewählten Tag eintragen"
+          >
+            ＋
+          </button>
+        )}
       </div>
 
-      {/* Testphase: Kalender-Verbindung, nur für die Testkonten */}
+      {/* Testphase: Kalender-Verbindung, nur für die Testkonten – zurzeit aus
+          (KALENDER_SYNC_AN in lib/kalender-sync.ts, Wunsch 14.10.2026). */}
       {kalenderDemo && (
         <button
           onClick={() => setSyncOffen(true)}
-          className="mb-2.5 flex w-full items-center gap-2 rounded-xl border border-dashed border-brand/40 px-3 py-2 text-left text-[12px] font-semibold text-brand-dark transition active:scale-[0.99] dark:text-brand-soft"
+          className="mb-2.5 flex w-full items-center gap-2 rounded-xl bg-brand/10 px-3 py-2 text-left text-[13px] font-semibold text-brand transition active:scale-[0.99] dark:bg-brand/20"
         >
-          <span aria-hidden>📱⇄</span>
           <span className="min-w-0 flex-1 truncate">
             {privat.termine.length
               ? `Kalender verbunden · ${privat.termine.length} eigene Termine`
               : "Stufen-Termine ins Handy übernehmen"}
           </span>
-          <span className="shrink-0 rounded-full bg-brand/10 px-2 py-0.5 text-[10px] font-bold">Test</span>
+          <span className="shrink-0 rounded-full bg-brand/15 px-2 py-0.5 text-[10px] font-bold">Test</span>
         </button>
       )}
       {kalenderDemo && <KalenderSyncSheet open={syncOffen} onClose={() => setSyncOffen(false)} />}
@@ -136,7 +152,7 @@ export function Wochenstreifen({
       {erstesNeues && (
         <button
           onClick={() => onKalender(erstesNeues.datum)}
-          className="mb-2.5 flex w-full items-center gap-2 rounded-xl bg-red-50 px-3 py-2 text-left text-[12px] font-semibold text-red-700 transition active:scale-[0.99] dark:bg-red-500/10 dark:text-red-300"
+          className="mb-2.5 flex w-full items-center gap-2 rounded-xl bg-red-500/10 px-3 py-2 text-left text-[13px] font-semibold text-red-700 transition active:scale-[0.99] dark:text-red-300"
         >
           <span className="h-2 w-2 shrink-0 rounded-full bg-red-500" />
           <span className="min-w-0 flex-1 truncate">
@@ -148,11 +164,13 @@ export function Wochenstreifen({
         </button>
       )}
 
-      {/* ------------------------------------------------ sieben Tage */}
+      {/* ------------------------------------------------ sieben Tage
+          Wie die Wochenleiste im iOS-Kalender: Wochentag klein, Zahl groß,
+          gewählter Tag als gefüllter Kreis, heute in Blau. */}
       <div
         {...wischen}
         key={woStart}
-        className={`grid touch-pan-y grid-cols-7 gap-1 ${richtung > 0 ? "animate-vonRechts" : richtung < 0 ? "animate-vonLinks" : ""}`}
+        className={`grid touch-pan-y grid-cols-7 gap-0.5 ${richtung > 0 ? "animate-vonRechts" : richtung < 0 ? "animate-vonLinks" : ""}`}
         style={zug ? { transform: `translateX(${zug}px)` } : undefined}
       >
         {tage.map((k) => {
@@ -167,20 +185,25 @@ export function Wochenstreifen({
               key={k}
               onClick={() => setGewaehlt(k)}
               title={ferien ? ferien.titel : undefined}
-              className={`flex min-w-0 flex-col items-center gap-1 rounded-xl border py-1.5 transition active:scale-95 ${
-                aktiv
-                  ? "border-brand bg-brand text-white"
-                  : istHeute
-                    ? "border-brand/40 bg-brand/5 dark:bg-brand/10"
-                    : ferien
-                      ? `border-transparent ${farbeVon(ferien)?.band ?? "bg-emerald-200/60 dark:bg-emerald-500/20"}`
-                      : "border-transparent hover:bg-papier-matt dark:hover:bg-slate-800"
+              aria-pressed={aktiv}
+              className={`flex min-w-0 flex-col items-center gap-1 rounded-2xl py-1.5 transition active:scale-95 ${
+                ferien && !aktiv ? farbeVon(ferien)?.band ?? "bg-emerald-200/60 dark:bg-emerald-500/20" : ""
               }`}
             >
-              <span className={`text-[10px] font-semibold ${aktiv ? "text-white/90" : "text-tinte-leise"}`}>
+              <span className={`text-[11px] font-semibold ${istHeute ? "text-brand" : "text-tinte-leise"}`}>
                 {WOCHENTAGE[(tag.getDay() + 6) % 7]}
               </span>
-              <span className={`zahl text-[15px] font-bold leading-none ${aktiv ? "" : istHeute ? "text-brand" : ""}`}>
+              <span
+                className={`zahl flex h-9 w-9 items-center justify-center rounded-full text-[17px] font-semibold leading-none transition duration-200 ease-ios ${
+                  aktiv
+                    ? istHeute
+                      ? "bg-brand text-white"
+                      : "bg-tinte text-white dark:bg-slate-100 dark:text-black"
+                    : istHeute
+                      ? "text-brand"
+                      : ""
+                }`}
+              >
                 {tag.getDate()}
               </span>
               {/* Punkte: höchstens drei, damit die Spalte schmal bleibt */}
@@ -188,22 +211,20 @@ export function Wochenstreifen({
                 {liste.filter((t) => !t.frei).slice(0, 3).map((t) => (
                   <span
                     key={t.id}
-                    className={`h-1.5 w-1.5 rounded-full ${
-                      neueTermine.has(t.id) ? "bg-red-500" : aktiv ? "bg-white/80" : punktKlasse(t, meins(t), st(t))
-                    }`}
+                    className={`h-1.5 w-1.5 rounded-full ${neueTermine.has(t.id) ? "bg-red-500" : punktKlasse(t, meins(t), st(t))}`}
                   />
                 ))}
               </span>
-              {fuerMich && !aktiv && <span className="sr-only">betrifft dich</span>}
+              {fuerMich && <span className="sr-only">betrifft dich</span>}
             </button>
           );
         })}
       </div>
 
       {/* ------------------------------------------------ der gewählte Tag */}
-      <div className="mt-3 border-t border-papier-linie pt-2.5 dark:border-slate-800">
-        <div className="mb-1.5 flex items-baseline justify-between gap-2">
-          <span className="truncate text-[12px] font-semibold text-tinte-matt">
+      <div className="mt-2.5 border-t border-black/[0.08] pt-2.5 dark:border-white/[0.1]">
+        <div className="mb-1 flex items-baseline justify-between gap-2 px-1">
+          <span className="truncate text-[13px] font-semibold uppercase tracking-[0.02em] text-tinte-leise">
             {gewaehlt === heute ? "Heute" : tagLang(gewaehlt)}
           </span>
           {gewaehlt !== heute && (
@@ -212,9 +233,9 @@ export function Wochenstreifen({
                 setWoStart(montagVon(heute));
                 setGewaehlt(heute);
               }}
-              className="shrink-0 text-[11px] font-semibold text-brand"
+              className="shrink-0 text-[13px] font-semibold text-brand"
             >
-              zu heute
+              Heute
             </button>
           )}
         </div>
@@ -224,9 +245,9 @@ export function Wochenstreifen({
             <SkelettText zeilen={2} />
           </div>
         ) : desTages.length === 0 ? (
-          <div className="py-3 text-center text-[12px] text-tinte-leise">Nichts eingetragen.</div>
+          <div className="px-1 py-2.5 text-[14px] text-tinte-leise">Nichts eingetragen.</div>
         ) : (
-          <ul className="grid gap-1.5">
+          <ul className="grid">
             {desTages.map((t) => (
               <TerminZeile key={t.id} t={t} meins={meins(t)} status={st(t)} onClick={onOeffnen ? () => onOeffnen(t) : undefined} />
             ))}
@@ -237,7 +258,10 @@ export function Wochenstreifen({
   );
 }
 
-/** Eine Zeile: Uhrzeit, Bezeichnung, Ort. Mehr braucht der schnelle Blick nicht. */
+/**
+ * Eine Zeile wie im iOS-Kalender: farbiger Strich links, Uhrzeit, Titel, Ort.
+ * Keine grau gefüllten Kästen – die Farbe des Termins steckt im Strich.
+ */
 export function TerminZeile({
   t, meins, status = null, onClick,
 }: {
@@ -247,17 +271,20 @@ export function TerminZeile({
   status?: SchichtStatus;
   onClick?: () => void;
 }) {
+  // Farbe des Strichs: Schicht bekommen = Grün, für mich = Blau, sonst die
+  // Terminfarbe; eigene Handy-Termine gestrichelt.
+  const strich = t.privat
+    ? "border-l-2 border-dashed border-tinte-leise/60"
+    : status === "eingeteilt"
+      ? "bg-emerald-500"
+      : meins
+        ? "bg-brand"
+        : farbeVon(t)?.punkt ?? (istKlausur(t) ? "bg-tinte dark:bg-slate-200" : "bg-tinte-leise/50");
   const inhalt = (
     <>
-      <span
-        className={`zahl w-[4.2rem] shrink-0 text-[12px] font-bold ${
-          status === "eingeteilt" ? "text-emerald-700 dark:text-emerald-300" : meins && status !== "nicht" ? "text-brand" : "text-tinte-matt"
-        }`}
-      >
-        {t.von ? zeitText(t).replace(" – ", "–") : "ganztägig"}
-      </span>
+      <span aria-hidden className={`w-[3px] shrink-0 self-stretch rounded-full ${strich}`} />
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-[13px] font-semibold">
+        <span className="block truncate text-[15px] font-semibold leading-tight">
           {t.privat ? (
             <span className="mr-1" aria-hidden>📱</span>
           ) : t.icon ? (
@@ -269,8 +296,9 @@ export function TerminZeile({
           )}
           {t.titel}
         </span>
-        <span className="block truncate text-[11px] text-tinte-leise">
+        <span className="mt-0.5 block truncate text-[13px] text-tinte-leise">
           {[
+            t.von ? zeitText(t) : "ganztägig",
             t.ort,
             t.privat
               ? "dein Kalender"
@@ -286,31 +314,21 @@ export function TerminZeile({
         <SchichtSchild status={status} klein />
       ) : (
         meins && (
-          <span className="shrink-0 rounded-full bg-brand/10 px-2 py-0.5 text-[10px] font-bold text-brand dark:bg-brand/20">
+          <span className="shrink-0 rounded-full bg-brand/10 px-2 py-0.5 text-[11px] font-bold text-brand dark:bg-brand/20">
             für dich
           </span>
         )
       )}
+      {onClick && <span aria-hidden className="shrink-0 text-[17px] leading-none text-tinte-leise/70">›</span>}
     </>
   );
 
-  const f = t.privat || status ? null : farbeVon(t);
-  const klasse = `flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left ${f ? "border-l-4 " + f.rand : ""} ${
-    status === "eingeteilt" ? "border-l-4 border-emerald-500 " : ""
-  }${
-    t.privat
-      ? "border border-dashed border-tinte-leise/40"
-      : status === "eingeteilt" || status === "nicht"
-        ? schichtRahmen(status)
-        : meins
-          ? "bg-brand/5 dark:bg-brand/10"
-          : "bg-papier-matt dark:bg-slate-800/60"
-  }`;
+  const klasse = `flex w-full items-center gap-3 rounded-xl px-1 py-2 text-left ${status === "nicht" ? "opacity-60" : ""}`;
 
   return (
     <li>
       {onClick ? (
-        <button onClick={onClick} className={`${klasse} transition active:scale-[.99]`}>
+        <button onClick={onClick} className={`${klasse} transition active:bg-black/[0.04] dark:active:bg-white/[0.06]`}>
           {inhalt}
         </button>
       ) : (

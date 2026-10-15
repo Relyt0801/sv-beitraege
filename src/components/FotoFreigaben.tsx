@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { hinScrollen, useSprungziel } from "../lib/sprung";
 import { useRole } from "../auth/RoleProvider";
 import { useStore } from "../store";
@@ -12,7 +12,7 @@ import { ZustimmungsMarke } from "./ZustimmungsMarke";
  * braucht so viele Zustimmungen wie im Profil → Freigaben eingestellt
  * (Standard 3); Ablehnen geht sofort. Steht bei den Anfragen in den Chats.
  */
-export function FotoFreigaben() {
+export function FotoFreigaben({ onAnzahl }: { onAnzahl?: (n: number) => void } = {}) {
   const { isStaff, uid } = useRole();
   const { students } = useStore();
   const fotos = useAlbumFotos(isStaff);
@@ -20,6 +20,11 @@ export function FotoFreigaben() {
   const [busy, setBusy] = useState<string | null>(null);
 
   useSprungziel("foto", isStaff && fotos.offene.length > 0, () => hinScrollen("sprung-foto"));
+  // Anzahl offener Einträge für die Kachel/den Zähler im Chats-Reiter
+  const anzahl = isStaff ? fotos.offene.length : 0;
+  useEffect(() => {
+    onAnzahl?.(anzahl);
+  }, [anzahl, onAnzahl]);
   if (!isStaff || fotos.offene.length === 0) return null;
 
   const name = (sid: string) => {

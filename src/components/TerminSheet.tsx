@@ -677,6 +677,7 @@ export function TerminAnsehen({
   const { students } = useStore();
   const { isStaff, can } = useRole();
   const darf = isStaff || can("termine.manage");
+  // „In meinen Kalender“ (.ics) – zurzeit aus: KALENDER_SYNC_AN in lib/kalender-sync.ts
   const kalenderDemo = useKalenderDemo();
   // Immer den frischen Stand zeigen (z. B. nach dem Austragen einer Person)
   const t = termin ? termine.find((x) => x.id === termin.id) ?? termin : null;

@@ -1,11 +1,24 @@
 /**
- * Patch Notes – erscheinen einmal pro Version nach dem nächsten Öffnen.
+ * Patch Notes – erscheinen einmal pro Version nach dem nächsten Öffnen
+ * (App.tsx vergleicht PATCH.version mit dem Merker im Gerät; wer die
+ * Einführung gerade gesehen hat, bekommt sie nicht zusätzlich).
  * Eltern sehen keine. Einträge mit nur: "team" sehen nur Stufenteam, Admin,
- * Kassenwart und Sprecher. Die Nummern (1.1, 1.2 …) werden je Ansicht neu
- * gezählt, damit bei Schülern keine Lücken entstehen.
+ * Kassenwart und Sprecher.
+ *
+ * Seit 1.4 im Stil von Apples „Neu in …“-Bildschirm: je Eintrag ein farbiges
+ * Symbol, ein fetter Titel und ein kurzer Satz. `icon` ist ein Name aus
+ * components/Icon.tsx (IconName), `farbe` eine Tailwind-Hintergrundklasse.
+ * Ältere Einträge ohne Titel (nur `text`) werden weiter einfach angezeigt.
  */
 export interface PatchEintrag {
+  /** Kurzer Titel, fett (seit 1.4) */
+  titel?: string;
+  /** Ein Satz Erklärung – für Schüler verständlich */
   text: string;
+  /** Symbol-Name aus Icon.tsx (seit 1.4) */
+  icon?: string;
+  /** Hintergrund des Symbol-Kästchens, z. B. "bg-[#34C759]" */
+  farbe?: string;
   nur?: "team";
 }
 export interface PatchBereich {
@@ -20,27 +33,75 @@ export interface PatchVersion {
 }
 
 export const PATCH: PatchVersion = {
-  version: "1.3",
+  version: "1.4",
   datum: "Oktober 2026",
   bereiche: [
     {
       bereich: "Neu",
       icon: "✨",
       eintraege: [
-        { text: "🗳️ Abstimmungsrunden für Motto, Zitate, Rankings und Umfragen" },
-        { text: "❤️ Sieger der Herzen: eigene Herzstimme für die Honorable Mentions" },
-        { text: "🖼️ Eigenes Hintergrundbild – nur für dich" },
-        { text: "😁 Mehr Reaktionen im Chat, über „+“ jedes Emoji" },
-        { text: "🛡️ Spam und gesperrte Wörter sperren kurz automatisch" },
+        {
+          titel: "Neue Reiterleiste",
+          text: "Unten jetzt aus Glas – der gewählte Reiter schwebt sichtbar hervor.",
+          icon: "haus",
+          farbe: "bg-brand",
+        },
+        {
+          titel: "Offiziell & Inoffiziell",
+          text: "Rankings, Zitate, Mottos und Kommentare gibt es zweimal: offiziell fürs Abibuch, inoffiziell nur für die Stufe.",
+          icon: "schild",
+          farbe: "bg-[#5856D6]",
+        },
+        {
+          titel: "Gewinner",
+          text: "Das Team kürt Gewinner – sie stehen ganz oben, und Ergebnisse siehst du direkt ohne Suchen.",
+          icon: "pokal",
+          farbe: "bg-[#FF9500]",
+        },
+        {
+          titel: "Eigene Antwort",
+          text: "Bei Abstimmungen kannst du jetzt auch selbst etwas eintragen.",
+          icon: "stimme",
+          farbe: "bg-[#34C759]",
+        },
+        {
+          titel: "Events gebündelt",
+          text: "Zusammengehöriges steht beisammen – weniger Scrollen.",
+          icon: "events",
+          farbe: "bg-[#FF2D55]",
+        },
+        {
+          titel: "Klarere Meldungen",
+          text: "Ohne Internet sagt dir die App genau, was gerade nicht geht.",
+          icon: "info",
+          farbe: "bg-[#32ADE6]",
+        },
+        {
+          titel: "Kalender kurz pausiert",
+          text: "Termine ins Handy übernehmen ist vorübergehend aus und kommt bald zurück.",
+          icon: "kalender",
+          farbe: "bg-[#8E8E93]",
+        },
       ],
     },
     {
       bereich: "Fürs Team",
       icon: "🔑",
       eintraege: [
-        { text: "👥 Freigaben mit mehreren Zustimmungen (Profil → Freigaben)", nur: "team" },
-        { text: "👁️ Je Abstimmung: Ergebnisse nur fürs Komitee oder für alle", nur: "team" },
-        { text: "🔁 Neues Passwort generieren, Ausgetretene ausgeblendet", nur: "team" },
+        {
+          titel: "Einstellungen aufgeräumt",
+          text: "Ein Zahnrad je Bereich, Profil und Rechte im Stil der iPhone-Einstellungen.",
+          icon: "regler",
+          farbe: "bg-[#8E8E93]",
+          nur: "team",
+        },
+        {
+          titel: "Verschieben mit Zustimmung",
+          text: "Offiziell ↔ inoffiziell braucht Zustimmungen – wie viele, steht unter Profil → Freigaben.",
+          icon: "pfeile",
+          farbe: "bg-[#5856D6]",
+          nur: "team",
+        },
       ],
     },
   ],

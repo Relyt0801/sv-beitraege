@@ -8,11 +8,12 @@ import { normalize } from "../lib/logic";
 import { datumLang } from "./BeitragsListe";
 
 import { frage } from "../lib/melder";
+import { ChatEbene, ChatKopf } from "./ChatBlasen";
 /**
  * Was das Stufenteam mit den Eltern zu tun hat: Infos anheften und die
  * Anfragen der Eltern beantworten. Erscheint im Reiter Chats.
  */
-export function ElternTeamTab({ glocke }: { glocke?: ReactNode } = {}) {
+export function ElternTeamTab({ glocke, nur }: { glocke?: ReactNode; nur?: "infos" | "gespraeche" } = {}) {
   const { infos, tickets, nachrichten, infoAnlegen, infoLoeschen, antworten, ticketSchliessen, ticketLoeschen, zuordnung, konten, anEltern, alsGelesen } = useEltern();
   const { uid } = useRole();
   const { profile } = useProfiles();
@@ -54,7 +55,7 @@ export function ElternTeamTab({ glocke }: { glocke?: ReactNode } = {}) {
   return (
     <div className="grid grid-cols-1 gap-3">
       {/* -------------------------------------------- Infos anheften */}
-      <section className="card p-4 sm:p-5">
+      {nur !== "gespraeche" && <section className="card p-4 sm:p-5">
         <div className="flex items-center gap-2">
           <h2 className="min-w-0 flex-1 text-lg font-bold">Infos für die Eltern</h2>
           <button
@@ -143,10 +144,10 @@ export function ElternTeamTab({ glocke }: { glocke?: ReactNode } = {}) {
             ))}
           </ul>
         )}
-      </section>
+      </section>}
 
       {/* -------------------------------------------- Anfragen */}
-      <section className="card p-4 sm:p-5">
+      {nur !== "infos" && <section className="card p-4 sm:p-5">
         <div className="flex items-center gap-2">
           <h2 className="min-w-0 flex-1 text-lg font-bold">
             Gespräche mit Eltern{offeneTickets.length > 0 && ` (${offeneTickets.length} offen)`}
@@ -263,7 +264,7 @@ export function ElternTeamTab({ glocke }: { glocke?: ReactNode } = {}) {
           </ul>
         )}
         {glocke && <div className="-mx-4 -mb-4 mt-3 sm:-mx-5 sm:-mb-5">{glocke}</div>}
-      </section>
+      </section>}
     </div>
   );
 }
@@ -412,5 +413,47 @@ function AnEltern({
         </>
       )}
     </div>
+  );
+}
+
+
+/**
+ * Zahlen für die Kacheln im Chats-Reiter: offene Gespräche mit Eltern, davon
+ * mit neuer Nachricht, und veröffentlichte Infos.
+ */
+export function useElternZahlen(aktiv: boolean) {
+  const { infos, tickets, nachrichten } = useEltern();
+  const { uid } = useRole();
+  if (!aktiv) return { offen: 0, neu: 0, infos: 0 };
+  const offene = tickets.filter((t) => !t.erledigt);
+  const neu = offene.filter((t) => {
+    const fremd = nachrichten.filter((n) => n.ticket_id === t.id && n.user_id !== uid);
+    if (!fremd.length) return false;
+    return !t.gelesen_team || fremd[fremd.length - 1].created_at > t.gelesen_team;
+  }).length;
+  return { offen: offene.length, neu, infos: infos.length };
+}
+
+/** Eigene Ebene „Gespräche mit Eltern“ (aus der Kachel im Chats-Reiter) */
+export function ElternGespraecheEbene({ onBack, glocke }: { onBack: () => void; glocke?: ReactNode }) {
+  const z = useElternZahlen(true);
+  return (
+    <ChatEbene label="Gespräche mit Eltern" kopf={<ChatKopf onBack={onBack} symbol="👪" titel="Gespräche mit Eltern" unter={z.offen ? `${z.offen} offen` : "Nichts offen"} />}>
+      <div className="grid gap-3 py-4">
+        <ElternTeamTab nur="gespraeche" glocke={glocke} />
+      </div>
+    </ChatEbene>
+  );
+}
+
+/** Eigene Ebene „Infos für Eltern“ (aus der Kachel im Chats-Reiter) */
+export function ElternInfosEbene({ onBack }: { onBack: () => void }) {
+  const z = useElternZahlen(true);
+  return (
+    <ChatEbene label="Infos für Eltern" kopf={<ChatKopf onBack={onBack} symbol="📌" titel="Infos für Eltern" unter={`${z.infos} veröffentlicht`} />}>
+      <div className="grid gap-3 py-4">
+        <ElternTeamTab nur="infos" />
+      </div>
+    </ChatEbene>
   );
 }

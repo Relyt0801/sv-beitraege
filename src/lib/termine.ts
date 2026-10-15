@@ -418,3 +418,119 @@ export function stundeAb(von: string | null): number | null {
 export function freiAn(termine: Termin[], key: string): Termin | null {
   return termine.find((t) => t.frei && laeuftAn(t, key)) ?? null;
 }
+
+/** „Di 21.10.“ – kurz für Gruppenköpfe („nächster Di 21.10.“). */
+export function kurzTag(key: string): string {
+  const d = ausKey(key);
+  return `${WOCHENTAGE[(d.getDay() + 6) % 7]} ${d.getDate()}.${d.getMonth() + 1}.`;
+}
+
+/** Sonntag der Woche, in der dieser Tag liegt – „diese Woche“ endet dort. */
+export function sonntagVon(key: string): string {
+  return plusTage(montagVon(key), 6);
+}
+
+// ---------------------------------------------------------------- Demo
+
+/**
+ * Erfundene Termine und Aktionen für den Demo-Modus (ohne Datenbank,
+ * ?rolle=…). Alles relativ zu heute, damit die Demo nie veraltet:
+ *  - „Waffelverkauf“ an den nächsten fünf Dienstagen und Donnerstagen
+ *    (zeigt das Zusammenfassen zu einer aufklappbaren Gruppe),
+ *  - „Waffelteig backen“ jeweils am Vortag (vier Termine, eigene Gruppe),
+ *  - ein einzelner Kuchenverkauf (bleibt einzeln stehen),
+ *  - ein paar normale Termine für den Wochenstreifen.
+ * `ich` = eigene student_id (Schüler-Demo), `andere` = weitere erfundene
+ * Personen für belegte Plätze. Keine echten Namen.
+ */
+export function demoTermine(
+  heute: string,
+  ich: string | null,
+  andere: string[],
+  meineUid: string,
+): { termine: Termin[]; aktionen: Aktion[]; bewerbungen: Record<string, string[]> } {
+  const jetzt = new Date().toISOString();
+  const aktion = (id: string, titel: string, icon: string, prozent: number): Aktion => ({
+    id, titel, icon, beschreibung: "", prozent, geschlossen: false, created_at: jetzt,
+  });
+  const aktionen = [
+    aktion("demo-a-waffel", "Waffelverkauf", "🧇", 10),
+    aktion("demo-a-teig", "Waffelteig backen", "🥣", 5),
+    aktion("demo-a-kuchen", "Kuchenverkauf Elternsprechtag", "🍰", 10),
+  ];
+  const leer = {
+    beschreibung: "", bis_datum: null, sichtbar: "alle" as Sichtbarkeit, fuer_eltern: false,
+    created_by: "demo-team", created_at: jetzt, tags: [] as string[], personen: [] as string[],
+    aktion_id: null as string | null, plaetze: null as number | null, icon: null as string | null,
+  };
+  // Die nächsten Dienstage und Donnerstage ab heute (heute selbst zählt mit)
+  const verkaufstage: string[] = [];
+  for (let i = 0; verkaufstage.length < 5 && i < 40; i++) {
+    const k = plusTage(heute, i);
+    if ([2, 4].includes(wochentagNr(k))) verkaufstage.push(k);
+  }
+  const p = (i: number) => andere[i % Math.max(1, andere.length)];
+  const termine: Termin[] = [];
+  verkaufstage.forEach((k, i) => {
+    termine.push({
+      ...leer,
+      id: `demo-t-waffel-${i}`,
+      titel: "Waffelverkauf",
+      ort: "Pausenhalle",
+      datum: k,
+      von: "09:10",
+      bis: "09:30",
+      aktion_id: "demo-a-waffel",
+      plaetze: 3,
+      icon: "🧇",
+      farbe: "gelb",
+      // Die erste Schicht ist voll, die zweite hat mich (Schüler-Demo), danach wird es leerer
+      personen: andere.length ? (i === 0 ? [p(1), p(2), p(3)] : i === 1 ? [p(4), ...(ich ? [ich] : [])] : i === 2 ? [p(5)] : []) : [],
+    });
+    if (i < 4)
+      termine.push({
+        ...leer,
+        id: `demo-t-teig-${i}`,
+        titel: "Waffelteig backen",
+        ort: "Lehrküche",
+        datum: plusTage(k, -1),
+        von: "15:00",
+        bis: "16:30",
+        aktion_id: "demo-a-teig",
+        plaetze: 2,
+        icon: "🥣",
+        farbe: "orange",
+        personen: andere.length && i === 0 ? [p(6)] : [],
+      });
+  });
+  termine.push(
+    {
+      ...leer, id: "demo-t-kuchen", titel: "Kuchenverkauf Elternsprechtag", ort: "Foyer",
+      datum: plusTage(heute, 9), von: "16:00", bis: "19:00", aktion_id: "demo-a-kuchen", plaetze: 4, icon: "🍰", farbe: "pink",
+    },
+    {
+      ...leer, id: "demo-t-versammlung", titel: "Stufenversammlung", ort: "Aula",
+      datum: plusTage(heute, 2), von: "13:15", bis: "14:00", farbe: "blau",
+    },
+    {
+      ...leer, id: "demo-t-abiball", titel: "Treffen Abiball-Komitee", ort: "Raum 112",
+      datum: plusTage(heute, 1), von: "14:00", bis: "15:00", sichtbar: "komitee", tags: ["abiball"],
+    },
+    {
+      ...leer, id: "demo-t-klausur", titel: "Klausur Mathematik", ort: "",
+      datum: plusTage(heute, 5), von: "08:25", bis: "10:15", icon: "M",
+    },
+  );
+  termine.sort((a, b) => a.datum.localeCompare(b.datum) || (a.von || "").localeCompare(b.von || ""));
+  // Gemeldet: ich für den dritten Verkauf, andere für ein paar weitere
+  // (Demo-Konten heißen „demo-<student_id>“, siehe lib/demo.ts → demoProfile)
+  const u = (i: number) => `demo-${p(i)}`;
+  const bewerbungen: Record<string, string[]> = andere.length
+    ? {
+        "demo-t-waffel-2": [meineUid, u(7), u(8)],
+        "demo-t-waffel-3": [u(9)],
+        "demo-t-teig-1": [u(10), u(11)],
+      }
+    : { "demo-t-waffel-2": [meineUid] };
+  return { termine, aktionen, bewerbungen };
+}

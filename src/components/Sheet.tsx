@@ -85,16 +85,34 @@ export function SheetKopf({
   unter,
   onClose,
   extra,
+  zurueck,
 }: {
   titel: ReactNode;
   unter?: ReactNode;
   onClose: () => void;
   /** Weitere runde Knöpfe links neben dem Schließen (z. B. Einstellungen) */
   extra?: ReactNode;
+  /**
+   * Unterseite im selben Blatt (wie „‹ Einstellungen“ in iOS): blauer
+   * Zurück-Knopf über dem Titel. `text` ist der Name der Seite davor.
+   */
+  zurueck?: { text: string; onClick: () => void };
 }) {
   return (
     <div className="mb-4 flex items-start gap-3">
       <div className="min-w-0 flex-1">
+        {zurueck && (
+          <button
+            type="button"
+            onClick={zurueck.onClick}
+            className="-ml-1.5 mb-1 flex min-h-[32px] items-center gap-0.5 rounded-full pr-2 text-[15px] font-medium text-brand-dark transition active:opacity-50 dark:text-brand"
+          >
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="m15 6-6 6 6 6" />
+            </svg>
+            {zurueck.text}
+          </button>
+        )}
         <h2 className="text-[1.375rem] font-bold leading-tight tracking-[-0.02em]">{titel}</h2>
         {unter && <p className="mt-0.5 text-[13px] text-tinte-leise">{unter}</p>}
       </div>

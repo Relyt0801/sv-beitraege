@@ -6,19 +6,76 @@ import { useProfiles } from "../profiles-store";
 import { prozentVon } from "../lib/logic";
 import { Sheet } from "./Sheet";
 import { Avatar } from "./Avatar";
-import { MONATE, WOCHENTAGE, abHeute, ausKey, schichtEnde, tagLang, uhr, zeitText, type Aktion, type SchichtStatus, type Termin } from "../lib/termine";
-import { SchichtSchild, schichtRahmen } from "./TerminZeichen";
+import {
+  MONATE, WOCHENTAGE, abHeute, ausKey, farbeVon, heuteKey, kurzTag, schichtEnde, sonntagVon, tagLang, zeitText,
+  type Aktion, type SchichtStatus, type Termin,
+} from "../lib/termine";
+import { gruppiereAehnliche } from "../lib/events";
+import { SchichtSchild } from "./TerminZeichen";
 import { abschlussOeffnen } from "./SchichtAbschluss";
 
 import { frage, meldeFehler } from "../lib/melder";
 import { ProzentWahl } from "./AktionSheet";
 import { MeldeBestaetigung } from "./MeldeBestaetigung";
+
+/** Ab so vielen gleichartigen Schichten wird zu einer aufklappbaren Gruppe zusammengefasst. */
+const GRUPPE_AB = 3;
+
 /**
- * Die ausgeschriebenen Aktionen im Events-Reiter.
+ * „Deine Schichten“ – die Schichten, die man bekommen hat, als grüne Tickets.
+ * Steht im Events-Reiter direkt unter der Woche, damit man sofort sieht,
+ * wann man dran ist. Mehr als zwei? Dann die nächsten zwei und „+ n weitere“.
+ */
+export function MeineSchichten() {
+  const { termine, aktionen } = useTermine();
+  const st = useSchichtStatus();
+  const [alle, setAlle] = useState(false);
+  const jetzt = Date.now();
+  const meine = abHeute(termine).filter(
+    (t) => st(t) === "eingeteilt" && !t.abschluss && schichtEnde(t).getTime() >= jetzt,
+  );
+  if (!meine.length) return null;
+  const sichtbar = alle ? meine : meine.slice(0, 2);
+  return (
+    <section className="mb-5">
+      <h3 className="mb-1.5 flex items-baseline px-4 text-[13px] uppercase tracking-[0.02em] text-tinte-leise">
+        <span className="flex-1">Deine Schichten</span>
+        {meine.length > 2 && (
+          <button onClick={() => setAlle(!alle)} className="text-[13px] font-semibold normal-case tracking-normal text-brand">
+            {alle ? "Weniger" : `+ ${meine.length - 2} weitere`}
+          </button>
+        )}
+      </h3>
+      <div className="grid gap-2 sm:grid-cols-2">
+        {sichtbar.map((t) => (
+          <SchichtTicket key={t.id} schicht={t} aktion={aktionen.find((a) => a.id === t.aktion_id) || null} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+/** Ein Block der Liste „Mitmachen“: gleichartige Schichten (eine oder mehrere Aktionen). */
+interface Block {
+  schluessel: string;
+  titel: string;
+  schichten: Termin[];
+  /** Ab GRUPPE_AB Schichten: eingeklappt mit „Alle n Termine“ */
+  aufklappbar: boolean;
+}
+
+/**
+ * Die ausgeschriebenen Aktionen im Events-Reiter („Mitmachen“).
  *
  * Für alle: sehen, wann Waffelverkauf ist, und sich eintragen.
- * Fürs Stufenteam: sehen, wer sich gemeldet hat – mit Mithilfe-Prozent, damit
- * die Schichten dahin gehen, wo noch wenig zusammengekommen ist.
+ * Fürs Stufenteam: Schicht antippen → sehen, wer sich gemeldet hat (mit
+ * Mithilfe-Prozent), und verteilen.
+ *
+ * Damit man nicht scrollen muss: gleichartige Schichten (gleicher oder
+ * ähnlicher Titel, siehe gruppiereAehnliche in lib/events.ts) stehen ab drei
+ * Stück in EINER Gruppe „Waffelverkauf · 5 Termine · nächster Di 21.10.“.
+ * Eingeklappt sieht man nur, was diese Woche dran ist (oder den nächsten
+ * Termin) und alles, was einen selbst betrifft; der Rest klappt auf.
  */
 export function AktionenListe() {
   const { termine, aktionen, bewerbungen, bewerben, meineUid, meineStudentIds } = useTermine();
@@ -36,66 +93,60 @@ export function AktionenListe() {
     setMeldung({ auftrag, titel: a?.titel || t?.titel || "Schicht", unter: t ? tagLang(t.datum) : "" });
   };
 
+  const nachId = useMemo(() => new Map(aktionen.map((a) => [a.id, a])), [aktionen]);
+
   // Übersichtlich halten: bestätigte Schichten („Punkte vergeben“ / „ohne“)
   // verschwinden für alle. Vorbei, aber noch nicht bestätigt, sieht nur das
   // Team – dort trägt man vor dem Bestätigen aus, wer nicht da war.
   const jetzt = Date.now();
-  const nachAktion = useMemo(() => {
-    const m = new Map<string, Termin[]>();
-    for (const t of abHeute(termine)) {
-      if (!t.aktion_id || t.abschluss) continue;
-      if (!darfVerteilen && schichtEnde(t).getTime() < jetzt) continue;
-      const l = m.get(t.aktion_id) || [];
-      l.push(t);
-      m.set(t.aktion_id, l);
-    }
-    return m;
+  const offen = useMemo(
+    () =>
+      abHeute(termine).filter(
+        (t) => t.aktion_id && nachId.has(t.aktion_id) && !t.abschluss && (darfVerteilen || schichtEnde(t).getTime() >= jetzt),
+      ),
     // jetzt: bei jedem Neuzeichnen frisch, absichtlich nicht als Abhängigkeit
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [termine, darfVerteilen]);
-
-  const laufende = aktionen.filter((a) => (nachAktion.get(a.id) || []).length > 0);
-  // Meine kommenden Schichten – oben als „Tickets“, damit man sofort sieht,
-  // was man bekommen hat.
-  const meineSchichten = abHeute(termine).filter(
-    (t) => st(t) === "eingeteilt" && !t.abschluss && schichtEnde(t).getTime() >= jetzt,
+    [termine, nachId, darfVerteilen],
   );
-  if (laufende.length === 0 && meineSchichten.length === 0) return null;
+
+  // Gleichartige zusammenfassen. Was unter GRUPPE_AB bleibt, steht trotzdem
+  // je Titel in einem (nicht aufklappbaren) Block – so sieht jede Aktion
+  // gleich aus, egal wie viele Termine sie hat.
+  const bloecke = useMemo(() => {
+    const titelVon = (t: Termin) => nachId.get(t.aktion_id!)?.titel || t.titel;
+    const liste: Block[] = [];
+    const nachSchluessel = new Map<string, Block>();
+    for (const g of gruppiereAehnliche(offen, titelVon, GRUPPE_AB)) {
+      if (g.art === "gruppe") {
+        liste.push({ schluessel: g.schluessel, titel: g.titel, schichten: g.eintraege, aufklappbar: true });
+        continue;
+      }
+      const da = nachSchluessel.get(g.schluessel);
+      if (da) da.schichten.push(g.eintrag);
+      else {
+        const neu: Block = { schluessel: g.schluessel, titel: titelVon(g.eintrag), schichten: [g.eintrag], aufklappbar: false };
+        nachSchluessel.set(g.schluessel, neu);
+        liste.push(neu);
+      }
+    }
+    return liste;
+  }, [offen, nachId]);
 
   // Damit das aufgeklappte Blatt immer die frischen Bewerbungen zeigt
   const aktuelleSchicht = schicht ? termine.find((t) => t.id === schicht.id) ?? schicht : null;
 
+  if (!bloecke.length) return null;
+
   return (
     <>
-      <section className="mb-3">
-        {meineSchichten.length > 0 && (
-          <>
-            <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-tinte-leise">
-              Deine Schichten
-            </h3>
-            <div className="mb-3.5 grid gap-2 sm:grid-cols-2">
-              {meineSchichten.map((t) => (
-                <SchichtTicket
-                  key={t.id}
-                  schicht={t}
-                  aktion={aktionen.find((a) => a.id === t.aktion_id) || null}
-                />
-              ))}
-            </div>
-          </>
-        )}
-        {laufende.length > 0 && (
-        <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-tinte-leise">
-          Mitmachen
-        </h3>
-        )}
-        <div className="grid items-start gap-2.5 lg:grid-cols-2">
-          {laufende.map((a) => (
-            <AktionKarte
-              key={a.id}
-              aktion={a}
-              schichten={nachAktion.get(a.id) || []}
-              gesamt={(nachAktion.get(a.id) || []).length}
+      <section className="mb-5">
+        <h3 className="mb-1.5 px-4 text-[13px] uppercase tracking-[0.02em] text-tinte-leise">Mitmachen</h3>
+        <div className="grid items-start gap-3 lg:grid-cols-2">
+          {bloecke.map((b) => (
+            <AktionGruppe
+              key={b.schluessel}
+              block={b}
+              aktionen={nachId}
               bewerbungen={bewerbungen}
               meineUid={meineUid}
               meineStudentIds={meineStudentIds}
@@ -106,6 +157,11 @@ export function AktionenListe() {
             />
           ))}
         </div>
+        <p className="mt-1.5 px-4 text-[13px] leading-snug text-tinte-leise">
+          {darfVerteilen
+            ? "Schicht antippen: sehen, wer sich gemeldet hat, und einteilen."
+            : "Eintragen heißt melden – das Stufenteam teilt ein, wer wenig Mithilfe hat, zuerst."}
+        </p>
       </section>
 
       <MeldeBestaetigung
@@ -137,10 +193,15 @@ function ProzentAendern({ aktion }: { aktion: Aktion }) {
   const [offen, setOffen] = useState(false);
   const vorlagen = useMemo(() => [...templates].sort((a, b) => a.sort - b.sort || a.punkte - b.punkte), [templates]);
   return (
-    <>
-      <button onClick={() => setOffen(!offen)} className="ml-1.5 font-bold text-brand underline-offset-2 hover:underline">
-        {offen ? "fertig" : "ändern"}
-      </button>
+    <div className="px-4 py-2.5">
+      <div className="flex items-center gap-2 text-[14px]">
+        <span className="min-w-0 flex-1 truncate text-tinte-matt dark:text-slate-300">
+          {aktion.icon} {aktion.titel} zählt <span className="zahl font-semibold text-brand">+{aktion.prozent} %</span>
+        </span>
+        <button onClick={() => setOffen(!offen)} className="shrink-0 text-[14px] font-semibold text-brand">
+          {offen ? "Fertig" : "Ändern"}
+        </button>
+      </div>
       {offen && (
         <div className="mt-2">
           <ProzentWahl
@@ -155,136 +216,250 @@ function ProzentAendern({ aktion }: { aktion: Aktion }) {
           />
         </div>
       )}
-    </>
+    </div>
   );
 }
 
-function AktionKarte({
-  aktion, schichten, gesamt, bewerbungen, meineUid, meineStudentIds, darfVerteilen, st, onEintragen, onOeffnen,
+/** Nach unten zeigender Winkel, dreht sich beim Aufklappen. */
+export function Winkel({ auf }: { auf: boolean }) {
+  return (
+    <svg
+      viewBox="0 0 12 12"
+      aria-hidden
+      className={`h-3 w-3 shrink-0 transition-transform duration-300 ease-ios motion-reduce:transition-none ${auf ? "rotate-180" : ""}`}
+    >
+      <path d="M2.5 4.5 6 8l3.5-3.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+/**
+ * Eine Gruppe gleichartiger Schichten als weiße Zellen-Gruppe (iOS-Liste).
+ *
+ * Kopf: Zeichen, Titel, „5 Termine · nächster Di 21.10.“, Prozent.
+ * Eingeklappt (nur wenn aufklappbar): sichtbar bleibt, was bis Sonntag dran
+ * ist, was mich betrifft (eingeteilt/gemeldet) und – fürs Team – was vorbei,
+ * aber noch nicht bestätigt ist. Gibt es davon nichts, der nächste Termin.
+ */
+function AktionGruppe({
+  block, aktionen, bewerbungen, meineUid, meineStudentIds, darfVerteilen, st, onEintragen, onOeffnen,
 }: {
+  block: Block;
+  aktionen: Map<string, Aktion>;
   st: (t: Termin) => SchichtStatus;
   meineStudentIds: string[];
-  aktion: Aktion;
-  schichten: Termin[];
-  gesamt: number;
   bewerbungen: Record<string, string[]>;
   meineUid: string | null;
   darfVerteilen: boolean;
   onEintragen: (id: string, an: boolean) => void;
   onOeffnen: (t: Termin) => void;
 }) {
-  const [alle, setAlle] = useState(false);
-  const sichtbar = alle ? schichten : schichten.slice(0, 4);
+  const [auf, setAuf] = useState(false);
+  const { schichten } = block;
+  const jetzt = Date.now();
+  const bisSonntag = sonntagVon(heuteKey());
+  // Welche Aktionen stecken drin? Meist eine – bei „Waffelverkauf“ und
+  // „Waffelverkauf Elternsprechtag“ auch mal zwei.
+  const drin = [...new Set(schichten.map((t) => t.aktion_id!))].map((id) => aktionen.get(id)!).filter(Boolean);
+  const erste = drin[0];
+  const prozente = [...new Set(drin.map((a) => a.prozent))].sort((a, b) => a - b);
+  const prozentText = prozente.length === 1 ? `+${prozente[0]} %` : `+${prozente[0]}–${prozente[prozente.length - 1]} %`;
+  const kommend = schichten.filter((t) => schichtEnde(t).getTime() >= jetzt);
+  const naechste = kommend[0] || schichten[0];
+  const farbe = farbeVon(naechste);
+
+  const wichtig = (t: Termin) =>
+    t.datum <= bisSonntag || st(t) === "eingeteilt" || st(t) === "gemeldet" || schichtEnde(t).getTime() < jetzt;
+  let sichtbar = schichten;
+  if (block.aufklappbar && !auf) {
+    sichtbar = schichten.filter(wichtig);
+    if (!sichtbar.length) sichtbar = [naechste];
+  }
+  const versteckt = schichten.length - sichtbar.length;
+
+  const kopf = (
+    <>
+      <span
+        aria-hidden
+        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-[11px] text-[22px] leading-none ${
+          farbe ? farbe.chip : "bg-brand/10 dark:bg-brand/20"
+        }`}
+      >
+        {erste?.icon || naechste.icon || "📌"}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-[16px] font-semibold leading-tight">{block.titel}</span>
+        <span className="mt-0.5 block truncate text-[13px] text-tinte-leise">
+          {schichten.length === 1 ? "1 Termin" : `${schichten.length} Termine`}
+          {kommend.length > 0 && ` · nächster ${kurzTag(kommend[0].datum)}`}
+        </span>
+      </span>
+      <span className="zahl shrink-0 rounded-full bg-brand/10 px-2 py-0.5 text-[12px] font-bold text-brand dark:bg-brand/20">
+        {prozentText}
+      </span>
+      {block.aufklappbar && (
+        <span className="text-tinte-leise">
+          <Winkel auf={auf} />
+        </span>
+      )}
+    </>
+  );
+
   return (
-    <div className="card p-4 sm:p-5">
-      <div className="flex items-start gap-3">
-        <span className="text-2xl leading-none">{aktion.icon}</span>
-        <div className="min-w-0 flex-1">
-          <div className="text-[15px] font-bold leading-tight">{aktion.titel}</div>
-          <div className="mt-0.5 text-[12px] text-tinte-leise">
-            zählt als <span className="font-semibold text-brand">+{aktion.prozent} %</span> Mithilfe
-            {gesamt > 4 && ` · ${gesamt} Termine`}
-            {darfVerteilen && <ProzentAendern aktion={aktion} />}
-          </div>
-        </div>
-      </div>
-
-      <ul className="mt-3 grid gap-1.5">
-        {sichtbar.map((t) => {
-          const gemeldet = bewerbungen[t.id] || [];
-          const ich = Boolean(meineUid && gemeldet.includes(meineUid));
-          const belegt = t.personen.length;
-          const plaetze = t.plaetze ?? 1;
-          const voll = belegt >= plaetze;
-          const status = st(t);
-          // Nur das Team sieht vorbei-aber-offene Schichten (zum Austragen vor dem Bestätigen)
-          const vorbei = schichtEnde(t).getTime() < Date.now();
-          return (
-            <li
-              key={t.id}
-              className={`relative flex flex-wrap items-center gap-x-2 gap-y-1.5 overflow-hidden rounded-xl bg-papier-matt px-3 py-2 transition dark:bg-slate-800/60 ${schichtRahmen(status)}`}
-            >
-              {status === "eingeteilt" && (
-                <span aria-hidden className="absolute inset-y-0 left-0 w-1 bg-emerald-500" />
-              )}
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-[13px] font-semibold">{tagLang(t.datum)}</span>
-                <span className="block truncate text-[11px] text-tinte-leise">
-                  {[zeitText(t), t.ort].filter(Boolean).join(" · ")}
-                </span>
-              </span>
-
-              {status !== "nicht" && (
-              <span
-                className={`zahl shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold ${
-                  voll
-                    ? "bg-bezahlt-grund text-bezahlt dark:bg-emerald-500/20 dark:text-emerald-300"
-                    : "bg-white text-tinte-matt dark:bg-slate-900 dark:text-slate-300"
-                }`}
-                title={voll ? "Alle Plätze sind vergeben" : "eingeteilt von Plätzen"}
-              >
-                {voll ? `voll · ${belegt}/${plaetze}` : `${belegt}/${plaetze}`}
-              </span>
-              )}
-
-              {/* Selbst eintragen – auch fürs Team (vorher sah das Team hier nur
-                  „x gemeldet“ und konnte sich nicht selbst melden). */}
-              {vorbei ? (
-                <button
-                  onClick={abschlussOeffnen}
-                  title="Schicht ist vorbei – Mithilfe bestätigen"
-                  className="shrink-0 rounded-lg border border-dashed border-amber-600/60 px-2.5 py-1.5 text-[12px] font-bold text-amber-800 transition active:scale-95 dark:text-amber-200"
-                >
-                  vorbei · bestätigen
-                </button>
-              ) : status === "eingeteilt" ? (
-                <SchichtSchild status="eingeteilt" />
-              ) : status === "nicht" ? (
-                <SchichtSchild status="nicht" />
-              ) : !meineStudentIds.length ? null : voll && !ich && !darfVerteilen ? (
-                <span className="shrink-0 rounded-lg px-2.5 py-1.5 text-[12px] font-bold text-tinte-leise">
-                  voll belegt
-                </span>
-              ) : (
-                <button
-                  onClick={() => onEintragen(t.id, !ich)}
-                  title={ich ? "Gemeldet – das Team teilt noch ein. Antippen zum Austragen." : undefined}
-                  className={`shrink-0 rounded-lg px-2.5 py-1.5 text-[12px] font-bold transition active:scale-95 ${
-                    ich
-                      ? "border border-brand text-brand"
-                      : darfVerteilen
-                        ? "border border-brand/40 text-brand"
-                        : "bg-brand text-white"
-                  }`}
-                >
-                  {ich ? "⏳ gemeldet" : darfVerteilen ? "mich eintragen" : "eintragen"}
-                </button>
-              )}
-
-              {status === "nicht" && (
-                <span className="basis-full text-[11px] leading-snug text-tinte-leise">
-                  {t.abschluss || voll ? "Die Plätze sind ohne dich vergeben – danke fürs Melden!" : "Schicht ist vorbei."}
-                </span>
-              )}
-
-              {darfVerteilen && (
-                <button
-                  onClick={() => onOeffnen(t)}
-                  className="shrink-0 rounded-lg bg-brand px-2.5 py-1.5 text-[12px] font-bold text-white transition active:scale-95"
-                >
-                  {gemeldet.length > 0 ? `${gemeldet.length} gemeldet` : "verteilen"}
-                </button>
-              )}
-            </li>
-          );
-        })}
-      </ul>
-      {schichten.length > 4 && (
+    <div className="liste">
+      {block.aufklappbar ? (
         <button
-          onClick={() => setAlle(!alle)}
-          className="mt-2 w-full rounded-lg py-1.5 text-[12px] font-bold text-brand"
+          onClick={() => setAuf(!auf)}
+          aria-expanded={auf}
+          className="flex w-full items-center gap-3 px-4 py-3 text-left transition active:bg-black/[0.04] dark:active:bg-white/[0.06]"
         >
-          {alle ? "weniger anzeigen" : `alle ${schichten.length} Termine anzeigen`}
+          {kopf}
+        </button>
+      ) : (
+        <div className="flex items-center gap-3 px-4 py-3">{kopf}</div>
+      )}
+
+      {sichtbar.map((t) => (
+        <SchichtZeile
+          key={t.id}
+          t={t}
+          aktion={drin.length > 1 ? aktionen.get(t.aktion_id!) ?? null : null}
+          gemeldet={bewerbungen[t.id] || []}
+          meineUid={meineUid}
+          darfEintragen={meineStudentIds.length > 0}
+          darfVerteilen={darfVerteilen}
+          status={st(t)}
+          onEintragen={onEintragen}
+          onOeffnen={onOeffnen}
+        />
+      ))}
+
+      {block.aufklappbar && (versteckt > 0 || auf) && (
+        <button
+          onClick={() => setAuf(!auf)}
+          className="flex w-full items-center gap-1.5 px-4 py-2.5 text-left text-[15px] font-medium text-brand transition active:bg-black/[0.04] dark:active:bg-white/[0.06]"
+        >
+          <span className="flex-1">{auf ? "Weniger anzeigen" : `Alle ${schichten.length} Termine anzeigen`}</span>
+          <Winkel auf={auf} />
+        </button>
+      )}
+
+      {/* Team: Prozent je Aktion ändern – erst aufgeklappt bzw. bei kleinen Gruppen */}
+      {darfVerteilen && (!block.aufklappbar || auf) && drin.map((a) => <ProzentAendern key={a.id} aktion={a} />)}
+    </div>
+  );
+}
+
+/**
+ * Eine Schicht in der Gruppe: links Tag und Uhrzeit, rechts die Aktion.
+ *  - Schüler: „Eintragen“ / „Gemeldet“ (antippen = austragen) / Schild
+ *  - Team: ganze Zeile antippen → verteilen (dort auch „mich selbst melden“)
+ *  - vorbei und noch nicht bestätigt (nur Team): „Bestätigen“
+ */
+function SchichtZeile({
+  t, aktion, gemeldet, meineUid, darfEintragen, darfVerteilen, status, onEintragen, onOeffnen,
+}: {
+  t: Termin;
+  /** nur gesetzt, wenn in der Gruppe mehrere Aktionen stecken – dann steht der Name dabei */
+  aktion: Aktion | null;
+  gemeldet: string[];
+  meineUid: string | null;
+  darfEintragen: boolean;
+  darfVerteilen: boolean;
+  status: SchichtStatus;
+  onEintragen: (id: string, an: boolean) => void;
+  onOeffnen: (t: Termin) => void;
+}) {
+  const ich = Boolean(meineUid && gemeldet.includes(meineUid));
+  const belegt = t.personen.length;
+  const plaetze = t.plaetze ?? 1;
+  const voll = belegt >= plaetze;
+  const vorbei = schichtEnde(t).getTime() < Date.now();
+  const d = ausKey(t.datum);
+  const heute = t.datum === heuteKey();
+  const zeit = t.von ? zeitText(t).replace(" – ", "–") : "ganztägig";
+
+  const links = (
+    <>
+      {/* Kleines Kalenderblatt: Wochentag über der Zahl – wie im iOS-Kalender */}
+      <span className="flex w-9 shrink-0 flex-col items-center leading-none">
+        <span className={`text-[11px] font-semibold uppercase ${heute ? "text-red-500" : "text-tinte-leise"}`}>
+          {heute ? "heute" : WOCHENTAGE[(d.getDay() + 6) % 7]}
+        </span>
+        <span className="zahl mt-0.5 text-[20px] font-semibold">{d.getDate()}</span>
+      </span>
+      <span className="min-w-0 flex-1">
+        {/* Oben die Uhrzeit (der Tag steht schon links) – stecken mehrere
+            Aktionen in der Gruppe, oben deren Name und die Uhrzeit darunter. */}
+        <span className="block truncate text-[15px] font-medium leading-tight">
+          {aktion ? `${aktion.icon} ${aktion.titel}` : zeit}
+        </span>
+        <span className="mt-0.5 block truncate text-[13px] text-tinte-leise">
+          {[aktion ? zeit : "", t.ort].filter(Boolean).join(" · ")}
+          {(aktion || t.ort) && " · "}
+          <span className={voll ? "font-semibold text-bezahlt" : ""}>
+            {voll ? "voll" : `${belegt}/${plaetze} Plätze`}
+          </span>
+        </span>
+        {status === "nicht" && (
+          <span className="mt-0.5 block text-[12px] leading-snug text-tinte-leise">
+            {t.abschluss || voll ? "Die Plätze sind ohne dich vergeben – danke fürs Melden!" : "Schicht ist vorbei."}
+          </span>
+        )}
+      </span>
+    </>
+  );
+
+  const zeilenKlasse = `relative flex w-full items-center gap-3 py-2.5 pl-4 pr-3 text-left ${status === "nicht" ? "opacity-60" : ""}`;
+  const gruenerStrich = status === "eingeteilt" && (
+    <span aria-hidden className="absolute inset-y-2 left-1 w-[3px] rounded-full bg-emerald-500" />
+  );
+
+  // ---------------------------------------------------------------- Team
+  if (darfVerteilen) {
+    return (
+      <button
+        onClick={() => (vorbei ? abschlussOeffnen() : onOeffnen(t))}
+        className={`${zeilenKlasse} transition active:bg-black/[0.04] dark:active:bg-white/[0.06]`}
+      >
+        {gruenerStrich}
+        {links}
+        {vorbei ? (
+          <span className="shrink-0 rounded-full bg-amber-500/15 px-2.5 py-1 text-[12px] font-bold text-amber-800 dark:text-amber-200">
+            Bestätigen
+          </span>
+        ) : status ? (
+          <SchichtSchild status={status} klein />
+        ) : (
+          gemeldet.length > 0 && (
+            <span className="zahl shrink-0 rounded-full bg-brand px-2 py-0.5 text-[12px] font-bold text-white">
+              {gemeldet.length} gemeldet
+            </span>
+          )
+        )}
+        <span aria-hidden className="shrink-0 text-[17px] leading-none text-tinte-leise/70">›</span>
+      </button>
+    );
+  }
+
+  // ---------------------------------------------------------------- alle anderen
+  return (
+    <div className={zeilenKlasse}>
+      {gruenerStrich}
+      {links}
+      {status === "eingeteilt" || status === "nicht" ? (
+        <SchichtSchild status={status} klein />
+      ) : !darfEintragen || (voll && !ich) ? null /* voll: steht schon grün in der Zeile */ : ich ? (
+        <button
+          onClick={() => onEintragen(t.id, false)}
+          title="Gemeldet – das Team teilt noch ein. Antippen zum Austragen."
+          className="btn-klein-grau shrink-0 !min-h-[2rem] !px-3 !text-[13px]"
+        >
+          Gemeldet
+        </button>
+      ) : (
+        <button onClick={() => onEintragen(t.id, true)} className="btn-klein shrink-0 !min-h-[2rem] !px-3.5 !text-[13px]">
+          Eintragen
         </button>
       )}
     </div>
@@ -422,7 +597,7 @@ function SchichtSheet({
         className={`mb-3 flex items-center gap-2 rounded-xl px-3 py-2.5 ${
           schicht.personen.length >= plaetze
             ? "bg-bezahlt-grund text-bezahlt dark:bg-emerald-500/20 dark:text-emerald-300"
-            : "bg-papier-matt dark:bg-slate-800"
+            : "zelle"
         }`}
       >
         <span className="text-[13px] font-semibold">
@@ -453,7 +628,7 @@ function SchichtSheet({
               <li
                 key={z.uid}
                 className={`flex items-center gap-2.5 rounded-xl px-2.5 py-2 ${
-                  z.zugeteilt ? "bg-brand/10 dark:bg-brand/20" : "bg-papier-matt dark:bg-slate-800/60"
+                  z.zugeteilt ? "bg-brand/10 dark:bg-brand/20" : "zelle"
                 }`}
               >
                 <Avatar userId={z.uid} name={z.name} size={32} />
@@ -540,7 +715,7 @@ function SchichtSheet({
                         void zuteilen(schicht.id, st.id, true);
                         setSuche("");
                       }}
-                      className="flex w-full items-center gap-2 rounded-lg bg-papier-matt px-2.5 py-2 text-left text-[13px] font-semibold dark:bg-slate-800"
+                      className="flex w-full items-center gap-2 rounded-lg zelle px-2.5 py-2 text-left text-[13px] font-semibold"
                     >
                       <span className="min-w-0 flex-1 truncate">
                         {st.nachname}, {st.vorname}

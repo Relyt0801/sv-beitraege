@@ -4,6 +4,7 @@ import { abonniere } from "./realtime";
 import { pushZitat } from "./push";
 import { nochFehlend, zustimmen } from "./zustimmung";
 import { useStimmenZahlen } from "./ergebnisse";
+import type { Teil } from "./teile";
 
 /**
  * Zitatwand (supabase/funktionen-zitate.sql)
@@ -13,6 +14,12 @@ import { useStimmenZahlen } from "./ergebnisse";
  *   🔥          eine Stimme je Person und Zitat, umschaltbar. Gezählt wird in
  *               der Datenbank (stimmen_zahlen); Zahlen gibt es nur, wenn das
  *               Komitee sie für alle freigibt (oder man selbst Komitee ist).
+ *
+ * Offiziell / Inoffiziell (supabase/offiziell-inoffiziell.sql): jedes Zitat
+ * gehört zu genau einem Teil (Spalte bereich). Eingereicht wird in den Teil,
+ * der gerade offen ist; Verschieben geht nur über verschieben_beantragen()
+ * (lib/teile.ts → useVerschiebungen). Abstimmungsrunden laufen je Teil
+ * getrennt – siehe rundenGruppe().
  *
  * Ohne Datenbank (Demo) liegt alles im Browser.
  */
@@ -24,6 +31,21 @@ export function zitatOhneZeichen(t: string): string {
 }
 export type ZitatStatus = "offen" | "frei" | "abgelehnt";
 
+/**
+ * Gruppe der Abstimmungsrunden (abstimm_runden.gruppe) je Teil.
+ * Inoffiziell nutzt bewusst die alte, leere Gruppe '': Alle Zitate von vor
+ * Update 1.4 sind inoffiziell, ihre Runden laufen also dort weiter – und die
+ * alte App (main) findet ihre Runde weiterhin unter ''. Offiziell bekommt
+ * eine eigene Gruppe.
+ */
+export function rundenGruppe(teil: Teil): string {
+  return teil === "offiziell" ? "offiziell" : "";
+}
+/** Umkehrung von rundenGruppe() */
+export function teilVonGruppe(gruppe: string): Teil {
+  return gruppe === "offiziell" ? "offiziell" : "inoffiziell";
+}
+
 export interface Zitat {
   id: string;
   text: string;
@@ -31,6 +53,8 @@ export interface Zitat {
   art: ZitatArt;
   kontext: string;
   status: ZitatStatus;
+  /** Offiziell (kommt ins Abibuch) oder inoffiziell (nur die Stufe) */
+  bereich: Teil;
   /** Nur im Demo-Modus – die Datenbank gibt Einreicher nicht heraus */
   eingereicht_von?: string;
   eingereicht_name?: string;
@@ -57,13 +81,14 @@ function demoLesen(): DemoDaten {
   }
   // Erfundene Beispiele, damit die Demo nicht leer ist
   const jetzt = Date.now();
-  const z = (i: number, text: string, wer: string, art: ZitatArt, kontext: string): Zitat => ({
+  const z = (i: number, text: string, wer: string, art: ZitatArt, kontext: string, bereich: Teil = "inoffiziell", status: ZitatStatus = "frei"): Zitat => ({
     id: `demo-z${i}`,
     text,
     wer,
     art,
     kontext,
-    status: "frei",
+    bereich,
+    status,
     eingereicht_von: "demo",
     eingereicht_name: "Demo",
     created_at: new Date(jetzt - i * 36e5 * 20).toISOString(),
@@ -73,11 +98,24 @@ function demoLesen(): DemoDaten {
       z(1, "Das ist keine Meinung, das ist Chemie.", "Frau Beispiel", "lehrer", "Chemie"),
       z(2, "Ich hab nicht verschlafen, ich war nur früh für morgen.", "Max M.", "schueler", "Q1"),
       z(3, "Sie können gerne gehen – aber nur, wenn Sie wiederkommen.", "Herr Muster", "lehrer", "Deutsch-LK"),
+      // Offizieller Teil – harmlos genug fürs Abibuch
+      z(4, "Wer zuletzt lacht, hat den Witz nicht verstanden – oder ist Physiklehrer.", "Herr Beispiel", "lehrer", "Physik", "offiziell"),
+      z(5, "Die Pause ist kein Grundrecht, sie ist ein Geschenk.", "Frau Muster", "lehrer", "Mathe-LK", "offiziell"),
+      z(6, "Ich hab das nicht vergessen, ich hab es nur noch nicht erinnert.", "Lea K.", "schueler", "Q2", "offiziell"),
+      // Wartet noch auf die Prüfung
+      z(7, "Kann man Hausaufgaben eigentlich auch abonnieren und dann kündigen?", "Tim S.", "schueler", "Englisch", "offiziell", "offen"),
+      z(8, "Ich bin nicht zu spät, der Unterricht war zu früh.", "Max M.", "schueler", "Montag, 1. Stunde", "inoffiziell", "offen"),
     ],
     stimmen: [
       { zitat_id: "demo-z1", user_id: "a" },
       { zitat_id: "demo-z1", user_id: "b" },
       { zitat_id: "demo-z3", user_id: "a" },
+      { zitat_id: "demo-z4", user_id: "a" },
+      { zitat_id: "demo-z4", user_id: "b" },
+      { zitat_id: "demo-z4", user_id: "c" },
+      { zitat_id: "demo-z5", user_id: "a" },
+      { zitat_id: "demo-z6", user_id: "b" },
+      { zitat_id: "demo-z6", user_id: "c" },
     ],
   };
 }
@@ -105,7 +143,8 @@ export function useZitate(aktiv: boolean, uid: string | null) {
   const laden = useCallback(async () => {
     if (!hasSupabase) {
       const d = demoLesen();
-      setZitate(d.zitate.filter((z) => z.status !== "abgelehnt"));
+      // Ältere Demo-Daten im Browser kennen bereich noch nicht → inoffiziell
+      setZitate(d.zitate.filter((z) => z.status !== "abgelehnt").map((z) => ({ ...z, bereich: z.bereich === "offiziell" ? "offiziell" : "inoffiziell" })));
       setStimmen(d.stimmen);
       setMeineIds(new Set(d.zitate.filter((z) => z.eingereicht_von === me).map((z) => z.id)));
       setBereit(true);
@@ -115,7 +154,7 @@ export function useZitate(aktiv: boolean, uid: string | null) {
     const [z, s, mi] = await Promise.all([
       supabase!
         .from("zitate")
-        .select("id, text, wer, art, kontext, status, created_at, geprueft_at")
+        .select("id, text, wer, art, kontext, status, bereich, created_at, geprueft_at")
         .neq("status", "abgelehnt")
         .order("created_at", { ascending: false })
         .limit(1000),
@@ -148,8 +187,16 @@ export function useZitate(aktiv: boolean, uid: string | null) {
   }, [aktiv, laden]);
 
   const einreichen = useCallback(
-    async (z: { text: string; wer: string; art: ZitatArt; kontext: string }): Promise<string | null> => {
-      const sauber = { text: zitatOhneZeichen(z.text).slice(0, 300), wer: z.wer.trim().slice(0, 60), art: z.art, kontext: z.kontext.trim().slice(0, 60) };
+    async (z: { text: string; wer: string; art: ZitatArt; kontext: string; bereich: Teil }): Promise<string | null> => {
+      // bereich = der Teil, der beim Einreichen offen war. Für offiziell prüft
+      // die Datenbank den Text gleich mit dem Wortfilter (Fehlermeldung kommt zurück).
+      const sauber = {
+        text: zitatOhneZeichen(z.text).slice(0, 300),
+        wer: z.wer.trim().slice(0, 60),
+        art: z.art,
+        kontext: z.kontext.trim().slice(0, 60),
+        bereich: z.bereich,
+      };
       if (!sauber.text || !sauber.wer) return "Zitat und Name fehlen";
       if (!hasSupabase) {
         const d = demoLesen();
@@ -251,7 +298,38 @@ export function useZitate(aktiv: boolean, uid: string | null) {
 
   const istMeins = useCallback((id: string) => meineIds.has(id), [meineIds]);
 
-  return { bereit, zitate, me, istMeins, zahlenSichtbar, neuZaehlen: z.laden, einreichen, pruefen, bearbeiten, abstimmen, stimmenVon, meineStimme };
+  /**
+   * Nur Demo: Teil sofort wechseln. In der Datenbank verschiebt
+   * verschieben_ausfuehren(), sobald genug zugestimmt haben – dann lädt die
+   * Wand über den Live-Kanal ohnehin neu.
+   */
+  const demoVerschieben = useCallback(
+    (id: string, nach: Teil) => {
+      if (hasSupabase) return;
+      const d = demoLesen();
+      d.zitate = d.zitate.map((x) => (x.id === id ? { ...x, bereich: nach } : x));
+      demoSchreiben(d);
+      void laden();
+    },
+    [laden],
+  );
+
+  return {
+    bereit,
+    zitate,
+    me,
+    istMeins,
+    zahlenSichtbar,
+    neuZaehlen: z.laden,
+    laden,
+    einreichen,
+    pruefen,
+    bearbeiten,
+    abstimmen,
+    stimmenVon,
+    meineStimme,
+    demoVerschieben,
+  };
 }
 
 export type Zitatwand = ReturnType<typeof useZitate>;

@@ -20,23 +20,25 @@ export function RollenRechteTab() {
   return (
     <div>
       {beide && (
-        <div className="mb-3 grid grid-cols-2 gap-0.5 rounded-xl bg-[rgb(118_118_128/0.12)] p-0.5 dark:bg-[rgb(118_118_128/0.24)]" role="tablist">
+        // Segment wie in iOS (.seg) – gleiche Optik wie überall in der App
+        <div className="seg mb-4" role="tablist">
           {(["rollen", "rechte"] as const).map((a) => (
             <button
               key={a}
               role="tab"
               aria-selected={zeige === a}
+              data-ansicht={a}
               onClick={() => setAnsicht(a)}
-              className={`rounded-[10px] py-2 text-[14px] font-semibold transition ${
-                zeige === a ? "bg-white text-tinte shadow-sm dark:bg-slate-600 dark:text-white" : "text-tinte-matt dark:text-slate-300"
-              }`}
+              className={`seg-item !py-[7px] !text-[14px] ${zeige === a ? "seg-aktiv" : ""}`}
             >
-              {a === "rollen" ? "Rollen" : "Rechte"}
+              {a === "rollen" ? "Personen" : "Rechte je Rolle"}
             </button>
           ))}
         </div>
       )}
-      {zeige === "rollen" ? <RolesTab /> : <PermissionsTab />}
+      <div key={zeige} className="animate-fadeIn">
+        {zeige === "rollen" ? <RolesTab /> : <PermissionsTab />}
+      </div>
     </div>
   );
 }

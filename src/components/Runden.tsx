@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Sheet, SheetKopf } from "./Sheet";
 import { Schalter } from "./Schalter";
 import { Icon } from "./Icon";
@@ -83,19 +83,71 @@ export function SichtbarkeitWahl({
 /** Kopf eines Wahl-Abschnitts: Titel links, Stimmen-Chip rechts */
 function AbschnittKopf({ titel, chip, unter, herz = false }: { titel: string; chip: string; unter?: string; herz?: boolean }) {
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-2.5">
       {herz && (
-        <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-white ${HERZ.voll}`}>
-          <Icon name="herz" size={13} strich={2.4} />
+        <span className={`symbol ${HERZ.voll}`}>
+          <Icon name="herz" size={15} strich={2.4} />
         </span>
       )}
       <span className="min-w-0 flex-1">
-        <span className={`block text-[16px] font-semibold leading-snug ${herz ? HERZ.text : ""}`}>{titel}</span>
+        <span className={`block text-[17px] font-semibold leading-snug tracking-[-0.01em] ${herz ? HERZ.text : ""}`}>{titel}</span>
         {unter && <span className={`block text-[12px] font-semibold uppercase tracking-[0.04em] opacity-80 ${herz ? HERZ.text : "text-tinte-leise"}`}>{unter}</span>}
       </span>
       <span className={`shrink-0 rounded-full px-2.5 py-1 text-[12px] font-semibold ${herz ? HERZ.chip : "bg-brand/10 text-brand-dark dark:text-brand"}`}>{chip}</span>
     </div>
   );
+}
+
+/** Punkte für die eigenen Stimmen: gefüllt = vergeben (wie die Seiten-Punkte in iOS) */
+function StimmPunkte({ vergeben, gesamt, hell = false }: { vergeben: number; gesamt: number; hell?: boolean }) {
+  if (gesamt > 12) return null;
+  return (
+    <span className="inline-flex items-center gap-1" aria-hidden>
+      {Array.from({ length: gesamt }, (_, i) => (
+        <span
+          key={i}
+          className={`h-2 w-2 rounded-full transition-colors duration-300 ${
+            i < vergeben ? (hell ? "bg-white" : "bg-brand") : hell ? "bg-white/35" : "bg-[rgb(118_118_128/0.24)]"
+          }`}
+        />
+      ))}
+    </span>
+  );
+}
+
+/** Satz zu den eigenen Stimmen einer Runde – überall gleich formuliert */
+export function stimmenSatz(stand: RundenStand, runde: Runde, gesperrt = false): string {
+  if (gesperrt) return GESPERRT_TEXT;
+  const uebrig = Math.max(0, runde.stimmen - stand.meineIn(runde.id).length);
+  if (uebrig === 0) return `Du hast ${runde.stimmen === 1 ? "deine Stimme" : `alle ${runde.stimmen} Stimmen`} vergeben.`;
+  return `Du hast noch ${uebrig} von ${runde.stimmen} ${runde.stimmen === 1 ? "Stimme" : "Stimmen"}.`;
+}
+
+/**
+ * Kandidaten für die nächste Runde aus einer laufenden: nach Stimmen
+ * sortiert, nur die eigentliche Wahl (Honorable Mentions bleiben draußen).
+ */
+export function naechsteRundeQuellen(stand: RundenStand, runde: Runde): (KandidatEingabe & { punkte?: number })[] {
+  return stand
+    .kandidatenVon(runde.id)
+    .filter((k) => !k.hm)
+    .map((k) => ({ id: k.ziel_id, label: k.label, unter: k.unter, punkte: stand.zahl(runde.id, k.ziel_id) ?? 0 }));
+}
+
+/** Runde beenden – mit Rückfrage, überall gleich */
+function rundeBeenden(stand: RundenStand, runde: Runde) {
+  void frage(`Runde ${runde.nr} beenden? Danach kann niemand mehr abstimmen.`, "Beenden", true).then(async (ok) => {
+    if (!ok) return;
+    const f = await stand.aendern(runde.id, { offen: false });
+    if (f) meldeFehler("Ging nicht: " + f);
+    else melde("Runde beendet", "erfolg");
+  });
+}
+
+/** Zur Wahl-Karte einer Runde scrollen (sie trägt die id „runde-<id>“) */
+function zurRunde(rundeId: string) {
+  const el = document.getElementById(`runde-${rundeId}`);
+  el?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 /**
@@ -104,6 +156,10 @@ function AbschnittKopf({ titel, chip, unter, herz = false }: { titel: string; ch
  *
  * mitHerz: beim Starten lassen sich Honorable Mentions für den „Sieger der
  * Herzen“ auswählen (Motto, Zitate). wahlTitel benennt die eigentliche Wahl.
+ *
+ * nurWahl: Stand, Start-Knopf, Kurz-Ergebnis und Steuerung zeigt schon eine
+ * RundenStandKarte oben (bzw. RundenEinstellungen im Zahnrad-Blatt) – hier
+ * steht dann nur noch die Liste zum Abstimmen.
  */
 export function RundenAbschnitt({
   stand,
@@ -115,6 +171,7 @@ export function RundenAbschnitt({
   startText = "Engere Auswahl starten",
   wahlTitel = "Wahl",
   mitHerz = false,
+  nurWahl = false,
 }: {
   stand: RundenStand;
   gruppe?: string;
@@ -126,6 +183,8 @@ export function RundenAbschnitt({
   startText?: string;
   wahlTitel?: string;
   mitHerz?: boolean;
+  /** nur die Wahl-Liste (Stand und Steuerung stehen woanders) */
+  nurWahl?: boolean;
 }) {
   const [starten, setStarten] = useState<null | (KandidatEingabe & { punkte?: number })[]>(null);
   const offen = stand.offeneVon(gruppe);
@@ -137,34 +196,18 @@ export function RundenAbschnitt({
         <RundenKarte
           stand={stand}
           runde={offen}
-          leitet={leitet}
+          leitet={leitet && !nurWahl}
+          kompakt={nurWahl}
+          zahlenSehen={leitet}
           gesperrt={gesperrt}
           wahlTitel={wahlTitel}
-          onWeiter={() => {
-            // Nächste Runde aus dieser: nach Stimmen sortiert vorauswählen (nur die Wahl)
-            const ks = stand
-              .kandidatenVon(offen.id)
-              .filter((k) => !k.hm)
-              .map((k) => ({ id: k.ziel_id, label: k.label, unter: k.unter, punkte: stand.zahl(offen.id, k.ziel_id) ?? 0 }));
-            setStarten(ks);
-          }}
+          onWeiter={() => setStarten(naechsteRundeQuellen(stand, offen))}
         />
-      ) : (
+      ) : nurWahl ? null : (
         <>
           {letzte && (leitet || letzte.ergebnis_sichtbar) && <ErgebnisKurz stand={stand} runde={letzte} wahlTitel={wahlTitel} />}
           {leitet && quellen.length >= 2 && (
-            <button onClick={() => setStarten(quellen)} className="feld-grau mb-3 flex w-full items-center gap-3 px-4 py-3 text-left transition active:scale-[.99]">
-              <span className="symbol bg-brand">
-                <Icon name="stimme" size={17} strich={2.3} />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block text-[15px] font-semibold">{startText}</span>
-                <span className="block text-[12.5px] leading-snug text-tinte-leise">
-                  {letzte ? `Runde ${letzte.nr + 1}` : "Runde 2"}: die Besten auswählen, Stimmen je Person festlegen
-                </span>
-              </span>
-              <Icon name="chevron" size={16} />
-            </button>
+            <StartZeile titel={startText} unter={`${letzte ? `Runde ${letzte.nr + 1}` : "Runde 2"}: die Besten auswählen, Stimmen je Person festlegen`} onClick={() => setStarten(quellen)} />
           )}
         </>
       )}
@@ -182,17 +225,40 @@ export function RundenAbschnitt({
   );
 }
 
+/** Weiße Zelle mit blauem Symbol: „Runde starten“ */
+function StartZeile({ titel, unter, onClick }: { titel: string; unter: string; onClick: () => void }) {
+  return (
+    <button onClick={onClick} className="feld-grau mb-3 flex w-full items-center gap-3 px-4 py-3 text-left transition active:scale-[.99]">
+      <span className="symbol bg-brand">
+        <Icon name="stimme" size={17} strich={2.3} />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-[15px] font-semibold">{titel}</span>
+        <span className="block text-[12.5px] leading-snug text-tinte-leise">{unter}</span>
+      </span>
+      <Icon name="chevron" size={16} />
+    </button>
+  );
+}
+
 function RundenKarte({
   stand,
   runde,
   leitet,
+  zahlenSehen,
   gesperrt,
   wahlTitel,
   onWeiter,
+  kompakt = false,
 }: {
   stand: RundenStand;
   runde: Runde;
+  /** ohne Runden-Marke und Gruppen-Titel (stehen schon in der Stand-Karte) */
+  kompakt?: boolean;
+  /** Steuerung unter der Karte zeigen */
   leitet: boolean;
+  /** Zahlen sehen, auch wenn nicht freigegeben (wer leitet) */
+  zahlenSehen: boolean;
   gesperrt: boolean;
   wahlTitel: string;
   onWeiter: () => void;
@@ -202,10 +268,9 @@ function RundenKarte({
   const herz = alle.filter((k) => k.hm);
   const herzLaeuft = !!runde.hm_aktiv && herz.length >= 2;
   const meine = stand.meineIn(runde.id);
-  const uebrig = Math.max(0, runde.stimmen - meine.length);
-  const zahlenDa = leitet || runde.ergebnis_sichtbar;
+  const zahlenDa = zahlenSehen || runde.ergebnis_sichtbar;
   const sortiere = (ks: typeof alle) =>
-    zahlenDa && leitet ? [...ks].sort((a, b) => (stand.zahl(runde.id, b.ziel_id) ?? 0) - (stand.zahl(runde.id, a.ziel_id) ?? 0)) : ks;
+    zahlenDa && zahlenSehen ? [...ks].sort((a, b) => (stand.zahl(runde.id, b.ziel_id) ?? 0) - (stand.zahl(runde.id, a.ziel_id) ?? 0)) : ks;
 
   const tippen = async (ziel: string) => {
     if (gesperrt) return meldeFehler(GESPERRT_TEXT);
@@ -214,28 +279,34 @@ function RundenKarte({
   };
 
   return (
-    <section className="mb-4 space-y-2.5">
-      <div className="overflow-hidden rounded-2xl border border-brand/25 bg-brand/[0.04] dark:bg-brand/[0.08]">
-        <div className="px-4 pb-2 pt-3.5">
-          <RundenMarke runde={runde} />
-          {runde.gruppe_titel && <div className="mt-1.5 text-[16px] font-semibold leading-snug">{runde.gruppe_titel}</div>}
-          <div className="mt-2.5">
+    <section id={`runde-${runde.id}`} className="mb-4 scroll-mt-4 space-y-3">
+      <div className="feld-grau overflow-hidden shadow-[0_1px_3px_rgba(0,0,0,.05)]">
+        <div className="px-4 pb-2.5 pt-3.5">
+          {!kompakt && (
+            <>
+              <div className="flex items-center gap-2">
+                <RundenMarke runde={runde} />
+                <span className="ml-auto">
+                  <StimmPunkte vergeben={meine.length} gesamt={runde.stimmen} />
+                </span>
+              </div>
+              {runde.gruppe_titel && <div className="mt-1.5 text-[15px] font-semibold leading-snug text-tinte-matt dark:text-slate-300">{runde.gruppe_titel}</div>}
+            </>
+          )}
+          <div className={kompakt ? "" : "mt-2"}>
             <AbschnittKopf titel={wahlTitel} chip={`${runde.stimmen} ${runde.stimmen === 1 ? "Stimme" : "Stimmen"}`} />
           </div>
-          <div className="mt-1 text-[13px] leading-snug text-tinte-matt dark:text-slate-300">
-            {gesperrt
-              ? GESPERRT_TEXT
-              : uebrig === 0
-                ? `Du hast ${runde.stimmen === 1 ? "deine Stimme" : `alle ${runde.stimmen} Stimmen`} vergeben. Antippen nimmt eine zurück.`
-                : `Du hast noch ${uebrig} von ${runde.stimmen} ${runde.stimmen === 1 ? "Stimme" : "Stimmen"}.`}
+          <div className="mt-1 text-[13px] leading-snug text-tinte-leise">
+            {stimmenSatz(stand, runde, gesperrt)}
+            {!gesperrt && meine.length > 0 ? " Antippen nimmt eine zurück." : ""}
           </div>
         </div>
         <KandidatenListe stand={stand} runde={runde} ks={sortiere(wahl)} zahlenDa={zahlenDa} onTippen={tippen} />
       </div>
 
       {herzLaeuft && (
-        <div className={`overflow-hidden rounded-2xl border ${HERZ.rahmen} ${HERZ.flaeche}`}>
-          <div className="px-4 pb-2 pt-3.5">
+        <div className="feld-grau overflow-hidden shadow-[0_1px_3px_rgba(0,0,0,.05)]">
+          <div className="px-4 pb-2.5 pt-3.5">
             <AbschnittKopf titel="Sieger der Herzen" unter="Honorable Mentions" chip="1 Stimme" herz />
           </div>
           <KandidatenListe stand={stand} runde={runde} ks={sortiere(herz)} zahlenDa={zahlenDa} onTippen={tippen} herz />
@@ -247,6 +318,7 @@ function RundenKarte({
   );
 }
 
+/** Kandidaten als Liste mit Trennlinien und Haken-Kreis links (wie Auswahllisten in iOS) */
 function KandidatenListe({
   stand,
   runde,
@@ -264,7 +336,7 @@ function KandidatenListe({
 }) {
   const hoechste = Math.max(1, ...ks.map((k) => stand.zahl(runde.id, k.ziel_id) ?? 0));
   return (
-    <ul className="space-y-1.5 px-2.5 pb-2.5">
+    <ul className="gruppe-zellen !rounded-none border-t border-black/[0.06] dark:border-white/[0.08]">
       {ks.map((k) => {
         const an = stand.hatGewaehlt(runde.id, k.ziel_id);
         const n = stand.zahl(runde.id, k.ziel_id);
@@ -273,27 +345,27 @@ function KandidatenListe({
             <button
               aria-pressed={an}
               onClick={() => onTippen(k.ziel_id)}
-              className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition active:scale-[.99] ${
-                an ? `bg-white shadow-card ring-2 dark:bg-slate-900 ${herz ? HERZ.ring : "ring-brand"}` : "bg-white/70 dark:bg-slate-900/60"
+              className={`flex w-full items-center gap-3 px-4 py-3 text-left transition active:bg-black/[0.04] dark:active:bg-white/[0.06] ${
+                an ? (herz ? "bg-[#FF2D55]/[0.06]" : "bg-brand/[0.06]") : ""
               }`}
             >
               <span
                 aria-hidden
-                className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 transition ${
-                  an ? (herz ? "border-[#FF2D55] bg-[#FF2D55] text-white" : "border-brand bg-brand text-white") : "border-black/20 dark:border-white/25"
+                className={`flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full transition duration-200 ease-ios ${
+                  an ? (herz ? "scale-100 bg-[#FF2D55] text-white" : "scale-100 bg-brand text-white") : "border-[1.5px] border-black/20 dark:border-white/25"
                 }`}
               >
-                {an && <Icon name={herz ? "herz" : "haken"} size={herz ? 12 : 14} strich={3} />}
+                {an && <Icon name={herz ? "herz" : "haken"} size={herz ? 11 : 13} strich={3} />}
               </span>
               <span className="min-w-0 flex-1">
-                <span className="block text-[15px] font-semibold leading-snug">{k.label}</span>
+                <span className={`block text-[15px] leading-snug [overflow-wrap:anywhere] ${an ? "font-semibold" : ""}`}>{k.label}</span>
                 {k.unter && <span className="block text-[12.5px] leading-snug text-tinte-leise">{k.unter}</span>}
                 {zahlenDa && n !== undefined && (
-                  <span className="mt-1 flex items-center gap-2">
-                    <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-black/[0.07] dark:bg-white/10">
-                      <span className={`block h-full rounded-full ${herz ? HERZ.voll : "bg-brand"}`} style={{ width: `${Math.round((n / hoechste) * 100)}%` }} />
+                  <span className="mt-1.5 flex items-center gap-2">
+                    <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-[rgb(118_118_128/0.12)] dark:bg-[rgb(118_118_128/0.24)]">
+                      <span className={`block h-full rounded-full transition-[width] duration-500 ease-ios ${herz ? HERZ.voll : "bg-brand"}`} style={{ width: `${Math.round((n / hoechste) * 100)}%` }} />
                     </span>
-                    <span className="zahl w-8 text-right text-[12.5px] font-semibold text-tinte-matt">{n}</span>
+                    <span className="zahl w-8 text-right text-[12.5px] font-semibold text-tinte-matt dark:text-slate-300">{n}</span>
                   </span>
                 )}
               </span>
@@ -305,16 +377,26 @@ function KandidatenListe({
   );
 }
 
+/** Steuerung unter der Wahl – wie eine Gruppe in den iOS-Einstellungen */
 function RundeSteuern({ stand, runde, hatHerz, onWeiter }: { stand: RundenStand; runde: Runde; hatHerz: boolean; onWeiter: () => void }) {
   const t = stand.teilnehmer(runde.id);
   const th = stand.teilnehmerHerz(runde.id);
   return (
-    <div className="feld-grau px-4 py-2">
-      <div className="text-[11.5px] font-semibold uppercase tracking-[0.04em] text-tinte-leise">
+    <div>
+      <h3 className="mb-1.5 px-4 text-[13px] uppercase tracking-[0.02em] text-tinte-leise">
         Steuerung · {t} {t === 1 ? "Person hat" : "Personen haben"} gewählt
-        {hatHerz && runde.hm_aktiv ? ` · ${th} ${th === 1 ? "Herzstimme" : "Herzstimmen"}` : ""}
-      </div>
-      <div className="flex min-h-[44px] items-center gap-3">
+        {hatHerz && runde.hm_aktiv ? ` · ${th} ♥` : ""}
+      </h3>
+      <SteuerZeilen stand={stand} runde={runde} hatHerz={hatHerz} onWeiter={onWeiter} />
+    </div>
+  );
+}
+
+/** Die Zeilen der Steuerung (Stimmen, Sichtbarkeit, Herzen, Weiter, Beenden) */
+function SteuerZeilen({ stand, runde, hatHerz, onWeiter }: { stand: RundenStand; runde: Runde; hatHerz: boolean; onWeiter: () => void }) {
+  return (
+    <div className="gruppe-zellen">
+      <div className="flex min-h-[48px] items-center gap-3 px-4 py-2">
         <span className="min-w-0 flex-1 text-[15px]">Stimmen je Person</span>
         <Stepper
           wert={runde.stimmen}
@@ -325,15 +407,17 @@ function RundeSteuern({ stand, runde, hatHerz, onWeiter }: { stand: RundenStand;
           }}
         />
       </div>
-      <SichtbarkeitWahl
-        alle={runde.ergebnis_sichtbar}
-        onChange={async (v) => {
-          const f = await stand.aendern(runde.id, { ergebnis: v });
-          if (f) meldeFehler("Ging nicht: " + f);
-        }}
-      />
+      <div className="px-4 py-1">
+        <SichtbarkeitWahl
+          alle={runde.ergebnis_sichtbar}
+          onChange={async (v) => {
+            const f = await stand.aendern(runde.id, { ergebnis: v });
+            if (f) meldeFehler("Ging nicht: " + f);
+          }}
+        />
+      </div>
       {hatHerz && (
-        <div className="flex min-h-[44px] items-center gap-3">
+        <div className="flex min-h-[48px] items-center gap-3 px-4 py-2">
           <span className="min-w-0 flex-1 text-[15px]">Sieger der Herzen</span>
           <Schalter
             an={!!runde.hm_aktiv}
@@ -345,74 +429,385 @@ function RundeSteuern({ stand, runde, hatHerz, onWeiter }: { stand: RundenStand;
           />
         </div>
       )}
-      <div className="flex gap-2 py-2">
-        <button className="btn-klein-grau flex-1" onClick={onWeiter}>
-          Nächste Runde …
-        </button>
-        <button
-          className="btn-klein-grau flex-1 !text-red-600 dark:!text-red-400"
-          onClick={() =>
-            void frage(`Runde ${runde.nr} beenden? Danach kann niemand mehr abstimmen.`, "Beenden", true).then(async (ok) => {
-              if (!ok) return;
-              const f = await stand.aendern(runde.id, { offen: false });
-              if (f) meldeFehler("Ging nicht: " + f);
-              else melde("Runde beendet", "erfolg");
-            })
-          }
-        >
-          Beenden
-        </button>
-      </div>
+      <button type="button" onClick={onWeiter} className="flex min-h-[48px] w-full items-center gap-3 px-4 py-2 text-left text-[15px] text-brand transition active:bg-black/[0.04] dark:active:bg-white/[0.06]">
+        <span className="flex-1">Nächste Runde starten …</span>
+        <span aria-hidden className="text-[17px] leading-none text-tinte-leise">›</span>
+      </button>
+      <button
+        type="button"
+        onClick={() => rundeBeenden(stand, runde)}
+        className="flex min-h-[48px] w-full items-center px-4 py-2 text-left text-[15px] font-semibold text-red-600 transition active:bg-black/[0.04] dark:text-red-400 dark:active:bg-white/[0.06]"
+      >
+        Runde {runde.nr} beenden
+      </button>
     </div>
   );
 }
 
-function ErgebnisKurz({ stand, runde, wahlTitel }: { stand: RundenStand; runde: Runde; wahlTitel: string }) {
+/** Rangliste einer Runde (Wahl und, falls vorhanden, Sieger der Herzen) */
+function RundenRangliste({ stand, runde, wahlTitel }: { stand: RundenStand; runde: Runde; wahlTitel: string }) {
   const alle = stand
     .kandidatenVon(runde.id)
     .map((k) => ({ ...k, n: stand.zahl(runde.id, k.ziel_id) ?? 0 }))
     .sort((a, b) => b.n - a.n);
   const wahl = alle.filter((k) => !k.hm);
   const herz = alle.filter((k) => k.hm);
-  if (!wahl.length) return null;
-  const Liste = ({ ks }: { ks: typeof alle }) => (
-    <ol className="space-y-1">
+  const Liste = ({ ks, rosa }: { ks: typeof alle; rosa?: boolean }) => (
+    <ol className="gruppe-zellen">
       {ks.map((k, i) => (
-        <li key={k.ziel_id} className="flex items-baseline gap-2 text-[14px]">
-          <span className="zahl w-5 text-tinte-leise">{i + 1}.</span>
-          <span className="min-w-0 flex-1">{k.label}</span>
+        <li key={k.ziel_id} className="flex min-h-[44px] items-center gap-3 px-4 py-2 text-[15px]">
+          <span
+            className={`zahl flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[12px] font-bold ${
+              i < 3 && !rosa ? "text-[#1C1C1E]" : rosa && i === 0 ? "bg-[#FF2D55] text-white" : "text-tinte-leise"
+            }`}
+            style={i < 3 && !rosa ? { background: MEDAILLE[i] } : undefined}
+          >
+            {i + 1}
+          </span>
+          <span className="min-w-0 flex-1 [overflow-wrap:anywhere]">{k.label}</span>
           <span className="zahl font-semibold">{k.n}</span>
         </li>
       ))}
     </ol>
   );
   return (
+    <div className="space-y-4">
+      <div>
+        <h3 className="mb-1.5 px-4 text-[13px] uppercase tracking-[0.02em] text-tinte-leise">{wahlTitel}</h3>
+        <Liste ks={wahl} />
+      </div>
+      {herz.length >= 2 && (
+        <div>
+          <h3 className={`mb-1.5 flex items-center gap-1.5 px-4 text-[13px] uppercase tracking-[0.02em] ${HERZ.text}`}>
+            <Icon name="herz" size={12} strich={2.4} /> Sieger der Herzen
+          </h3>
+          <Liste ks={herz} rosa />
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Medaillenfarben Gold, Silber, Bronze – wie bei den Rankings */
+const MEDAILLE = ["#E9C460", "#C0C4CC", "#D4A373"];
+
+function ErgebnisKurz({ stand, runde, wahlTitel }: { stand: RundenStand; runde: Runde; wahlTitel: string }) {
+  const wahl = stand
+    .kandidatenVon(runde.id)
+    .filter((k) => !k.hm)
+    .map((k) => ({ ...k, n: stand.zahl(runde.id, k.ziel_id) ?? 0 }))
+    .sort((a, b) => b.n - a.n);
+  if (!wahl.length) return null;
+  return (
     <details className="feld-grau group mb-3 overflow-hidden">
-      <summary className="flex min-h-[44px] cursor-pointer list-none items-center gap-2 px-4 py-2.5 [&::-webkit-details-marker]:hidden">
-        <Icon name="pokal" size={17} />
-        <span className="min-w-0 flex-1 text-[14px]">
-          <span className="font-semibold">Runde {runde.nr} beendet</span>
-          <span className="text-tinte-leise"> · vorn: {wahl[0].label}</span>
+      <summary className="flex min-h-[48px] cursor-pointer list-none items-center gap-3 px-4 py-2.5 [&::-webkit-details-marker]:hidden">
+        <span className="symbol bg-[#E9A23B]">
+          <Icon name="pokal" size={16} strich={2.2} />
         </span>
-        <span className="text-tinte-leise transition group-open:rotate-90" aria-hidden>
+        <span className="min-w-0 flex-1 text-[14.5px] leading-snug">
+          <span className="font-semibold">Runde {runde.nr} beendet</span>
+          <span className="block truncate text-[12.5px] text-tinte-leise">vorn: {wahl[0].label}</span>
+        </span>
+        <span className="text-[17px] text-tinte-leise transition group-open:rotate-90" aria-hidden>
           ›
         </span>
       </summary>
-      <div className="space-y-3 px-4 pb-3">
-        <div>
-          <div className="mb-1 text-[12px] font-semibold uppercase tracking-[0.04em] text-tinte-leise">{wahlTitel}</div>
-          <Liste ks={wahl} />
-        </div>
-        {herz.length >= 2 && (
-          <div className={`rounded-xl border px-3 py-2 ${HERZ.rahmen} ${HERZ.flaeche}`}>
-            <div className={`mb-1 flex items-center gap-1.5 text-[12px] font-semibold uppercase tracking-[0.04em] ${HERZ.text}`}>
-              <Icon name="herz" size={12} strich={2.4} /> Sieger der Herzen · Honorable Mentions
-            </div>
-            <Liste ks={herz} />
-          </div>
-        )}
+      <div className="px-0 pb-3">
+        <RundenRangliste stand={stand} runde={runde} wahlTitel={wahlTitel} />
       </div>
     </details>
+  );
+}
+
+/** Blatt mit dem Ergebnis einer Runde (aus der Stand-Karte heraus) */
+export function RundenErgebnisBlatt({
+  stand,
+  runde,
+  wahlTitel = "Wahl",
+  onClose,
+}: {
+  stand: RundenStand;
+  runde: Runde | null;
+  wahlTitel?: string;
+  onClose: () => void;
+}) {
+  const t = runde ? stand.teilnehmer(runde.id) : 0;
+  return (
+    <Sheet open={!!runde} onClose={onClose}>
+      {runde && (
+        <>
+          <SheetKopf
+            titel={`Ergebnis · Runde ${runde.nr}`}
+            unter={`${runde.offen ? "Läuft noch" : "Beendet"}${runde.gruppe_titel ? ` · ${runde.gruppe_titel}` : ""} · ${t} ${t === 1 ? "Person hat" : "Personen haben"} gewählt`}
+            onClose={onClose}
+          />
+          <RundenRangliste stand={stand} runde={runde} wahlTitel={wahlTitel} />
+        </>
+      )}
+    </Sheet>
+  );
+}
+
+/* ====================================================================== */
+/* Stand-Karte oben im Bereich                                            */
+/* ====================================================================== */
+
+/**
+ * Kompakte Karte für ganz oben in einem Bereich: zeigt die laufende Runde
+ * (Nummer, Titel, meine Stimmen als Punkte), führt mit einem Tipp zur
+ * Wahl-Liste und – sobald man es sehen darf – zum Ergebnis. Wer die Runden
+ * leitet, startet hier die (nächste) Runde und beendet sie.
+ *
+ * Läuft nichts und darf man nichts starten, zeigt sie das letzte Ergebnis
+ * (falls freigegeben) – sonst gar nichts.
+ *
+ * Dazu passt darunter <RundenAbschnitt nurWahl … /> mit der eigentlichen
+ * Liste zum Abstimmen (die Karte scrollt mit „Abstimmen“ dorthin).
+ */
+export function RundenStandKarte({
+  stand,
+  gruppe = "",
+  gruppeTitel = "",
+  quellen,
+  leitet,
+  gesperrt = false,
+  startText = "Runde starten",
+  wahlTitel = "Wahl",
+  mitHerz = false,
+  onAbstimmen,
+  onErgebnis,
+  verlauf = "from-[#0A84FF] to-[#0062CC]",
+  schatten = "shadow-[0_12px_28px_-14px_rgba(0,98,204,.8)]",
+  className = "",
+}: {
+  stand: RundenStand;
+  gruppe?: string;
+  gruppeTitel?: string;
+  /** Was in eine neue Runde kommen kann (mit Punkten zum Vorsortieren) */
+  quellen: (KandidatEingabe & { punkte?: number })[];
+  leitet: boolean;
+  gesperrt?: boolean;
+  startText?: string;
+  wahlTitel?: string;
+  mitHerz?: boolean;
+  /** „Abstimmen“: Standard = zur Wahl-Liste (RundenAbschnitt) scrollen */
+  onAbstimmen?: (runde: Runde) => void;
+  /** „Ergebnis“: Standard = Ergebnis-Blatt dieser Karte */
+  onErgebnis?: (runde: Runde) => void;
+  /** Farbe der Karte während einer Runde (Verlauf innerhalb EINER Farbe) */
+  verlauf?: string;
+  schatten?: string;
+  className?: string;
+}) {
+  const [starten, setStarten] = useState<null | (KandidatEingabe & { punkte?: number })[]>(null);
+  const [ergebnis, setErgebnis] = useState<Runde | null>(null);
+  const offen = stand.offeneVon(gruppe);
+  const letzte = stand.letzteBeendete(gruppe);
+  const zeigeErgebnis = (r: Runde) => (onErgebnis ? onErgebnis(r) : setErgebnis(r));
+
+  let inhalt: ReactNode = null;
+  if (offen) {
+    const meine = stand.meineIn(offen.id).length;
+    const fertig = meine >= offen.stimmen;
+    const t = stand.teilnehmer(offen.id);
+    const ergebnisDa = leitet || offen.ergebnis_sichtbar;
+    inhalt = (
+      <section className={`relative overflow-hidden rounded-[1.4rem] bg-gradient-to-br p-4 text-white ${verlauf} ${schatten}`}>
+        <div aria-hidden className="pointer-events-none absolute -right-8 -top-10 h-32 w-32 rounded-full bg-white/15 blur-2xl" />
+        <div className="relative flex items-center gap-2">
+          <RundenMarke runde={offen} hell />
+          <span className="ml-auto">
+            <StimmPunkte vergeben={meine} gesamt={offen.stimmen} hell />
+          </span>
+        </div>
+        <div className="relative mt-2 text-[1.2rem] font-bold leading-tight tracking-[-0.01em]">
+          {fertig ? "Deine Stimmen sind drin" : `${wahlTitel} läuft`}
+        </div>
+        <div className="relative mt-0.5 text-[13.5px] leading-snug text-white/85">
+          {gruppeTitel || offen.gruppe_titel ? `${gruppeTitel || offen.gruppe_titel} · ` : ""}
+          {stimmenSatz(stand, offen, gesperrt)}
+        </div>
+        <div className="relative mt-3.5 flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => (onAbstimmen ? onAbstimmen(offen) : zurRunde(offen.id))}
+            className="rounded-full bg-white px-4 py-2 text-[14px] font-semibold text-[#0062CC] shadow-sm transition active:scale-95"
+          >
+            {fertig ? "Stimmen ansehen" : "Jetzt abstimmen"}
+          </button>
+          {ergebnisDa && (
+            <button onClick={() => zeigeErgebnis(offen)} className="rounded-full bg-white/20 px-4 py-2 text-[14px] font-semibold text-white transition active:scale-95">
+              Ergebnis
+            </button>
+          )}
+        </div>
+        {leitet && (
+          <div className="relative mt-3.5 flex flex-wrap items-center gap-2 border-t border-white/20 pt-3">
+            <span className="zahl mr-auto text-[12.5px] font-semibold text-white/85">{t} gewählt</span>
+            <button onClick={() => setStarten(naechsteRundeQuellen(stand, offen))} className="rounded-full bg-white/20 px-3.5 py-1.5 text-[13px] font-semibold text-white transition active:scale-95">
+              Nächste Runde
+            </button>
+            <button onClick={() => rundeBeenden(stand, offen)} className="rounded-full bg-black/25 px-3.5 py-1.5 text-[13px] font-semibold text-white transition active:scale-95">
+              Beenden
+            </button>
+          </div>
+        )}
+      </section>
+    );
+  } else {
+    const ergebnisSichtbar = !!letzte && (leitet || letzte.ergebnis_sichtbar);
+    const vorn = letzte
+      ? stand
+          .kandidatenVon(letzte.id)
+          .filter((k) => !k.hm)
+          .map((k) => ({ ...k, n: stand.zahl(letzte.id, k.ziel_id) ?? 0 }))
+          .sort((a, b) => b.n - a.n)[0]
+      : undefined;
+    if (ergebnisSichtbar || (leitet && quellen.length >= 2))
+      inhalt = (
+        <section className="gruppe-zellen shadow-[0_1px_3px_rgba(0,0,0,.05)]">
+          {ergebnisSichtbar && letzte && (
+            <button
+              type="button"
+              onClick={() => zeigeErgebnis(letzte)}
+              className="flex min-h-[56px] w-full items-center gap-3 px-4 py-2.5 text-left transition active:bg-black/[0.04] dark:active:bg-white/[0.06]"
+            >
+              <span className="symbol bg-[#E9A23B]">
+                <Icon name="pokal" size={16} strich={2.2} />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-[15px] font-semibold">Runde {letzte.nr} beendet</span>
+                <span className="block truncate text-[12.5px] text-tinte-leise">{vorn ? `vorn: ${vorn.label}` : "Ergebnis ansehen"}</span>
+              </span>
+              <span className="text-[13px] font-semibold text-brand">Ergebnis</span>
+              <span aria-hidden className="text-[17px] leading-none text-tinte-leise">›</span>
+            </button>
+          )}
+          {leitet && quellen.length >= 2 && (
+            <button
+              type="button"
+              onClick={() => setStarten(quellen)}
+              className="flex min-h-[56px] w-full items-center gap-3 px-4 py-2.5 text-left transition active:bg-black/[0.04] dark:active:bg-white/[0.06]"
+            >
+              <span className="symbol bg-brand">
+                <Icon name="stimme" size={17} strich={2.3} />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-[15px] font-semibold">{startText}</span>
+                <span className="block text-[12.5px] leading-snug text-tinte-leise">
+                  {letzte ? `Runde ${letzte.nr + 1}` : "Runde 2"}: die Besten auswählen, Stimmen festlegen
+                </span>
+              </span>
+              <span aria-hidden className="text-[17px] leading-none text-tinte-leise">›</span>
+            </button>
+          )}
+        </section>
+      );
+  }
+
+  return (
+    <>
+      {inhalt && <div className={`animate-fadeIn ${className}`}>{inhalt}</div>}
+      <RundeStartenSheet
+        offen={starten !== null}
+        quellen={starten || []}
+        gruppe={gruppe}
+        gruppeTitel={gruppeTitel}
+        stand={stand}
+        mitHerz={mitHerz}
+        wahlTitel={wahlTitel}
+        onClose={() => setStarten(null)}
+      />
+      <RundenErgebnisBlatt stand={stand} runde={ergebnis} wahlTitel={wahlTitel} onClose={() => setErgebnis(null)} />
+    </>
+  );
+}
+
+/**
+ * Gruppe „Abstimmung“ für das Einstellungs-Blatt (Zahnrad) eines Bereichs:
+ * läuft eine Runde → Stimmen je Person, wer das Ergebnis sieht, Sieger der
+ * Herzen, nächste Runde, beenden. Sonst → „Runde starten …“.
+ * Nur für wer leitet (sonst nichts).
+ */
+export function RundenEinstellungen({
+  stand,
+  gruppe = "",
+  gruppeTitel = "",
+  quellen,
+  leitet,
+  titel = "Abstimmung",
+  startText = "Runde starten",
+  wahlTitel = "Wahl",
+  mitHerz = false,
+  fuss,
+  className = "mt-4",
+}: {
+  stand: RundenStand;
+  gruppe?: string;
+  gruppeTitel?: string;
+  quellen: (KandidatEingabe & { punkte?: number })[];
+  leitet: boolean;
+  titel?: string;
+  startText?: string;
+  wahlTitel?: string;
+  mitHerz?: boolean;
+  fuss?: ReactNode;
+  className?: string;
+}) {
+  const [starten, setStarten] = useState<null | (KandidatEingabe & { punkte?: number })[]>(null);
+  if (!leitet) return null;
+  const offen = stand.offeneVon(gruppe);
+  const letzte = stand.letzteBeendete(gruppe);
+  const herzDa = offen ? stand.kandidatenVon(offen.id).filter((k) => k.hm).length >= 2 : false;
+  const t = offen ? stand.teilnehmer(offen.id) : 0;
+
+  return (
+    <section className={className}>
+      <h3 className="mb-1.5 px-4 text-[13px] uppercase tracking-[0.02em] text-tinte-leise">{titel}</h3>
+      {offen ? (
+        <>
+          <div className="gruppe-zellen mb-0">
+            <div className="flex min-h-[48px] items-center gap-3 px-4 py-2">
+              <RundenMarke runde={offen} />
+              <span className="zahl ml-auto text-[14px] text-tinte-matt dark:text-slate-300">
+                {t} {t === 1 ? "Person" : "Personen"}
+              </span>
+            </div>
+          </div>
+          <div className="mt-2">
+            <SteuerZeilen stand={stand} runde={offen} hatHerz={herzDa} onWeiter={() => setStarten(naechsteRundeQuellen(stand, offen))} />
+          </div>
+        </>
+      ) : (
+        <div className="gruppe-zellen">
+          <button
+            type="button"
+            disabled={quellen.length < 2}
+            onClick={() => setStarten(quellen)}
+            className="flex min-h-[48px] w-full items-center gap-3 px-4 py-2 text-left transition active:bg-black/[0.04] disabled:opacity-40 dark:active:bg-white/[0.06]"
+          >
+            <span className="symbol bg-brand">
+              <Icon name="stimme" size={16} strich={2.3} />
+            </span>
+            <span className="min-w-0 flex-1 text-[15px]">{startText} …</span>
+            <span className="text-[13px] text-tinte-leise">{letzte ? `Runde ${letzte.nr + 1}` : "Runde 2"}</span>
+            <span aria-hidden className="text-[17px] leading-none text-tinte-leise">›</span>
+          </button>
+        </div>
+      )}
+      {(fuss || (!offen && quellen.length < 2)) && (
+        <p className="mt-1.5 px-4 text-[13px] leading-snug text-tinte-leise">{fuss ?? "Für eine Runde braucht es mindestens zwei Möglichkeiten."}</p>
+      )}
+      <RundeStartenSheet
+        offen={starten !== null}
+        quellen={starten || []}
+        gruppe={gruppe}
+        gruppeTitel={gruppeTitel}
+        stand={stand}
+        mitHerz={mitHerz}
+        wahlTitel={wahlTitel}
+        onClose={() => setStarten(null)}
+      />
+    </section>
   );
 }
 
@@ -565,22 +960,31 @@ export function RundeStartenSheet({
           const istHerz = herz.has(q.id);
           return (
             <div key={q.id} className="zeile">
-              <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-3">
-                <input
-                  type="checkbox"
-                  className="h-5 w-5 shrink-0 accent-[rgb(var(--brand))]"
-                  checked={an}
-                  aria-label={`${q.label}: zur ${wahlTitel}`}
-                  onChange={() => umschalten(q.id, "wahl")}
-                />
+              <button
+                type="button"
+                role="checkbox"
+                aria-checked={an}
+                aria-label={`${q.label}: zur ${wahlTitel}`}
+                onClick={() => umschalten(q.id, "wahl")}
+                className="flex min-w-0 flex-1 items-center gap-3 text-left"
+              >
+                {/* Haken-Kreis wie in iOS-Auswahllisten statt Kästchen */}
+                <span
+                  aria-hidden
+                  className={`flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full transition duration-200 ease-ios ${
+                    an ? "bg-brand text-white" : "border-[1.5px] border-black/20 dark:border-white/25"
+                  }`}
+                >
+                  {an && <Icon name="haken" size={13} strich={3} />}
+                </span>
                 <span className="min-w-0 flex-1">
                   <span className="block text-[15px] leading-snug">{q.label}</span>
                   {q.unter && <span className="block truncate text-[12px] text-tinte-leise">{q.unter}</span>}
                 </span>
-              </label>
+              </button>
               {mitPunkten && (
-                <span className="zahl shrink-0 text-[13px] text-tinte-leise">
-                  {i < 3 && (q.punkte ?? 0) > 0 ? ["🥇", "🥈", "🥉"][i] + " " : ""}
+                <span className="zahl flex shrink-0 items-center gap-1.5 text-[13px] text-tinte-leise">
+                  {i < 3 && (q.punkte ?? 0) > 0 && <span aria-hidden className="h-2.5 w-2.5 rounded-full" style={{ background: MEDAILLE[i] }} />}
                   {q.punkte ?? 0}
                 </span>
               )}
@@ -591,7 +995,7 @@ export function RundeStartenSheet({
                   aria-label={`${q.label}: Honorable Mention`}
                   onClick={() => umschalten(q.id, "herz")}
                   className={`-my-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition active:scale-90 ${
-                    istHerz ? "bg-[#FF2D55] text-white" : "bg-black/[0.05] text-tinte-leise dark:bg-white/10"
+                    istHerz ? "bg-[#FF2D55] text-white" : "bg-[rgb(118_118_128/0.12)] text-tinte-leise dark:bg-[rgb(118_118_128/0.24)]"
                   }`}
                 >
                   <Icon name="herz" size={15} strich={2.4} />

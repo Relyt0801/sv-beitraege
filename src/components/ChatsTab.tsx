@@ -1,20 +1,20 @@
-import type { ReactNode } from "react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { SkelettKarten } from "./Skelett";
 import { useTopics, type Topic } from "../topics-store";
 import { useRole } from "../auth/RoleProvider";
 import { UnbanRequests } from "./UnbanRequests";
 import { KomiteeRequests } from "./KomiteeRequests";
-import { ElternTeamTab } from "./ElternTeamTab";
+import { ElternGespraecheEbene, ElternInfosEbene, useElternZahlen } from "./ElternTeamTab";
 import { COMMITTEES, committeeIcon, committeeLabel } from "../lib/committees";
 import { KomiteePage } from "./KomiteePage";
 import { BannHinweis } from "./BannHinweis";
-import { ChatBlasen, ChatEingabe } from "./ChatBlasen";
+import { ChatBlasen, ChatEbene, ChatEingabe, ChatKopf } from "./ChatBlasen";
 import { Avatar } from "./Avatar";
 import { useProfiles } from "../profiles-store";
 import { useStore } from "../store";
-import { Sheet } from "./Sheet";
+import { Sheet, SheetKopf } from "./Sheet";
 import { normalize } from "../lib/logic";
+import { lesbarerName } from "../lib/profil";
 
 import { frage } from "../lib/melder";
 import { NachtragAnfragen } from "./NachtragAnfragen";
@@ -24,16 +24,53 @@ import { Schalter } from "./Schalter";
 import { kategorieAn, komiteeAn, useMitteilungen, type Kategorie } from "../lib/mitteilungen";
 import { useZaehltMit } from "../lib/chat-zaehler";
 import { FotoFreigaben } from "./FotoFreigaben";
+import { FarbKachel } from "./Kachel";
+import { Gruppe } from "./Liste";
+import { Icon } from "./Icon";
+import { sprungAusHash, type Sprungziel } from "../lib/sprung";
 const TEAM_CHAT_TITLE = "Stufenteam";
+
+/**
+ * Farben der Kacheln im Chats-Reiter – je Bereich EINE Systemfarbe (wie die
+ * bunten Karten der Startseite), der Verlauf bleibt in dieser Farbe. Etwas
+ * dunkler als die reinen iOS-Töne, damit die weiße Schrift gut lesbar ist.
+ */
+const FARBE = {
+  komitee: { verlauf: "from-[#6E6CF0] to-[#4341C8]", schatten: "shadow-[0_10px_24px_-14px_rgba(67,65,200,.9)]" },
+  team: { verlauf: "from-[#1E8CFF] to-[#0058C8]", schatten: "shadow-[0_10px_24px_-14px_rgba(0,88,200,.9)]" },
+  nachtragen: { verlauf: "from-[#30B852] to-[#1D7F35]", schatten: "shadow-[0_10px_24px_-14px_rgba(29,127,53,.9)]" },
+  anfragen: { verlauf: "from-[#FF9F0A] to-[#E2560B]", schatten: "shadow-[0_10px_24px_-14px_rgba(226,86,11,.9)]" },
+  schueler: { verlauf: "from-[#2FB0CC] to-[#0F7690]", schatten: "shadow-[0_10px_24px_-14px_rgba(15,118,144,.9)]" },
+  eltern: { verlauf: "from-[#FF4F6F] to-[#D1103F]", schatten: "shadow-[0_10px_24px_-14px_rgba(209,16,63,.9)]" },
+  infos: { verlauf: "from-[#BF5AF2] to-[#8B2CC2]", schatten: "shadow-[0_10px_24px_-14px_rgba(139,44,194,.9)]" },
+} as const;
+
+/** Unterseiten des Chats-Reiters – jede als eigene Ebene über allem. */
+type Ansicht = "anfragen" | "schueler" | "eltern" | "elterninfos" | null;
+
+/** Diese Benachrichtigungen führen zu den Anfragen (lib/sprung.ts). */
+const ANFRAGE_ZIELE: Sprungziel[] = ["nachtrag", "komitee", "entsperren", "meldung", "foto"];
+const istAnfrageSprung = () => {
+  const z = sprungAusHash(window.location.hash);
+  return Boolean(z && ANFRAGE_ZIELE.includes(z));
+};
 
 /**
  * Chats: pro Komitee ein Chat und der Stufenteam-Chat.
  * Für Schüler fühlt sich der Stufenteam-Chat wie ein normaler Chat an –
  * im Hintergrund entsteht daraus ein Ticket, das das Team beantwortet.
+ *
+ * Aufbau seit 1.4 (Wunsch: „wie die Kacheln auf der Startseite“ und „nicht
+ * scrollen müssen, um etwas zu finden“):
+ *   - oben ein Raster aus bunten Kacheln (2 Spalten am Handy) mit dem, was man
+ *     am häufigsten braucht – mit roter Zahl, wenn dort etwas wartet,
+ *   - darunter die Komitee-Chats als ruhige iOS-Liste,
+ *   - jede Kachel öffnet eine eigene Vollbild-Ebene (ChatEbene) mit eigener
+ *     Kopfleiste und Zurück-Pfeil, wie in iMessage.
  */
 export function ChatsTab() {
-  const { topics, members, ready, unreadCount, createTopic, committeesOf, uid } = useTopics();
-  const { can, isStaff, studentId } = useRole();
+  const { topics, items, members, ready, unreadCount, createTopic, committeesOf, uid } = useTopics();
+  const { can, isStaff } = useRole();
   const [anschreiben, setAnschreiben] = useState(false);
   const [nachtragen, setNachtragen] = useState(false);
   const { mitteilungen, setKategorie, setKomitee } = useMitteilungen();
@@ -47,11 +84,29 @@ export function ChatsTab() {
   const siehtAlle = can("chats.view_all");
   const [openId, setOpenId] = useState<string | null>(null);
   const [teamOffen, setTeamOffen] = useState(false);
-  const [ticketListe, setTicketListe] = useState(false);
+  // Kam man über eine Benachrichtigung zu einer Anfrage, gleich die Anfragen
+  // zeigen. Schon beim ersten Zeichnen prüfen: Die Anfrage-Komponenten
+  // nehmen die Marke (#anfrage-…) beim Einhängen sofort aus der Adresse.
+  const [ansicht, setAnsicht] = useState<Ansicht>(() => (istAnfrageSprung() ? "anfragen" : null));
+  const [anfragenZahl, setAnfragenZahl] = useState(0);
   const angelegt = useRef(false);
+  const eltern = useElternZahlen(isStaff);
 
   const chats = topics.filter((t) => t.kind === "chat");
   const teamChat = chats.find((t) => !t.tag) ?? null;
+
+  // Benachrichtigung, während der Reiter schon offen ist. Als Layout-Effekt,
+  // damit dieser Zuhörer VOR denen der Anfrage-Komponenten an der Reihe ist –
+  // die entfernen die Marke aus der Adresse.
+  useLayoutEffect(() => {
+    const pruefe = () => {
+      if (!istAnfrageSprung()) return;
+      setOpenId(null);
+      setAnsicht("anfragen");
+    };
+    window.addEventListener("hashchange", pruefe);
+    return () => window.removeEventListener("hashchange", pruefe);
+  }, []);
 
   // Aus einer Benachrichtigung (#chat-<id>): genau diesen Chat öffnen
   useEffect(() => {
@@ -62,7 +117,6 @@ export function ChatsTab() {
       history.replaceState(null, "", window.location.pathname + window.location.search);
       const t = topics.find((x) => x.id === m[1]);
       if (!t) return;
-      setTicketListe(false);
       // Schüler sehen ihre Gespräche mit dem Team als einen durchgehenden Chat
       if (t.kind === "ticket" && !isStaff) return setTeamOffen(true);
       setOpenId(t.id);
@@ -99,6 +153,24 @@ export function ChatsTab() {
     [topics, members, isStaff, uid],
   );
 
+  /** Letzte Nachricht eines Chats als kurze Vorschau („Lena: Treffen um 3?“) */
+  const vorschau = useCallback(
+    (topicIds: string[], leer: string) => {
+      const ids = new Set(topicIds);
+      let letzte: (typeof items)[number] | null = null;
+      for (const i of items) {
+        if (!ids.has(i.topic_id) || i.type !== "nachricht" || i.pinned) continue;
+        if (!letzte || i.created_at > letzte.created_at) letzte = i;
+      }
+      if (!letzte) return leer;
+      const wer = letzte.created_by === uid ? "Du" : lesbarerName(letzte.author || "").split(" ")[0] || "Jemand";
+      return `${wer}: ${letzte.body}`;
+    },
+    [items, uid],
+  );
+
+  const glocke = (k: Kategorie) => ({ an: kategorieAn(mitteilungen, k), setAn: (an: boolean) => void setKategorie(k, an) });
+
   if (!ready)
     return (
       <div className="pt-2">
@@ -106,177 +178,224 @@ export function ChatsTab() {
       </div>
     );
 
-  if (ticketListe && isStaff)
-    return (
-      <TicketListe
-        offene={tickets.filter((t) => t.status !== "erledigt")}
-        erledigt={tickets.filter((t) => t.status === "erledigt")}
-        onBack={() => setTicketListe(false)}
-        onOpen={(id) => {
-          setTicketListe(false);
-          setOpenId(id);
-        }}
-      />
-    );
-
-  // Schüler: durchgehender Chat mit dem Stufenteam
-  if (teamOffen && !isStaff)
-    return <TeamChatSchueler tickets={tickets} onBack={() => setTeamOffen(false)} />;
-
   const offen = topics.find((t) => t.id === openId) ?? null;
-  if (offen)
-    return offen.kind === "chat" ? (
-      <KomiteePage topic={offen} onBack={() => setOpenId(null)} />
-    ) : (
-      <TicketChat topic={offen} onBack={() => setOpenId(() => (isStaff ? null : null))} />
-    );
-
-  const reihenfolge = new Map(COMMITTEES.map((c, i) => [c.slug, i]));
-  const komiteeChats = chats
-    .filter((t) => t.tag)
-    .sort((a, b) => {
-      const meinA = meineKoms.includes(a.tag) ? 0 : 1;
-      const meinB = meineKoms.includes(b.tag) ? 0 : 1;
-      if (meinA !== meinB) return meinA - meinB;
-      return (reihenfolge.get(a.tag) ?? 99) - (reihenfolge.get(b.tag) ?? 99);
-    });
   const offeneTickets = tickets.filter((t) => t.status !== "erledigt");
   // Rote Zahl nur für offene Gespräche – erledigte zählen nicht mehr
   const ticketUngelesen = offeneTickets.reduce((n, t) => n + unreadCount(t.id), 0);
 
-  const glocke = (k: Kategorie) => ({ an: kategorieAn(mitteilungen, k), setAn: (an: boolean) => void setKategorie(k, an) });
+  const reihenfolge = new Map(COMMITTEES.map((c, i) => [c.slug, i]));
+  const komiteeChats = chats
+    .filter((t) => t.tag)
+    .sort((a, b) => (reihenfolge.get(a.tag) ?? 99) - (reihenfolge.get(b.tag) ?? 99));
+  const meineChats = komiteeChats.filter((t) => meineKoms.includes(t.tag));
+  const andereChats = komiteeChats.filter((t) => !meineKoms.includes(t.tag));
+
+  // ------------------------------------------------------------ Kacheln
+  const kacheln: JSX.Element[] = [];
+  const komiteeKachel = (t: Topic) => (
+    <FarbKachel
+      key={t.id}
+      {...FARBE.komitee}
+      symbol={committeeIcon(t.tag)}
+      titel={committeeLabel(t.tag)}
+      unter={vorschau([t.id], "Mein Komitee – noch keine Nachricht")}
+      zahl={unreadCount(t.id)}
+      zahlRot
+      onClick={() => setOpenId(t.id)}
+    />
+  );
+
+  if (isStaff) {
+    kacheln.push(
+      <FarbKachel
+        key="anfragen"
+        {...FARBE.anfragen}
+        symbol={<Icon name="haken" size={19} strich={2.6} />}
+        titel="Anfragen"
+        unter={anfragenZahl ? `${anfragenZahl} warten auf eine Entscheidung` : "Gerade nichts offen"}
+        zahl={anfragenZahl}
+        zahlRot
+        gedaempft={!anfragenZahl}
+        onClick={() => setAnsicht("anfragen")}
+      />,
+    );
+    if (teamChat)
+      kacheln.push(
+        <FarbKachel
+          key="teamchat"
+          {...FARBE.team}
+          symbol="👑"
+          titel="Stufenteam-Chat"
+          unter={vorschau([teamChat.id], "Nur fürs Team")}
+          zahl={unreadCount(teamChat.id)}
+          zahlRot
+          onClick={() => setOpenId(teamChat.id)}
+        />,
+      );
+    kacheln.push(
+      <FarbKachel
+        key="schueler"
+        {...FARBE.schueler}
+        symbol="🎓"
+        titel="Schüler"
+        unter={offeneTickets.length ? `${offeneTickets.length} ${offeneTickets.length === 1 ? "Gespräch" : "Gespräche"} offen` : "Kein Gespräch offen"}
+        zahl={ticketUngelesen}
+        zahlRot
+        onClick={() => setAnsicht("schueler")}
+      />,
+      <FarbKachel
+        key="eltern"
+        {...FARBE.eltern}
+        symbol="👪"
+        titel="Eltern"
+        unter={eltern.offen ? `${eltern.offen} ${eltern.offen === 1 ? "Gespräch" : "Gespräche"} offen` : "Kein Gespräch offen"}
+        zahl={eltern.neu}
+        zahlRot
+        onClick={() => setAnsicht("eltern")}
+      />,
+      <FarbKachel
+        key="elterninfos"
+        {...FARBE.infos}
+        symbol="📣"
+        titel="Infos für Eltern"
+        unter={eltern.infos ? `${eltern.infos} veröffentlicht` : "Noch nichts veröffentlicht"}
+        onClick={() => setAnsicht("elterninfos")}
+      />,
+    );
+    // Eigene Komitees des Teams ebenfalls als Kachel – die übrigen in der Liste
+    for (const t of meineChats) kacheln.push(komiteeKachel(t));
+  } else {
+    for (const t of meineChats) kacheln.push(komiteeKachel(t));
+    kacheln.push(
+      <FarbKachel
+        key="frag"
+        {...FARBE.team}
+        symbol="🛡️"
+        titel="Frag das Stufenteam"
+        unter={vorschau(tickets.map((t) => t.id), "Frag hier alles – das Team antwortet dir")}
+        zahl={ticketUngelesen}
+        zahlRot
+        onClick={() => setTeamOffen(true)}
+      />,
+      <FarbKachel
+        key="nachtragen"
+        {...FARBE.nachtragen}
+        symbol="🙌"
+        titel="Mithilfe nachtragen"
+        unter="Vergessen eingetragen? Hier beantragen."
+        onClick={() => setNachtragen(true)}
+      />,
+    );
+  }
+  // Ungerade Anzahl: die letzte Kachel geht über beide Spalten (am Handy)
+  const breitLetzte = kacheln.length % 2 === 1;
 
   return (
     <div className="space-y-6 pb-4">
-      {/* Der Chat des Stufenteams – nur fürs Team, ganz oben */}
-      {isStaff && teamChat && (
-        <section>
-          <KategorieKopf titel="Stufenteam" />
-          <div className="card divide-y divide-black/[0.06] overflow-hidden dark:divide-white/[0.08]">
-            <ChatCard
-              titel="Stufenteam-Chat"
-              icon="👑"
-              unread={unreadCount(teamChat.id)}
-              mine
-              onOpen={() => setOpenId(teamChat.id)}
-            />
-          </div>
-        </section>
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {kacheln.map((k, i) =>
+          breitLetzte && i === kacheln.length - 1 ? (
+            <div key={k.key} className="col-span-2 grid lg:col-span-1">
+              {k}
+            </div>
+          ) : (
+            k
+          ),
+        )}
+      </div>
+
+      {!isStaff && meineChats.length === 0 && (
+        <p className="-mt-2 px-4 text-[13px] leading-snug text-tinte-leise">
+          Du bist noch in keinem Komitee. Das Stufenteam kann dich eintragen – dann steht dein Komitee-Chat hier oben.
+        </p>
       )}
 
-      <section>
-        <KategorieKopf
-          titel={isStaff ? "Komitees" : "Mein Komitee"}
-          hinweis={isStaff ? "🔔 = Mitteilungen und roter Punkt auch für fremde Komitees" : undefined}
-        />
-        {komiteeChats.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-papier-linie py-8 text-center text-sm text-tinte-leise dark:border-slate-700">
-            {meineKoms.length
-              ? "Der Chat wird gerade eingerichtet."
-              : "Du bist noch in keinem Komitee. Das Stufenteam kann dich eintragen."}
-          </div>
-        ) : (
-          <div className="card divide-y divide-black/[0.06] overflow-hidden dark:divide-white/[0.08]">
-            {komiteeChats.map((t) => {
-              const mein = meineKoms.includes(t.tag);
-              const an = komiteeAn(mitteilungen, t.tag, mein);
+      {/* Komitee-Chats: ruhige Liste. Fürs Team mit Glocke je Komitee. */}
+      {andereChats.length > 0 &&
+        (isStaff ? (
+          <Gruppe
+            className=""
+            titel={meineChats.length ? "Weitere Komitees" : "Komitees"}
+            fuss="Glocke an = Mitteilungen und roter Punkt auch für Komitees, in denen du nicht bist."
+          >
+            {andereChats.map((t) => {
+              const an = komiteeAn(mitteilungen, t.tag, false);
               return (
-                <ChatCard
+                <ChatZeile
                   key={t.id}
                   titel={committeeLabel(t.tag)}
                   icon={committeeIcon(t.tag)}
+                  unter={vorschau([t.id], "Noch keine Nachricht")}
                   unread={zaehlt(t) ? unreadCount(t.id) : 0}
-                  mine={mein || an}
                   onOpen={() => setOpenId(t.id)}
-                  glocke={isStaff ? { an, setAn: (x) => void setKomitee(t.tag, x), name: committeeLabel(t.tag) } : undefined}
+                  glocke={{ an, setAn: (x) => void setKomitee(t.tag, x), name: committeeLabel(t.tag) }}
                 />
               );
             })}
-          </div>
-        )}
-      </section>
-
-      {isStaff ? (
-        <>
-          <section>
-            <KategorieKopf titel="Chats mit Schülern" />
-            <div className="grid grid-cols-1 gap-2.5">
-              <TicketUebersichtKarte
-                offene={offeneTickets}
-                unread={ticketUngelesen}
-                onOpen={() => setTicketListe(true)}
-                onAnschreiben={() => setAnschreiben(true)}
-                glocke={<MitteilungsZeile {...glocke("schueler")} name="Chats mit Schülern" />}
-              />
-              <SchuelerAnschreiben open={anschreiben} onClose={() => setAnschreiben(false)} />
+          </Gruppe>
+        ) : (
+          // Schüler sehen andere Komitees normalerweise gar nicht (Datenbank);
+          // falls doch (Testbetrieb), zugeklappt, damit nichts überladen wirkt.
+          <details className="group">
+            <summary className="flex min-h-[40px] cursor-pointer list-none items-center gap-1.5 px-4 text-[13px] uppercase tracking-[0.02em] text-tinte-leise [&::-webkit-details-marker]:hidden">
+              Weitere Komitees ({andereChats.length})
+              <span className="transition group-open:rotate-90" aria-hidden>
+                <Icon name="chevron" size={13} />
+              </span>
+            </summary>
+            <div className="gruppe-zellen mt-1">
+              {andereChats.map((t) => (
+                <ChatZeile
+                  key={t.id}
+                  titel={committeeLabel(t.tag)}
+                  icon={committeeIcon(t.tag)}
+                  unread={0}
+                  onOpen={() => setOpenId(t.id)}
+                />
+              ))}
             </div>
-          </section>
-
-          <section>
-            <KategorieKopf titel="Chats mit Eltern" />
-            <ElternTeamTab glocke={<MitteilungsZeile {...glocke("eltern")} name="Chats mit Eltern" />} />
-          </section>
-
-          <section>
-            <KategorieKopf titel="Anfragen" />
-            {/* Offene Anfragen stehen als Karten darüber; darunter ein Feld mit
-                dem Hinweis (wenn nichts offen ist) und dem Mitteilungs-Schalter. */}
-            <div className="peer grid grid-cols-1 gap-2.5 empty:hidden">
-              <MeldungenAnfragen />
-              <NachtragAnfragen />
-              <KomiteeRequests />
-              <UnbanRequests />
-              <FotoFreigaben />
-            </div>
-            <div className="card mt-2.5 overflow-hidden peer-empty:mt-0 [&>p]:hidden peer-empty:[&>p]:block [&>div]:border-t-0 peer-empty:[&>div]:border-t">
-              <p className="px-4 py-3 text-[13px] text-tinte-leise">Gerade keine offenen Anfragen.</p>
-              <MitteilungsZeile {...glocke("anfragen")} name="Anfragen" />
-            </div>
-          </section>
-        </>
-      ) : (
-        <section>
-          <KategorieKopf titel="Stufenteam" />
-          <div className="card divide-y divide-black/[0.06] overflow-hidden dark:divide-white/[0.08]">
-            <ChatCard
-              titel="Frag das Stufenteam"
-              icon="🛡️"
-              unread={ticketUngelesen}
-              mine
-              onOpen={() => setTeamOffen(true)}
-            />
-            <ChatCard
-              titel="Mithilfe nachtragen"
-              unter="Vergessen eingetragen? Hier beantragen."
-              icon="🙌"
-              unread={0}
-              mine
-              onOpen={() => setNachtragen(true)}
-            />
-          </div>
-        </section>
-      )}
+          </details>
+        ))}
 
       <NachtragSheet open={nachtragen} onClose={() => setNachtragen(false)} />
-    </div>
-  );
-}
 
-/** Überschrift eines Bereichs, rechts optional der Mitteilungs-Schalter. */
-function KategorieKopf({
-  titel, glocke, hinweis,
-}: {
-  titel: string;
-  glocke?: { an: boolean; setAn: (an: boolean) => void };
-  hinweis?: string;
-}) {
-  return (
-    <div className="mb-2 flex items-center gap-2">
-      <h3 className="min-w-0 flex-1 text-xs font-bold uppercase tracking-wide text-tinte-leise">
-        {titel}
-        {hinweis && <span className="ml-2 font-medium normal-case tracking-normal">{hinweis}</span>}
-      </h3>
-      {glocke && <Glocke an={glocke.an} setAn={glocke.setAn} name={titel} />}
+      {/* ---------------------------------------------- Ebenen (Vollbild) */}
+      {isStaff && (
+        // Immer eingehängt (unsichtbar), damit die Kachel ihre Zahl kennt
+        // und Benachrichtigungen („bitte prüfen“) sofort hierher führen.
+        <AnfragenEbene
+          sichtbar={ansicht === "anfragen" && !offen}
+          onBack={() => setAnsicht(null)}
+          onZahl={setAnfragenZahl}
+          glocke={glocke("anfragen")}
+        />
+      )}
+      {isStaff && ansicht === "schueler" && (
+        <TicketListe
+          offene={offeneTickets}
+          erledigt={tickets.filter((t) => t.status === "erledigt")}
+          onBack={() => setAnsicht(null)}
+          onOpen={(id) => setOpenId(id)}
+          onAnschreiben={() => setAnschreiben(true)}
+          glocke={glocke("schueler")}
+        />
+      )}
+      {isStaff && ansicht === "eltern" && <ElternGespraecheEbene onBack={() => setAnsicht(null)} glocke={<MitteilungsGruppe {...glocke("eltern")} name="Chats mit Eltern" fuss="Kommt als Mitteilung aufs Handy, sobald Eltern schreiben." />} />}
+      {isStaff && ansicht === "elterninfos" && <ElternInfosEbene onBack={() => setAnsicht(null)} />}
+
+      {/* Schüler: durchgehender Chat mit dem Stufenteam */}
+      {teamOffen && !isStaff && <TeamChatSchueler tickets={tickets} onBack={() => setTeamOffen(false)} />}
+
+      {/* Ein geöffneter Chat liegt über allem – auch über einer Liste, aus der
+          er geöffnet wurde; Zurück führt dann wieder in diese Liste. */}
+      {offen &&
+        (offen.kind === "chat" ? (
+          <KomiteePage key={offen.id} topic={offen} onBack={() => setOpenId(null)} />
+        ) : (
+          <TicketChat key={offen.id} topic={offen} onBack={() => setOpenId(null)} />
+        ))}
+
+      {isStaff && <SchuelerAnschreiben open={anschreiben} onClose={() => setAnschreiben(false)} />}
     </div>
   );
 }
@@ -305,14 +424,14 @@ function Glocke({ an, setAn, name }: { an: boolean; setAn: (an: boolean) => void
   );
 }
 
-function ChatCard({
-  titel, unter, icon, unread, mine, onOpen, glocke,
+/** Eine Zeile in der Komitee-Liste: Symbol, Name, letzte Nachricht, Zahl, Glocke. */
+function ChatZeile({
+  titel, unter, icon, unread, onOpen, glocke,
 }: {
   titel: string;
   unter?: string;
   icon: string;
   unread: number;
-  mine: boolean;
   onOpen: () => void;
   glocke?: { an: boolean; setAn: (an: boolean) => void; name: string };
 }) {
@@ -320,19 +439,21 @@ function ChatCard({
     <div className="flex w-full items-center">
       <button
         onClick={onOpen}
-        className={`flex min-h-[52px] min-w-0 flex-1 items-center gap-3 px-4 py-2.5 text-left transition active:bg-black/[0.04] dark:active:bg-white/[0.06] ${mine ? "" : "opacity-70"}`}
+        className="flex min-h-[56px] min-w-0 flex-1 items-center gap-3 px-4 py-2 text-left transition active:bg-black/[0.04] dark:active:bg-white/[0.06]"
       >
-        <span className="text-xl">{icon}</span>
+        <span aria-hidden className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[rgb(118_118_128/0.12)] text-[18px] dark:bg-[rgb(118_118_128/0.24)]">
+          {icon}
+        </span>
         <span className="min-w-0 flex-1">
           <span className="block truncate text-[15.5px] font-semibold">{titel}</span>
-          {unter && <span className="block truncate text-[12px] text-tinte-leise">{unter}</span>}
+          {unter && <span className="block truncate text-[12.5px] text-tinte-leise">{unter}</span>}
         </span>
         {unread > 0 && (
           <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[11px] font-bold text-white">
             {unread > 9 ? "9+" : unread}
           </span>
         )}
-        {!glocke && <span className="text-slate-300">›</span>}
+        {!glocke && <span aria-hidden className="text-[17px] leading-none text-tinte-leise">›</span>}
       </button>
       {glocke && (
         <span className="pr-3">
@@ -343,42 +464,111 @@ function ChatCard({
   );
 }
 
-function TicketCard({
-  topic, unread, onOpen, onDelete,
-}: { topic: Topic; unread: number; onOpen: () => void; onDelete?: () => void }) {
-  const { profile } = useProfiles();
-  const person = useTicketPerson(topic);
-  const name = person ? profile[person]?.anzeigename : "";
+/**
+ * Mitteilungen für einen Bereich an/aus – als eigene Gruppe am Ende der
+ * jeweiligen Unterseite (eine Stelle je Bereich, nicht verstreut).
+ */
+function MitteilungsGruppe({ an, setAn, name, fuss }: { an: boolean; setAn: (an: boolean) => void; name: string; fuss?: string }) {
   return (
-    <div className="card flex items-center">
-    <button
-      onClick={onOpen}
-      className="flex min-w-0 flex-1 items-center gap-3 p-4 text-left transition active:scale-[.99]"
-    >
-      <Avatar userId={person} name={name} size={32} />
-      <span className="min-w-0 flex-1">
-        <span className="block truncate text-[15px] font-bold">{name || "Frage"}</span>
-        <span className="block truncate text-[12px] text-tinte-leise">{topic.title}</span>
-      </span>
-      {unread > 0 && (
-        <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[11px] font-bold text-white">
-          {unread > 9 ? "9+" : unread}
-        </span>
-      )}
-      {topic.status === "erledigt" && <span className="text-emerald-500">✓</span>}
-      <span className="text-slate-300">›</span>
-    </button>
-    {onDelete && (
-      <button
-        onClick={onDelete}
-        className="mr-2 shrink-0 rounded-lg px-2 py-2 text-tinte-leise transition hover:text-red-500 active:scale-90"
-        aria-label="Ticket löschen"
-        title="Ticket löschen"
-      >
-        🗑
-      </button>
-    )}
+    <Gruppe titel="Mitteilungen" fuss={fuss} className="mt-6">
+      <div className="flex min-h-[48px] items-center gap-3 px-4 py-2">
+        <span aria-hidden className="text-[15px]">{an ? "🔔" : "🔕"}</span>
+        <span className="min-w-0 flex-1 text-[15px]">{name}</span>
+        <Schalter an={an} onChange={setAn} label={`Mitteilungen für ${name}`} />
+      </div>
+    </Gruppe>
+  );
+}
+
+/** Leerer Zustand einer Unterseite: Symbol, ein Satz, was als Nächstes passiert. */
+function Leer({ icon, text }: { icon: string; text: string }) {
+  return (
+    <div className="flex flex-col items-center px-8 py-12 text-center">
+      <span aria-hidden className="text-[40px] leading-none">{icon}</span>
+      <p className="mt-3 max-w-xs text-[14px] leading-snug text-tinte-leise">{text}</p>
     </div>
+  );
+}
+
+/**
+ * Zählt die Meldungen in der Anfragen-Ebene. MeldungenAnfragen (Melden.tsx)
+ * meldet ihre Anzahl nicht selbst; statt die Meldungen ein zweites Mal zu
+ * laden (doppelte Live-Verbindung „sv-meldungen“), zählen wir die Karten in
+ * ihrem Behälter #sprung-meldung.
+ */
+function useMeldungenZahl(box: HTMLElement | null) {
+  const [n, setN] = useState(0);
+  useEffect(() => {
+    if (!box) return;
+    const zaehlen = () => setN(box.querySelector("#sprung-meldung")?.childElementCount ?? 0);
+    zaehlen();
+    const mo = new MutationObserver(zaehlen);
+    mo.observe(box, { childList: true, subtree: true });
+    return () => mo.disconnect();
+  }, [box]);
+  return n;
+}
+
+/**
+ * Alle Anfragen ans Team auf einer Seite, nach Art gruppiert (mit Anzahl),
+ * damit man nicht durch eine lange gemischte Liste scrollen muss.
+ */
+function AnfragenEbene({
+  sichtbar, onBack, onZahl, glocke,
+}: {
+  sichtbar: boolean;
+  onBack: () => void;
+  onZahl: (n: number) => void;
+  glocke: { an: boolean; setAn: (an: boolean) => void };
+}) {
+  const [zahlen, setZahlen] = useState({ nachtrag: 0, komitee: 0, entsperren: 0, foto: 0 });
+  const [box, setBox] = useState<HTMLDivElement | null>(null);
+  const meldungen = useMeldungenZahl(box);
+  // Je Art ein fester Rückruf – sonst liefen die Effekte der Kinder bei jedem Zeichnen neu
+  const setzer = useMemo(() => {
+    const f = (k: keyof typeof zahlen) => (n: number) => setZahlen((z) => (z[k] === n ? z : { ...z, [k]: n }));
+    return { nachtrag: f("nachtrag"), komitee: f("komitee"), entsperren: f("entsperren"), foto: f("foto") };
+  }, []);
+  const summe = zahlen.nachtrag + zahlen.komitee + zahlen.entsperren + zahlen.foto + meldungen;
+  useEffect(() => onZahl(summe), [summe, onZahl]);
+
+  const Abschnitt = ({ titel, n, children }: { titel: string; n: number; children: React.ReactNode }) => (
+    <section className={n ? "mb-6" : "hidden"}>
+      <h3 className="mb-1.5 px-4 text-[13px] uppercase tracking-[0.02em] text-tinte-leise">
+        {titel} <span className="zahl">· {n}</span>
+      </h3>
+      <div className="grid gap-2.5 lg:grid-cols-2">{children}</div>
+    </section>
+  );
+
+  return (
+    <ChatEbene
+      sichtbar={sichtbar}
+      label="Anfragen"
+      kopf={<ChatKopf onBack={onBack} symbol="📥" titel="Anfragen" unter={summe ? `${summe} offen` : "Alles erledigt"} />}
+    >
+      <div ref={setBox} className="py-4">
+        {summe === 0 && <Leer icon="✅" text="Gerade keine offenen Anfragen. Neue erscheinen hier – mit roter Zahl auf der Kachel." />}
+        {/* Die Abschnitte bleiben immer eingehängt (nur unsichtbar), damit sie
+            weiter zählen und live nachladen. */}
+        <Abschnitt titel="Meldungen" n={meldungen}>
+          <MeldungenAnfragen />
+        </Abschnitt>
+        <Abschnitt titel="Mithilfe nachtragen" n={zahlen.nachtrag}>
+          <NachtragAnfragen onAnzahl={setzer.nachtrag} />
+        </Abschnitt>
+        <Abschnitt titel="Komitee-Wünsche" n={zahlen.komitee}>
+          <KomiteeRequests onAnzahl={setzer.komitee} />
+        </Abschnitt>
+        <Abschnitt titel="Entsperren" n={zahlen.entsperren}>
+          <UnbanRequests onAnzahl={setzer.entsperren} />
+        </Abschnitt>
+        <Abschnitt titel="Steckbrief-Fotos" n={zahlen.foto}>
+          <FotoFreigaben onAnzahl={setzer.foto} />
+        </Abschnitt>
+        <MitteilungsGruppe {...glocke} name="Neue Anfragen" fuss="Kommt als Mitteilung aufs Handy, sobald jemand etwas beantragt." />
+      </div>
+    </ChatEbene>
   );
 }
 
@@ -435,33 +625,25 @@ function TeamChatSchueler({ tickets, onBack }: { tickets: Topic[]; onBack: () =>
   }
 
   return (
-    <div>
-      <div className="sticky top-[var(--kopf)] z-10 -mx-3 flex items-center gap-2 border-b border-papier-linie bg-papier-matt px-3 py-2 dark:border-slate-800 dark:bg-slate-950 sm:-mx-5 sm:px-5 lg:mx-0 lg:rounded-2xl lg:border lg:bg-[rgb(var(--glas))] lg:px-4 lg:shadow-card lg:dark:border-white/10 lg:dark:bg-[rgb(var(--glas))]">
-        <button className="iconbtn" onClick={onBack} aria-label="Zurück">‹</button>
-        <span className="text-xl">🛡️</span>
-        <div className="min-w-0 flex-1">
-          <div className="truncate text-[17px] font-bold">Stufenteam</div>
-          <div className="text-[11px] text-tinte-leise">Frag hier alles, das Team antwortet dir</div>
-        </div>
-      </div>
-
+    <ChatEbene
+      label="Stufenteam"
+      kopf={<ChatKopf onBack={onBack} symbol="🛡️" titel="Stufenteam" unter="Frag hier alles – das Team antwortet dir" />}
+      fuss={banned ? undefined : <ChatEingabe wert={text} setWert={setText} onSenden={senden} />}
+    >
       {banned ? (
         <div className="mt-3">
           <BannHinweis />
         </div>
       ) : (
-        <>
-          <ChatBlasen
-            liste={verlauf}
-            uid={uid}
-            darfLoeschen={false}
-            onDelete={deleteItem}
-            leerText="Schreib dem Stufenteam, sie melden sich hier zurück."
-          />
-          <ChatEingabe wert={text} setWert={setText} onSenden={senden} />
-        </>
+        <ChatBlasen
+          liste={verlauf}
+          uid={uid}
+          darfLoeschen={false}
+          onDelete={deleteItem}
+          leerText="Schreib dem Stufenteam – die Antwort kommt hier in den Chat."
+        />
       )}
-    </div>
+    </ChatEbene>
   );
 }
 
@@ -489,104 +671,56 @@ function TicketChat({ topic, onBack }: { topic: Topic; onBack: () => void }) {
 
   const person = useTicketPerson(topic);
   const name = person ? profile[person]?.anzeigename : "";
+  const erledigt = topic.status === "erledigt";
 
   return (
-    <div>
-      <div className="sticky top-[var(--kopf)] z-10 -mx-3 flex items-center gap-2 border-b border-papier-linie bg-papier-matt px-3 py-2 dark:border-slate-800 dark:bg-slate-950 sm:-mx-5 sm:px-5 lg:mx-0 lg:rounded-2xl lg:border lg:bg-[rgb(var(--glas))] lg:px-4 lg:shadow-card lg:dark:border-white/10 lg:dark:bg-[rgb(var(--glas))]">
-        <button className="iconbtn" onClick={onBack} aria-label="Zurück">‹</button>
-        <Avatar userId={person} name={name} size={28} />
-        <div className="min-w-0 flex-1">
-          <div className="truncate text-[16px] font-bold">{name || "Frage"}</div>
-          <div className="truncate text-[11px] text-tinte-leise">
-            {topic.status === "erledigt" ? "erledigt" : topic.title}
-          </div>
-        </div>
-        {isStaff && (
-          <>
-            <button
-              className="rounded-lg border border-papier-linie px-2.5 py-1.5 text-xs font-bold dark:border-slate-700"
-              onClick={() => updateTopic(topic.id, { status: topic.status === "erledigt" ? "offen" : "erledigt" })}
-            >
-              {topic.status === "erledigt" ? "öffnen" : "erledigt"}
-            </button>
-            {can("chats.manage") && (
-              <button
-                className="iconbtn"
-                title="Ticket löschen"
-                onClick={async () => {
-                  if (await frage("Diese Frage samt Verlauf löschen?", "Löschen", true)) {
-                    void deleteTopic(topic.id);
-                    onBack();
-                  }
-                }}
-              >
-                🗑
-              </button>
-            )}
-          </>
-        )}
-      </div>
-
+    <ChatEbene
+      label={name || "Frage"}
+      kopf={
+        <ChatKopf
+          onBack={onBack}
+          symbol={<Avatar userId={person} name={name} size={32} />}
+          titel={name || "Frage"}
+          unter={erledigt ? `Erledigt · ${topic.title}` : topic.title}
+          rechts={
+            isStaff && (
+              <>
+                <button
+                  className={`flex h-10 items-center gap-1 rounded-full px-3 text-[13px] font-semibold transition active:scale-95 ${
+                    erledigt
+                      ? "bg-[rgb(118_118_128/0.12)] text-brand-dark dark:bg-[rgb(118_118_128/0.24)] dark:text-brand"
+                      : "bg-[#248A3D] text-white dark:bg-[#30D158] dark:text-black"
+                  }`}
+                  onClick={() => updateTopic(topic.id, { status: erledigt ? "offen" : "erledigt" })}
+                  title={erledigt ? "Wieder öffnen" : "Als erledigt markieren"}
+                >
+                  {!erledigt && <Icon name="haken" size={15} strich={2.6} />}
+                  {erledigt ? "Öffnen" : "Erledigt"}
+                </button>
+                {can("chats.manage") && (
+                  <button
+                    className="iconbtn"
+                    title="Gespräch löschen"
+                    aria-label="Gespräch löschen"
+                    onClick={async () => {
+                      if (await frage("Diese Frage samt Verlauf löschen?", "Löschen", true)) {
+                        void deleteTopic(topic.id);
+                        onBack();
+                      }
+                    }}
+                  >
+                    <Icon name="muell" size={17} />
+                  </button>
+                )}
+              </>
+            )
+          }
+        />
+      }
+      fuss={banned ? undefined : <ChatEingabe wert={text} setWert={setText} onSenden={senden} platzhalter="Antworten" />}
+    >
       <ChatBlasen liste={liste} uid={uid} darfLoeschen={can("chats.delete_messages")} onDelete={deleteItem} />
-      {!banned && <ChatEingabe wert={text} setWert={setText} onSenden={senden} platzhalter="Antworten…" />}
-    </div>
-  );
-}
-
-
-/** Karte "Gespräche mit Schülern" – steht direkt über den Gesprächen mit Eltern. */
-function TicketUebersichtKarte({
-  offene, unread, onOpen, onAnschreiben, glocke,
-}: { offene: Topic[]; unread: number; onOpen: () => void; onAnschreiben: () => void; glocke?: ReactNode }) {
-  const { profile } = useProfiles();
-  const neueste = offene[0];
-  const person = useTicketPerson(neueste ?? null);
-  const name = person ? profile[person]?.anzeigename : "";
-  const text =
-    offene.length === 0
-      ? "Gerade nichts offen"
-      : offene.length === 1
-        ? `${name || "Jemand"}: ${neueste.title}`
-        : `${offene.length} offen`;
-
-  return (
-    <section className="card p-4 sm:p-5">
-      <div className="flex items-center gap-2">
-        <h2 className="min-w-0 flex-1 text-lg font-bold">
-          Gespräche mit Schülern
-          {unread > 0 && (
-            <span className="ml-2 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 align-middle text-[11px] font-bold text-white">
-              {unread > 9 ? "9+" : unread} neu
-            </span>
-          )}
-        </h2>
-        <button onClick={onAnschreiben} className="shrink-0 rounded-lg bg-brand px-3 py-1.5 text-sm font-bold text-white">
-          Anschreiben
-        </button>
-      </div>
-      <button
-        onClick={onOpen}
-        className="mt-3 flex w-full items-center gap-2 rounded-2xl border border-papier-linie p-3.5 text-left dark:border-slate-700"
-      >
-        <span className="min-w-0 flex-1 truncate text-[14px] text-tinte-matt dark:text-slate-300">{text}</span>
-        <span className="shrink-0 text-[13px] font-bold text-brand">Alle ansehen ›</span>
-      </button>
-      {glocke && <div className="-mx-4 -mb-4 mt-3 sm:-mx-5 sm:-mb-5">{glocke}</div>}
-    </section>
-  );
-}
-
-/**
- * Mitteilungen für einen Bereich an/aus – als Zeile IM Feld (unten, mit
- * Trennlinie), nicht mehr als Knopf über den Feldern.
- */
-function MitteilungsZeile({ an, setAn, name }: { an: boolean; setAn: (an: boolean) => void; name: string }) {
-  return (
-    <div className="flex min-h-[48px] items-center gap-3 border-t border-black/[0.06] px-4 py-2 dark:border-white/[0.08]">
-      <span aria-hidden className="text-[15px]">{an ? "🔔" : "🔕"}</span>
-      <span className="min-w-0 flex-1 text-[14px] text-tinte-matt dark:text-slate-300">Mitteilungen</span>
-      <Schalter an={an} onChange={setAn} label={`Mitteilungen für ${name}`} />
-    </div>
+    </ChatEbene>
   );
 }
 
@@ -660,82 +794,154 @@ function SchuelerAnschreiben({ open, onClose }: { open: boolean; onClose: () => 
 
   return (
     <Sheet open={open} onClose={onClose}>
-      <h2 className="text-xl font-extrabold">Schüler anschreiben</h2>
+      <SheetKopf titel="Schüler anschreiben" unter="Kommt als Pop-up an – auch wenn Chat-Meldungen aus sind." onClose={onClose} />
       {!wer ? (
         <>
-          <input className="field mt-3" placeholder="Name suchen …" value={q} autoFocus onChange={(e) => setQ(e.target.value)} />
-          <ul className="mt-2 grid max-h-[50vh] grid-cols-1 gap-1 overflow-y-auto">
+          <input className="field" placeholder="Name suchen …" value={q} autoFocus onChange={(e) => setQ(e.target.value)} />
+          <div className="gruppe-zellen mt-3 max-h-[50vh] overflow-y-auto">
             {liste.map((x) => (
-              <li key={x.id}>
-                <button
-                  onClick={() => setWer(x.id)}
-                  className="flex w-full items-center gap-2.5 rounded-xl px-2 py-2 text-left hover:bg-papier-matt dark:hover:bg-slate-800"
-                >
-                  <Avatar userId={x.id} name={x.name} size={28} />
-                  <span className="truncate text-[14px] font-semibold">{x.name}</span>
-                </button>
-              </li>
+              <button
+                key={x.id}
+                onClick={() => setWer(x.id)}
+                className="flex min-h-[48px] w-full items-center gap-3 px-4 py-2 text-left transition active:bg-black/[0.04] dark:active:bg-white/[0.06]"
+              >
+                <Avatar userId={x.id} name={x.name} size={28} />
+                <span className="truncate text-[15px]">{x.name}</span>
+              </button>
             ))}
-          </ul>
+            {liste.length === 0 && <p className="px-4 py-3 text-[14px] text-tinte-leise">Niemand gefunden.</p>}
+          </div>
         </>
       ) : (
         <>
-          <button onClick={() => setWer(null)} className="mt-3 flex items-center gap-2 rounded-xl bg-papier-matt px-3 py-2 text-[14px] font-semibold dark:bg-slate-800">
-            <Avatar userId={wer} name={gewaehlt?.name} size={24} />
-            {gewaehlt?.name || "Ausgewählt"} <span className="text-tinte-leise">· ändern</span>
+          <button
+            onClick={() => setWer(null)}
+            className="flex min-h-[48px] w-full items-center gap-3 rounded-[0.875rem] zelle px-4 py-2 text-left"
+          >
+            <Avatar userId={wer} name={gewaehlt?.name} size={28} />
+            <span className="min-w-0 flex-1 truncate text-[15px] font-semibold">{gewaehlt?.name || "Ausgewählt"}</span>
+            <span className="text-[15px] text-brand-dark dark:text-brand">Ändern</span>
           </button>
-          <label className="mt-3 block text-[12px] font-semibold text-tinte-leise">Betreff</label>
-          <input className="field mt-1" placeholder="z. B. Waffelstand 1. Pause" value={betreff} maxLength={60} onChange={(e) => setBetreff(e.target.value)} />
-          <label className="mt-3 block text-[12px] font-semibold text-tinte-leise">Nachricht</label>
-          <textarea className="field mt-1 min-h-[90px]" value={text} onChange={(e) => setText(e.target.value)} />
-          <button disabled={busy || !betreff.trim() || !text.trim()} onClick={senden} className="btn-primary mt-4 disabled:opacity-40">
-            {busy ? "…" : "Senden"}
+          <label className="mb-1.5 mt-4 block px-4 text-[13px] uppercase tracking-[0.02em] text-tinte-leise">Betreff</label>
+          <input className="field" placeholder="z. B. Waffelstand 1. Pause" value={betreff} maxLength={60} onChange={(e) => setBetreff(e.target.value)} />
+          <label className="mb-1.5 mt-4 block px-4 text-[13px] uppercase tracking-[0.02em] text-tinte-leise">Nachricht</label>
+          <textarea className="field min-h-[90px]" value={text} onChange={(e) => setText(e.target.value)} />
+          <button disabled={busy || !betreff.trim() || !text.trim()} onClick={senden} className="btn-primary mt-5">
+            {busy ? "Wird gesendet …" : "Senden"}
           </button>
-          <p className="mt-2 text-center text-[11px] text-tinte-leise">Kommt als Pop-up an – auch wenn Chat-Meldungen aus sind.</p>
         </>
       )}
     </Sheet>
   );
 }
 
-/** Alle Tickets der Stufe – nur fürs Team. */
+/**
+ * Alle Gespräche mit Schülern – nur fürs Team. Offene oben als Liste,
+ * erledigte zugeklappt darunter; oben rechts „+“ zum Anschreiben.
+ */
 function TicketListe({
-  offene, erledigt, onBack, onOpen,
-}: { offene: Topic[]; erledigt: Topic[]; onBack: () => void; onOpen: (id: string) => void }) {
+  offene, erledigt, onBack, onOpen, onAnschreiben, glocke,
+}: {
+  offene: Topic[];
+  erledigt: Topic[];
+  onBack: () => void;
+  onOpen: (id: string) => void;
+  onAnschreiben: () => void;
+  glocke: { an: boolean; setAn: (an: boolean) => void };
+}) {
   const { unreadCount, deleteTopic } = useTopics();
   const loeschen = (t: Topic) => async () => {
-    if (await frage(`Das Ticket „${t.title}" endgültig löschen?\n\nAlle Nachrichten darin verschwinden.`, "Löschen", true))
+    if (await frage(`Das Gespräch „${t.title}" endgültig löschen?\n\nAlle Nachrichten darin verschwinden.`, "Löschen", true))
       void deleteTopic(t.id);
   };
   return (
-    <div>
-      <div className="sticky top-[var(--kopf)] z-10 -mx-3 mb-3 flex items-center gap-2 border-b border-papier-linie bg-papier-matt px-3 py-2 dark:border-slate-800 dark:bg-slate-950 sm:-mx-5 sm:px-5 lg:mx-0 lg:rounded-2xl lg:border lg:bg-[rgb(var(--glas))] lg:px-4 lg:shadow-card lg:dark:border-white/10 lg:dark:bg-[rgb(var(--glas))]">
-        <button className="iconbtn" onClick={onBack} aria-label="Zurück">‹</button>
-        <span className="text-xl">🎓</span>
-        <div className="min-w-0 flex-1 truncate text-[17px] font-bold">Gespräche mit Schülern</div>
-      </div>
-
-      {offene.length === 0 ? (
-        <p className="py-8 text-center text-sm text-tinte-leise">Gerade keine offenen Fragen.</p>
-      ) : (
-        <div className="grid items-start gap-2.5 lg:grid-cols-2">
-          {offene.map((t) => (
-            <TicketCard key={t.id} topic={t} unread={unreadCount(t.id)} onOpen={() => onOpen(t.id)} onDelete={loeschen(t)} />
-          ))}
-        </div>
-      )}
-
-      {erledigt.length > 0 && (
-        <details className="mt-4">
-          <summary className="cursor-pointer text-xs font-bold uppercase tracking-wide text-tinte-leise">
-            Erledigt ({erledigt.length})
-          </summary>
-          <div className="mt-2 grid items-start gap-2.5 lg:grid-cols-2">
-            {erledigt.map((t) => (
-              <TicketCard key={t.id} topic={t} unread={0} onOpen={() => onOpen(t.id)} onDelete={loeschen(t)} />
+    <ChatEbene
+      label="Gespräche mit Schülern"
+      kopf={
+        <ChatKopf
+          onBack={onBack}
+          symbol="🎓"
+          titel="Schüler"
+          unter={offene.length ? `${offene.length} offen` : "Nichts offen"}
+          rechts={
+            <button className="iconbtn" onClick={onAnschreiben} aria-label="Schüler anschreiben" title="Schüler anschreiben">
+              <Icon name="plus" size={19} strich={2.4} />
+            </button>
+          }
+        />
+      }
+    >
+      <div className="py-4">
+        {offene.length === 0 ? (
+          <Leer icon="💬" text="Gerade keine offenen Fragen. Mit „+“ oben rechts schreibst du jemanden an." />
+        ) : (
+          <Gruppe titel="Offen" className="">
+            {offene.map((t) => (
+              <TicketZeile key={t.id} topic={t} unread={unreadCount(t.id)} onOpen={() => onOpen(t.id)} onDelete={loeschen(t)} />
             ))}
-          </div>
-        </details>
+          </Gruppe>
+        )}
+
+        {erledigt.length > 0 && (
+          <details className="group mt-6">
+            <summary className="flex min-h-[40px] cursor-pointer list-none items-center gap-1.5 px-4 text-[13px] uppercase tracking-[0.02em] text-tinte-leise [&::-webkit-details-marker]:hidden">
+              Erledigt ({erledigt.length})
+              <span className="transition group-open:rotate-90" aria-hidden>
+                <Icon name="chevron" size={13} />
+              </span>
+            </summary>
+            <div className="gruppe-zellen mt-1">
+              {erledigt.map((t) => (
+                <TicketZeile key={t.id} topic={t} unread={0} onOpen={() => onOpen(t.id)} onDelete={loeschen(t)} />
+              ))}
+            </div>
+          </details>
+        )}
+
+        <MitteilungsGruppe {...glocke} name="Gespräche mit Schülern" />
+      </div>
+    </ChatEbene>
+  );
+}
+
+/** Eine Zeile „Gespräch mit …“ in der Liste der Schüler-Gespräche. */
+function TicketZeile({
+  topic, unread, onOpen, onDelete,
+}: { topic: Topic; unread: number; onOpen: () => void; onDelete?: () => void }) {
+  const { profile } = useProfiles();
+  const person = useTicketPerson(topic);
+  const name = person ? profile[person]?.anzeigename : "";
+  return (
+    <div className="flex items-center">
+      <button
+        onClick={onOpen}
+        className="flex min-h-[60px] min-w-0 flex-1 items-center gap-3 px-4 py-2 text-left transition active:bg-black/[0.04] dark:active:bg-white/[0.06]"
+      >
+        <Avatar userId={person} name={name} size={36} />
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-[15.5px] font-semibold">{name || "Frage"}</span>
+          <span className="block truncate text-[12.5px] text-tinte-leise">{topic.title}</span>
+        </span>
+        {unread > 0 && (
+          <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[11px] font-bold text-white">
+            {unread > 9 ? "9+" : unread}
+          </span>
+        )}
+        {topic.status === "erledigt" && (
+          <span className="text-[#248A3D] dark:text-[#30D158]">
+            <Icon name="haken" size={16} strich={2.6} />
+          </span>
+        )}
+      </button>
+      {onDelete && (
+        <button
+          onClick={onDelete}
+          className="mr-2 flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-tinte-leise transition hover:text-red-500 active:scale-90"
+          aria-label="Gespräch löschen"
+          title="Gespräch löschen"
+        >
+          <Icon name="muell" size={17} />
+        </button>
       )}
     </div>
   );

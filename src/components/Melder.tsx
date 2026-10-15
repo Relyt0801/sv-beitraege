@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { melderEinhaengen, type MeldeArt } from "../lib/melder";
+import { useNetz } from "../lib/netz";
 
 /**
  * Zeichnet Meldungen und Rückfragen selbst, statt die Fenster des Browsers zu
@@ -35,6 +36,10 @@ export function MelderProvider({ children }: { children: ReactNode }) {
   const [warteschlange, setWarteschlange] = useState<Rueckfrage[]>([]);
   const naechsteId = useRef(1);
   const rueckfrage = warteschlange[0] ?? null;
+  // Steht oben das Offline-Band (components/Verbindung.tsx), rücken die
+  // Meldungen darunter – sonst lägen beide Kapseln übereinander.
+  const netz = useNetz();
+  const bandDa = netz.zustand !== "online" || netz.wieder;
 
   const zeigeToast = useCallback((text: string, art: MeldeArt) => {
     const id = naechsteId.current++;
@@ -87,7 +92,9 @@ export function MelderProvider({ children }: { children: ReactNode }) {
         <>
           {toasts.length > 0 && (
             <div
-              className="pointer-events-none fixed inset-x-0 top-[calc(env(safe-area-inset-top)+0.75rem)] z-[85] flex flex-col items-center gap-2 px-4"
+              className={`pointer-events-none fixed inset-x-0 z-[85] flex flex-col items-center gap-2 px-4 transition-[top] duration-300 ease-ios ${
+                bandDa ? "top-[calc(env(safe-area-inset-top)+3.25rem)]" : "top-[calc(env(safe-area-inset-top)+0.75rem)]"
+              }`}
               role="status"
               aria-live="polite"
             >

@@ -5,7 +5,7 @@ import { useStore } from "../store";
 import { committeeIcon, committeeLabel } from "../lib/committees";
 import { WerHatGestimmt } from "./WerHatGestimmt";
 import { Avatar, PersonName } from "./Avatar";
-import { ChatBlase, SystemZeile } from "./ChatBlasen";
+import { ChatBlase, ChatBlasen, ChatEbene, ChatEingabe, ChatKopf, SystemZeile } from "./ChatBlasen";
 import { BannHinweis } from "./BannHinweis";
 import { Sheet, SheetKopf } from "./Sheet";
 import { useChatEnde } from "../lib/gescrollt";
@@ -13,7 +13,7 @@ import { VorsitzZeile } from "./VorsitzSheet";
 import { Icon } from "./Icon";
 
 import { frage } from "../lib/melder";
-import { ANTWORT_ART_NAME, FreiAntworten, type AntwortArt } from "./Freitext";
+import { AbstimmungKarte, NeuEintragSheet, type NeuDaten } from "./Freitext";
 type Neu = "pin" | "umfrage" | "todo" | null;
 
 /**
@@ -49,37 +49,71 @@ export function KomiteePage({ topic, onBack }: { topic: Topic; onBack: () => voi
   const titel = topic.tag ? committeeLabel(topic.tag) : topic.title;
   const icon = topic.tag ? committeeIcon(topic.tag) : "💬";
 
-  return (
-    <div>
-      <div className="sticky top-[var(--kopf)] z-10 -mx-3 border-b border-papier-linie bg-papier-matt px-3 py-2 dark:border-slate-800 dark:bg-slate-950 sm:-mx-5 sm:px-5 lg:mx-0 lg:rounded-2xl lg:border lg:bg-[rgb(var(--glas))] lg:px-4 lg:shadow-card lg:dark:border-white/10 lg:dark:bg-[rgb(var(--glas))]">
-      <div className="flex items-center gap-2">
-        <button className="iconbtn" onClick={onBack} aria-label="Zurück">‹</button>
-        <span className="text-xl">{icon}</span>
-        <div className="min-w-0 flex-1 truncate text-[17px] font-bold">{titel}</div>
-      </div>
-      {/* Zwei Knöpfe: Chat (Standard) und Übersicht – jeder mit eigenem roten Punkt */}
-      <div className="seg mt-2">
-        {(["chat", "uebersicht"] as const).map((k) => {
-          const n = tab === k ? 0 : unreadCount(topic.id, k);
-          return (
-            <button
-              key={k}
-              onClick={() => setTab(k)}
-              aria-pressed={tab === k}
-              className={`seg-item flex items-center justify-center gap-1.5 ${tab === k ? "seg-aktiv" : ""}`}
-            >
-              {k === "chat" ? "💬 Chat" : "📋 Übersicht"}
-              {n > 0 && (
-                <span className="flex h-[17px] min-w-[17px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
-                  {n > 9 ? "9+" : n}
-                </span>
-              )}
-            </button>
-          );
-        })}
-      </div>
-      </div>
+  // Die Übersicht beginnt oben (der Chat dagegen unten bei der neuesten Nachricht)
+  useEffect(() => {
+    if (tab !== "uebersicht") return;
+    const r = requestAnimationFrame(() => document.querySelector("[data-chat-scroller]")?.scrollTo({ top: 0 }));
+    return () => cancelAnimationFrame(r);
+  }, [tab]);
 
+  // Eigene Nachricht im Chat
+  const [text, setText] = useState("");
+  async function senden() {
+    if (!text.trim()) return;
+    const t = text;
+    setText("");
+    await postItem(topic, "nachricht", t, undefined, "", { role, koms: committeesOf(uid) });
+  }
+
+  /* Zwei Knöpfe: Chat (Standard) und Übersicht – jeder mit eigenem roten Punkt.
+     Als schlankes Segment direkt unter der Kopfleiste (vorher ein dunkler
+     Balken mitten auf der Seite). */
+  const segment = (
+    <div className="seg">
+      {(["chat", "uebersicht"] as const).map((k) => {
+        const n = tab === k ? 0 : unreadCount(topic.id, k);
+        return (
+          <button
+            key={k}
+            onClick={() => setTab(k)}
+            aria-pressed={tab === k}
+            className={`seg-item flex items-center justify-center gap-1.5 ${tab === k ? "seg-aktiv" : ""}`}
+          >
+            {k === "chat" ? "Chat" : "Übersicht"}
+            {n > 0 && (
+              <span className="flex h-[17px] min-w-[17px] items-center justify-center rounded-full bg-[#FF3B30] px-1 text-[10px] font-bold text-white">
+                {n > 9 ? "9+" : n}
+              </span>
+            )}
+          </button>
+        );
+      })}
+    </div>
+  );
+
+  /* Wie ein Chat in iMessage: eine Vollbild-Ebene über der App mit EINER
+     Glas-Kopfleiste (Zurück, Name, darunter Chat | Übersicht) und der
+     Eingabe bzw. den Neu-Knöpfen unten. */
+  return (
+    <ChatEbene
+      label={titel}
+      kopf={
+        <ChatKopf onBack={onBack} symbol={icon} titel={titel} unter={topic.tag ? "Komitee" : "Chat"}>
+          {segment}
+        </ChatKopf>
+      }
+      fuss={
+        banned ? undefined : tab === "chat" ? (
+          <ChatEingabe wert={text} setWert={setText} onSenden={() => void senden()} />
+        ) : (
+          <div className="grid grid-cols-3 gap-2">
+            <NeuKnopf icon="📌" label="Anpinnen" onClick={() => setNeu("pin")} />
+            <NeuKnopf icon="🗳️" label="Abstimmung" onClick={() => setNeu("umfrage")} />
+            <NeuKnopf icon="✅" label="To-do" onClick={() => setNeu("todo")} />
+          </div>
+        )
+      }
+    >
       {banned && (
         <div className="mt-3">
           <BannHinweis />
@@ -87,7 +121,7 @@ export function KomiteePage({ topic, onBack }: { topic: Topic; onBack: () => voi
       )}
 
       {tab === "uebersicht" ? (
-        <div className="mt-3 space-y-5 pb-8 lg:pb-4">
+        <div className="space-y-5 py-3">
           {/* Wer hier den Vorsitz hat, darf Termine anfragen. */}
           {topic.tag && <VorsitzZeile tag={topic.tag} />}
 
@@ -163,17 +197,7 @@ export function KomiteePage({ topic, onBack }: { topic: Topic; onBack: () => voi
 
         </div>
       ) : (
-        <ChatBereich topic={topic} liste={chat} banned={banned} darfLoeschen={darfLoeschen} uid={uid} />
-      )}
-
-      {tab === "uebersicht" && !banned && (
-        <div className="fixed inset-x-0 bottom-[var(--leiste)] lg:bottom-0 lg:pb-[calc(env(safe-area-inset-bottom)+0.75rem)] z-30 border-t border-papier-linie bg-papier-matt/95 px-3 py-2 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95 sm:px-5">
-          <div className="mx-auto grid max-w-5xl grid-cols-3 gap-2">
-            <NeuKnopf icon="📌" label="Anpinnen" onClick={() => setNeu("pin")} />
-            <NeuKnopf icon="🗳️" label="Abstimmung" onClick={() => setNeu("umfrage")} />
-            <NeuKnopf icon="✅" label="To-do" onClick={() => setNeu("todo")} />
-          </div>
-        </div>
+        <ChatBlasen liste={chat} uid={uid} darfLoeschen={darfLoeschen} onDelete={(id) => void deleteItem(id)} />
       )}
 
       <NeuSheet
@@ -186,12 +210,12 @@ export function KomiteePage({ topic, onBack }: { topic: Topic; onBack: () => voi
           if (daten.art === "umfrage")
             await postItem(topic, "umfrage", daten.text, daten.optionen, daten.text.slice(0, 60), {
               ...meta,
-              poll: { multi: daten.multi, anon: daten.anon, deadline: daten.frist, antwortArt: daten.antwortArt },
+              poll: { multi: daten.multi, anon: daten.anon, deadline: daten.frist, antwortArt: daten.antwortArt, eigene: daten.eigene },
             });
           setNeu(null);
         }}
       />
-    </div>
+    </ChatEbene>
   );
 }
 
@@ -213,7 +237,7 @@ function NeuKnopf({ icon, label, onClick }: { icon: string; label: string; onCli
   return (
     <button
       onClick={onClick}
-      className="flex items-center justify-center gap-1.5 rounded-xl border border-dashed border-brand/50 py-2.5 text-center text-[13px] font-bold text-brand transition active:scale-[.98]"
+      className="flex min-h-[2.75rem] items-center justify-center gap-1.5 rounded-full bg-[rgb(118_118_128/0.12)] px-2 text-center text-[13.5px] font-semibold text-brand-dark transition active:scale-[.97] dark:bg-[rgb(118_118_128/0.24)] dark:text-brand"
     >
       <span className="text-base">{icon}</span>
       {label}
@@ -221,124 +245,13 @@ function NeuKnopf({ icon, label, onClick }: { icon: string; label: string; onCli
   );
 }
 
-function UmfrageKarte({
-  item, kannLoeschen, onDelete,
-}: { item: TopicItem; kannLoeschen: boolean; onDelete: () => void }) {
-  const { myVotes, voteCounts, voters, vote } = useTopics();
-  const { isAdmin } = useRole();
-  const meine = myVotes[item.id] || [];
-  const counts = voteCounts[item.id] || {};
-  const gesamt = Object.values(counts).reduce((a, b) => a + b, 0);
-  const abgelaufen = item.poll_deadline ? new Date(item.poll_deadline) < new Date() : false;
-
-  // anonym = nur Admins sehen, wer gestimmt hat
-  const zeigeWaehler = !item.poll_anon || isAdmin;
-
-  return (
-    <div className="card p-4">
-      <div className="flex items-start gap-2">
-        <div className="min-w-0 flex-1">
-          <div className="text-[15px] font-bold [overflow-wrap:anywhere]">{item.body}</div>
-          <div className="mt-0.5 flex flex-wrap gap-1.5 text-[11px] text-tinte-leise">
-            <span>{item.antwort_art ? `Freie Antwort · ${ANTWORT_ART_NAME[item.antwort_art]}` : item.poll_multi ? "Mehrfachwahl" : "Einfachwahl"}</span>
-            <span>·</span>
-            <span>{item.poll_anon ? "anonym" : "nicht anonym"}</span>
-            {item.poll_deadline && (
-              <>
-                <span>·</span>
-                <span className={abgelaufen ? "font-bold text-red-500" : ""}>
-                  {abgelaufen ? "beendet" : `bis ${new Date(item.poll_deadline).toLocaleString("de-DE", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}`}
-                </span>
-              </>
-            )}
-          </div>
-        </div>
-        {/* Name höchstens 40 % breit – sonst blieb der Frage auf schmalen
-            Handys nur eine schmale Spalte. */}
-        <span className="flex min-w-0 max-w-[40%] items-center gap-1.5 text-[11px] text-tinte-leise">
-          <Avatar userId={item.created_by} name={item.author} size={20} />
-          <PersonName userId={item.created_by} name={item.author} role={item.author_role} koms={item.author_koms} className="block min-w-0 truncate font-semibold" />
-        </span>
-        {kannLoeschen && (
-          <button onClick={() => void frage("Abstimmung löschen?", "Löschen", true).then((ok) => { if (ok) void onDelete(); })} className="shrink-0 text-tinte-leise">
-            🗑
-          </button>
-        )}
-      </div>
-
-      {item.antwort_art ? (
-        <FreiAntworten item={item} abgelaufen={abgelaufen} />
-      ) : (
-      <>
-      <div className="mt-3 grid gap-1.5">
-        {(Array.isArray(item.options) ? item.options : []).map((o) => {
-          const n = counts[o.id] || 0;
-          const pct = gesamt ? Math.round((n / gesamt) * 100) : 0;
-          const gewaehlt = meine.includes(o.id);
-          const waehler = zeigeWaehler
-            ? (voters[item.id] || []).filter((v) => v.option_id === o.id).map((v) => v.user_id)
-            : [];
-          return (
-            <button
-              key={o.id}
-              disabled={abgelaufen}
-              onClick={() => vote(item.id, o.id, item.poll_multi)}
-              className={`relative overflow-hidden rounded-xl border px-3 py-2 text-left transition disabled:opacity-60 ${
-                gewaehlt ? "border-brand" : "border-papier-linie dark:border-slate-700"
-              }`}
-            >
-              <div className="absolute inset-y-0 left-0 bg-brand/10" style={{ width: `${pct}%` }} />
-              <div className="relative flex items-center gap-2">
-                <span className={`flex h-4 w-4 shrink-0 items-center justify-center text-[10px] text-white ${item.poll_multi ? "rounded" : "rounded-full"} ${gewaehlt ? "bg-brand" : "border border-papier-linie dark:border-slate-600"}`}>
-                  {gewaehlt ? "✓" : ""}
-                </span>
-                <span className="min-w-0 flex-1 truncate text-[14px] font-semibold">{o.label}</span>
-                <span className="shrink-0 text-[12px] text-tinte-matt">{n}</span>
-              </div>
-              {zeigeWaehler
-                ? waehler.length > 0 && (
-                    <div className="relative mt-1.5 flex items-center pl-6">
-                      {waehler.slice(0, 12).map((u, i) => (
-                        <span key={u} style={{ marginLeft: i === 0 ? -24 : -8 }} className="relative">
-                          <Avatar userId={u} size={22} ring />
-                        </span>
-                      ))}
-                      {waehler.length > 12 && (
-                        <span className="ml-1 text-[11px] font-semibold text-tinte-leise">+{waehler.length - 12}</span>
-                      )}
-                    </div>
-                  )
-                : n > 0 && (
-                    // anonym: ein grauer Kreis je Stimme, ohne Initialen
-                    <div className="relative mt-1.5 flex items-center pl-6">
-                      {Array.from({ length: Math.min(n, 12) }).map((_, i) => (
-                        <span key={i} style={{ marginLeft: i === 0 ? -24 : -8 }} className="relative">
-                          <span
-                            style={{ width: 22, height: 22 }}
-                            className="flex items-center justify-center rounded-full bg-slate-300 text-[10px] font-extrabold leading-none text-tinte-matt ring-2 ring-white dark:bg-slate-600 dark:text-slate-300 dark:ring-slate-900"
-                          >
-                            ?
-                          </span>
-                        </span>
-                      ))}
-                      {n > 12 && <span className="ml-1 text-[11px] font-semibold text-tinte-leise">+{n - 12}</span>}
-                    </div>
-                  )}
-            </button>
-          );
-        })}
-      </div>
-      <div className="mt-1.5 text-[11px] text-tinte-leise">{gesamt} Stimme{gesamt === 1 ? "" : "n"}</div>
-      {zeigeWaehler && (
-        <WerHatGestimmt
-          optionen={Array.isArray(item.options) ? item.options : []}
-          stimmen={voters[item.id] || []}
-        />
-      )}
-      </>
-      )}
-    </div>
-  );
+/**
+ * Karte einer Abstimmung – gebaut in Freitext.tsx (AbstimmungKarte): Ergebnis
+ * mit Prozent und Anzahl, führende Möglichkeit hervorgehoben, „Eigene Antwort“
+ * mit gruppierten Texten.
+ */
+function UmfrageKarte(props: { item: TopicItem; kannLoeschen: boolean; onDelete: () => void }) {
+  return <AbstimmungKarte {...props} />;
 }
 
 function ChatBereich({
@@ -398,135 +311,7 @@ function ChatBereich({
   );
 }
 
-interface NeuDaten {
-  art: Exclude<Neu, null>;
-  text: string;
-  optionen: string[];
-  multi: boolean;
-  anon: boolean;
-  frist: string | null;
-  /** null = Auswahl-Möglichkeiten, sonst freie Antwort */
-  antwortArt: AntwortArt | null;
-}
-
+/** Blatt zum Anlegen (Angepinntes, Abstimmung, To-do) – gebaut in Freitext.tsx */
 function NeuSheet({ art, onClose, onSave }: { art: Neu; onClose: () => void; onSave: (d: NeuDaten) => void }) {
-  const [text, setText] = useState("");
-  const [optionen, setOptionen] = useState(["", ""]);
-  const [multi, setMulti] = useState(false);
-  const [anon, setAnon] = useState(true);
-  const [frist, setFrist] = useState("");
-  const [antwortArt, setAntwortArt] = useState<AntwortArt | null>(null);
-
-  useEffect(() => {
-    if (art) {
-      setAntwortArt(null);
-      setText("");
-      setOptionen(["", ""]);
-      setMulti(false);
-      setAnon(true);
-      setFrist("");
-    }
-  }, [art]);
-
-  if (!art) return null;
-  const maxLen = art === "pin" ? 100 : 200;
-  const titel = art === "pin" ? "Kurz anpinnen" : art === "todo" ? "Neues To-do" : "Neue Abstimmung";
-  const gueltig = text.trim() && (art !== "umfrage" || antwortArt || optionen.filter((o) => o.trim()).length >= 2);
-
-  return (
-    <Sheet open onClose={onClose}>
-      <SheetKopf titel={titel} onClose={onClose} />
-
-      <textarea
-        rows={art === "pin" ? 2 : 2}
-        autoFocus
-        maxLength={maxLen}
-        className="field mb-1 resize-none"
-        placeholder={art === "pin" ? "Kurze Info, die oben stehen bleibt" : art === "todo" ? "Was ist zu tun?" : "Worüber wird abgestimmt?"}
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-      />
-      <div className="mb-3 text-right text-[11px] text-tinte-leise">
-        {text.length} / {maxLen}
-      </div>
-
-      {art === "umfrage" && (
-        <>
-          <div className="mb-1.5 px-1 text-[12px] font-semibold uppercase tracking-[0.04em] text-tinte-leise">Art der Antwort</div>
-          <div className="seg mb-3" role="radiogroup" aria-label="Art der Antwort">
-            {([null, "kurz", "lang", "zahl"] as (AntwortArt | null)[]).map((a) => (
-              <button key={a ?? "auswahl"} role="radio" aria-checked={antwortArt === a} className={`seg-item ${antwortArt === a ? "seg-aktiv" : ""}`} onClick={() => setAntwortArt(a)}>
-                {a ? (a === "kurz" ? "Kurz" : a === "lang" ? "Lang" : "Zahl") : "Auswahl"}
-              </button>
-            ))}
-          </div>
-          {antwortArt && (
-            <p className="mb-4 px-1 text-[12.5px] text-tinte-leise">
-              {antwortArt === "kurz" ? "Alle antworten mit einer Zeile (höchstens 120 Zeichen)." : antwortArt === "lang" ? "Alle antworten mit freiem Text, auch mehrere Zeilen." : "Alle antworten mit einer Zahl. Dazu siehst du Ø, Median, kleinste und größte."}
-            </p>
-          )}
-          {!antwortArt && (
-          <>
-          <div className="mb-1.5 px-1 text-[12px] font-semibold uppercase tracking-[0.04em] text-tinte-leise">Antworten</div>
-          {optionen.map((o, i) => (
-            <input
-              key={i}
-              className="field mb-2"
-              placeholder={`Antwort ${i + 1}`}
-              value={o}
-              onChange={(e) => setOptionen((prev) => prev.map((x, j) => (j === i ? e.target.value : x)))}
-            />
-          ))}
-          <button onClick={() => setOptionen((p) => [...p, ""])} className="mb-4 text-sm font-bold text-brand">
-            ＋ Antwort
-          </button>
-          </>
-          )}
-
-          <div className="mb-4 grid gap-2 rounded-2xl bg-papier-matt p-3 dark:bg-slate-800/70">
-            {!antwortArt && <Schalter label="Mehrfachauswahl erlauben" on={multi} set={setMulti} />}
-            <Schalter label="Anonym abstimmen" on={anon} set={setAnon} />
-            <label className="flex items-center gap-2 text-sm">
-              <span className="flex-1 text-tinte-matt dark:text-slate-300">Frist (optional)</span>
-              <input
-                type="datetime-local"
-                className="rounded-lg border border-papier-linie bg-white px-2 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-900"
-                value={frist}
-                onChange={(e) => setFrist(e.target.value)}
-              />
-            </label>
-          </div>
-        </>
-      )}
-
-      <button
-        className="btn-primary"
-        disabled={!gueltig}
-        onClick={() =>
-          onSave({
-            art,
-            text: text.trim(),
-            optionen: antwortArt ? [] : optionen.map((o) => o.trim()).filter(Boolean),
-            multi: antwortArt ? false : multi,
-            antwortArt,
-            anon,
-            frist: frist ? new Date(frist).toISOString() : null,
-          })
-        }
-      >
-        {art === "pin" ? "Anpinnen" : art === "todo" ? "To-do anlegen" : "Abstimmung starten"}
-      </button>
-    </Sheet>
-  );
-}
-
-function Schalter({ label, on, set }: { label: string; on: boolean; set: (v: boolean) => void }) {
-  return (
-    <button onClick={() => set(!on)} className="flex items-center gap-2 text-left text-sm">
-      <span className={`flex h-5 w-5 items-center justify-center rounded border text-[11px] text-white ${on ? "border-brand bg-brand" : "border-papier-linie dark:border-slate-600"}`}>
-        {on ? "✓" : ""}
-      </span>
-      <span className="text-tinte-matt dark:text-slate-300">{label}</span>
-    </button>
-  );
+  return <NeuEintragSheet art={art} onClose={onClose} onSave={onSave} />;
 }

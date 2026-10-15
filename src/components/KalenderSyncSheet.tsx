@@ -7,6 +7,10 @@ import { tagLang, zeitText, type Termin } from "../lib/termine";
 /**
  * "Mit deinem Kalender verbinden" – TESTPHASE, nur für die Testkonten.
  *
+ * Vorübergehend ausgeblendet (Wunsch 14.10.2026): Alle Einstiege hängen an
+ * useKalenderDemo(), und das bleibt false, solange KALENDER_SYNC_AN in
+ * lib/kalender-sync.ts aus ist. Zum Wiedereinschalten nur dort `true` setzen.
+ *
  * Oben: die Termine der Stufe als Abo im eigenen Kalender.
  * Unten: den eigenen Kalender (iCloud/Google/Outlook) grau in der App zeigen.
  */

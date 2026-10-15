@@ -10,7 +10,7 @@ import { entscheideKomitee, ladeKomiteeAntraege, type KomiteeRequest } from "../
 
 import { meldeFehler } from "../lib/melder";
 /** Anträge auf Komitee-Wechsel – wie die Entbannungsanfragen oben in den Events. */
-export function KomiteeRequests() {
+export function KomiteeRequests({ onAnzahl }: { onAnzahl?: (n: number) => void } = {}) {
   const { can } = useRole();
   const { profile } = useProfiles();
   const [liste, setListe] = useState<KomiteeRequest[]>([]);
@@ -36,6 +36,11 @@ export function KomiteeRequests() {
   }, []);
 
   useSprungziel("komitee", can("komitees.assign") && liste.length > 0, () => hinScrollen("sprung-komitee"));
+  // Anzahl offener Einträge für die Kachel/den Zähler im Chats-Reiter
+  const anzahl = can("komitees.assign") ? liste.length : 0;
+  useEffect(() => {
+    onAnzahl?.(anzahl);
+  }, [anzahl, onAnzahl]);
   if (!can("komitees.assign") || liste.length === 0) return null;
 
   return (

@@ -45,7 +45,8 @@ export function Kalender({
   onOeffnen: (t: Termin) => void;
 }) {
   const { termine: stufenTermine, meineKomitees, meineStudentIds } = useTermine();
-  // Testphase: eigene Termine aus dem Handy-Kalender grau dazu (nur Testkonten)
+  // Testphase: eigene Termine aus dem Handy-Kalender grau dazu (nur Testkonten).
+  // Zurzeit aus: KALENDER_SYNC_AN in lib/kalender-sync.ts (Wunsch 14.10.2026).
   const kalenderDemo = useKalenderDemo();
   const privat = usePrivatTermine(kalenderDemo);
   const termine = useMemo(
@@ -132,17 +133,13 @@ export function Kalender({
         <div className="mx-auto flex max-w-5xl items-center gap-2 pb-2.5">
           {/* Sichtbarer Umschalter mit Rahmen: so erkennt man, dass es drei
               Ansichten gibt und welche gerade laeuft. */}
-          <div className="flex shrink-0 gap-0.5 rounded-xl bg-papier-matt p-1 dark:bg-slate-800">
+          <div className="seg shrink-0">
             {(["monat", "woche", "tag"] as Ansicht[]).map((a) => (
               <button
                 key={a}
                 onClick={() => setAnsicht(a)}
                 aria-pressed={ansicht === a}
-                className={`rounded-lg px-2.5 py-1.5 text-[12px] font-bold transition min-[380px]:px-3 ${
-                  ansicht === a
-                    ? "bg-white text-brand-dark shadow-card dark:bg-slate-900 dark:text-brand-soft"
-                    : "text-tinte-matt dark:text-slate-300"
-                }`}
+                className={`seg-item !flex-none whitespace-nowrap !px-2.5 min-[380px]:!px-3.5 ${ansicht === a ? "seg-aktiv" : ""}`}
               >
                 {ANSICHT_NAME[a]}
               </button>
@@ -150,7 +147,7 @@ export function Kalender({
           </div>
           <button
             onClick={() => setAnker(heute)}
-            className="ml-auto shrink-0 rounded-lg border border-papier-linie px-3 py-1.5 text-[12px] font-semibold text-tinte-matt transition active:scale-95 dark:border-slate-700 dark:text-slate-300"
+            className="btn-klein-grau ml-auto shrink-0 !min-h-[2rem] !px-3 !text-[13px]"
           >
             Heute
           </button>
@@ -158,7 +155,7 @@ export function Kalender({
             <button
               onClick={() => onNeu!(anker)}
               aria-label="Termin eintragen"
-              className="flex shrink-0 items-center gap-1 whitespace-nowrap rounded-lg bg-brand px-3 py-1.5 text-[12px] font-bold text-white transition active:scale-95"
+              className="btn-klein shrink-0 !min-h-[2rem] gap-1 whitespace-nowrap !px-3 !text-[13px]"
             >
               {/* Auf schmalen Handys (iPhone SE) nur das Plus – sonst fällt der
                   Knopf rechts aus dem Bild. */}
@@ -178,7 +175,8 @@ export function Kalender({
           className={`mx-auto max-w-5xl ${richtung > 0 ? "animate-vonRechts" : richtung < 0 ? "animate-vonLinks" : ""}`}
           style={zug ? { transform: `translateX(${zug}px)`, transition: "none" } : undefined}
         >
-          {/* Testphase: Kalender-Verbindung, nur für die Testkonten */}
+          {/* Testphase: Kalender-Verbindung, nur für die Testkonten – zurzeit
+              aus (KALENDER_SYNC_AN in lib/kalender-sync.ts) */}
           {kalenderDemo && (
             <button
               onClick={() => setSyncOffen(true)}

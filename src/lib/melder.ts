@@ -20,6 +20,7 @@
  */
 
 import { hasSupabase, supabase } from "./supabase";
+import { fehlerText } from "./netz";
 
 export type MeldeArt = "info" | "fehler" | "erfolg";
 
@@ -56,7 +57,15 @@ function sperrePruefen(): void {
   if (typeof window !== "undefined") window.dispatchEvent(new Event("sv:sperre-pruefen"));
 }
 
-export function meldeFehler(text: string): void {
+export function meldeFehler(eingabe: string | unknown): void {
+  // Update 1.4: Englische Technik-Meldungen („Failed to fetch“, „Load failed“,
+  // „NetworkError …“, Zeitüberschreitung, 502/503/504, „Invalid login
+  // credentials“ …) werden hier zentral übersetzt (lib/netz.ts). Die vielen
+  // Aufrufe der Form meldeFehler("Speichern ging nicht: " + error.message)
+  // werden damit automatisch verständlich – „Speichern ging nicht: Keine
+  // Verbindung zum Server. Prüfe dein Internet …“. Es darf auch direkt ein
+  // Fehler-Objekt übergeben werden.
+  const text = fehlerText(eingabe);
   // Wortfilter (Datenbank): Meldung ohne „Ging nicht:“ davor, und den
   // Versuch zählen – 3 in 10 Minuten sperren automatisch
   // (5 Minuten → 1 Stunde → 1 Tag, supabase/auto-sperre.sql).

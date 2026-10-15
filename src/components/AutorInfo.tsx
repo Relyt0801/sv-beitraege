@@ -96,7 +96,21 @@ export function AutorInfo({ art, id, className = "" }: { art: "motto" | "zitat";
  * Bereichs (Motto, Zitate, Rankings, Umfragen, Album) bei denen, die ihn
  * verwalten. Unsichtbar für alle anderen.
  */
-export function WortfilterSchalter({ bereich, className = "", kompakt }: { bereich: WfBereich; className?: string; kompakt?: boolean }) {
+export function WortfilterSchalter({
+  bereich,
+  className = "",
+  kompakt,
+  zeile,
+  titel,
+}: {
+  bereich: WfBereich;
+  className?: string;
+  kompakt?: boolean;
+  /** Als Zeile ohne eigene Fläche – für eine Gruppe (Liste.tsx) im Einstellungs-Blatt */
+  zeile?: boolean;
+  /** Eigene Bezeichnung statt „Wortfilter · …“ (z. B. „Offiziell“) */
+  titel?: string;
+}) {
   const darf = useWfRecht()(bereich);
   const { an, setzen } = useWortfilterBereiche(darf);
   if (!darf) return null;
@@ -105,6 +119,18 @@ export function WortfilterSchalter({ bereich, className = "", kompakt }: { berei
     const f = await setzen(bereich, v);
     if (f) meldeFehler("Ging nicht: " + f);
   };
+  if (zeile)
+    return (
+      <label className={`flex min-h-[52px] items-center gap-3 px-4 py-2 ${className}`}>
+        <span className="min-w-0 flex-1">
+          <span className="block text-[15px]">{titel ?? `Wortfilter · ${info?.titel}`}</span>
+          <span className="block text-[12.5px] leading-snug text-tinte-leise">
+            {an[bereich] ? "An – beleidigende Wörter werden blockiert" : "Aus – Einträge werden nicht geprüft"}
+          </span>
+        </span>
+        <Schalter an={an[bereich]} label={`Wortfilter für ${info?.titel ?? bereich}`} onChange={(v) => void umschalten(v)} />
+      </label>
+    );
   if (kompakt)
     return (
       <label className={`flex min-h-[36px] items-center gap-3 ${className}`}>

@@ -14,7 +14,7 @@ import { Gruppe, Zeile } from "./Liste";
  * Anträge „Mithilfe nachtragen“ fürs Team. Je Antrag eine Karte wie eine
  * Rechnung; Antippen öffnet das Blatt zum Annehmen oder Ablehnen.
  */
-export function NachtragAnfragen() {
+export function NachtragAnfragen({ onAnzahl }: { onAnzahl?: (n: number) => void } = {}) {
   const { isStaff, can, isAdmin, uid } = useRole();
   // Hat der Admin Bearbeiter festgelegt (Profil → Freigaben), dürfen nur sie
   const [bearbeiter, setBearbeiter] = useState<string[] | null>(null);
@@ -34,6 +34,11 @@ export function NachtragAnfragen() {
     if (offen.length === 1) setAuf(offen[0]);
     else hinScrollen("sprung-nachtrag");
   });
+  // Anzahl offener Einträge für die Kachel/den Zähler im Chats-Reiter
+  const anzahl = darf ? offen.length : 0;
+  useEffect(() => {
+    onAnzahl?.(anzahl);
+  }, [anzahl, onAnzahl]);
   if (!darf || offen.length === 0) return null;
   return (
     <>

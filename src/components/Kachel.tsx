@@ -124,6 +124,90 @@ export function FarbKarte({
   );
 }
 
+/**
+ * Kleine bunte Kachel zum Antippen – wie in der Kurzbefehle-App von iOS.
+ *
+ * Gedacht für Raster mit zwei Spalten am Handy (Chats-Reiter: „Frag das
+ * Stufenteam“, „Anfragen“, „Eltern“ …). Die ganze Kachel ist EIN Knopf:
+ * oben links das Symbol in einem hellen Kreis, oben rechts optional eine
+ * Zahl (rot = Neues, das auf einen wartet; weiß = einfach eine Anzahl),
+ * unten Titel und eine Zeile Stand. Eine große, blasse Deko in der Ecke macht
+ * sie lebendig, ohne zu stören. Gleiche Farblogik wie FarbKarte: EINE Farbe
+ * je Kachel, der Verlauf bleibt innerhalb dieser Farbe.
+ */
+export function FarbKachel({
+  verlauf,
+  schatten = "",
+  symbol,
+  titel,
+  unter,
+  zahl,
+  zahlRot = false,
+  breit = false,
+  gedaempft = false,
+  onClick,
+  label,
+  tour,
+}: {
+  /** z. B. "from-[#0A84FF] to-[#0066CC]" – beide Töne derselben Farbe */
+  verlauf: string;
+  /** farbiger Schatten, z. B. "shadow-[0_10px_24px_-14px_rgba(0,102,204,.9)]" */
+  schatten?: string;
+  /** Emoji oder <Icon …/> */
+  symbol: ReactNode;
+  titel: ReactNode;
+  /** eine (höchstens zwei) Zeilen Stand, z. B. „2 offen“ oder die letzte Nachricht */
+  unter?: ReactNode;
+  /** Zahl oben rechts; 0/undefined = keine */
+  zahl?: number;
+  /** true = rote Zahl (Ungelesenes/Offenes), sonst weiße Kapsel */
+  zahlRot?: boolean;
+  /** über beide Spalten */
+  breit?: boolean;
+  /** ruhiger (z. B. „nichts offen“): etwas blasser */
+  gedaempft?: boolean;
+  onClick: () => void;
+  /** Vorlesetext, falls der Titel allein nicht reicht */
+  label?: string;
+  /** data-tour-Kennung für die Einführung */
+  tour?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      data-tour={tour}
+      className={`relative flex min-h-[7.25rem] flex-col overflow-hidden rounded-[1.4rem] bg-gradient-to-br p-3.5 text-left text-white transition duration-200 ease-ios active:scale-[.97] ${verlauf} ${schatten} ${
+        breit ? "col-span-2" : ""
+      } ${gedaempft ? "opacity-80 saturate-[.85]" : ""}`}
+    >
+      {/* Deko: das Symbol noch einmal groß und blass in der Ecke */}
+      <span aria-hidden className="pointer-events-none absolute -bottom-4 -right-3 text-[4.75rem] leading-none opacity-[0.16] [filter:grayscale(1)_brightness(3)]">
+        {symbol}
+      </span>
+      <span className="relative flex items-start justify-between gap-2">
+        <span aria-hidden className="flex h-9 w-9 items-center justify-center rounded-full bg-white/25 text-[19px] leading-none">
+          {symbol}
+        </span>
+        {zahl ? (
+          <span
+            className={`zahl flex h-[22px] min-w-[22px] items-center justify-center rounded-full px-1.5 text-[12.5px] font-bold ${
+              zahlRot ? "bg-[#FF3B30] text-white ring-2 ring-white/90" : "bg-white text-tinte"
+            }`}
+          >
+            {zahl > 99 ? "99+" : zahl}
+          </span>
+        ) : null}
+      </span>
+      <span className="relative mt-auto block pt-3">
+        <span className="block text-[16px] font-semibold leading-tight tracking-[-0.01em]">{titel}</span>
+        {unter && <span className="mt-0.5 line-clamp-2 block text-[12.5px] leading-snug text-white/85">{unter}</span>}
+      </span>
+    </button>
+  );
+}
+
 /** Weißer Hauptknopf auf einer FarbKarte; text = Farbe der Schrift */
 export function KnopfHell({ onClick, text, children }: { onClick: () => void; text: string; children: ReactNode }) {
   return (

@@ -1,0 +1,12 @@
+-- =====================================================================
+-- Zitate: Spalte „bereich“ (offiziell/inoffiziell) lesbar machen
+--
+-- Die Tabelle zitate gibt ihre Spalten einzeln frei (damit niemand sieht,
+-- wer ein Zitat eingereicht hat). Die neue Spalte bereich aus
+-- supabase/offiziell-inoffiziell.sql war dabei noch nicht freigegeben –
+-- ohne diese Zeile schlägt das Laden der Zitatwand fehl, sobald die App
+-- bereich mitlädt.
+--
+-- Abwärtskompatibel: nur ein zusätzliches Leserecht, sonst nichts.
+-- =====================================================================
+grant select (bereich) on public.zitate to authenticated;

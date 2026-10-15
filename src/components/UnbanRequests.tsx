@@ -10,7 +10,7 @@ import { meldeFehler } from "../lib/melder";
 import { useZustimmungen } from "../lib/zustimmung";
 import { ZustimmungsMarke } from "./ZustimmungsMarke";
 /** Entbannungsanfragen – erscheinen für die Moderation oben in den Events. */
-export function UnbanRequests() {
+export function UnbanRequests({ onAnzahl }: { onAnzahl?: (n: number) => void } = {}) {
   const { can, profiles, uid, isStaff } = useRole();
   const zu = useZustimmungen("entsperren", isStaff || can("mod.timeout"), uid);
   const { students } = useStore();
@@ -37,6 +37,11 @@ export function UnbanRequests() {
   }, []);
 
   useSprungziel("entsperren", can("mod.timeout") && liste.length > 0, () => hinScrollen("sprung-entsperren"));
+  // Anzahl offener Einträge für die Kachel/den Zähler im Chats-Reiter
+  const anzahl = can("mod.timeout") ? liste.length : 0;
+  useEffect(() => {
+    onAnzahl?.(anzahl);
+  }, [anzahl, onAnzahl]);
   if (!can("mod.timeout") || liste.length === 0) return null;
 
   const nameVon = (userId: string) => {

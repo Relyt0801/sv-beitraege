@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Sheet, SheetKopf } from "./Sheet";
-import { Gruppe, Zeile, ZeileAuswahl } from "./Liste";
+import { Gruppe, Zeile, ZeileAuswahl, ZeileEingabe } from "./Liste";
 import { Schalter } from "./Schalter";
 import { useRole } from "../auth/RoleProvider";
 import { useStore } from "../store";
@@ -14,6 +14,11 @@ import {
   WEISS_NICHT,
   ZIEL_NAME,
   beantwortet,
+  EIGENE_NAME,
+  eigenerWert,
+  eigeneText,
+  istEigene,
+  mitEigener,
   useOffeneUmfragen,
   useUmfragePersonen,
   useUmfragenVerwaltung,
@@ -37,7 +42,7 @@ import { useRunden } from "../lib/runden";
 import { RundenAbschnitt, SichtbarkeitWahl } from "./Runden";
 import { Kachel } from "./Kachel";
 import { Icon } from "./Icon";
-import { ZahlenAuswertung } from "./Freitext";
+import { TextGruppen, ZahlenAuswertung, gruppiereTexte } from "./Freitext";
 import { WortfilterSchalter } from "./AutorInfo";
 
 const name = (p: UPerson) => `${p.vorname} ${p.nachname}`;
@@ -286,31 +291,41 @@ function Antwort({ f, wert, personen, setzen }: { f: Frage; wert: Wert | undefin
   const [text, setText] = useState(typeof wert === "string" && f.typ === "text" ? wert : "");
   const [suche, setSuche] = useState("");
 
-  if (f.typ === "einfach")
+  // „Eigene Antwort“: Text steht im Wert als "__eigene__:Text" (lib/umfragen.ts)
+  const eigenesFeld = (an: boolean, mitText: (t: string) => Wert) =>
+    an && (
+      <EigenesFeld
+        start={typeof wert === "string" && istEigene(wert) ? eigeneText(wert) : Array.isArray(wert) ? eigeneText((wert as string[]).find(istEigene) || "") : ""}
+        sichern={(t) => setzen(mitText(t))}
+      />
+    );
+
+  if (f.typ === "einfach") {
+    const eigenAn = istEigene(wert);
     return (
       <div className="space-y-2">
-        {f.optionen.map((o) => {
-          const an = wert === o;
-          return (
-            <button
-              key={o}
-              onClick={() => setzen(o, true)}
-              className={`flex w-full items-center gap-3 rounded-2xl px-4 py-3.5 text-left text-[15.5px] font-medium transition active:scale-[.98] ${
-                an ? "bg-[#5E5CE6] text-white shadow-[0_6px_16px_-6px_rgba(94,92,230,.7)]" : "bg-[rgb(118_118_128/0.1)] dark:bg-[rgb(118_118_128/0.22)]"
-              }`}
-            >
-              <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${an ? "bg-white" : "ring-2 ring-inset ring-black/20 dark:ring-white/30"}`}>
-                {an && <span className="h-2.5 w-2.5 rounded-full bg-[#5E5CE6]" />}
-              </span>
-              {o}
-            </button>
-          );
-        })}
+        {f.optionen.map((o) => (
+          <EinfachKnopf key={o} an={wert === o} onClick={() => setzen(o, true)}>
+            {o}
+          </EinfachKnopf>
+        ))}
+        {mitEigener(f) && (
+          <>
+            {/* Alternative zu den Möglichkeiten: ankreuzen, dann Text eingeben (kein Weiterspringen) */}
+            <EinfachKnopf an={eigenAn} onClick={() => !eigenAn && setzen(eigenerWert(""))}>
+              <span className="italic">{EIGENE_NAME}</span>
+            </EinfachKnopf>
+            {eigenesFeld(eigenAn, (t) => eigenerWert(t))}
+          </>
+        )}
       </div>
     );
+  }
 
   if (f.typ === "mehrfach") {
     const liste = Array.isArray(wert) ? (wert as string[]) : [];
+    const eigenAn = liste.some(istEigene);
+    const ohneEigene = liste.filter((x) => !istEigene(x));
     return (
       <>
         <p className="-mt-2 mb-3 text-[13px] text-tinte-leise">Mehrere möglich</p>
@@ -318,19 +333,19 @@ function Antwort({ f, wert, personen, setzen }: { f: Frage; wert: Wert | undefin
           {f.optionen.map((o) => {
             const an = liste.includes(o);
             return (
-              <button
-                key={o}
-                onClick={() => setzen(an ? liste.filter((x) => x !== o) : [...liste, o])}
-                className={`rounded-full px-4 py-2.5 text-[15px] font-semibold transition active:scale-95 ${
-                  an ? "bg-[#5E5CE6] text-white" : "bg-[rgb(118_118_128/0.1)] dark:bg-[rgb(118_118_128/0.22)]"
-                }`}
-              >
-                {an ? "✓ " : ""}
+              <MehrfachChip key={o} an={an} onClick={() => setzen(an ? liste.filter((x) => x !== o) : [...liste, o])}>
                 {o}
-              </button>
+              </MehrfachChip>
             );
           })}
+          {mitEigener(f) && (
+            // Zusätzlich zu den Kreuzen: eigene Antwort an/aus
+            <MehrfachChip an={eigenAn} onClick={() => setzen(eigenAn ? ohneEigene : [...ohneEigene, eigenerWert("")])}>
+              <span className="italic">{EIGENE_NAME}</span>
+            </MehrfachChip>
+          )}
         </div>
+        {eigenesFeld(eigenAn, (t) => [...ohneEigene, eigenerWert(t)])}
       </>
     );
   }
@@ -411,6 +426,77 @@ function Antwort({ f, wert, personen, setzen }: { f: Frage; wert: Wert | undefin
       setText={setText}
       speichern={(t) => setzen(t)}
     />
+  );
+}
+
+/** Ein runder Auswahlknopf (Einfachwahl) */
+function EinfachKnopf({ an, onClick, children }: { an: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      onClick={onClick}
+      aria-pressed={an}
+      className={`flex w-full items-center gap-3 rounded-2xl px-4 py-3.5 text-left text-[15.5px] font-medium transition active:scale-[.98] ${
+        an ? "bg-[#5E5CE6] text-white shadow-[0_6px_16px_-6px_rgba(94,92,230,.7)]" : "bg-[rgb(118_118_128/0.12)] dark:bg-[rgb(118_118_128/0.24)]"
+      }`}
+    >
+      <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${an ? "bg-white" : "ring-2 ring-inset ring-black/20 dark:ring-white/30"}`}>
+        {an && <span className="h-2.5 w-2.5 rounded-full bg-[#5E5CE6]" />}
+      </span>
+      {children}
+    </button>
+  );
+}
+
+/** Ein Chip zum Ankreuzen (Mehrfachwahl) */
+function MehrfachChip({ an, onClick, children }: { an: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      onClick={onClick}
+      aria-pressed={an}
+      className={`rounded-full px-4 py-2.5 text-[15px] font-semibold transition active:scale-95 ${
+        an ? "bg-[#5E5CE6] text-white" : "bg-[rgb(118_118_128/0.12)] dark:bg-[rgb(118_118_128/0.24)]"
+      }`}
+    >
+      {an ? "✓ " : ""}
+      {children}
+    </button>
+  );
+}
+
+/**
+ * Textfeld unter „Eigene Antwort“ – speichert kurz nach dem Tippen und beim
+ * Verlassen des Feldes (wie die Freitext-Fragen). Höchstens 120 Zeichen.
+ */
+function EigenesFeld({ start, sichern }: { start: string; sichern: (t: string) => void }) {
+  const [text, setText] = useState(start);
+  // Immer die aktuelle Speicher-Funktion nehmen (die Auswahl kann sich inzwischen geändert haben)
+  const sichernRef = useRef(sichern);
+  sichernRef.current = sichern;
+  const zuletzt = useRef(start);
+  const raus = (t: string) => {
+    if (t === zuletzt.current) return;
+    zuletzt.current = t;
+    sichernRef.current(t);
+  };
+  useEffect(() => {
+    const t = setTimeout(() => raus(text), 500);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [text]);
+  return (
+    <div className="mt-2 animate-fadeIn">
+      <input
+        className="field"
+        autoFocus={!start}
+        value={text}
+        maxLength={120}
+        placeholder="Deine Antwort …"
+        aria-label={EIGENE_NAME}
+        onChange={(e) => setText(e.target.value)}
+        onBlur={() => raus(text)}
+      />
+      <p className="mt-1 px-1 text-right text-[11.5px] text-tinte-leise">{text.length} / 120</p>
+    </div>
   );
 }
 
@@ -636,7 +722,7 @@ function UmfrageEditor({
     setMitRankings(umfrage?.mit_rankings ?? vorlage?.mitRankings ?? false);
     setListe(
       umfrage
-        ? [...fragen].sort((a, b) => a.sort - b.sort).map(({ sort, typ, titel, optionen, pflicht }) => ({ sort, typ, titel, optionen, pflicht }))
+        ? [...fragen].sort((a, b) => a.sort - b.sort).map(({ sort, typ, titel, optionen, pflicht, eigene }) => ({ sort, typ, titel, optionen, pflicht, eigene: Boolean(eigene) }))
         : vorlage ? vorlage.fragen : [{ sort: 1, typ: "einfach", titel: "", optionen: ["Ja", "Nein"], pflicht: true }],
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -649,9 +735,11 @@ function UmfrageEditor({
       ? "Mindestens eine Frage (oder Rankings abfragen)"
       : liste.some((f) => !f.titel.trim())
         ? "Jede Frage braucht einen Text"
-        : liste.some((f) => (f.typ === "einfach" || f.typ === "mehrfach") && f.optionen.filter((o) => o.trim()).length < 2)
+        : liste.some((f) => (f.typ === "einfach" || f.typ === "mehrfach") && f.optionen.filter((o) => o.trim()).length + (mitEigener(f) ? 1 : 0) < 2)
           ? "Auswahlfragen brauchen mindestens 2 Antworten"
-          : "";
+          : liste.some((f) => mitEigener(f) && f.optionen.some((o) => o.trim().toLocaleLowerCase("de") === EIGENE_NAME.toLocaleLowerCase("de")))
+            ? `„${EIGENE_NAME}“ kommt über den Schalter dazu – bitte die Antwort umbenennen`
+            : "";
 
   async function sichern(): Promise<string | null> {
     const sauber = liste.map((f, i) => ({ ...f, sort: i + 1, optionen: f.optionen.map((o) => o.trim()).filter(Boolean) }));
@@ -700,19 +788,24 @@ function UmfrageEditor({
         {mitRankings && " Rankings: Jede aktive Ranking-Kategorie wird ein Schritt nach den Fragen – die Stimmen landen direkt in den Rankings."}
       </p>
 
-      <h3 className="mb-1.5 mt-5 px-4 text-[12px] font-semibold uppercase tracking-[0.04em] text-tinte-leise">Fragen</h3>
-      <div className="space-y-3">
-        {liste.map((f, i) => (
-          <div key={i} className="rounded-2xl zelle p-3">
-            <div className="flex items-center gap-2">
-              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#5E5CE6] text-[12px] font-bold text-white">{i + 1}</span>
+      {/* Jede Frage eine Gruppe wie in den iOS-Einstellungen: Zeilen mit Trennlinien */}
+      {liste.map((f, i) => {
+        const auswahl = f.typ === "einfach" || f.typ === "mehrfach";
+        const kaestchen = `h-[18px] w-[18px] shrink-0 ring-[1.5px] ring-inset ring-black/25 dark:ring-white/35 ${f.typ === "einfach" ? "rounded-full" : "rounded-[5px]"}`;
+        return (
+          <Gruppe key={i} titel={`Frage ${i + 1}`} className="mt-5">
+            <div className="flex min-h-[48px] items-center gap-1 pl-4 pr-2">
               <select
                 aria-label="Fragetyp"
-                className="min-w-0 flex-1 bg-transparent text-[14px] font-semibold text-[#5E5CE6] outline-none"
+                className="min-w-0 flex-1 cursor-pointer appearance-none bg-transparent text-[15px] font-semibold text-[#5E5CE6] outline-none dark:text-[#A5A4FF]"
                 value={f.typ}
                 onChange={(e) => {
                   const typ = e.target.value as FrageTyp;
-                  aendern(i, { typ, optionen: typ === "einfach" || typ === "mehrfach" ? (f.optionen.length ? f.optionen : ["", ""]) : typ === "skala" ? ["gar nicht", "sehr"] : typ === "text" ? ["kurz"] : [] });
+                  aendern(i, {
+                    typ,
+                    optionen: typ === "einfach" || typ === "mehrfach" ? (f.optionen.length ? f.optionen : ["", ""]) : typ === "skala" ? ["gar nicht", "sehr"] : typ === "text" ? ["kurz"] : [],
+                    eigene: typ === "einfach" || typ === "mehrfach" ? f.eigene : false,
+                  });
                 }}
               >
                 {(Object.keys(TYP_NAME) as FrageTyp[]).filter((t) => t !== "ranking").map((t) => (
@@ -721,62 +814,82 @@ function UmfrageEditor({
                   </option>
                 ))}
               </select>
-              <button aria-label="Nach oben" disabled={i === 0} className="px-1 text-tinte-leise disabled:opacity-25" onClick={() => setListe((l) => { const n = [...l]; [n[i - 1], n[i]] = [n[i], n[i - 1]]; return n; })}>▲</button>
-              <button aria-label="Nach unten" disabled={i === liste.length - 1} className="px-1 text-tinte-leise disabled:opacity-25" onClick={() => setListe((l) => { const n = [...l]; [n[i + 1], n[i]] = [n[i], n[i + 1]]; return n; })}>▼</button>
-              <button aria-label="Frage entfernen" className="px-1 text-[15px] text-red-500" onClick={() => setListe((l) => l.filter((_, n) => n !== i))}>✕</button>
+              <button aria-label="Nach oben" disabled={i === 0} className="flex h-9 w-9 items-center justify-center rounded-full text-[13px] text-tinte-leise disabled:opacity-25" onClick={() => setListe((l) => { const n = [...l]; [n[i - 1], n[i]] = [n[i], n[i - 1]]; return n; })}>▲</button>
+              <button aria-label="Nach unten" disabled={i === liste.length - 1} className="flex h-9 w-9 items-center justify-center rounded-full text-[13px] text-tinte-leise disabled:opacity-25" onClick={() => setListe((l) => { const n = [...l]; [n[i + 1], n[i]] = [n[i], n[i + 1]]; return n; })}>▼</button>
+              <button aria-label="Frage entfernen" className="flex h-9 w-9 items-center justify-center rounded-full text-tinte-leise" onClick={() => setListe((l) => l.filter((_, n) => n !== i))}>
+                <Icon name="muell" size={16} />
+              </button>
             </div>
-            <input className="field mt-2" placeholder="Frage" maxLength={160} value={f.titel} onChange={(e) => aendern(i, { titel: e.target.value })} />
-            {(f.typ === "einfach" || f.typ === "mehrfach") && (
-              <div className="mt-2 space-y-1.5">
-                {f.optionen.map((o, n) => (
-                  <div key={n} className="flex items-center gap-2">
-                    <span className={`h-4 w-4 shrink-0 ring-2 ring-inset ring-black/20 dark:ring-white/30 ${f.typ === "einfach" ? "rounded-full" : "rounded-[4px]"}`} />
-                    <input
-                      className="min-w-0 flex-1 rounded-lg bg-white px-3 py-2 text-[15px] outline-none dark:bg-slate-800"
-                      placeholder={`Antwort ${n + 1}`}
-                      value={o}
-                      maxLength={80}
-                      onChange={(e) => aendern(i, { optionen: f.optionen.map((x, m) => (m === n ? e.target.value : x)) })}
-                    />
-                    <button aria-label="Antwort entfernen" className="px-1 text-tinte-leise" onClick={() => aendern(i, { optionen: f.optionen.filter((_, m) => m !== n) })}>
-                      −
-                    </button>
-                  </div>
-                ))}
-                <button className="ml-6 text-[14px] font-semibold text-brand" onClick={() => aendern(i, { optionen: [...f.optionen, ""] })}>
-                  + Antwort
-                </button>
-              </div>
-            )}
-            {f.typ === "skala" && (
-              <div className="mt-2 flex gap-2">
-                <input className="field" placeholder="1 = …" value={f.optionen[0] || ""} onChange={(e) => aendern(i, { optionen: [e.target.value, f.optionen[1] || ""] })} />
-                <input className="field" placeholder="5 = …" value={f.optionen[1] || ""} onChange={(e) => aendern(i, { optionen: [f.optionen[0] || "", e.target.value] })} />
-              </div>
-            )}
-            {f.typ === "text" && (
-              <div className="seg mt-2" role="radiogroup" aria-label="Art der Antwort">
-                {(["kurz", "lang", "zahl"] as TextArt[]).map((a) => (
-                  <button key={a} role="radio" aria-checked={textArt(f) === a} className={`seg-item ${textArt(f) === a ? "seg-aktiv" : ""}`} onClick={() => aendern(i, { optionen: [a] })}>
-                    {TEXT_ART_NAME[a]}
+            <input className="block w-full bg-transparent px-4 py-3 text-[16px] font-semibold outline-none placeholder:text-tinte-leise" placeholder="Frage" maxLength={160} value={f.titel} onChange={(e) => aendern(i, { titel: e.target.value })} />
+            {auswahl &&
+              f.optionen.map((o, n) => (
+                <div key={`o${n}`} className="flex min-h-[48px] items-center gap-3 pl-4 pr-2">
+                  <span aria-hidden className={kaestchen} />
+                  <input
+                    className="min-w-0 flex-1 bg-transparent py-2.5 text-[16px] outline-none placeholder:text-tinte-leise"
+                    placeholder={`Antwort ${n + 1}`}
+                    value={o}
+                    maxLength={80}
+                    onChange={(e) => aendern(i, { optionen: f.optionen.map((x, m) => (m === n ? e.target.value : x)) })}
+                  />
+                  <button aria-label={`Antwort ${n + 1} entfernen`} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition active:scale-90" onClick={() => aendern(i, { optionen: f.optionen.filter((_, m) => m !== n) })}>
+                    <span className="flex h-[22px] w-[22px] items-center justify-center rounded-full bg-[#FF3B30] text-[15px] font-bold leading-none text-white">−</span>
                   </button>
-                ))}
+                </div>
+              ))}
+            {auswahl && f.eigene && (
+              <div className="flex min-h-[48px] items-center gap-3 px-4 text-tinte-leise">
+                <span aria-hidden className={kaestchen} />
+                <span className="flex-1 text-[16px] italic">{EIGENE_NAME}: ____</span>
               </div>
             )}
-            {f.typ === "person" && <p className="mt-2 text-[12.5px] text-tinte-leise">Alle wählen eine Person aus der Stufe. Gezählt wird, wie oft jemand gewählt wurde.</p>}
-            <label className="mt-2 flex items-center justify-between text-[14px]">
-              Muss beantwortet werden
+            {auswahl && (
+              <button
+                className="flex min-h-[48px] w-full items-center gap-3 px-4 text-left text-[16px] text-brand-dark transition active:bg-black/[0.04] dark:text-brand dark:active:bg-white/[0.06]"
+                onClick={() => aendern(i, { optionen: [...f.optionen, ""] })}
+              >
+                <span className="flex h-[18px] w-[18px] items-center justify-center rounded-full bg-[#34C759] text-white">
+                  <Icon name="plus" size={12} strich={3} />
+                </span>
+                Antwort hinzufügen
+              </button>
+            )}
+            {auswahl && (
+              <Zeile label="Eigene Antwort erlauben">
+                <Schalter an={Boolean(f.eigene)} onChange={(x) => aendern(i, { eigene: x })} label="Eigene Antwort erlauben" />
+              </Zeile>
+            )}
+            {f.typ === "skala" && <ZeileEingabe label="1 =" placeholder="gar nicht" value={f.optionen[0] || ""} onChange={(v) => aendern(i, { optionen: [v, f.optionen[1] || ""] })} />}
+            {f.typ === "skala" && <ZeileEingabe label="5 =" placeholder="sehr" value={f.optionen[1] || ""} onChange={(v) => aendern(i, { optionen: [f.optionen[0] || "", v] })} />}
+            {f.typ === "text" && (
+              <div className="px-3 py-2.5">
+                <div className="seg" role="radiogroup" aria-label="Art der Antwort">
+                  {(["kurz", "lang", "zahl"] as TextArt[]).map((a) => (
+                    <button key={a} role="radio" aria-checked={textArt(f) === a} className={`seg-item ${textArt(f) === a ? "seg-aktiv" : ""}`} onClick={() => aendern(i, { optionen: [a] })}>
+                      {TEXT_ART_NAME[a]}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            {f.typ === "person" && <p className="px-4 py-3 text-[13px] text-tinte-leise">Alle wählen eine Person aus der Stufe. Gezählt wird, wie oft jemand gewählt wurde.</p>}
+            <Zeile label="Muss beantwortet werden">
               <Schalter an={f.pflicht} onChange={(x) => aendern(i, { pflicht: x })} label="Muss beantwortet werden" />
-            </label>
-          </div>
-        ))}
-      </div>
-      <button
-        className="mt-3 w-full rounded-2xl border-2 border-dashed border-[#5E5CE6]/35 py-3 text-[15px] font-semibold text-[#5E5CE6]"
-        onClick={() => setListe((l) => [...l, { sort: l.length + 1, typ: "einfach", titel: "", optionen: ["", ""], pflicht: true }])}
-      >
-        + Frage
-      </button>
+            </Zeile>
+          </Gruppe>
+        );
+      })}
+      <Gruppe className="mt-5" fuss={liste.some((f) => mitEigener(f)) ? "„Eigene Antwort“ ist wie „Sonstiges: ____“: wer sie wählt, schreibt kurz dazu. Gleiche Texte werden in der Auswertung zusammengezählt." : undefined}>
+        <button
+          className="flex min-h-[48px] w-full items-center gap-3 px-4 text-left text-[16px] font-semibold text-[#5E5CE6] transition active:bg-black/[0.04] dark:text-[#A5A4FF] dark:active:bg-white/[0.06]"
+          onClick={() => setListe((l) => [...l, { sort: l.length + 1, typ: "einfach", titel: "", optionen: ["", ""], pflicht: true, eigene: false }])}
+        >
+          <span className="flex h-[22px] w-[22px] items-center justify-center rounded-full bg-[#5E5CE6] text-white">
+            <Icon name="plus" size={14} strich={3} />
+          </span>
+          Frage hinzufügen
+        </button>
+      </Gruppe>
 
       <Gruppe className="mt-5">
         <Zeile label="Beim Start benachrichtigen">
@@ -908,47 +1021,55 @@ function ErgebnisSheet({
           {fragen.map((f, n) => {
             const e = erg.fragen.find((x) => x.frage_id === f.id);
             if (!e) return null;
+            const eigen = mitEigener(f);
+            // Die freie Möglichkeit steht extra (mit ihren Texten) – nicht zwischen den anderen
             const eintraege = Object.entries(e.zaehlung)
+              .filter(([k]) => !(eigen && k === EIGENE_NAME))
               .map(([k, v]) => [f.typ === "person" ? pName[k] || "Unbekannt" : k, v] as const)
               .sort((a, b) => (f.typ === "skala" ? Number(a[0]) - Number(b[0]) : b[1] - a[1]));
-            const max = Math.max(1, ...eintraege.map(([, v]) => v));
+            const eigenN = eigen ? e.zaehlung[EIGENE_NAME] || 0 : 0;
+            const eigeneGruppen = gruppiereTexte((e.eigene || []).map((text) => ({ text })));
+            const max = Math.max(0, eigenN, ...eintraege.map(([, v]) => v));
+            // Prozent = Anteil der Leute, die die Frage beantwortet haben
+            const basis = Math.max(1, e.antworten);
             const schnitt = f.typ === "skala" && e.antworten ? Object.entries(e.zaehlung).reduce((s, [k, v]) => s + Number(k) * v, 0) / e.antworten : 0;
+            const ta = f.typ === "text" ? textArt(f) : null;
             return (
-              <section key={f.id} className="mt-5">
+              <section key={f.id} className="mt-6">
                 <h3 className="px-1 text-[15px] font-semibold leading-snug">
                   <span className="text-tinte-leise">{n + 1}.</span> {f.titel}
                 </h3>
-                <p className="px-1 text-[12px] text-tinte-leise">
-                  {e.antworten} {e.antworten === 1 ? "Antwort" : "Antworten"}{f.typ === "skala" && e.antworten ? ` · Ø ${schnitt.toFixed(1).replace(".", ",")}` : ""}
+                <p className="mb-2 px-1 text-[12.5px] text-tinte-leise">
+                  {e.antworten} {e.antworten === 1 ? "Antwort" : "Antworten"}
+                  {f.typ === "skala" && e.antworten ? ` · Ø ${schnitt.toFixed(1).replace(".", ",")}` : ""}
+                  {f.typ === "mehrfach" && e.antworten ? " · mehrere Kreuze möglich" : ""}
                 </p>
                 {f.typ === "text" ? (
-                  <ul className="mt-2 space-y-1.5">
-                    {textArt(f) === "zahl" && <ZahlenAuswertung werte={e.texte.map(alsZahl).filter((z): z is number => z !== null)} />}
-                    {(textArt(f) === "zahl" ? [...e.texte].sort((x, y) => (alsZahl(x) ?? 0) - (alsZahl(y) ?? 0)) : e.texte).map((t, i) => (
-                      <li key={i} className="rounded-xl zelle px-3 py-2 text-[14px]">
-                        {t}
-                      </li>
-                    ))}
-                    {!e.texte.length && <li className="px-1 text-[13px] text-tinte-leise">Noch nichts.</li>}
-                  </ul>
+                  <>
+                    {ta === "zahl" && (
+                      <ul className="mb-1.5">
+                        <ZahlenAuswertung werte={e.texte.map(alsZahl).filter((z): z is number => z !== null)} />
+                      </ul>
+                    )}
+                    <TextGruppen
+                      gruppen={gruppiereTexte(e.texte.map((text) => ({ text })), ta === "zahl")}
+                      zahl={ta === "zahl"}
+                      max={ta === "lang" ? 3 : 5}
+                      leer="Noch nichts."
+                    />
+                  </>
                 ) : (
-                  <div className="mt-2 space-y-1.5">
-                    {eintraege.slice(0, f.typ === "person" ? 10 : 50).map(([k, v], i) => (
-                      <div key={k} className="relative overflow-hidden rounded-xl zelle">
-                        <div
-                          className={`absolute inset-y-0 left-0 rounded-xl ${i === 0 && f.typ !== "skala" ? "bg-brand/30" : "bg-brand/15"}`}
-                          style={{ width: `${(v / max) * 100}%` }}
-                        />
-                        <div className="relative flex items-center justify-between px-3 py-2 text-[14px]">
-                          <span className="truncate font-medium">
-                            {i === 0 && f.typ === "person" ? "🏆 " : ""}
-                            {k}
-                          </span>
-                          <span className="zahl font-bold">{v}</span>
-                        </div>
-                      </div>
+                  <div className="space-y-1.5">
+                    {eintraege.slice(0, f.typ === "person" ? 10 : 50).map(([k, v]) => (
+                      <ErgebnisZeile key={k} label={k} n={v} pct={Math.round((v / basis) * 100)} vorne={v > 0 && v === max} />
                     ))}
-                    {!eintraege.length && <p className="px-1 text-[13px] text-tinte-leise">Noch keine Stimmen.</p>}
+                    {eigen && <ErgebnisZeile label={EIGENE_NAME} n={eigenN} pct={Math.round((eigenN / basis) * 100)} vorne={eigenN > 0 && eigenN === max} kursiv />}
+                    {eigen && eigeneGruppen.length > 0 && (
+                      <div className="pl-4">
+                        <TextGruppen gruppen={eigeneGruppen} />
+                      </div>
+                    )}
+                    {!eintraege.length && !eigenN && <p className="px-1 text-[13px] text-tinte-leise">Noch keine Stimmen.</p>}
                   </div>
                 )}
                 {(f.typ === "einfach" || f.typ === "mehrfach" || f.typ === "text") && (
@@ -956,7 +1077,7 @@ function ErgebnisSheet({
                     kandidaten={
                       f.typ === "text"
                         ? [...new Set(e.texte.map((t) => t.trim()).filter((t) => t && t.length <= 120))].map((t) => ({ titel: t, n: 0 }))
-                        : eintraege.map(([k, v]) => ({ titel: k, n: v }))
+                        : [...eintraege.map(([k, v]) => ({ titel: k, n: v })), ...eigeneGruppen.map((g) => ({ titel: g.text, n: g.n }))]
                     }
                     rk={can("rankings.verwalten") ? rk : null}
                     album={can("album.kategorien") ? album : null}
@@ -968,7 +1089,9 @@ function ErgebnisSheet({
                       stand={runden}
                       gruppe={f.id}
                       gruppeTitel={f.titel}
-                      quellen={Object.entries(e.zaehlung).map(([k, v]) => ({ id: k.slice(0, 100), label: f.typ === "person" ? pName[k] || "Unbekannt" : k, punkte: v }))}
+                      quellen={Object.entries(e.zaehlung)
+                        .filter(([k]) => !(eigen && k === EIGENE_NAME))
+                        .map(([k, v]) => ({ id: k.slice(0, 100), label: f.typ === "person" ? pName[k] || "Unbekannt" : k, punkte: v }))}
                       leitet
                       gesperrt={false}
                       startText="Stichwahl starten"
@@ -1013,6 +1136,27 @@ function ErgebnisSheet({
         </button>
       )}
     </Sheet>
+  );
+}
+
+/**
+ * Eine Zeile der Auswertung: Balken = Anteil, rechts Prozent und Anzahl.
+ * Die führende Antwort (bei Gleichstand alle) ist kräftig und blau.
+ */
+function ErgebnisZeile({ label, n, pct, vorne, kursiv }: { label: string; n: number; pct: number; vorne: boolean; kursiv?: boolean }) {
+  return (
+    <div className="relative flex items-center gap-3 overflow-hidden rounded-xl zelle px-3 py-2.5">
+      <span
+        aria-hidden
+        className={`absolute inset-y-0 left-0 ${vorne ? "bg-brand/20 dark:bg-brand/30" : "bg-[rgb(118_118_128/0.12)] dark:bg-[rgb(118_118_128/0.22)]"}`}
+        style={{ width: `${Math.min(100, pct)}%` }}
+      />
+      <span className={`relative min-w-0 flex-1 truncate text-[14.5px] ${vorne ? "font-bold" : "font-medium"} ${kursiv ? "italic" : ""}`}>{label}</span>
+      <span className="relative shrink-0 text-right leading-none">
+        <span className={`zahl block text-[14px] font-bold ${vorne ? "text-brand-dark dark:text-brand" : ""}`}>{pct} %</span>
+        <span className="zahl mt-0.5 block text-[11px] text-tinte-leise">{n}×</span>
+      </span>
+    </div>
   );
 }
 
