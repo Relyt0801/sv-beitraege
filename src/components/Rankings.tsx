@@ -384,7 +384,7 @@ function FertigAnsicht({ titel, anzahl, onClose, onUebersicht, onErgebnisse }: {
           <Icon name="haken" size={32} strich={3} />
         </span>
         <div className="mt-4 text-[1.3rem] font-bold tracking-[-0.01em]">Fertig – alle abgestimmt</div>
-        <p className="mt-1.5 max-w-xs text-[14px] leading-snug text-tinte-leise">
+        <p className="auf-bild mt-1.5 max-w-xs text-[14px] leading-snug text-tinte-leise">
           Du hast in {anzahl === 1 ? "der Kategorie" : `allen ${anzahl} Kategorien`} abgestimmt. Danke! In der Übersicht kannst du jede Stimme noch ändern.
         </p>
       </div>

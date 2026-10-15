@@ -15,6 +15,8 @@ import { PersonAnlegenSheet } from "./PersonAnlegenSheet";
 import { KinderSheet } from "./KinderSheet";
 import { Icon } from "./Icon";
 import { Schalter } from "./Schalter";
+import { Gruppe, Zeile, ZeileMitSchalter } from "./Liste";
+import { Sheet, SheetKopf } from "./Sheet";
 // Sperrdauern und die Ist-gesperrt-Frage stehen beim Chat-Knopf – eine Quelle fuer beide.
 import { DAUERN, isBanned } from "./MuteKnopf";
 
@@ -53,9 +55,8 @@ export function RolesTab() {
   const { students, reload, settings } = useStore();
   const { committeesOf, setUserCommittee } = useTopics();
   const [q, setQ] = useState("");
-  const [openKom, setOpenKom] = useState<string | null>(null);
-  const [openRolle, setOpenRolle] = useState<string | null>(null);
-  const [openBan, setOpenBan] = useState<string | null>(null);
+  // Angetippte Person: ihr Blatt (Rolle, Komitees, Rechte, Konto)
+  const [personId, setPersonId] = useState<string | null>(null);
   // Elternzugang, dessen Kinder gerade bearbeitet werden
   const [kinderFuer, setKinderFuer] = useState<Profile | null>(null);
   // Person angetippt: ihre einzelnen Rechte (vorher eigene Liste im Reiter Rechte)
@@ -118,15 +119,6 @@ export function RolesTab() {
   return (
     <div>
       {pw.anzeige}
-      {(isAdmin || isOp) && (
-        <button
-          onClick={() => setAnlegen(true)}
-          className="btn-grau mb-3 gap-2 !text-[15px] md:!w-auto md:px-6"
-        >
-          <Icon name="plus" size={18} strich={2.4} />
-          Person hinzufügen
-        </button>
-      )}
       <PersonAnlegenSheet
         open={anlegen}
         onClose={() => setAnlegen(false)}
@@ -139,225 +131,109 @@ export function RolesTab() {
       />
       <Suchfeld wert={q} onChange={setQ} />
 
-      {/* Umschalter wie in den iOS-Einstellungen */}
-      <label className="card mb-3 flex min-h-[2.75rem] cursor-pointer select-none items-center gap-3 px-4 py-2 text-[15px]">
-        <span className="min-w-0 flex-1">
-          Elternzugänge anzeigen
-          <span className="ml-1.5 text-tinte-leise">{elternAnzahl}</span>
-        </span>
-        <Schalter an={zeigeEltern} onChange={setZeigeEltern} />
-      </label>
-      {wegAnzahl > 0 && (
-        <label className="card -mt-1 mb-3 flex min-h-[2.75rem] cursor-pointer select-none items-center gap-3 px-4 py-2 text-[15px]">
-          <span className="min-w-0 flex-1">
-            Ausgetretene anzeigen
-            <span className="ml-1.5 text-tinte-leise">{wegAnzahl}</span>
-          </span>
-          <Schalter an={zeigeWeg} onChange={setZeigeWeg} />
-        </label>
-      )}
+      {/* Anzeige-Schalter als eine iOS-Gruppe */}
+      <Gruppe className="mb-4">
+        {(isAdmin || isOp) && <Zeile label="Person hinzufügen" blau onClick={() => setAnlegen(true)} />}
+        <ZeileMitSchalter label={<>Elternzugänge anzeigen <span className="ml-1 text-tinte-leise">{elternAnzahl}</span></>}>
+          <Schalter an={zeigeEltern} onChange={setZeigeEltern} />
+        </ZeileMitSchalter>
+        {wegAnzahl > 0 && (
+          <ZeileMitSchalter label={<>Ausgetretene anzeigen <span className="ml-1 text-tinte-leise">{wegAnzahl}</span></>}>
+            <Schalter an={zeigeWeg} onChange={setZeigeWeg} />
+          </ZeileMitSchalter>
+        )}
+      </Gruppe>
 
-      {/* Ab iPad-Breite zwei Spalten – sonst standen Name und Auswahl
-          1300 px auseinander */}
-      <div className="grid items-start gap-2.5 md:grid-cols-2 [&>*]:min-w-0">
+      {/* Eine Liste wie in den iOS-Einstellungen: links die Person, rechts
+          knapp der Stand, Antippen öffnet das Blatt mit Rolle, Komitees,
+          Rechten und Konto. Vorher: zwei Spalten Karten mit je zwei großen
+          Auswahlfeldern und Knöpfen – unruhig und am Laptop schwer zu lesen. */}
+      <Gruppe titel={`${rows.length} ${rows.length === 1 ? "Konto" : "Konten"}`} className="">
         {rows.slice(0, sichtbar).map(({ p, kinder }) => {
           const koms = committeesOf(p.user_id);
           const banned = isBanned(p);
-          const geschuetzt = p.is_op || p.user_id === opUserId;
-          // Ohne Admin-Rolle auch nicht weg von einer Admin-Rolle – genau so
-          // haelt es der Trigger in der Datenbank.
-          const rolleGesperrt = geschuetzt || (!isAdmin && NUR_ADMIN.includes(p.role));
           const istEltern = p.role === "eltern";
-          const feld =
-            "h-11 rounded-xl border border-transparent bg-[rgb(118_118_128/0.12)] font-semibold transition dark:bg-[rgb(118_118_128/0.24)]";
           return (
-            <div key={p.user_id} className="card min-w-0 p-4">
-              {/* Zeile 1: Person – antippen öffnet ihre einzelnen Rechte */}
-              <button
-                type="button"
-                disabled={!darfRechte || istEltern}
-                onClick={() => {
-                  const st = p.student_id ? nachId.get(p.student_id) : null;
-                  setRechteFuer({ p, name: st ? `${st.vorname} ${st.nachname}` : p.username || "Konto" });
-                }}
-                className="-m-1 w-[calc(100%+0.5rem)] rounded-xl p-1 text-left transition enabled:active:bg-black/[0.03] disabled:cursor-default dark:enabled:active:bg-white/[0.04]"
-              >
-              <KontoZeile
-                profil={p}
-                student={p.student_id ? nachId.get(p.student_id) ?? null : null}
-                punkt={p.must_change_password === false}
-                hinweis={
-                  istEltern
-                    ? kinder.length
-                      ? kinder.join(" und ")
-                      : "kein Kind verknüpft – sieht nichts"
-                    : undefined
-                }
-                hinweisWarnt={istEltern && kinder.length === 0}
-                rechts={
-                  darfRechte && !istEltern ? (
-                    <span className="flex shrink-0 items-center gap-0.5 text-[14px] font-medium text-brand-dark dark:text-brand">
-                      Rechte <Icon name="chevron" size={15} strich={2.4} />
-                    </span>
-                  ) : undefined
-                }
-              />
-              </button>
-
-              {/* Zeile 2: Rolle + Komitees (bei Eltern: Kinder) + Chat-Sperre */}
-              <div className="mt-3 flex min-w-0 flex-wrap items-stretch gap-2">
-                <RollenMenue
+            <button
+              key={p.user_id}
+              type="button"
+              onClick={() => setPersonId(p.user_id)}
+              className="flex min-h-[60px] w-full items-center gap-3 px-4 py-2 text-left transition active:bg-black/[0.04] dark:active:bg-white/[0.06]"
+            >
+              <div className="min-w-0 flex-1">
+                <KontoZeile
                   profil={p}
-                  gesperrt={rolleGesperrt}
-                  gesperrtGrund={
-                    geschuetzt
-                      ? "Diese Rolle kann nicht geändert werden"
-                      : rolleGesperrt
-                        ? "Diese Rolle darf nur der Admin ändern"
-                        : undefined
-                  }
-                  offen={openRolle === p.user_id}
-                  setOffen={(an) => setOpenRolle(an ? p.user_id : null)}
-                  auswahl={ROLLEN_AUSWAHL.filter((r) => isAdmin || !NUR_ADMIN.includes(r) || p.role === r)}
-                  vergeben={(r) => NUR_EINMAL.includes(r) && profiles.some((x) => x.role === r && x.user_id !== p.user_id)}
-                  feld={feld}
-                  onWahl={async (neu) => {
-                    setOpenRolle(null);
-                    if (neu === p.role) return;
-                    // Eltern zu Stufenteam oder umgekehrt ist fast immer ein Versehen
-                    const heikel = p.role === "eltern" || neu === "eltern" || neu === "admin";
-                    if (heikel && !(await frage(`${p.username ?? "Dieses Konto"} wirklich zu „${rolleName(neu)}“ machen?`, "Ändern"))) return;
-                    void setRole(p.user_id, neu);
-                  }}
+                  student={p.student_id ? nachId.get(p.student_id) ?? null : null}
+                  punkt={p.must_change_password === false}
+                  hinweis={istEltern ? (kinder.length ? kinder.join(" und ") : "kein Kind verknüpft – sieht nichts") : undefined}
+                  hinweisWarnt={istEltern && kinder.length === 0}
                 />
-
-                {/* Eltern haben keine Komitees – dort waehlt man stattdessen die Kinder. */}
-                {istEltern ? (
-                  <button
-                    onClick={() => setKinderFuer(p)}
-                    className={`${feld} flex w-0 min-w-[7rem] flex-1 items-center gap-2 px-3 text-left active:scale-[.98] ${
-                      kinder.length === 0 ? "!border-offen/40 !bg-offen-grund text-offen" : ""
-                    }`}
-                  >
-                    <Icon name="kind" size={17} />
-                    <span className="min-w-0 flex-1 truncate">
-                      {kinder.length === 0 ? (darfKinder ? "Kind wählen" : "Kein Kind") : kinder.length === 1 ? "1 Kind" : `${kinder.length} Kinder`}
-                    </span>
-                    <span className="hidden text-tinte-leise min-[400px]:inline">
-                      <Icon name="chevron" size={15} />
-                    </span>
-                  </button>
-                ) : (
-                  canAssignKom && (
-                    <div className="relative w-0 min-w-[7rem] flex-1">
-                      <button
-                        onClick={() => setOpenKom(openKom === p.user_id ? null : p.user_id)}
-                        className={`${feld} flex w-full items-center gap-1.5 px-3`}
-                      >
-                        <span className="truncate text-tinte-matt dark:text-slate-300">Komitees</span>
-                        {koms.length > 0 && (
-                          <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-brand px-1.5 text-xs font-semibold text-white">{koms.length}</span>
-                        )}
-                        <span aria-hidden className="ml-auto rotate-90 text-tinte-leise"><Icon name="chevron" size={14} strich={2.4} /></span>
-                      </button>
-                      {openKom === p.user_id && (
-                        <>
-                          <button className="fixed inset-0 z-20 cursor-default" onClick={() => setOpenKom(null)} aria-label="Schließen" />
-                          <div className="absolute left-0 right-0 z-30 mt-1.5 max-h-72 animate-popIn overflow-y-auto rounded-2xl border border-black/[0.06] bg-white/95 p-1.5 shadow-glas backdrop-blur-xl dark:border-white/10 dark:bg-slate-800/95">
-                            {COMMITTEES.map((c) => {
-                              const on = koms.includes(c.slug);
-                              return (
-                                <button
-                                  key={c.slug}
-                                  onClick={() => setUserCommittee(p.user_id, c.slug, !on)}
-                                  className="flex w-full items-center gap-2 rounded-xl px-2.5 py-2 text-left text-[15px] hover:bg-black/[0.04] dark:hover:bg-white/[0.06]"
-                                >
-                                  <span className="min-w-0 flex-1 truncate">{c.label}</span>
-                                  <span className={`text-brand transition ${on ? "opacity-100" : "opacity-0"}`}>
-                                    <Icon name="haken" size={18} strich={2.5} />
-                                  </span>
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  )
-                )}
-
               </div>
-
-              {/* Zeile 3: Aktionen mit Beschriftung (vorher ein Emoji-Knopf, hinter
-                  dem das Passwort-Zurücksetzen versteckt war) */}
-              {((pw.darf && !geschuetzt && p.user_id !== uid) || (canTimeout && !geschuetzt && !istEltern)) && (
-                <div className="mt-2 flex min-w-0 flex-wrap items-center gap-2">
-                  {pw.darf && !geschuetzt && p.user_id !== uid && (
-                    <button
-                      type="button"
-                      disabled={pw.busy}
-                      onClick={() => void pw.zuruecksetzen(p.user_id, p.username || "diese Person")}
-                      className="btn-klein-grau"
-                    >
-                      <Icon name="schluessel" size={16} />
-                      {pw.busy ? "Wird erzeugt …" : "Passwort zurücksetzen"}
-                    </button>
-                  )}
-                  {/* Eltern schreiben in keinem Chat – da gibt es nichts zu sperren. */}
-                  {canTimeout && !geschuetzt && !istEltern && (
-                    <div className="relative shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => (banned ? setBan(p.user_id, null, false) : setOpenBan(openBan === p.user_id ? null : p.user_id))}
-                        aria-haspopup={banned ? undefined : "menu"}
-                        aria-expanded={banned ? undefined : openBan === p.user_id}
-                        className={banned ? "btn-klein !bg-red-600 dark:!bg-red-600" : "btn-klein-grau"}
-                      >
-                        {banned ? "Chat-Sperre aufheben" : "Chat sperren"}
-                      </button>
-                      {openBan === p.user_id && !banned && (
-                        <>
-                          <button className="fixed inset-0 z-20 cursor-default" onClick={() => setOpenBan(null)} aria-label="Schließen" />
-                          <div role="menu" className="absolute left-0 z-30 mt-1.5 w-48 animate-popIn rounded-2xl border border-black/[0.06] bg-white/95 p-1.5 shadow-glas backdrop-blur-xl dark:border-white/10 dark:bg-slate-800/95">
-                            <div className="px-2.5 py-1 text-[12px] font-semibold text-tinte-leise">Chat sperren für</div>
-                            {DAUERN.map((d) => (
-                              <button
-                                key={d.label}
-                                role="menuitem"
-                                onClick={() => {
-                                  setOpenBan(null);
-                                  void setBan(
-                                    p.user_id,
-                                    d.ms ? new Date(Date.now() + d.ms).toISOString() : null,
-                                    d.ms === null,
-                                  );
-                                }}
-                                className="min-h-[44px] w-full rounded-xl px-2.5 py-2 text-left text-[15px] hover:bg-black/[0.04] dark:hover:bg-white/[0.06]"
-                              >
-                                {d.label}
-                              </button>
-                            ))}
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  )}
-                </div>
+              {banned && <span className="shrink-0 text-[13px] font-semibold text-red-600 dark:text-red-400">gesperrt</span>}
+              {!istEltern && koms.length > 0 && (
+                <span className="hidden shrink-0 text-[13px] text-tinte-leise sm:inline">
+                  {koms.length} {koms.length === 1 ? "Komitee" : "Komitees"}
+                </span>
               )}
-            </div>
+              <span aria-hidden className="shrink-0 text-[17px] leading-none text-tinte-leise">›</span>
+            </button>
           );
         })}
         {rest > 0 && (
-          <div ref={marke} className="py-6 text-center text-[13px] text-tinte-leise md:col-span-2">
+          <div ref={marke} className="py-6 text-center text-[13px] text-tinte-leise">
             lädt weitere … ({rest} übrig)
           </div>
         )}
         {rows.length === 0 && (
-          <div className="py-16 text-center text-[15px] text-tinte-leise md:col-span-2">
-            Noch keine Konten. Sobald Konten angelegt sind, erscheinen sie hier.
+          <div className="px-4 py-10 text-center text-[15px] text-tinte-leise">
+            Keine Konten gefunden.
           </div>
         )}
-      </div>
+      </Gruppe>
+
+      {(() => {
+        const p = personId ? profiles.find((x) => x.user_id === personId) : undefined;
+        if (!p) return null;
+        const st = p.student_id ? nachId.get(p.student_id) : null;
+        const name = st ? `${st.vorname} ${st.nachname}` : p.username || "Konto";
+        const geschuetzt = p.is_op || p.user_id === opUserId;
+        const rolleGesperrt = geschuetzt || (!isAdmin && NUR_ADMIN.includes(p.role));
+        const istEltern = p.role === "eltern";
+        const kinder = istEltern ? kinderVon(p).map((k) => `${k.vorname} ${k.nachname}`) : [];
+        const koms = committeesOf(p.user_id);
+        const banned = isBanned(p);
+        return (
+          <PersonBlatt
+            name={name}
+            profil={p}
+            onClose={() => setPersonId(null)}
+            rolleGesperrt={rolleGesperrt}
+            gesperrtGrund={geschuetzt ? "Diese Rolle kann nicht geändert werden." : rolleGesperrt ? "Diese Rolle darf nur der Admin ändern." : undefined}
+            auswahl={ROLLEN_AUSWAHL.filter((r) => isAdmin || !NUR_ADMIN.includes(r) || p.role === r)}
+            vergeben={(r) => NUR_EINMAL.includes(r) && profiles.some((x) => x.role === r && x.user_id !== p.user_id)}
+            onRolle={async (neu) => {
+              if (neu === p.role) return;
+              const heikel = p.role === "eltern" || neu === "eltern" || neu === "admin";
+              if (heikel && !(await frage(`${p.username ?? "Dieses Konto"} wirklich zu „${rolleName(neu)}“ machen?`, "Ändern"))) return;
+              void setRole(p.user_id, neu);
+            }}
+            kinder={istEltern ? { text: kinder.length === 0 ? (darfKinder ? "Kind wählen" : "Kein Kind") : kinder.join(", "), warnt: kinder.length === 0, oeffnen: () => setKinderFuer(p) } : undefined}
+            komitees={!istEltern && canAssignKom ? { gewaehlt: koms, setzen: (slug, an) => setUserCommittee(p.user_id, slug, an) } : undefined}
+            onRechte={darfRechte && !istEltern ? () => setRechteFuer({ p, name }) : undefined}
+            onPasswort={pw.darf && !geschuetzt && p.user_id !== uid ? () => void pw.zuruecksetzen(p.user_id, p.username || "diese Person") : undefined}
+            pwBusy={pw.busy}
+            sperre={
+              canTimeout && !geschuetzt && !istEltern
+                ? {
+                    gesperrt: banned,
+                    aufheben: () => void setBan(p.user_id, null, false),
+                    sperren: (ms) => void setBan(p.user_id, ms ? new Date(Date.now() + ms).toISOString() : null, ms === null),
+                  }
+                : undefined
+            }
+          />
+        );
+      })()}
 
       {rechteFuer && (
         <PersonRechteSheet profil={rechteFuer.p} name={rechteFuer.name} onClose={() => setRechteFuer(null)} />
@@ -381,95 +257,124 @@ const ROLLE_HINWEIS: Partial<Record<Role, string>> = {
 };
 
 /**
- * Rolle wählen – als eigenes Menü statt nativem <select>. Das native Feld sah
- * je nach Betriebssystem anders aus (unter Windows im Dunkelmodus: hellgraue
- * Liste mit fast weißer Schrift) und konnte nicht erklären, warum eine Rolle
- * gesperrt ist. Hier: Häkchen an der aktuellen Rolle, ein Satz Erklärung,
- * gesperrte Rollen mit Grund. Team und Eltern sind durch Linien getrennt.
+ * Blatt einer Person – aufgebaut wie eine Seite der iOS-Einstellungen:
+ * Rolle als Auswahlliste mit Häkchen (ein Satz Erklärung je Rolle,
+ * gesperrte mit Grund), Komitees mit Häkchen, dann Rechte und Konto.
  */
-function RollenMenue({
-  profil, gesperrt, gesperrtGrund, offen, setOffen, auswahl, vergeben, feld, onWahl,
+function PersonBlatt({
+  name, profil, onClose, rolleGesperrt, gesperrtGrund, auswahl, vergeben, onRolle,
+  kinder, komitees, onRechte, onPasswort, pwBusy, sperre,
 }: {
+  name: string;
   profil: Profile;
-  gesperrt: boolean;
+  onClose: () => void;
+  rolleGesperrt: boolean;
   gesperrtGrund?: string;
-  offen: boolean;
-  setOffen: (an: boolean) => void;
   auswahl: Role[];
   vergeben: (r: Role) => boolean;
-  feld: string;
-  onWahl: (r: Role) => void;
+  onRolle: (r: Role) => void;
+  kinder?: { text: string; warnt: boolean; oeffnen: () => void };
+  komitees?: { gewaehlt: string[]; setzen: (slug: string, an: boolean) => void };
+  onRechte?: () => void;
+  onPasswort?: () => void;
+  pwBusy?: boolean;
+  sperre?: { gesperrt: boolean; aufheben: () => void; sperren: (ms: number | null) => void };
 }) {
-  const trennerVor = (r: Role, i: number) => i > 0 && (r === "sprecher" || r === "eltern");
+  const [dauerWahl, setDauerWahl] = useState(false);
   return (
-    <div className="relative w-0 min-w-[8.5rem] flex-1">
-      <button
-        type="button"
-        disabled={gesperrt}
-        aria-label={`Rolle: ${rolleName(profil.role)}`}
-        aria-haspopup="listbox"
-        aria-expanded={offen}
-        title={gesperrtGrund}
-        onClick={() => setOffen(!offen)}
-        onKeyDown={(e) => e.key === "Escape" && setOffen(false)}
-        className={`${feld} flex w-full items-center gap-1.5 px-3 text-left active:scale-[.98] disabled:opacity-50 disabled:active:scale-100`}
-      >
-        <span className="min-w-0 flex-1 truncate">{rolleName(profil.role)}</span>
-        <span className={`shrink-0 text-tinte-leise transition ${offen ? "-rotate-90" : "rotate-90"}`} aria-hidden>
-          <Icon name="chevron" size={14} strich={2.4} />
-        </span>
-      </button>
-      {offen && (
-        <>
-          <button className="fixed inset-0 z-20 cursor-default" onClick={() => setOffen(false)} aria-label="Schließen" />
-          <div
-            role="listbox"
-            aria-label="Rolle wählen"
-            onKeyDown={(e) => e.key === "Escape" && setOffen(false)}
-            className="absolute left-0 z-30 mt-1.5 max-h-[22rem] w-[max(100%,16rem)] animate-popIn overflow-y-auto rounded-2xl border border-black/[0.06] bg-white/95 p-1.5 shadow-glas backdrop-blur-xl dark:border-white/10 dark:bg-slate-800/95"
-          >
-            {auswahl.map((r, i) => {
-              const aktiv = r === profil.role;
-              const belegt = vergeben(r);
-              return (
-                <div key={r}>
-                  {trennerVor(r, i) && <div className="mx-2.5 my-1 h-px bg-black/[0.07] dark:bg-white/10" aria-hidden />}
-                  <button
-                    type="button"
-                    role="option"
-                    aria-selected={aktiv}
-                    disabled={belegt}
-                    autoFocus={aktiv}
-                    onClick={() => onWahl(r)}
-                    className={`flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left transition focus:outline-none focus-visible:bg-black/[0.06] enabled:hover:bg-black/[0.04] disabled:cursor-not-allowed dark:focus-visible:bg-white/[0.1] dark:enabled:hover:bg-white/[0.06] ${
-                      aktiv ? "bg-brand/[0.08] dark:bg-brand/[0.15]" : ""
-                    }`}
-                  >
-                    <span className="min-w-0 flex-1">
-                      <span className={`block truncate text-[15px] font-semibold ${belegt ? "text-tinte-leise" : aktiv ? "text-brand" : ""}`}>
-                        {rolleName(r)}
-                      </span>
-                      <span className="block text-[12px] leading-snug text-tinte-leise">
-                        {belegt ? "Schon vergeben – erst der anderen Person wegnehmen" : ROLLE_HINWEIS[r]}
-                      </span>
-                    </span>
-                    {aktiv && (
-                      <span className="shrink-0 text-brand">
-                        <Icon name="haken" size={18} strich={2.5} />
-                      </span>
-                    )}
-                    {belegt && (
-                      <span className="shrink-0 text-[12px] font-semibold text-tinte-leise" aria-hidden>
-                        vergeben
-                      </span>
-                    )}
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        </>
+    <Sheet open onClose={onClose}>
+      <SheetKopf titel={name} unter={`${profil.username ?? ""} · ${rolleName(profil.role)}`} onClose={onClose} />
+
+      <Gruppe titel="Rolle" className="" fuss={gesperrtGrund}>
+        {(rolleGesperrt ? [profil.role] : auswahl).map((r) => {
+          const aktiv = r === profil.role;
+          const belegt = vergeben(r);
+          return (
+            <button
+              key={r}
+              type="button"
+              disabled={rolleGesperrt || belegt}
+              aria-pressed={aktiv}
+              onClick={() => onRolle(r)}
+              className="flex min-h-[52px] w-full items-center gap-3 px-4 py-2 text-left transition enabled:active:bg-black/[0.04] disabled:cursor-default dark:enabled:active:bg-white/[0.06]"
+            >
+              <span className="min-w-0 flex-1">
+                <span className={`block text-[15px] ${belegt ? "text-tinte-leise" : ""}`}>{rolleName(r)}</span>
+                <span className="mt-0.5 block text-[12.5px] leading-snug text-tinte-leise">
+                  {belegt ? "Schon vergeben – erst der anderen Person wegnehmen" : ROLLE_HINWEIS[r]}
+                </span>
+              </span>
+              {aktiv && (
+                <span className="shrink-0 text-brand-dark dark:text-brand">
+                  <Icon name="haken" size={18} strich={2.5} />
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </Gruppe>
+
+      {kinder && (
+        <Gruppe titel="Kinder">
+          <Zeile label="Verknüpfte Kinder" onClick={kinder.oeffnen}>
+            <span className={`truncate text-[15px] ${kinder.warnt ? "font-medium text-offen" : "text-tinte-matt dark:text-slate-300"}`}>{kinder.text}</span>
+          </Zeile>
+        </Gruppe>
       )}
-    </div>
+
+      {komitees && (
+        <Gruppe titel="Komitees">
+          {COMMITTEES.map((c) => {
+            const an = komitees.gewaehlt.includes(c.slug);
+            return (
+              <button
+                key={c.slug}
+                type="button"
+                aria-pressed={an}
+                onClick={() => komitees.setzen(c.slug, !an)}
+                className="flex min-h-[48px] w-full items-center gap-3 px-4 py-2 text-left transition active:bg-black/[0.04] dark:active:bg-white/[0.06]"
+              >
+                <span className="min-w-0 flex-1 truncate text-[15px]">{c.label}</span>
+                {an && (
+                  <span className="shrink-0 text-brand-dark dark:text-brand">
+                    <Icon name="haken" size={18} strich={2.5} />
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </Gruppe>
+      )}
+
+      {onRechte && (
+        <Gruppe fuss="Ausnahmen nur für diese Person – zusätzlich zu dem, was ihre Rolle darf.">
+          <Zeile label="Einzelne Rechte" onClick={onRechte} />
+        </Gruppe>
+      )}
+
+      {(onPasswort || sperre) && (
+        <Gruppe titel="Konto">
+          {onPasswort && <Zeile label={pwBusy ? "Wird erzeugt …" : "Passwort zurücksetzen"} blau disabled={pwBusy} onClick={onPasswort} />}
+          {sperre &&
+            (sperre.gesperrt ? (
+              <Zeile label="Chat-Sperre aufheben" blau onClick={sperre.aufheben} />
+            ) : !dauerWahl ? (
+              <Zeile label="Chat sperren …" rot onClick={() => setDauerWahl(true)} />
+            ) : (
+              DAUERN.map((d) => (
+                <Zeile
+                  key={d.label}
+                  label={`Chat sperren: ${d.label}`}
+                  rot
+                  onClick={() => {
+                    setDauerWahl(false);
+                    sperre.sperren(d.ms);
+                  }}
+                />
+              ))
+            ))}
+        </Gruppe>
+      )}
+    </Sheet>
   );
 }

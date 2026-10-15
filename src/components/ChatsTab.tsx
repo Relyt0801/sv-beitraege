@@ -490,7 +490,7 @@ function Leer({ icon, text }: { icon: IconName; text: string }) {
       <span aria-hidden className="flex h-14 w-14 items-center justify-center rounded-full bg-brand/10 text-brand dark:bg-brand/20">
         <Icon name={icon} size={26} />
       </span>
-      <p className="mt-3 max-w-xs text-[14px] leading-snug text-tinte-leise">{text}</p>
+      <p className="auf-bild mt-3 max-w-xs text-[14px] leading-snug text-tinte-leise">{text}</p>
     </div>
   );
 }

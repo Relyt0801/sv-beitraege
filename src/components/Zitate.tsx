@@ -413,7 +413,7 @@ function Wand({ wand, teil, gw, v, einreichen }: { wand: Zitatwand; teil: Teil; 
           <span className={`flex h-12 w-12 items-center justify-center rounded-full ${TEIL_FARBE[teil].grund} ${TEIL_FARBE[teil].text}`}>
             <TeilSymbol teil={teil} size={22} />
           </span>
-          <p className="mt-3 max-w-xs text-[14px] leading-snug text-tinte-leise">
+          <p className="auf-bild mt-3 max-w-xs text-[14px] leading-snug text-tinte-leise">
             {frei.length
               ? "Keine Zitate in dieser Auswahl."
               : teil === "offiziell"
@@ -692,7 +692,7 @@ function ErgebnisAnsicht({ wand, r, gw, teil, einstellungen }: { wand: Zitatwand
       {nichts && (
         <div className="flex flex-col items-center py-10 text-center">
           <span className="flex h-12 w-12 items-center justify-center rounded-full bg-[#F5B53F]/20 text-[22px]">🏆</span>
-          <p className="mt-3 max-w-xs text-[14px] leading-snug text-tinte-leise">
+          <p className="auf-bild mt-3 max-w-xs text-[14px] leading-snug text-tinte-leise">
             Noch keine Ergebnisse im Teil „{TEIL_NAME[teil]}“. Gib den Zitaten auf der Wand Feuer – sobald das Komitee auswertet, steht es hier.
           </p>
         </div>

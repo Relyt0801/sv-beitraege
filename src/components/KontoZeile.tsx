@@ -86,7 +86,7 @@ export function Suchfeld({
   platzhalter?: string;
 }) {
   return (
-    <div className="mb-3 flex h-11 items-center gap-2 rounded-xl bg-[rgb(118_118_128/0.12)] px-3 dark:bg-[rgb(118_118_128/0.24)]">
+    <div className="feld-auf-bild mb-3 flex h-11 items-center gap-2 rounded-xl bg-[rgb(118_118_128/0.12)] px-3 dark:bg-[rgb(118_118_128/0.24)]">
       <span className="text-tinte-leise">
         <Icon name="lupe" size={17} />
       </span>

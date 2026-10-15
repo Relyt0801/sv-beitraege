@@ -431,11 +431,65 @@ html.mit-hintergrund .kopf-grund {
 /* Mit eigenem Hintergrundbild: ruhige, fast deckende Leiste ohne Weichzeichner
    und ohne Farbschein aus dem Bild */
 html.mit-hintergrund .kopf-band::before {
-  background-color: rgb(var(--papier) / 0.94);
+  /* DECKEND: mit 0.94 schimmerte der große Titel/Inhalt als Geist durch */
+  background-color: rgb(var(--glas));
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
+}
+/* Text, der direkt auf dem Hintergrundbild steht (Abschnittstitel, Fußnoten
+   von Gruppen, großer Seitentitel): kräftigere Farbe + Lichthof in der
+   Grundfarbe, damit er auf jedem Foto lesbar bleibt. In Blättern (Sheet,
+   eigener deckender Grund) wirkt das nicht. */
+html.mit-hintergrund .auf-bild,
+html.mit-hintergrund .auf-bild .text-tinte-leise,
+html.mit-hintergrund .auf-bild.text-tinte-leise {
+  text-shadow: 0 0 2px rgb(var(--papier)), 0 0 8px rgb(var(--papier)), 0 0 16px rgb(var(--papier) / 0.9);
+}
+html.mit-hintergrund .auf-bild.text-tinte-leise,
+html.mit-hintergrund .auf-bild .text-tinte-leise {
+  color: rgb(var(--tinte-matt));
+}
+html.mit-hintergrund .blatt .auf-bild,
+html.mit-hintergrund .blatt .auf-bild .text-tinte-leise {
+  text-shadow: none;
+}
+html.mit-hintergrund .blatt .auf-bild.text-tinte-leise,
+html.mit-hintergrund .blatt .auf-bild .text-tinte-leise {
+  color: rgb(var(--tinte-leise));
+}
+/* Vollbild-Ebenen (ChatEbene) zeigen dasselbe Hintergrundbild wie die Seite –
+   vorher war die Ebene am Laptop schwarz, darüber (App-Kopf) das Foto. */
+html.mit-hintergrund .ebene-grund {
+  background-image: linear-gradient(rgb(var(--papier) / 0.45), rgb(var(--papier) / 0.45)), var(--hg-bild);
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
 }
 /* Die breite Leiste darf keinen waagerechten Scrollbalken erzeugen */
 #root {
   overflow-x: clip;
+}
+
+/* Graue Flächen (Segment, Suchfeld) direkt auf dem Hintergrundbild: deckend
+   in der Kartenfarbe, sonst scheinen Streifen/Fotos durch und die Schrift
+   wird unlesbar. In Blättern bleiben sie wie gehabt. */
+html.mit-hintergrund main .seg,
+html.mit-hintergrund .ebene-grund .seg,
+html.mit-hintergrund .feld-auf-bild {
+  background-color: rgb(227 227 232);
+  box-shadow: 0 0 0 0.5px rgb(0 0 0 / 0.08);
+}
+html.dark.mit-hintergrund main .seg,
+html.dark.mit-hintergrund .ebene-grund .seg,
+html.dark.mit-hintergrund .feld-auf-bild {
+  background-color: rgb(var(--glas));
+}
+html.mit-hintergrund .blatt .seg,
+html.mit-hintergrund .blatt .feld-auf-bild {
+  background-color: rgb(118 118 128 / 0.12);
+  box-shadow: none;
+}
+html.dark.mit-hintergrund .blatt .seg,
+html.dark.mit-hintergrund .blatt .feld-auf-bild {
+  background-color: rgb(118 118 128 / 0.24);
 }

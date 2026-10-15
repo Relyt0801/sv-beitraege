@@ -434,7 +434,7 @@ export function LeererChat({ text }: { text: string }) {
       <span aria-hidden className="flex h-14 w-14 items-center justify-center rounded-full bg-brand/10 text-brand dark:bg-brand/20">
         <Icon name="chats" size={26} />
       </span>
-      <p className="mt-3 max-w-xs text-[14px] leading-snug text-tinte-leise">{text}</p>
+      <p className="auf-bild mt-3 max-w-xs text-[14px] leading-snug text-tinte-leise">{text}</p>
     </div>
   );
 }
@@ -728,7 +728,7 @@ export function ChatEbene({
     <div
       role="region"
       aria-label={label}
-      className={`fixed inset-x-0 top-0 z-[45] flex h-[100dvh] flex-col bg-papier dark:bg-slate-950 lg:bottom-0 lg:top-[var(--kopf)] lg:z-[15] lg:h-auto ${
+      className={`ebene-grund fixed inset-x-0 top-0 z-[45] flex h-[100dvh] flex-col bg-papier dark:bg-slate-950 lg:bottom-0 lg:top-[var(--kopf)] lg:z-[15] lg:h-auto ${
         sichtbar ? "animate-vonRechts" : "hidden"
       }`}
       style={sicht.hoehe ? { height: sicht.hoehe, top: sicht.oben } : undefined}

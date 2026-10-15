@@ -11,6 +11,23 @@ ausführlich (auf Deutsch); hier steht der Überblick dazu.
 
 ---
 
+## Laptop-Layout & Design-Regeln (15.10.2026)
+
+- **Beiträge**: Inhalt nutzt die volle Spalte (vorher `max-w-3xl` ohne
+  `mx-auto` → linksbündig und schmaler als Titel/Leiste). Möglichkeiten sind
+  iOS-Zeilen „Name … 5 % ›“; Bearbeiten, „Anpassbar“ und Löschen im Blatt
+  (`VorlageBlatt`), „Neue Möglichkeit“ als blaue letzte Zeile (`VorlageNeu`).
+- **Rollen**: eine Liste statt Karten-Raster mit Auswahlfeldern; Antippen
+  öffnet `PersonBlatt` (Rolle mit Häkchen, Komitees, Einzelne Rechte,
+  Passwort, Chat-Sperre). Anzeige-Schalter und „Person hinzufügen“ als Gruppe.
+- **Hintergrundbild**: Kopfleiste deckend (kein durchscheinender Titel),
+  Text auf dem Foto mit `auf-bild` lesbar, Segment/Suchfeld deckend,
+  Chat-Ebenen zeigen das Bild ebenfalls (`ebene-grund`, `--hg-bild`).
+- **Regeln für künftige Änderungen**: `CLAUDE.md` (Projektstamm) und
+  `docs/DESIGN-REGELN.md`; Foto-Helfer `tests/geraet.mjs` (`BILD=1`, `DARK=1`).
+
+---
+
 
 ## 15.10.2026 (2): UX/UI-Prüfung und Überarbeitung (Branch `update-1-4`)
 

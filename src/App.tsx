@@ -616,7 +616,7 @@ function Main() {
       </header>
 
       {/* Großer Titel – läuft beim Scrollen einfach mit weg */}
-      <div className="mx-auto max-w-5xl px-1 pb-1 pt-1">
+      <div className="auf-bild mx-auto max-w-5xl px-1 pb-1 pt-1">
         <h1 className="font-zahl text-[2.125rem] font-bold leading-tight tracking-[-0.025em]">{REITER_TITEL[tab]}</h1>
         <p className="text-[13px] text-tinte-leise">{isStaff ? "Stufenteam" : "Mein Zugang"} · Abi 28</p>
       </div>

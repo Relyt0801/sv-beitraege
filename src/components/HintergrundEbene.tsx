@@ -61,8 +61,15 @@ export function HintergrundEbene() {
   }, [uid]);
 
   useEffect(() => {
-    document.documentElement.classList.toggle("mit-hintergrund", Boolean(bild));
-    return () => document.documentElement.classList.remove("mit-hintergrund");
+    const html = document.documentElement;
+    html.classList.toggle("mit-hintergrund", Boolean(bild));
+    // Für Vollbild-Ebenen (.ebene-grund), die das Bild noch einmal zeigen
+    if (bild) html.style.setProperty("--hg-bild", `url(${bild})`);
+    else html.style.removeProperty("--hg-bild");
+    return () => {
+      html.classList.remove("mit-hintergrund");
+      html.style.removeProperty("--hg-bild");
+    };
   }, [bild]);
 
   if (!bild) return null;
