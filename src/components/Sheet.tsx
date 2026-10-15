@@ -519,9 +519,11 @@ export function Sheet({ open, onClose, children, hoch }: { open: boolean; onClos
           transition: ziehend ? "none" : "transform .38s cubic-bezier(.32,.72,0,1)",
         }}
       >
-        {/* Griff: nach unten ziehen schliesst */}
+        {/* Griff: nach unten ziehen schliesst. Klebt oben (deckend), damit der
+            Blattkopf darunter immer an derselben Stelle steht – vorher scrollte
+            der Griff weg, und der Kopf rutschte beim Umblättern um 18 px. */}
         <div
-          className="-mx-5 -mt-1.5 flex h-6 cursor-grab touch-none items-center justify-center sm:hidden"
+          className="sticky top-0 z-20 -mx-5 -mt-1.5 flex h-6 cursor-grab touch-none items-center justify-center bg-papier dark:bg-slate-900 sm:hidden"
           onPointerDown={(e) => {
             start.current = e.clientY;
             setZiehend(true);
@@ -613,7 +615,7 @@ export function SheetKopf({
   useZurueckKanal(zurueck?.onClick);
   const zurueckJetzt = zurueck ?? (lage?.kind ? { text: lage.zurueckText, onClick: onClose } : undefined);
   return (
-    <div className="sticky top-0 z-10 -mx-5 mb-2 flex items-start gap-3 bg-papier px-5 pb-2 pt-2 shadow-[0_-24px_0_0_rgb(var(--papier))] dark:bg-slate-900 dark:shadow-[0_-24px_0_0_#1C1C1E]">
+    <div className="sticky top-0 z-10 -mx-5 mb-2 flex items-start gap-3 bg-papier px-5 pb-2 pt-2 shadow-[0_-24px_0_0_rgb(var(--papier))] max-sm:top-[18px] dark:bg-slate-900 dark:shadow-[0_-24px_0_0_#1C1C1E]">
       <div className="min-w-0 flex-1">
         {zurueckJetzt && <ZurueckKnopf text={zurueckJetzt.text} onClick={zurueckJetzt.onClick} className="-mt-1.5 mb-0.5" />}
         <h2 id={lage?.titelId} className="text-[1.375rem] font-bold leading-tight tracking-[-0.02em]">

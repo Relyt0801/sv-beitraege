@@ -554,7 +554,7 @@ function SteckbriefAnsicht({
   return (
     <div className="animate-vonRechts">
       {/* Kopf wie überall: „‹ Abi-Album“ links, ✕ rechts – klebt beim Scrollen */}
-      <div className="sticky top-0 z-10 -mx-5 mb-1 flex items-center justify-between gap-3 bg-papier px-5 pb-1 pt-0.5 shadow-[0_-24px_0_0_rgb(var(--papier))] dark:bg-slate-900 dark:shadow-[0_-24px_0_0_#1C1C1E]">
+      <div className="sticky top-0 z-10 -mx-5 mb-1 flex items-center justify-between gap-3 bg-papier px-5 pb-1 pt-0.5 shadow-[0_-24px_0_0_rgb(var(--papier))] max-sm:top-[18px] dark:bg-slate-900 dark:shadow-[0_-24px_0_0_#1C1C1E]">
         <ZurueckKnopf text="Abi-Album" onClick={zurueck} />
         <SchliessenKnopf onClick={onClose} className="-mr-1.5" />
       </div>

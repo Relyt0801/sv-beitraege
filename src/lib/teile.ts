@@ -37,12 +37,15 @@ export function wortfilterSchluessel(basis: "motto" | "zitate" | "rankings" | "k
 /** Zuletzt gewählter Teil je Bereich – nur eine Bequemlichkeit pro Gerät. */
 export function useTeil(bereich: string): [Teil, (t: Teil) => void] {
   const schluessel = `sv:teil:${bereich}`;
+  // Beim Abimotto geht es zuerst um das echte Motto (offiziell); Zitate und
+  // Rankings starten im lockeren Teil der Stufe
+  const standard: Teil = bereich === "motto" ? "offiziell" : "inoffiziell";
   const [teil, setTeilRoh] = useState<Teil>(() => {
     try {
       const t = localStorage.getItem(schluessel);
-      return t === "offiziell" ? "offiziell" : "inoffiziell";
+      return t === "offiziell" || t === "inoffiziell" ? t : standard;
     } catch {
-      return "inoffiziell";
+      return standard;
     }
   });
   const setTeil = useCallback(

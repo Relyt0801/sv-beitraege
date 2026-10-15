@@ -456,7 +456,9 @@ function MonatsAnsicht({
                           onOeffnen(t);
                         }}
                         aria-label={`${t.titel}${t.von ? `, ${uhr(t.von)}` : ""} öffnen`}
-                        className={`block min-w-0 truncate rounded px-1 py-0.5 text-left text-[12px] font-semibold leading-tight transition hover:brightness-95 active:scale-[.97] ${chipKlasse(t, meins(t), st(t))}`}
+                        // Bis zu zwei Einträge dürfen zweizeilig sein – die Zellen sind
+                        // am Laptop hoch genug; vorher blieb nur ein Wort („Waf…“)
+                        className={`min-w-0 rounded px-1 py-0.5 text-left text-[12px] font-semibold leading-tight transition hover:brightness-95 active:scale-[.97] ${liste.length <= 2 ? "line-clamp-2 break-words" : "block truncate"} ${chipKlasse(t, meins(t), st(t))}`}
                       >
                         {schichtVorzeichen(st(t))}
                         {t.icon ? `${t.icon} ` : t.von ? `${uhr(t.von)} ` : ""}

@@ -190,13 +190,14 @@ export function RolesTab() {
                   profil={p}
                   student={p.student_id ? nachId.get(p.student_id) ?? null : null}
                   punkt={p.must_change_password === false}
-                  hinweis={istEltern ? (kinder.length ? kinder.join(" und ") : "kein Kind verknüpft – sieht nichts") : undefined}
+                  hinweis={istEltern ? (kinder.length ? kinder.join(" und ") : "kein Kind – sieht nichts") : undefined}
                   hinweisWarnt={istEltern && kinder.length === 0}
                 />
               </div>
               {banned && <span className="shrink-0 text-[13px] font-semibold text-red-600 dark:text-red-400">gesperrt</span>}
+              {/* Komitee-Zahl erst ab sm – am Handy nahm sie der Rolle den Platz */}
               {!istEltern && koms.length > 0 && (
-                <span className="shrink-0 text-[13px] text-tinte-leise">
+                <span className="hidden shrink-0 text-[13px] text-tinte-leise sm:inline">
                   {koms.length} {koms.length === 1 ? "Komitee" : "Komitees"}
                 </span>
               )}

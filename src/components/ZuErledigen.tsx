@@ -1,5 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { useEvents } from "../events-store";
+import { useTopics } from "../topics-store";
+import { committeeLabel } from "../lib/committees";
 import { useRole } from "../auth/RoleProvider";
 import { springe, useFuerMichOffen, useTeamAufgaben, type TeamArt } from "../lib/offen";
 import { tagLang, zeitText } from "../lib/termine";
@@ -70,8 +72,43 @@ export function ZuErledigen({ className = "" }: { className?: string }) {
   const [infoId, setInfoId] = useState<string | null>(null);
   // Die eigene nächste Schicht im Blatt (fürs Team dasselbe wie unter „Mitmachen“)
   const [schichtOffen, setSchichtOffen] = useState<Termin | null>(null);
+  const { topics, items, myVotes, committeesOf, uid } = useTopics();
 
   if (isEltern) return null;
+
+  // Was in den eigenen Komitees offen ist (Abstimmung ohne eigene Stimme,
+  // offene To-dos) – vorher sah man das nur, wenn man in Chats nachschaute.
+  // Eigene Gruppe: Komitee-Aufgaben gehören allen Mitgliedern, die Zahl am
+  // Reiter zählt nur, was oben unter „Zu erledigen“ steht.
+  const meineKoms = uid ? committeesOf(uid) : [];
+  const jetzt = Date.now();
+  const komitee: ReactNode[] = topics
+    .filter((t) => t.kind === "chat" && t.tag && meineKoms.includes(t.tag))
+    .flatMap((t) => {
+      const eig = items.filter((i) => i.topic_id === t.id);
+      const abst = eig.filter(
+        (i) => i.type === "umfrage" && !(i.poll_deadline && Date.parse(i.poll_deadline) < jetzt) && !(myVotes[i.id] || []).length,
+      );
+      const todos = eig.filter((i) => i.type === "todo" && !i.done);
+      const erstes = abst[0] ?? todos[0];
+      if (!erstes) return [];
+      const teile = [
+        abst.length ? `${abst.length} ${abst.length === 1 ? "Abstimmung" : "Abstimmungen"}` : "",
+        todos.length ? `${todos.length} ${todos.length === 1 ? "To-do" : "To-dos"}` : "",
+      ].filter(Boolean);
+      return [
+        <Zeile
+          key={`k-${t.id}`}
+          symbol={sym("chats", "bg-[#5856D6]")}
+          label={committeeLabel(t.tag!)}
+          unter={`${teile.join(" · ")} offen`}
+          // Öffnet das Komitee auf der Pinnwand beim ersten offenen Eintrag
+          onClick={() => {
+            window.location.hash = `chats/${t.id}/${erstes.id}`;
+          }}
+        />,
+      ];
+    });
 
   const zeilen: ReactNode[] = [];
 
@@ -139,10 +176,19 @@ export function ZuErledigen({ className = "" }: { className?: string }) {
 
   return (
     <>
-      {zeilen.length > 0 && (
-        <Gruppe titel={isStaff ? "Zu erledigen" : "Für dich offen"} className={className}>
-          {zeilen}
-        </Gruppe>
+      {(zeilen.length > 0 || komitee.length > 0) && (
+        <div className={className}>
+          {zeilen.length > 0 && (
+            <Gruppe titel={isStaff ? "Zu erledigen" : "Für dich offen"} className="">
+              {zeilen}
+            </Gruppe>
+          )}
+          {komitee.length > 0 && (
+            <Gruppe titel="Aus deinen Komitees" className={zeilen.length ? "mt-4" : ""}>
+              {komitee}
+            </Gruppe>
+          )}
+        </div>
       )}
       <AbstimmungBlatt id={abstimmungId} onClose={() => setAbstimmungId(null)} />
       <InfoBlatt id={infoId} onClose={() => setInfoId(null)} />

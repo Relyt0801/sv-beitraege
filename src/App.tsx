@@ -207,6 +207,27 @@ const REITER_TITEL: Record<Tab, string> = {
   rollen: "Rollen",
 };
 
+/**
+ * Reihenfolge der Reiter nach Rolle (Rollen-Prüfung Okt. 2026): Wer etwas
+ * täglich braucht, findet es weiter vorne – am Handy direkt neben dem
+ * Daumen. Stufenteam und Sprecher organisieren Events und Chats (Kasse und
+ * Finanzen schauen sie nur an), der Kassenwart arbeitet in Kasse und Finanzen.
+ * Admin und Schüler behalten die Grundordnung. Jede Person hat eine Rolle –
+ * für sie steht jeder Reiter also immer an derselben Stelle.
+ */
+const REITER_REIHENFOLGE: Partial<Record<string, Tab[]>> = {
+  kassenwart: ["profil", "kasse", "finanzen", "events", "themen", "rollen"],
+  stufenteam: ["profil", "events", "themen", "kasse", "finanzen", "rollen"],
+  sprecher: ["profil", "events", "themen", "kasse", "finanzen", "rollen"],
+  stv_sprecher: ["profil", "events", "themen", "kasse", "finanzen", "rollen"],
+};
+function reiterOrdnen<R extends { key: Tab }>(role: string | null | undefined, liste: R[]): R[] {
+  const ordnung = REITER_REIHENFOLGE[role ?? ""];
+  if (!ordnung) return liste;
+  const platz = (k: Tab) => (ordnung.includes(k) ? ordnung.indexOf(k) : ordnung.length);
+  return [...liste].sort((a, b) => platz(a.key) - platz(b.key));
+}
+
 function Main() {
   const { students, punkte, settings, ready, mode, reload, setTerm, setSettings, exportData, importData } = useStore();
   const { can, canEditData, canEditHilfen, canEditBeitrag, canManageRoles, isStaff, ready: roleReady, role, loginByStudent, userByStudent, studentId, tourResetAt } = useRole();
@@ -611,7 +632,7 @@ function Main() {
     setMax("");
   };
 
-  const navItems: { key: Tab; icon: IconName; label: string; badge?: number; show: boolean }[] = [
+  const navItems: { key: Tab; icon: IconName; label: string; badge?: number; show: boolean }[] = reiterOrdnen(role, [
     // Team mit eigenem Eintrag: die eigene Ansicht wie bei den Schülern.
     // Schüler sehen sie im Reiter „kasse“ – beides heißt „Übersicht“.
     // Die Zahl der Prüfaufgaben steht dort, wo „Zu erledigen“ steht: auf der
@@ -626,7 +647,7 @@ function Main() {
     // der Kassenwart 5 Reiter statt 6 (Apple: höchstens 5 am iPhone).
     { key: "finanzen", icon: "finanzen", label: "Finanzen", badge: offeneKosten, show: showFinanzen },
     { key: "rollen", icon: "rollen", label: "Rollen", show: rollenReiter },
-  ];
+  ]);
   // Über eine Adresse wie #finanzen kommt niemand in einen Reiter, der für ihn
   // nicht vorgesehen ist – `tab` zeigt dann die Kasse (siehe darfReiter oben).
 

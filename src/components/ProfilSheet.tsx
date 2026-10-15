@@ -152,6 +152,41 @@ export function ProfilSheet({
 
       {farbFehler && <div className="mt-3 rounded-xl bg-red-500/10 px-3 py-2 text-[13px] font-semibold text-fehler">{farbFehler}</div>}
 
+      {/* ------------------------------------------------ Verwaltung
+          Gleich unter dem eigenen Konto: Wer verwalten darf, braucht das
+          öfter als Darstellung und Mitteilungen (einmal eingestellt) – vorher
+          standen Funktionen, Freigaben und Protokoll unter dem Rand. */}
+      {verwaltung && (
+        <Gruppe titel="Verwaltung">
+          {darfFunktionen && <Zeile label="Funktionen" symbol={<Sym icon="auswahl" farbe="bg-brand" />} onClick={() => setFunktionenOffen(true)} />}
+          {darfFreigaben && <Zeile label="Freigaben" symbol={<Sym icon="stimme" farbe="bg-[#34C759]" />} onClick={() => setFreigabenOffen(true)} />}
+          {darfWortfilter && <Zeile label="Wortfilter" symbol={<Sym icon="schild" farbe="bg-[#FF3B30]" />} onClick={() => setWortfilterOffen(true)} />}
+        </Gruppe>
+      )}
+
+      {/* ------------------------------------------------ Daten (Admin, Kassenwart) */}
+      {daten && (
+        <Gruppe titel="Daten">
+          {istAdmin && <Zeile label="Protokoll & Sicherung" symbol={<Sym icon="beitraege" farbe="bg-[#8E8E93]" />} onClick={() => setProtokollOffen(true)} />}
+          {istKassenwart && <Zeile label="Sicherheitskopie" symbol={<Sym icon="beitraege" farbe="bg-[#8E8E93]" />} onClick={() => setProtokollOffen(true)} />}
+          {darfLoeschfristen && <Zeile label="Speicher & Löschen" symbol={<Sym icon="muell" farbe="bg-[#FF9500]" />} onClick={() => setLoeschOffen(true)} />}
+          {darfLoeschfristen && (
+            <Zeile
+              label="Update bei allen erzwingen"
+              symbol={<Sym icon="pfeile" farbe="bg-[#32ADE6]" />}
+              onClick={() =>
+                void frage("Alle offenen Apps jetzt neu laden?\n\nWer gerade tippt, wird erst danach neu geladen.", "Neu laden").then(async (ok) => {
+                  if (!ok) return;
+                  const f = await neuLadenErzwingen();
+                  if (f) meldeFehler("Ging nicht: " + f);
+                  else melde("Alle Apps laden jetzt neu");
+                })
+              }
+            />
+          )}
+        </Gruppe>
+      )}
+
       {/* ------------------------------------------------ Darstellung */}
       <Gruppe
         titel="Darstellung"
@@ -326,38 +361,6 @@ export function ProfilSheet({
             >
               {hatAntrag && <Wert>Angefragt</Wert>}
             </Zeile>
-          )}
-        </Gruppe>
-      )}
-
-      {/* ------------------------------------------------ Verwaltung */}
-      {verwaltung && (
-        <Gruppe titel="Verwaltung">
-          {darfFunktionen && <Zeile label="Funktionen" symbol={<Sym icon="auswahl" farbe="bg-brand" />} onClick={() => setFunktionenOffen(true)} />}
-          {darfFreigaben && <Zeile label="Freigaben" symbol={<Sym icon="stimme" farbe="bg-[#34C759]" />} onClick={() => setFreigabenOffen(true)} />}
-          {darfWortfilter && <Zeile label="Wortfilter" symbol={<Sym icon="schild" farbe="bg-[#FF3B30]" />} onClick={() => setWortfilterOffen(true)} />}
-        </Gruppe>
-      )}
-
-      {/* ------------------------------------------------ Daten (Admin, Kassenwart) */}
-      {daten && (
-        <Gruppe titel="Daten">
-          {istAdmin && <Zeile label="Protokoll & Sicherung" symbol={<Sym icon="beitraege" farbe="bg-[#8E8E93]" />} onClick={() => setProtokollOffen(true)} />}
-          {istKassenwart && <Zeile label="Sicherheitskopie" symbol={<Sym icon="beitraege" farbe="bg-[#8E8E93]" />} onClick={() => setProtokollOffen(true)} />}
-          {darfLoeschfristen && <Zeile label="Speicher & Löschen" symbol={<Sym icon="muell" farbe="bg-[#FF9500]" />} onClick={() => setLoeschOffen(true)} />}
-          {darfLoeschfristen && (
-            <Zeile
-              label="Update bei allen erzwingen"
-              symbol={<Sym icon="pfeile" farbe="bg-[#32ADE6]" />}
-              onClick={() =>
-                void frage("Alle offenen Apps jetzt neu laden?\n\nWer gerade tippt, wird erst danach neu geladen.", "Neu laden").then(async (ok) => {
-                  if (!ok) return;
-                  const f = await neuLadenErzwingen();
-                  if (f) meldeFehler("Ging nicht: " + f);
-                  else melde("Alle Apps laden jetzt neu");
-                })
-              }
-            />
           )}
         </Gruppe>
       )}

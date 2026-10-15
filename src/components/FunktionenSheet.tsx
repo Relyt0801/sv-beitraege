@@ -94,7 +94,7 @@ export function FunktionenSheet({ open, onClose }: { open: boolean; onClose: () 
     abiball: [],
     album: [{ l: "Steckbrief-Kategorien", f: "steckbrief", darf: Boolean(album) && can("album.kategorien") }],
     zitate: [{ l: "Lehrkräfte", f: "lehrer", darf: can("lehrer.verwalten") }],
-    rankings: [{ l: "Ranking-Kategorien & Lehrer", f: "rankings", darf: can("rankings.verwalten") || can("lehrer.verwalten") }],
+    rankings: [{ l: "Rankings verwalten", f: "rankings", darf: can("rankings.verwalten") || can("lehrer.verwalten") }],
     spotify: [],
     motto: [],
     umfragen: [{ l: "Umfragen verwalten", f: "umfragen", darf: can("umfragen.verwalten") || can("umfragen.ergebnisse") }],

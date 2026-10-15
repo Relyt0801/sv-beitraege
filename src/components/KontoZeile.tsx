@@ -56,7 +56,9 @@ export function KontoZeile({
         </div>
         <div className="mt-0.5 truncate text-[13px] leading-tight text-tinte-leise">
           {name ? (
-            `${profil.username} · ${rolleName(profil.role)}`
+            // Rolle zuerst: Sie ist hier das Wichtigste – wird es eng, wird
+            // höchstens der Login gekürzt, nicht „Stufenspr…“
+            `${rolleName(profil.role)} · ${profil.username}`
           ) : (
             <>
               {rolleName(profil.role)}
