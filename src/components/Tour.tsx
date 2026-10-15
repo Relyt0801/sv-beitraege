@@ -245,7 +245,7 @@ export function Tour({
       <div
         key={i}
         ref={karte}
-        className={`relative animate-aufsteigen rounded-[1.5rem] border border-white/40 bg-white/90 p-5 shadow-glas backdrop-blur-2xl backdrop-saturate-[1.8] dark:border-white/10 dark:bg-slate-900/90 ${
+        className={`relative animate-aufsteigen rounded-[1.5rem] border border-white/40 bg-white p-5 shadow-glas dark:border-white/10 dark:bg-slate-900 ${
           rect ? "" : "text-center"
         }`}
       >

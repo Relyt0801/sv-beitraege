@@ -363,8 +363,9 @@ function Wand({ wand, teil, gw, v, einreichen }: { wand: Zitatwand; teil: Teil; 
 
   return (
     <>
-      <div className="mb-3 flex items-center gap-2">
-        <div className="seg flex-1">
+      {/* Bei schmalen Handys umbrechen statt „Schüle/r“ */}
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <div className="seg min-w-[15rem] flex-1">
           {(
             [
               ["alle", "Alle"],
@@ -372,7 +373,7 @@ function Wand({ wand, teil, gw, v, einreichen }: { wand: Zitatwand; teil: Teil; 
               ["schueler", "Schüler"],
             ] as const
           ).map(([k, l]) => (
-            <button key={k} className={`seg-item ${filter === k ? "seg-aktiv" : ""}`} onClick={() => setFilter(k)}>
+            <button key={k} className={`seg-item whitespace-nowrap ${filter === k ? "seg-aktiv" : ""}`} onClick={() => setFilter(k)}>
               {l}
             </button>
           ))}

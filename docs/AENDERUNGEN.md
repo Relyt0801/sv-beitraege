@@ -12,6 +12,20 @@ ausführlich (auf Deutsch); hier steht der Überblick dazu.
 ---
 
 
+## 15.10.2026 (2): UX/UI-Prüfung und Überarbeitung (Branch `update-1-4`)
+
+Sechs simulierte Nutzer (Schülerin iPhone, Stufenteam kleine Handys, Admin Laptop/iPad, Eltern, Stresstest, Design-Prüfung) haben die App geprüft; danach wurde umgesetzt:
+- **Blätter**: Escape schließt nur das oberste; Kopf mit ✕ bleibt beim Scrollen sichtbar; Fußknöpfe kleben unten (`FussLeiste.tsx`, `BlattFuss`).
+- **Navigation**: 7 Reiter passen auch bei 360 px; Eltern-App mit derselben Glas-Reiterleiste; schwebendes „+“ beschriftet („Person“/„Neu“), am iPad/Laptop im Kopf; „Nachtragen“ immer beschriftet.
+- **Rückmeldungen**: Toasts unten über der Leiste, Offline-Kapsel verdeckt nichts mehr, Fehler beim Abstimmen/Ändern/Löschen werden gemeldet, „Erneut senden“ im Chat.
+- **Chats**: lange Links sprengen die Blase nicht mehr; Übersicht beginnt oben; „+“ in der Eingabezeile für Abstimmung/To-do/Anpinnen; Verschiebe-Anträge unter Chats → Anfragen.
+- **Abizeitung**: Kacheln der Startseite ganz antippbar; Begriffe vereinheitlicht („Runde“, „Gewinner der Herzen“, „Lehrkräfte“); Verschieben-Rückfrage nennt die nötigen Zustimmungen; Rankings springen nach der Stimme zur nächsten Kategorie.
+- **Events**: „Aktion mit Schichten“ direkt wählbar, 24-h-Zeitfeld mit Pausen-Vorschlägen, mehrere Schichten pro Tag, einheitliche Verben (Eintragen → Angemeldet → Eingeteilt).
+- **Verwaltung**: Passwort zurücksetzen sichtbar je Person; Funktionen mit einem Hauptschalter je Funktion; Beiträge-Reiter neu im iOS-Stil.
+- **Eltern**: Beträge eindeutig, Siezen durchgängig, Begriffe erklärt, „Aufschlag“ statt „Helferzuschuss“, feststehendes Motto als Karte.
+- **Leistung**: Lazy-Loading (`FaulLaden.tsx`), Start-Paket 374 → 215 kB (gzip); freundliche Meldung bei langsamem Netz.
+- **Profil**: Erscheinungsbild (Hell/Dunkel/Automatisch), „Was ist neu“ jederzeit aufrufbar.
+
 ## 15.10.2026: Update 1.4 (Vorschau-Branch `update-1-4`)
 
 - **Design-Grundlagen** (`index.css`, `Liste.tsx`, `Sheet.tsx`): weiße Zellen auf grauem Grund wie in den iOS-Einstellungen (Variable `--zelle`, Klasse `zelle`), Blätter mit grauem Grund, Eingabefelder als weiße Zellen mit Haarlinie. Graue 8-%-Flächen sind ersetzt.
