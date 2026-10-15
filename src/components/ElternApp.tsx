@@ -12,6 +12,7 @@ import { StaffelKacheln, StaffelRing } from "./Staffel";
 import { BeitragsListe } from "./BeitragsListe";
 import { TicketBereich } from "./AbiTicket";
 import { Icon, type IconName } from "./Icon";
+import { Symbol, Zeile } from "./Liste";
 import { ElternInfosTab } from "./ElternInfosTab";
 import { FinanzStandard } from "./FinanzStandard";
 import { KontoTab } from "./KontoTab";
@@ -30,6 +31,10 @@ type Reiter = "uebersicht" | "infos" | "finanzen" | "konto";
 // Titel = Name des Reiters (wie in der Schüler-App; vorher hieß „Übersicht“ oben „Stufenkasse“)
 const TITEL: Record<Reiter, string> = { uebersicht: "Übersicht", infos: "Infos", finanzen: "Finanzen der Stufe", konto: "Kontodaten" };
 const TOUR_MERKER = "sv:tour:v3:eltern";
+
+/** Die Begriffe der Halbjahre – steht einmal auf der Übersicht. */
+const HALBJAHRE_ERKLAERT =
+  "„erlassen“ heißt: muss nicht gezahlt werden. „später“: kommt erst in einem späteren Halbjahr dran. EF ist die Einführungsphase (Klasse 11), Q1 und Q2 sind die beiden Qualifikationsjahre (Klasse 12 und 13) – die Zahl dahinter (.1 / .2) ist das Halbjahr.";
 
 /**
  * Die ganze App, wie Eltern sie sehen.
@@ -54,7 +59,7 @@ export function ElternApp() {
   const titelWeg = useGescrollt(44);
   const breit = useBreit();
   const { students, contributions, settings, ready, reload } = useStore();
-  const { bereit, ungelesen, kinder: zugeordnet, zuordnungFehlt } = useEltern();
+  const { bereit, ungelesen, ungelesenIds, infos, infosNeu, infosGesehen, infosGelesen, kinder: zugeordnet, zuordnungFehlt } = useEltern();
   // Fehlt die Zuordnung wegen eines Ladefehlers, gilt, was die Datenbank an
   // Personen herausgibt – die liefert Eltern ohnehin nur ihre Kinder.
   const kinderIds = useMemo(
@@ -75,7 +80,24 @@ export function ElternApp() {
   const ohneKind = bereit && kinderIds.length === 0;
   const laedt = !ready || !bereit;
 
-  useEffect(() => appZaehler(ohneKind ? 0 : ungelesen || 0), [ungelesen, ohneKind]);
+  // Zahl am App-Symbol und am Reiter „Infos“: neue Antworten UND neue Infos
+  // vom Stufenteam (vorher zählten nur Antworten – eine neue Info sah niemand)
+  const neuInInfos = (ungelesen || 0) + infosNeu;
+  useEffect(() => appZaehler(ohneKind ? 0 : neuInInfos), [neuInInfos, ohneKind]);
+  // Wer den Reiter „Infos“ öffnet, hat die neuen Infos gesehen
+  useEffect(() => {
+    if (reiter === "infos" && infosNeu > 0) infosGelesen();
+  }, [reiter, infosNeu, infosGelesen]);
+  // „Antwort vom Stufenteam“ auf der Übersicht öffnet gleich dieses Gespräch
+  const [infosStart, setInfosStart] = useState<string | null>(null);
+  useEffect(() => {
+    if (reiter !== "infos") setInfosStart(null);
+  }, [reiter]);
+  // Die neuesten ungesehenen Infos für die Zeile „Neu“ auf der Übersicht
+  const neueInfos = useMemo(() => {
+    const ab = Date.parse(infosGesehen) || 0;
+    return infos.filter((i) => Date.parse(i.created_at) > ab).sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
+  }, [infos, infosGesehen]);
 
   // Ordnet der Admin ein Kind zu oder nimmt es weg, liefert die Datenbank
   // danach andere Personen. Dann einmal neu laden – ohne dass die Eltern
@@ -119,10 +141,12 @@ export function ElternApp() {
   }, [kinder]);
 
   const familieOffen = kinder.reduce((n, k) => n + basisOffen(k, settings.aktuelles_halbjahr, settings), 0);
+  const mehrere = kinder.length > 1;
+  const hatNeues = neueInfos.length > 0 || ungelesen > 0;
 
   const NAV: { key: Reiter; label: string; icon: IconName; zahl?: number }[] = [
     { key: "uebersicht", label: "Übersicht", icon: "haus" },
-    { key: "infos", label: "Infos", icon: "pin", zahl: ungelesen },
+    { key: "infos", label: "Infos", icon: "pin", zahl: neuInInfos },
     // Standard-Ansicht der Finanzen: nur Summen, keine Namen
     ...(can("finanzen.basis") ? [{ key: "finanzen" as const, label: "Finanzen", icon: "finanzen" as const }] : []),
     { key: "konto", label: "Konto", icon: "bank" },
@@ -131,7 +155,9 @@ export function ElternApp() {
   // ------------------------------------------------ Kein Kind: nichts zeigen
   if (ohneKind)
     return (
-      <div className="flex min-h-dvh flex-col bg-papier px-5 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] pt-[calc(env(safe-area-inset-top)+1rem)] dark:bg-slate-950">
+      // Kein eigener Grund: ohne Bild malt body die Papierfarbe, mit Bild
+      // steht alles auf dem Foto (Texte mit auf-bild, Flächen deckend)
+      <div className="flex min-h-dvh flex-col px-5 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] pt-[calc(env(safe-area-inset-top)+1rem)]">
         <div className="flex justify-end">
           <button className="iconbtn" onClick={toggle} aria-label={theme === "dark" ? "Helles Design" : "Dunkles Design"}>
             <Icon name={theme === "dark" ? "sonne" : "mond"} size={19} />
@@ -141,8 +167,8 @@ export function ElternApp() {
           <div className="flex h-20 w-20 items-center justify-center rounded-[1.4rem] bg-white text-tinte-leise shadow-card dark:bg-slate-900">
             <Icon name="kind" size={38} strich={1.6} />
           </div>
-          <h1 className="mt-6 text-[1.75rem] font-bold leading-tight tracking-[-0.02em]">Noch kein Kind verknüpft</h1>
-          <p className="mt-3 text-[16px] leading-relaxed text-tinte-matt dark:text-slate-300">
+          <h1 className="auf-bild mt-6 text-[1.75rem] font-bold leading-tight tracking-[-0.02em]">Noch kein Kind verknüpft</h1>
+          <p className="auf-bild mt-3 text-[16px] leading-relaxed text-tinte-matt dark:text-slate-300">
             Sobald das Stufenteam Ihren Zugang mit Ihrem Kind verknüpft, sehen Sie hier Beiträge, Mithilfe und
             Kontodaten. Das erscheint von selbst – Sie müssen nichts neu laden.
           </p>
@@ -154,20 +180,24 @@ export function ElternApp() {
             </p>
           </div>
         </div>
-        <div className="mx-auto grid w-full max-w-sm gap-2">
-          <button className="btn-grau" onClick={() => setProfilOffen(true)}>
-            Passwort & Einstellungen
-          </button>
-          <button className="btn-grau !text-red-600 dark:!text-red-400" onClick={() => void frage("Wirklich abmelden?", "Abmelden", true).then((ok) => { if (ok) void abmelden(); })}>
-            Abmelden
-          </button>
+        {/* Wie in iOS: eine deckende Gruppe aus Zeilen statt zweier grauer
+            (durchscheinender) Knöpfe */}
+        <div className="gruppe-zellen mx-auto w-full max-w-sm">
+          <Zeile label="Passwort & Einstellungen" onClick={() => setProfilOffen(true)} />
+          <Zeile
+            label="Abmelden"
+            rot
+            onClick={() => void frage("Wirklich abmelden?", "Abmelden", true).then((ok) => { if (ok) void abmelden(); })}
+          />
         </div>
         <ProfilSheet open={profilOffen} onClose={() => setProfilOffen(false)} />
       </div>
     );
 
   return (
-    <div className="min-h-dvh bg-papier pb-32 dark:bg-slate-950 lg:pb-10">
+    // Kein eigener Grund (vorher bg-papier): der verdeckte das eigene
+    // Hintergrundbild. Ohne Bild malt body dieselbe Farbe.
+    <div className="min-h-dvh pb-32 lg:pb-10">
       {/* Das feststehende Abimotto sehen auch Eltern einmal groß */}
       <MottoEnthuellung />
       <header
@@ -178,14 +208,18 @@ export function ElternApp() {
         <div className="mx-auto flex max-w-5xl items-center gap-2.5">
           {/* Wie in der Schüler-App: am Rechner steht der Titel fest hier oben
               (vorher sprang der große Titel je Reiter zwischen zwei Breiten) */}
-          <h2
-            aria-hidden={!titelWeg && !breit}
+          {/* Am Rechner die einzige Seitenüberschrift (h1), am Handy nur die
+              kleine Wiederholung des großen Titels – dort für Vorlesehilfen aus */}
+          <div
+            role={breit ? "heading" : undefined}
+            aria-level={breit ? 1 : undefined}
+            aria-hidden={breit ? undefined : true}
             className={`min-w-0 flex-1 truncate text-[17px] font-semibold tracking-[-0.01em] transition-[opacity,transform,visibility] duration-300 ease-ios lg:visible lg:translate-y-0 lg:font-zahl lg:text-[1.625rem] lg:font-bold lg:tracking-[-0.025em] lg:opacity-100 ${
               titelWeg ? "visible translate-y-0 opacity-100" : "invisible translate-y-1 opacity-0"
             } ${gescrollt ? "" : "auf-bild"}`}
           >
             {TITEL[reiter]}
-          </h2>
+          </div>
           <button className="iconbtn" onClick={toggle} aria-label={theme === "dark" ? "Helles Design" : "Dunkles Design"}>
             <Icon name={theme === "dark" ? "sonne" : "mond"} size={19} />
           </button>
@@ -194,14 +228,17 @@ export function ElternApp() {
             onClick={() => setProfilOffen(true)}
             aria-label={`Ihr Zugang – ${familienName}`}
             title="Ihr Zugang"
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-500 text-[14px] font-semibold text-white ring-2 ring-white transition active:scale-90 dark:ring-slate-900"
+            // Tippfläche 44 px wie in der Schüler-App, der runde Knopf bleibt 40 px
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition active:scale-90"
           >
-            {familienKuerzel}
+            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-500 text-[14px] font-semibold text-white ring-2 ring-white dark:ring-slate-900">
+              {familienKuerzel}
+            </span>
           </button>
         </div>
 
         {/* Am Rechner: schwebende Reiterleiste oben, auf dem Handy unten. */}
-        <nav className="glas mx-auto mt-2 hidden w-fit max-w-full rounded-full border border-black/[0.06] p-1 shadow-glas dark:border-white/10 lg:flex">
+        <nav className="glas mx-auto mt-2 hidden w-fit max-w-full rounded-full border border-black/[0.06] !bg-[rgb(var(--glas))] p-1 shadow-glas dark:border-white/10 lg:flex">
           <GlasLeiste
             variante="oben"
             aktiv={reiter}
@@ -227,50 +264,106 @@ export function ElternApp() {
             <SkelettKarten n={2} gross />
           ) : (
             <div key="uebersicht" className="grid animate-fadeIn gap-5">
-              {/* Erst die Summe für die ganze Familie, dann jedes Kind einzeln. */}
-              <section className="leitkarte sm:flex sm:items-end sm:justify-between sm:gap-6" data-tour="familie-offen">
-                <div className="min-w-0">
-                  <div className="text-[13px] font-medium text-white/60">
-                    {kinder.length > 1 ? "Offen für Ihre Kinder zusammen" : kinder[0] ? `Noch offen für ${kinder[0].vorname}` : "Noch offen"}
+              {/* Oben, was Eltern beim seltenen Öffnen wissen wollen: was offen
+                  ist (und wohin damit) und was es Neues gibt. Am Rechner stehen
+                  beide nebeneinander, das spart eine ganze Zeile. */}
+              <div className={hatNeues ? "grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]" : ""}>
+                <section className="leitkarte sm:flex sm:items-end sm:justify-between sm:gap-6" data-tour="familie-offen">
+                  <div className="min-w-0">
+                    <div className="text-[13px] font-medium text-white/60">
+                      {mehrere ? "Offen für Ihre Kinder zusammen" : kinder[0] ? `Noch offen für ${kinder[0].vorname}` : "Noch offen"}
+                    </div>
+                    <div className="mt-1.5 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                      <span className={`leitwert ${familieOffen > 0 ? "text-white" : "text-[#30D158]"}`}>{familieOffen} €</span>
+                      <span className="text-[14px] text-white/60">
+                        {familieOffen > 0
+                          ? mehrere
+                            ? // Je Kind der eigene Betrag – überwiesen wird ja je Kind
+                              `${kinder.map((k) => `${k.vorname} ${basisOffen(k, settings.aktuelles_halbjahr, settings)} €`).join(" · ")} – bitte je Kind einzeln überweisen`
+                            : ""
+                          : "Alles bezahlt. Danke!"}
+                      </span>
+                    </div>
                   </div>
-                  <div className="mt-1.5 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                    <span className={`leitwert ${familieOffen > 0 ? "text-white" : "text-[#30D158]"}`}>{familieOffen} €</span>
-                    <span className="text-[14px] text-white/60">
-                      {familieOffen > 0 ? (kinder.length > 1 ? "insgesamt – bitte je Kind einzeln überweisen" : "") : "Alles bezahlt. Danke!"}
-                    </span>
-                  </div>
-                </div>
-                {familieOffen > 0 && (
-                  <button
-                    onClick={() => setReiter("konto")}
-                    className="mt-4 flex h-11 w-full shrink-0 items-center justify-center gap-1.5 rounded-full bg-white px-5 text-[15px] font-semibold text-[#1c1c1e] transition active:scale-[.97] sm:mt-0 sm:w-auto"
-                  >
-                    Jetzt überweisen
-                    <Icon name="chevron" size={16} strich={2.4} />
-                  </button>
+                  {familieOffen > 0 && (
+                    <button
+                      onClick={() => setReiter("konto")}
+                      className="mt-4 flex h-11 w-full shrink-0 items-center justify-center gap-1.5 rounded-full bg-white px-5 text-[15px] font-semibold text-[#1c1c1e] transition active:scale-[.97] sm:mt-0 sm:w-auto"
+                    >
+                      Jetzt überweisen
+                      <Icon name="chevron" size={16} strich={2.4} />
+                    </button>
+                  )}
+                </section>
+
+                {/* Neu vom Stufenteam: Info oder Antwort – ein Tipp öffnet „Infos“ */}
+                {hatNeues && (
+                  <nav aria-label="Neu für Sie" className="gruppe-zellen flex flex-col justify-center">
+                    {neueInfos.length > 0 && (
+                      <Zeile
+                        symbol={
+                          <Symbol farbe="bg-brand">
+                            <Icon name="pin" size={16} strich={2.2} />
+                          </Symbol>
+                        }
+                        label={<span className="font-semibold">{neueInfos[0].titel}</span>}
+                        unter={
+                          neueInfos.length > 1
+                            ? `${neueInfos.length} neue Infos vom Stufenteam`
+                            : `Neu vom Stufenteam · ${new Date(neueInfos[0].created_at).toLocaleDateString("de-DE", { day: "numeric", month: "short" })}`
+                        }
+                        onClick={() => setReiter("infos")}
+                      />
+                    )}
+                    {ungelesen > 0 && (
+                      <Zeile
+                        symbol={
+                          <Symbol farbe="bg-emerald-500">
+                            <Icon name="chats" size={16} strich={2.2} />
+                          </Symbol>
+                        }
+                        label={<span className="font-semibold">{ungelesen === 1 ? "Antwort vom Stufenteam" : `${ungelesen} Antworten vom Stufenteam`}</span>}
+                        unter="Auf Ihre Frage ans Stufenteam"
+                        onClick={() => {
+                          setInfosStart(ungelesenIds[0] ?? null);
+                          setReiter("infos");
+                        }}
+                      />
+                    )}
+                  </nav>
                 )}
-              </section>
+              </div>
 
-              {/* Feststehendes Abimotto – antippen spielt die Enthüllung noch einmal ab */}
+              {/* Jedes Kind einzeln. Ab dem iPad stehen Geschwister nebeneinander
+                  (vorher kam das zweite Kind erst nach 1,5 Bildschirmen); im
+                  iPad hoch ist jede Spalte so breit wie ein iPhone. */}
+              <div className={mehrere ? "grid grid-cols-1 gap-5 md:grid-cols-2 md:items-start" : "grid gap-5"}>
+                {kinder.map((kind, i) => (
+                  <KindKarte
+                    key={kind.id}
+                    kind={kind}
+                    erstes={i === 0}
+                    einzeln={!mehrere}
+                    punkte={punkte[kind.id] || 0}
+                    eintraege={contributions
+                      .filter((c) => c.student_id === kind.id)
+                      .sort((a, b) => (a.datum < b.datum ? 1 : -1))}
+                  />
+                ))}
+              </div>
+
+              {/* Begriffe einmal erklärt – bei Geschwistern nicht bei jedem Kind */}
+              {mehrere && <p className="auf-bild -mt-2 px-1 text-[12px] leading-relaxed text-tinte-leise">{HALBJAHRE_ERKLAERT}</p>}
+
+              {/* Feststehendes Abimotto – antippen spielt die Enthüllung noch
+                  einmal ab. Schön, aber selten gebraucht: darum unter den Kindern. */}
               <MottoFeststehend />
-
-              {kinder.map((kind, i) => (
-                <KindKarte
-                  key={kind.id}
-                  kind={kind}
-                  erstes={i === 0}
-                  punkte={punkte[kind.id] || 0}
-                  eintraege={contributions
-                    .filter((c) => c.student_id === kind.id)
-                    .sort((a, b) => (a.datum < b.datum ? 1 : -1))}
-                />
-              ))}
             </div>
           ))}
 
         {reiter === "infos" && (
           <div key="infos" className="mx-auto max-w-3xl animate-fadeIn lg:max-w-5xl">
-            <ElternInfosTab />
+            <ElternInfosTab startGespraech={infosStart} />
           </div>
         )}
         {reiter === "finanzen" && (
@@ -287,7 +380,7 @@ export function ElternApp() {
 
       {/* Reiterleiste wie in der Schüler-App: schwebende Glas-Kapsel (GlasLeiste) */}
       <nav className="pointer-events-none fixed inset-x-0 bottom-0 z-20 px-3 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] lg:hidden">
-        <div className="pointer-events-auto mx-auto max-w-md rounded-[2rem] border border-white/60 p-1 shadow-[0_8px_32px_-8px_rgba(0,0,0,.28),0_0_0_.5px_rgba(0,0,0,.08)] glas !bg-[rgb(var(--glas)/0.92)] dark:border-white/10 dark:shadow-[0_8px_32px_-8px_rgba(0,0,0,.8),0_0_0_.5px_rgba(255,255,255,.08)]">
+        <div className="pointer-events-auto mx-auto max-w-md rounded-[2rem] border border-white/60 p-1 shadow-[0_8px_32px_-8px_rgba(0,0,0,.28),0_0_0_.5px_rgba(0,0,0,.08)] glas !bg-[rgb(var(--glas))] dark:border-white/10 dark:shadow-[0_8px_32px_-8px_rgba(0,0,0,.8),0_0_0_.5px_rgba(255,255,255,.08)]">
           <GlasLeiste
             variante="unten"
             aktiv={reiter}
@@ -331,33 +424,42 @@ export function ElternApp() {
   );
 }
 
-/** Ein Kind: offener Betrag, Prozentstand, Ticketpreis und die Liste der Beiträge. */
+/**
+ * Ein Kind: offener Betrag, Ticket und Mithilfe (mit der Liste, wobei es
+ * geholfen hat). Bei nur einem Kind am Rechner zweispaltig: Halbjahre neben
+ * Mithilfe, darunter das Ticket über die volle Breite. Bei Geschwistern ist
+ * jedes Kind eine Spalte (ElternApp).
+ */
 function KindKarte({
   kind,
   punkte,
   eintraege,
   erstes,
+  einzeln,
 }: {
   kind: import("../lib/types").Student;
   punkte: number;
   eintraege: import("../lib/types").Contribution[];
   /** Nur am ersten Kind hängen die Anker für die Einführung. */
   erstes: boolean;
+  /** Das einzige Kind: am Rechner zweispaltig, Begriffe in der Halbjahr-Karte */
+  einzeln: boolean;
 }) {
   const { settings } = useStore();
   const offen = basisOffen(kind, settings.aktuelles_halbjahr, settings);
   const pct = prozentVon(punkte, settings);
 
   return (
-    <div className="grid gap-3">
-      <div className="flex items-baseline gap-2 px-1 pt-1">
-        <h2 className="font-zahl text-[1.375rem] font-bold tracking-[-0.02em]">
-          {kind.vorname} {kind.nachname}
-        </h2>
-      </div>
+    <div className={`grid grid-cols-1 gap-3 ${einzeln ? "lg:grid-cols-2" : ""}`}>
+      <h2 className={`auf-bild px-1 pt-1 font-zahl text-[1.375rem] font-bold tracking-[-0.02em] ${einzeln ? "lg:col-span-2" : ""}`}>
+        {kind.vorname} {kind.nachname}
+      </h2>
 
       {/* Halbjahre und Betrag dieses Kindes */}
-      <section className="card p-4 sm:p-5" data-tour={erstes ? "kind-halbjahre" : undefined}>
+      <section
+        className={`card p-4 sm:p-5 ${einzeln ? "lg:col-start-1 lg:row-start-2" : ""}`}
+        data-tour={erstes ? "kind-halbjahre" : undefined}
+      >
         <div className="flex items-baseline justify-between gap-2">
           <div className="text-[15px] font-semibold">Halbjahre</div>
           <div className="text-[14px]">
@@ -379,36 +481,51 @@ function KindKarte({
           ))}
         </div>
         <HalbjahrLegende />
-        <p className="mt-3 text-[12px] leading-relaxed text-tinte-leise">
-          „erlassen“ heißt: muss nicht gezahlt werden. „später fällig“: kommt erst in einem späteren Halbjahr dran.
-          EF ist die Einführungsphase (Klasse 11), Q1 und Q2 sind die beiden Qualifikationsjahre (Klasse 12 und 13) –
-          die Zahl dahinter (.1 / .2) ist das Halbjahr.
-        </p>
+        {einzeln && <p className="mt-3 text-[12px] leading-relaxed text-tinte-leise">{HALBJAHRE_ERKLAERT}</p>}
       </section>
 
       {/* Abiball-Ticket: Preis, Bestellungen des Kindes, überweisen */}
-      <TicketBereich student={kind} settings={settings} prozent={pct} fuerEltern />
+      <TicketBereich
+        student={kind}
+        settings={settings}
+        prozent={pct}
+        fuerEltern
+        // Das Gäste-Ticket hängt nicht vom Kind ab – nur beim ersten zeigen
+        ohneGaeste={!erstes}
+        // Geschwister stehen ab iPad je in einer halben Spalte: dort passen
+        // Tickets und Kasse nicht nebeneinander (die Tickets wurden bei
+        // laufendem Verkauf auf ein Drittel gequetscht) – also untereinander.
+        eineSpalte={!einzeln}
+        className={einzeln ? "lg:col-span-2 lg:row-start-3" : ""}
+      />
 
-      <div className="grid items-start gap-3 lg:grid-cols-2">
-        {/* Prozentstand */}
-        <section className="card p-5" data-tour={erstes ? "kind-prozent" : undefined}>
-          <div className="text-[15px] font-semibold">Mithilfe bei Aktionen</div>
-          <div className="mt-3 flex items-center gap-4">
-            <StaffelRing pct={pct} settings={settings} />
-            <div className="min-w-0 flex-1 text-[14px] leading-relaxed text-tinte-matt dark:text-slate-300">
-              Mithilfe macht das 1. Abiball-Ticket Ihres Kindes günstiger.
-            </div>
+      {/* Mithilfe: Prozentstand, Staffel und – falls schon etwas eingetragen
+          ist – wobei das Kind geholfen hat. Vorher eine eigene Karte, die
+          meist nur „Noch nichts eingetragen.“ zeigte. */}
+      <section
+        className={`card p-5 ${einzeln ? "lg:col-start-2 lg:row-start-2" : ""}`}
+        data-tour={erstes ? "kind-prozent" : undefined}
+      >
+        <div className="text-[15px] font-semibold">Mithilfe bei Aktionen</div>
+        <div className="mt-3 flex items-center gap-4">
+          <StaffelRing pct={pct} settings={settings} />
+          <div className="min-w-0 flex-1 text-[14px] leading-relaxed text-tinte-matt dark:text-slate-300">
+            {eintraege.length
+              ? "Mithilfe macht das 1. Abiball-Ticket Ihres Kindes günstiger."
+              : `Noch keine Mithilfe von ${kind.vorname} eingetragen – jede Aktion macht das 1. Abiball-Ticket günstiger.`}
           </div>
+        </div>
 
-          {/* Die Staffel zum Nachsehen: ab wie viel Prozent kostet das Ticket wie viel extra */}
-          <StaffelKacheln pct={pct} settings={settings} />
-        </section>
+        {/* Die Staffel zum Nachsehen: ab wie viel Prozent kostet das Ticket wie viel extra */}
+        <StaffelKacheln pct={pct} settings={settings} />
 
-        <section className="card p-5">
-          <div className="text-[15px] font-semibold">Wobei {kind.vorname} geholfen hat</div>
-          <BeitragsListe eintraege={eintraege} leerText="Noch nichts eingetragen." />
-        </section>
-      </div>
+        {eintraege.length > 0 && (
+          <>
+            <h3 className="mt-5 text-[13px] font-semibold">Wobei {kind.vorname} geholfen hat</h3>
+            <BeitragsListe eintraege={eintraege} leerText="Noch nichts eingetragen." />
+          </>
+        )}
+      </section>
     </div>
   );
 }

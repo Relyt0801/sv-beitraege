@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Sheet, SheetKopf } from "./Sheet";
+import { SchliessenKnopf, Sheet, SheetKopf, ZurueckKnopf, useBlattKopf } from "./Sheet";
 import { Gruppe, Zeile } from "./Liste";
 import { Schalter } from "./Schalter";
 import { useRole } from "../auth/RoleProvider";
@@ -18,6 +18,7 @@ import { frage, melde, meldeFehler } from "../lib/melder";
 import { useFunktionen } from "../lib/funktionen";
 import { LiedSuche, SpotifyKarte, ohneLink, spotifyAus } from "./Spotify";
 import { FarbKarte, FussLeiste, KleinerRing, KnopfGlas, KnopfHell } from "./Kachel";
+import { FussLeiste as FussLeisteBlatt } from "./FussLeiste";
 import { WortfilterSchalter } from "./AutorInfo";
 import { TeilMarke, TeilUmschalter, useVerschiebenRueckfrage } from "./TeilUmschalter";
 import { TEIL_NAME, useTeil, useVerschiebungen, type Teil } from "../lib/teile";
@@ -125,7 +126,7 @@ function Herz({ an, n, onClick, klein }: { an: boolean; n: number; onClick: () =
       aria-label={an ? "Gefällt mir nicht mehr" : "Gefällt mir"}
       aria-pressed={an}
       // Tippfläche mindestens 44 × 44 px, auch wenn das Symbol klein bleibt
-      className={`flex min-h-[44px] min-w-[44px] items-center justify-center gap-1 ${klein ? "flex-col gap-0 self-start text-[11px]" : "text-[14px]"} font-semibold transition active:scale-90 ${
+      className={`flex min-h-[44px] min-w-[44px] items-center justify-center gap-1 ${klein ? "flex-col gap-0 self-start text-[12px]" : "text-[14px]"} font-semibold transition active:scale-90 ${
         an ? "text-[#FF2D55]" : "text-tinte-leise"
       }`}
     >
@@ -164,7 +165,10 @@ export function AlbumKarte({ className = "" }: { className?: string }) {
   if (!album || !can("album.nutzen")) return null;
   const mein = studentId ? album.steckbriefVon(studentId) : undefined;
   const prozent = fortschritt(mein, album.kategorien);
-  const fertige = album.steckbriefe.filter((s) => fortschritt(s, album.kategorien) >= 50).length;
+  // Gezählt wird ab 50 % – die Bläschen zeigen genau diese Personen (vorher
+  // standen fünf beliebige Personen neben „0 Steckbriefe“)
+  const fertigeListe = album.steckbriefe.filter((s) => fortschritt(s, album.kategorien) >= 50);
+  const fertige = fertigeListe.length;
   const meineLikes = studentId ? album.likes.filter((l) => l.student_id === studentId).length : 0;
   const meineKommentare = studentId ? album.kommentare.filter((k) => k.student_id === studentId).length : 0;
   const wartend = album.steckbriefe.filter(
@@ -172,7 +176,7 @@ export function AlbumKarte({ className = "" }: { className?: string }) {
   );
   const offeneFreigaben = wartend.length;
 
-  const vorschau = album.personen.slice(0, 5);
+  const vorschau = fertigeListe.slice(0, 5).map((s) => s.student_id);
   const oeffne = (detail: string | null) => window.dispatchEvent(new CustomEvent("sv:album", { detail }));
 
   return (
@@ -220,11 +224,13 @@ export function AlbumKarte({ className = "" }: { className?: string }) {
           <span>❤ {meineLikes}</span>
           <span>💬 {meineKommentare}</span>
           <span className="flex items-center">
-            <span className="mr-1.5 flex -space-x-2">
-              {vorschau.map((p) => (
-                <span key={p.id} className={`h-5 w-5 rounded-full bg-gradient-to-br ring-2 ring-[#E8264F] ${personVerlauf(p.id)}`} />
-              ))}
-            </span>
+            {vorschau.length > 0 && (
+              <span className="mr-1.5 flex -space-x-2">
+                {vorschau.map((id) => (
+                  <span key={id} className={`h-5 w-5 rounded-full bg-gradient-to-br ring-2 ring-[#E8264F] ${personVerlauf(id)}`} />
+                ))}
+              </span>
+            )}
             {fertige} {fertige === 1 ? "Steckbrief" : "Steckbriefe"}
           </span>
         </div>
@@ -245,7 +251,8 @@ export function AlbumSheet({ open, start, album, onClose }: { open: boolean; sta
   const [nurFuerMich, setNurFuerMich] = useState(false);
 
   useEffect(() => {
-    if (!open) return;
+    // Zu (auch von außen): keine Unterseite für das nächste Öffnen stehen lassen
+    if (!open) return setKategorienOffen(false);
     setNurFuerMich(false);
     if (start === "__mein__" && studentId) setAnsicht({ art: "mein" });
     else if (start === "__fuer_mich__") {
@@ -260,7 +267,8 @@ export function AlbumSheet({ open, start, album, onClose }: { open: boolean; sta
 
   return (
     <>
-      <Sheet open={open && !kategorienOffen} onClose={onClose}>
+      {/* Bleibt offen unter „Steckbrief-Kategorien“ (Unterseite mit „‹ Abi-Album“) */}
+      <Sheet hoch open={open} onClose={onClose}>
         {ansicht.art === "person" ? (
           <SteckbriefAnsicht
             album={album}
@@ -272,9 +280,9 @@ export function AlbumSheet({ open, start, album, onClose }: { open: boolean; sta
             onClose={onClose}
           />
         ) : ansicht.art === "korrigieren" ? (
-          <KorrigierenAnsicht album={album} id={ansicht.id} fertig={() => setAnsicht({ art: "person", id: ansicht.id })} />
+          <KorrigierenAnsicht album={album} id={ansicht.id} fertig={() => setAnsicht({ art: "person", id: ansicht.id })} onClose={onClose} />
         ) : ansicht.art === "schreiben" ? (
-          <TextFuerAndere album={album} id={ansicht.id} fertig={() => setAnsicht({ art: "person", id: ansicht.id })} />
+          <TextFuerAndere album={album} id={ansicht.id} fertig={() => setAnsicht({ art: "person", id: ansicht.id })} onClose={onClose} />
         ) : (
           <>
             <SheetKopf
@@ -428,7 +436,7 @@ function AlleSteckbriefe({
                 <PolaroidBild p={p} />
                 {pr === 0 && <span className="absolute inset-0 bg-white/45 dark:bg-slate-900/50" />}
                 {fuerMich && (
-                  <span className="absolute left-1.5 top-1.5 rounded-full bg-white/95 px-2 py-0.5 text-[11px] font-bold text-[#D70040] shadow-sm">✍️ für dich</span>
+                  <span className="absolute left-1.5 top-1.5 rounded-full bg-white/95 px-2 py-0.5 text-[12px] font-bold text-[#D70040] shadow-sm">✍️ für dich</span>
                 )}
               </span>
               <span className="mt-2 block truncate font-buch text-[15px] font-semibold italic leading-tight">
@@ -501,6 +509,8 @@ function SteckbriefAnsicht({
   const [sendet, setSendet] = useState(false);
   const ende = useRef<HTMLDivElement | null>(null);
   const meinName = studentId ? kurzName(album.personen.find((x) => x.id === studentId) || { vorname: "Ich", nachname: "" }) : "Stufenteam";
+  // Als Kopf im Blatt anmelden: ein Blatt darüber (z. B. Melden) zeigt „‹ Name“
+  const blattLage = useBlattKopf(p ? `${p.vorname} ${p.nachname}` : undefined);
 
   if (!p) return <p className="py-10 text-center text-[14px] text-tinte-leise">Nicht gefunden.</p>;
   const felder = album.kategorien.filter((k) => k.aktiv && (s?.stammdaten[k.id] || "").trim());
@@ -519,18 +529,14 @@ function SteckbriefAnsicht({
 
   return (
     <div className="animate-vonRechts">
-      {/* Kopf mit Farbe der Person */}
-      <div className="mb-3 flex items-center justify-between">
-        <button onClick={zurueck} className="py-1 text-[16px] font-semibold text-brand">
-          ‹ Album
-        </button>
-        <button onClick={onClose} aria-label="Schließen" className="flex h-[30px] w-[30px] items-center justify-center rounded-full bg-[rgb(118_118_128/0.12)] text-[13px] font-bold text-tinte-leise dark:bg-[rgb(118_118_128/0.24)]">
-          ✕
-        </button>
+      {/* Kopf wie überall: „‹ Abi-Album“ links, ✕ rechts – klebt beim Scrollen */}
+      <div className="sticky top-0 z-10 -mx-5 mb-1 flex items-center justify-between gap-3 bg-papier px-5 pb-1 pt-0.5 shadow-[0_-24px_0_0_rgb(var(--papier))] dark:bg-slate-900 dark:shadow-[0_-24px_0_0_#1C1C1E]">
+        <ZurueckKnopf text="Abi-Album" onClick={zurueck} />
+        <SchliessenKnopf onClick={onClose} className="-mr-1.5" />
       </div>
       <div className="flex flex-col items-center text-center">
         <Bild p={p} gross />
-        <h2 className="mt-2 font-buch text-[1.7rem] font-semibold italic leading-tight">
+        <h2 id={blattLage?.titelId} className="mt-2 font-buch text-[1.7rem] font-semibold italic leading-tight">
           {p.vorname} {p.nachname}
         </h2>
         <div className="mt-2 flex items-center gap-4">
@@ -710,7 +716,7 @@ function SteckbriefAnsicht({
 }
 
 /* ---------------------------------------------------------------- Text für andere schreiben */
-function TextFuerAndere({ album, id, fertig }: { album: Album; id: string; fertig: () => void }) {
+function TextFuerAndere({ album, id, fertig, onClose }: { album: Album; id: string; fertig: () => void; onClose: () => void }) {
   const { studentId } = useRole();
   const p = album.personen.find((x) => x.id === id);
   const s = album.steckbriefVon(id);
@@ -720,7 +726,12 @@ function TextFuerAndere({ album, id, fertig }: { album: Album; id: string; ferti
   if (!p) return null;
   return (
     <div className="animate-vonRechts">
-      <SheetKopf titel={`Text für ${p.vorname}`} unter="Nur der Text – Stammdaten bleiben bei der Person." onClose={fertig} />
+      <SheetKopf
+        titel={`Text für ${p.vorname}`}
+        unter="Nur der Text – Stammdaten bleiben bei der Person."
+        zurueck={{ text: `${p.vorname} ${p.nachname}`, onClick: fertig }}
+        onClose={onClose}
+      />
       <TextFeld wert={text} setzen={setText} platzhalter={`Was macht ${p.vorname} aus? Eine Geschichte, ein Moment, was ihr zusammen erlebt habt …`} />
       <button
         disabled={busy}
@@ -787,7 +798,7 @@ function BearbeitetInfo({ s, className = "" }: { s: Steckbrief; className?: stri
 }
 
 /* ---------------------------------------------------------------- Korrigieren (Abizeitung) */
-function KorrigierenAnsicht({ album, id, fertig }: { album: Album; id: string; fertig: () => void }) {
+function KorrigierenAnsicht({ album, id, fertig, onClose }: { album: Album; id: string; fertig: () => void; onClose: () => void }) {
   const p = album.personen.find((x) => x.id === id);
   const s = album.steckbriefVon(id);
   const kat = album.kategorien.filter((k) => k.aktiv);
@@ -798,15 +809,13 @@ function KorrigierenAnsicht({ album, id, fertig }: { album: Album; id: string; f
 
   return (
     <div className="animate-vonRechts">
-      <div className="mb-3 flex items-center justify-between">
-        <button onClick={fertig} className="py-1 text-[16px] font-semibold text-brand">
-          ‹ Zurück
-        </button>
-      </div>
-      <h2 className="text-[1.375rem] font-bold leading-tight tracking-[-0.02em]">
-        {p ? `${p.vorname} ${p.nachname}` : "Steckbrief"} korrigieren
-      </h2>
-      <p className="mt-1 text-[13px] leading-snug text-tinte-leise">
+      <SheetKopf
+        titel={`${p ? `${p.vorname} ${p.nachname}` : "Steckbrief"} korrigieren`}
+        zurueck={{ text: p ? `${p.vorname} ${p.nachname}` : "Zurück", onClick: fertig }}
+        onClose={onClose}
+      />
+      {/* Erklärung im Inhalt, nicht im klebenden Kopf – der bleibt schmal */}
+      <p className="text-[13px] leading-snug text-tinte-leise">
         Für Rechtschreibung und Ähnliches. Andere sehen nicht, wer korrigiert hat – nur die Person selbst einmal. Bitte nichts inhaltlich umschreiben.
       </p>
       <Gruppe titel="Stammdaten">
@@ -853,7 +862,7 @@ function TextFeld({ wert, setzen, platzhalter }: { wert: string; setzen: (v: str
         placeholder={platzhalter}
         className="block w-full resize-y bg-transparent px-3.5 py-3 font-buch text-[16px] leading-[1.55] text-[#3A2E12] outline-none placeholder:text-[#3A2E12]/40 dark:text-[#F3E7C6] dark:placeholder:text-[#F3E7C6]/40"
       />
-      <div className="px-3.5 pb-2 text-right text-[11.5px] font-semibold text-[#3A2E12]/50 dark:text-[#F3E7C6]/50">{wert.length} / 3000</div>
+      <div className="px-3.5 pb-2 text-right text-[12px] font-semibold text-[#3A2E12]/50 dark:text-[#F3E7C6]/50">{wert.length} / 3000</div>
     </div>
   );
 }
@@ -1079,14 +1088,17 @@ function MeinSteckbrief({ album, vorschau }: { album: Album; vorschau: () => voi
         </div>
       )}
 
-      <div className="mt-5 flex gap-2">
-        <button onClick={vorschau} className="btn-grau flex-1">
-          Ansehen
-        </button>
-        <button disabled={busy} onClick={() => void speichern()} className="btn-primary flex-[1.6]">
-          {busy ? "…" : "Speichern"}
-        </button>
-      </div>
+      {/* „Ansehen | Speichern“ klebt unten – nicht erst am Ende des langen Formulars */}
+      <FussLeisteBlatt>
+        <div className="flex gap-2">
+          <button onClick={vorschau} className="btn-grau flex-1">
+            Ansehen
+          </button>
+          <button disabled={busy} onClick={() => void speichern()} className="btn-primary flex-[1.6]">
+            {busy ? "…" : "Speichern"}
+          </button>
+        </div>
+      </FussLeisteBlatt>
     </div>
   );
 }

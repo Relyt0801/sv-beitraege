@@ -10,7 +10,7 @@ import { FinanzStandard } from "./FinanzStandard";
 import { BuchungSheet, FarbWahl, Kennzahlen, PostenBereiche } from "./FinanzBereiche";
 import { committeeLabel } from "../lib/committees";
 import {
-  EINNAHME_QUELLEN, QUELLE_NAME, STANDARD_FARBE, buchungFarbe, centAus, euro, euroKurz, farbHex,
+  EINNAHME_QUELLEN, KASSEN_FARBEN, QUELLE_NAME, STANDARD_FARBE, buchungFarbe, centAus, euro, euroKurz, farbHex,
   uebersichtAus, useFinanzen,
   type Buchung, type FinanzenValue, type KassenKategorie,
 } from "../lib/finanzen";
@@ -18,7 +18,8 @@ import type { KostenAnfrage, KostenValue } from "../lib/kosten";
 import { Sheet, SheetKopf } from "./Sheet";
 import { InKopf } from "./InKopf";
 import { Icon, type IconName } from "./Icon";
-import { Gruppe, Symbol, Wert, Zeile, ZeileEingabe, ZeileHaken } from "./Liste";
+import { Gruppe, Wert, Zeile, ZeileEingabe, ZeileHaken } from "./Liste";
+import { FussLeiste } from "./FussLeiste";
 
 import { frage, meldeFehler } from "../lib/melder";
 import { useDunkel } from "../lib/dunkel";
@@ -218,26 +219,34 @@ export function FinanzenTab({ kosten }: { kosten: KostenValue }) {
         </div>
       )}
 
-      {/* ================================================ Übersicht */}
-      <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-3">
-        <UebersichtKarte
-          zahlen={zahlen}
-          offen={isStaff ? offen : null}
-          halbjahr={settings.aktuelles_halbjahr}
-          ziel={fin.ziel}
-          darf={darfBuchen}
-          onEinstellungen={() => setEinstellungen(true)}
-        />
+      {/* Aufteilung: Am Laptop links Kontostand, Aktionen, Geplantes und
+          Kostenanfragen untereinander, rechts von Anfang an die Buchungen –
+          sie bleiben beim Scrollen stehen und scrollen in sich (wie die
+          Liste in Mail). Vorher standen sie über die volle Breite erst unter
+          dem Falz. Am Handy (die linke Spalte ist dann „contents“) folgen
+          auf den Kontostand direkt die Buchungen, danach der Rest. */}
+      <div className="contents lg:flex lg:min-w-0 lg:flex-col lg:gap-3">
+        {/* ================================================ Übersicht */}
+        <div className="min-w-0 max-lg:order-1">
+          <UebersichtKarte
+            zahlen={zahlen}
+            offen={isStaff ? offen : null}
+            halbjahr={settings.aktuelles_halbjahr}
+            ziel={fin.ziel}
+            darf={darfBuchen}
+            onEinstellungen={() => setEinstellungen(true)}
+          />
+        </div>
+
+        {/* ================================================ Kostenanfragen (oben, wenn etwas ansteht) */}
+        {kostenOben && <div className="min-w-0 max-lg:order-1">{kostenKarte}</div>}
+
+        {/* ================================================ Aktionen, Beiträge, Ausgaben */}
+        <PostenBereiche d={postenDaten} fin={darfBuchen ? fin : null} listeKlasse="max-lg:order-3" geplantKlasse="max-lg:order-3" />
+
+        {/* ================================================ Kostenanfragen (sonst hier) */}
+        {zeigeAnfragen && !kostenOben && <div className="min-w-0 max-lg:order-3">{kostenKarte}</div>}
       </div>
-
-      {/* ================================================ Kostenanfragen (oben, wenn etwas ansteht) */}
-      {kostenOben && kostenKarte}
-
-      {/* ================================================ Aktionen, Beiträge, Ausgaben */}
-      <PostenBereiche d={postenDaten} fin={darfBuchen ? fin : null} />
-
-      {/* ================================================ Kostenanfragen (sonst hier) */}
-      {zeigeAnfragen && !kostenOben && kostenKarte}
 
       {/* ================================================ Verlauf */}
       <VerlaufKarte
@@ -281,7 +290,9 @@ function AnsichtWahl({ ansicht, setAnsicht }: { ansicht: "standard" | "erweitert
     // Am Rechner steht die Wahl in der Kopfzeile (InKopf) – dort feste Breite;
     // die Erklärung steht dann am Anfang der Seite (FinanzenTab), nicht als
     // Hinweis beim Darüberfahren (der legte sich über die Reiterleiste)
-    <div className="lg:w-[17rem]">
+    // 19rem wie „Personen | Beiträge & Abiball“ (Kasse) und „Personen | Rechte
+    // je Rolle“ (Rollen) – sonst sprang der Umschalter je Reiter waagerecht.
+    <div className="lg:w-[19rem]">
       <div className="seg" role="tablist" aria-label="Ansicht der Finanzen">
         {([["standard", "Für alle sichtbar"], ["erweitert", "Alle Buchungen"]] as const).map(([k, label]) => (
           <button
@@ -289,7 +300,7 @@ function AnsichtWahl({ ansicht, setAnsicht }: { ansicht: "standard" | "erweitert
             role="tab"
             aria-selected={ansicht === k}
             onClick={() => setAnsicht(k)}
-            className={`seg-item !py-2 !text-[14px] lg:!py-1.5 lg:!text-[13px] ${ansicht === k ? "seg-aktiv" : ""}`}
+            className={`seg-item whitespace-nowrap !py-2 !text-[14px] lg:!py-1.5 lg:!text-[13px] ${ansicht === k ? "seg-aktiv" : ""}`}
           >
             {label}
           </button>
@@ -354,10 +365,11 @@ function UebersichtKarte({
 
       <Kennzahlen ein={zahlen.ein} aus={zahlen.aus} offen={offen ? { ...offen, halbjahr } : null} />
 
-      {/* Kreis + Legende */}
-      <div className="mt-4 flex flex-col items-center gap-4 border-t border-papier-linie pt-4 dark:border-slate-800 sm:flex-row">
+      {/* Kreis + Legende – auch am Handy nebeneinander (Kreis dort kleiner):
+          untereinander nahmen sie fast eine halbe Bildschirmhöhe ein. */}
+      <div className="mt-4 flex items-start gap-3.5 border-t border-papier-linie pt-4 dark:border-slate-800 sm:items-center sm:gap-4">
         <Kreis teile={teile} ganz={ganz} prozent={prozent} summe={summe} dunkel={dunkel} />
-        <div className="w-full min-w-0 sm:flex-1">
+        <div className="min-w-0 flex-1">
           <div className="mb-1.5 text-[13px] font-bold">
             {ziel.ziel_cent > 0 ? `Ziel ${ziel.ziel_titel}: ${euroKurz(ziel.ziel_cent)}` : "Woher das Geld kommt"}
           </div>
@@ -372,7 +384,10 @@ function UebersichtKarte({
             {zahlen.aus > 0 && (
               <li className="flex items-center gap-2.5 text-[13px] text-tinte-leise">
                 <span className="h-3 w-3 shrink-0" />
-                <span className="min-w-0 flex-1 truncate">abzüglich Ausgaben</span>
+                <span className="min-w-0 flex-1 truncate">
+                  <span className="sm:hidden">Ausgaben</span>
+                  <span className="max-sm:hidden">abzüglich Ausgaben</span>
+                </span>
                 <span className="zahl shrink-0 font-bold">−{euroKurz(zahlen.aus)}</span>
               </li>
             )}
@@ -404,7 +419,7 @@ function KategorieWahl({
       <button
         type="button"
         onClick={() => setzen(null)}
-        className={`rounded-full border px-3 py-1.5 text-[13px] font-semibold ${
+        className={`min-h-[44px] rounded-full border px-3 py-1.5 text-[13px] font-semibold ${
           wert === null ? "border-brand text-brand" : "border-papier-linie text-tinte-leise dark:border-slate-700"
         }`}
       >
@@ -415,7 +430,7 @@ function KategorieWahl({
           type="button"
           key={k.id}
           onClick={() => setzen(k.id)}
-          className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[13px] font-semibold ${
+          className={`flex min-h-[44px] items-center gap-1.5 rounded-full border px-3 py-1.5 text-[13px] font-semibold ${
             wert === k.id ? "border-brand bg-brand/10" : "border-papier-linie dark:border-slate-700"
           }`}
         >
@@ -442,6 +457,9 @@ function EinstellungenSheet({
   const [betrag, setBetrag] = useState("");
   const [bank, setBank] = useState("");
   const [busy, setBusy] = useState(false);
+  // Eine Kategorie bearbeiten/anlegen: Unterseite im selben Blatt (wie in
+  // den iOS-Einstellungen), mit „‹ Einstellungen“ zurück
+  const [kat, setKat] = useState<KassenKategorie | "neu" | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -449,9 +467,19 @@ function EinstellungenSheet({
     setBetrag(fin.ziel.ziel_cent ? String(fin.ziel.ziel_cent / 100).replace(".", ",") : "");
     setBank("");
   }, [open, fin.ziel]);
+  useEffect(() => {
+    if (open) setKat(null);
+  }, [open]);
 
   const c = centAus(bank);
   const diff = c === null ? null : c - stand;
+
+  if (kat)
+    return (
+      <Sheet open={open} onClose={onClose}>
+        <KategorieSeite key={kat === "neu" ? "neu" : kat.id} k={kat} fin={fin} onZurueck={() => setKat(null)} onClose={onClose} />
+      </Sheet>
+    );
 
   return (
     <Sheet open={open} onClose={onClose}>
@@ -504,54 +532,25 @@ function EinstellungenSheet({
         Abgleichen
       </button>
 
-      <KategorienVerwalten fin={fin} />
+      <KategorienListe fin={fin} onWahl={setKat} />
     </Sheet>
   );
 }
 
-function KategorienVerwalten({ fin }: { fin: FinanzenValue }) {
+const ART_TEXT: Record<KassenKategorie["art"], string> = {
+  beide: "Einnahmen und Ausgaben",
+  ein: "Nur Einnahmen",
+  aus: "Nur Ausgaben",
+};
+
+/**
+ * Kategorien als iOS-Liste: je Kategorie EINE Zeile (Farbe, Name, wofür) mit
+ * „›“ – Bearbeiten und Löschen auf der Unterseite. Vorher standen in jeder
+ * Zeile „Ändern“ und ein roter Mülleimer, das Formular klappte mitten in der
+ * Gruppe auf.
+ */
+function KategorienListe({ fin, onWahl }: { fin: FinanzenValue; onWahl: (k: KassenKategorie | "neu") => void }) {
   const dunkel = useDunkel();
-  const [offen, setOffen] = useState<string | null>(null);
-  const [name, setName] = useState("");
-  const [farbe, setFarbe] = useState("blau");
-  const [artWahl, setArtWahl] = useState<KassenKategorie["art"]>("beide");
-
-  function bearbeiten(k: KassenKategorie | null) {
-    setOffen(k ? k.id : "neu");
-    setName(k?.name ?? "");
-    setFarbe(k?.farbe ?? "blau");
-    setArtWahl(k?.art ?? "beide");
-  }
-
-  async function speichern() {
-    const f = await fin.kategorieSpeichern({ id: offen === "neu" ? undefined : offen ?? undefined, name, farbe, art: artWahl });
-    if (f) meldeFehler("Hat nicht geklappt: " + f);
-    else setOffen(null);
-  }
-
-  // Formular als weiße Zelle (kein Kasten mit Rand), Knöpfe wie überall
-  const formular = (
-    <div className="px-4 py-3">
-      <input className="field" placeholder="Name der Kategorie" maxLength={40} value={name} onChange={(e) => setName(e.target.value)} />
-      <FarbWahl wert={farbe} setzen={setFarbe} />
-      <div className="seg mt-3" role="radiogroup" aria-label="Für welche Buchungen">
-        {([["beide", "Beides"], ["ein", "Einnahmen"], ["aus", "Ausgaben"]] as const).map(([k, l]) => (
-          <button key={k} type="button" role="radio" aria-checked={artWahl === k} onClick={() => setArtWahl(k)} className={`seg-item ${artWahl === k ? "seg-aktiv" : ""}`}>
-            {l}
-          </button>
-        ))}
-      </div>
-      <div className="mt-3 flex gap-2">
-        <button type="button" onClick={() => void speichern()} className="btn-klein flex-1">
-          Speichern
-        </button>
-        <button type="button" onClick={() => setOffen(null)} className="btn-klein-grau">
-          Abbrechen
-        </button>
-      </div>
-    </div>
-  );
-
   return (
     <Gruppe
       titel="Kategorien"
@@ -559,47 +558,83 @@ function KategorienVerwalten({ fin }: { fin: FinanzenValue }) {
       fuss="Die Farbe steht im Kreis, im Balken der Übersicht und als Punkt an jeder Zeile. Mehrere Kategorien dürfen dieselbe Farbe haben."
     >
       {fin.kategorien.map((k) => (
-        <div key={k.id}>
-          <div className="flex min-h-[52px] items-center gap-3 px-4 py-1.5">
-            <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: farbHex(k.farbe, dunkel) }} />
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-[15px] font-semibold">{k.name}</span>
-              <span className="block text-[12.5px] text-tinte-leise">{k.art === "ein" ? "Einnahmen" : k.art === "aus" ? "Ausgaben" : "Einnahmen und Ausgaben"}</span>
-            </span>
-            <button type="button" onClick={() => (offen === k.id ? setOffen(null) : bearbeiten(k))} className="flex min-h-[44px] shrink-0 items-center px-1 text-[15px] font-medium text-brand-dark dark:text-brand">
-              {offen === k.id ? "Zu" : "Ändern"}
-            </button>
-            <button
-              type="button"
-              onClick={async () => {
-                if (!(await frage(`Kategorie „${k.name}“ löschen? Die Buchungen bleiben, sie verlieren nur die Farbe.`, "Löschen", true))) return;
-                const f = await fin.kategorieLoeschen(k.id);
-                if (f) meldeFehler("Löschen hat nicht geklappt: " + f);
-              }}
-              className="-mr-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-red-600 transition active:scale-90 active:bg-red-500/10 dark:text-red-400"
-              aria-label={`${k.name} löschen`}
-            >
-              <Icon name="muell" size={18} />
-            </button>
-          </div>
-          {offen === k.id && formular}
-        </div>
-      ))}
-      {offen === "neu" ? (
-        formular
-      ) : (
         <Zeile
-          label="Kategorie anlegen"
-          blau
-          onClick={() => bearbeiten(null)}
-          symbol={
-            <span aria-hidden className="flex h-[30px] w-[30px] items-center justify-center rounded-full bg-brand text-white">
-              <Icon name="plus" size={16} strich={2.6} />
-            </span>
-          }
+          key={k.id}
+          label={k.name}
+          unter={ART_TEXT[k.art]}
+          onClick={() => onWahl(k)}
+          symbol={<span aria-hidden className="h-3 w-3 shrink-0 rounded-full" style={{ background: farbHex(k.farbe, dunkel) }} />}
         />
-      )}
+      ))}
+      <Zeile label="Neue Kategorie" blau onClick={() => onWahl("neu")} />
     </Gruppe>
+  );
+}
+
+/** Unterseite „Kategorie“: Name, Farbe, wofür – Sichern unten, Löschen ganz unten mit Rückfrage. */
+function KategorieSeite({
+  k, fin, onZurueck, onClose,
+}: {
+  k: KassenKategorie | "neu";
+  fin: FinanzenValue;
+  onZurueck: () => void;
+  onClose: () => void;
+}) {
+  const neu = k === "neu";
+  const [name, setName] = useState(neu ? "" : k.name);
+  const [farbe, setFarbe] = useState(() => {
+    if (!neu) return k.farbe;
+    const belegt = new Set(fin.kategorien.map((x) => x.farbe));
+    return KASSEN_FARBEN.find((f) => !["blau", "grau"].includes(f.key) && !belegt.has(f.key))?.key ?? "orange";
+  });
+  const [art, setArt] = useState<KassenKategorie["art"]>(neu ? "beide" : k.art);
+  const [busy, setBusy] = useState(false);
+
+  async function speichern() {
+    if (!name.trim() || busy) return;
+    setBusy(true);
+    const f = await fin.kategorieSpeichern({ id: neu ? undefined : k.id, name: name.trim(), farbe, art });
+    setBusy(false);
+    if (f) meldeFehler("Hat nicht geklappt: " + f);
+    else onZurueck();
+  }
+
+  return (
+    <>
+      <SheetKopf titel={neu ? "Neue Kategorie" : "Kategorie"} zurueck={{ text: "Einstellungen", onClick: onZurueck }} onClose={onClose} />
+      <Gruppe className="">
+        <ZeileEingabe label="Name" value={name} onChange={setName} placeholder="z. B. Lehrerkarten" maxLength={40} autoFocus={neu} onEnter={() => void speichern()} />
+      </Gruppe>
+      <Gruppe titel="Farbe">
+        <div className="px-4 pb-3 pt-0.5">
+          <FarbWahl wert={farbe} setzen={setFarbe} />
+        </div>
+      </Gruppe>
+      <Gruppe titel="Für welche Buchungen">
+        {(["beide", "ein", "aus"] as const).map((a) => (
+          <ZeileHaken key={a} label={ART_TEXT[a]} gewaehlt={art === a} onClick={() => setArt(a)} />
+        ))}
+      </Gruppe>
+      {!neu && (
+        <Gruppe className="mt-6">
+          <Zeile
+            label="Kategorie löschen"
+            rot
+            onClick={async () => {
+              if (!(await frage(`Kategorie „${k.name}“ löschen? Die Buchungen bleiben, sie verlieren nur die Farbe.`, "Löschen", true))) return;
+              const f = await fin.kategorieLoeschen(k.id);
+              if (f) meldeFehler("Löschen hat nicht geklappt: " + f);
+              else onZurueck();
+            }}
+          />
+        </Gruppe>
+      )}
+      <FussLeiste>
+        <button type="button" disabled={busy || !name.trim()} onClick={() => void speichern()} className="btn-primary">
+          {busy ? "…" : neu ? "Anlegen" : "Sichern"}
+        </button>
+      </FussLeiste>
+    </>
   );
 }
 
@@ -636,7 +671,7 @@ function KostenKarte({
   return (
     <section id="sprung-kosten" className="min-w-0">
       <div className="mb-1.5 flex items-center gap-3 px-4">
-        <h2 className="min-w-0 flex-1 text-[13px] font-semibold uppercase tracking-[0.02em] text-tinte-leise">
+        <h2 className="auf-bild min-w-0 flex-1 text-[13px] font-semibold uppercase tracking-[0.02em] text-tinte-leise">
           Kostenanfragen{offene.length > 0 ? ` · ${offene.length} offen` : ""}
         </h2>
         {vorsitze.length > 0 && (
@@ -678,7 +713,7 @@ function KostenKarte({
           ))}
         </div>
       )}
-      <p className="mt-1.5 px-4 text-[13px] leading-snug text-tinte-leise">
+      <p className="auf-bild mt-1.5 px-4 text-[13px] leading-snug text-tinte-leise">
         {vorsitze.length > 0
           ? "Du brauchst Geld fürs Komitee? Hier anfragen – der Kassenwart entscheidet."
           : darfEntscheiden
@@ -979,18 +1014,25 @@ function VerlaufKarte({
   ];
 
   return (
-    <section className="min-w-0 lg:col-span-2">
-      <div className="mb-2 flex flex-wrap items-center gap-3 px-1 pt-2">
-        <h2 className="mr-auto text-[1.375rem] font-bold tracking-[-0.02em]">Buchungen</h2>
+    // Am Laptop die rechte Spalte: klebt unter der Kopfzeile, Filter und Suche
+    // bleiben stehen, nur die Monate scrollen (eigene Höhe = Fensterhöhe).
+    // lg:-mb-[6.5rem]: Ein klebendes Element bleibt mit seinem Außenrand im
+    // Rasterfeld. Unter dem Raster liegen am Laptop noch 6,5 rem Seitenrand
+    // (pb-6 hier, pb-4 an <main>, lg:pb-16 in App.tsx) – ohne den negativen
+    // Rand schob das Rasterende den Block am Seitenende nach oben, und
+    // „Buchungen“, Filter und Suche verschwanden unter der Kopfzeile.
+    <section className="min-w-0 max-lg:order-2 lg:sticky lg:top-[calc(var(--kopf)+0.75rem)] lg:-mb-[6.5rem] lg:flex lg:max-h-[calc(100dvh-var(--kopf)-1.5rem)] lg:flex-col">
+      <div className="mb-2 flex flex-wrap items-center gap-3 px-1 pt-2 lg:shrink-0 lg:pt-0">
+        <h2 className="auf-bild mr-auto text-[1.375rem] font-bold tracking-[-0.02em]">Buchungen</h2>
         <div className="seg w-full sm:w-80" role="radiogroup" aria-label="Buchungen filtern">
           {FILTER.map(([k, label]) => (
-            <button key={k} role="radio" aria-checked={filter === k} onClick={() => setFilter(k)} className={`seg-item ${filter === k ? "seg-aktiv" : ""}`}>
+            <button key={k} role="radio" aria-checked={filter === k} onClick={() => setFilter(k)} className={`seg-item whitespace-nowrap ${filter === k ? "seg-aktiv" : ""}`}>
               {label}
             </button>
           ))}
         </div>
       </div>
-      <div className="mb-4 flex h-11 items-center gap-2 rounded-xl bg-[rgb(118_118_128/0.12)] px-3 dark:bg-[rgb(118_118_128/0.24)]">
+      <div className="feld-auf-bild mb-4 flex h-11 items-center gap-2 rounded-xl bg-[rgb(118_118_128/0.12)] px-3 dark:bg-[rgb(118_118_128/0.24)] lg:mb-3 lg:shrink-0">
         <span className="text-tinte-leise">
           <Icon name="lupe" size={17} />
         </span>
@@ -1010,6 +1052,9 @@ function VerlaufKarte({
       {liste.length === 0 ? (
         <div className="card py-10 text-center text-[14px] text-tinte-leise">Keine Buchungen.</div>
       ) : (
+        // Eigene Scroll-Fläche nur am Laptop; das Raster darin behält seine
+        // volle Höhe (in einem Raster mit fester Höhe würden die Monate gestaucht)
+        <div className="lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:rounded-[1.25rem]">
         <div className="grid grid-cols-[minmax(0,1fr)] gap-2.5">
           {gruppen.map(([monat, zeilen]) => {
             const summe = zeilen.reduce((n, b) => n + (b.quelle === "abgleich" ? 0 : b.cent), 0);
@@ -1046,6 +1091,7 @@ function VerlaufKarte({
               </ul>
             );
           })}
+        </div>
         </div>
       )}
 
@@ -1106,7 +1152,8 @@ function BuchungsZeile({
       >
         <Kachel b={b} kategorien={kategorien} />
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-[15px] font-medium">{b.titel || zu}</span>
+          {/* Zwei Zeilen statt abgeschnitten: am Ende steht oft der Name („… – Bauer, Lena“) */}
+          <span className="line-clamp-2 text-[15px] font-medium leading-snug [overflow-wrap:anywhere]">{b.titel || zu}</span>
           <span className="block truncate text-[13px] text-tinte-leise">
             {zu !== b.titel ? `${zu} · ` : ""}
             {new Date(b.datum + "T12:00:00").toLocaleDateString("de-DE", { day: "numeric", month: "short" })}
@@ -1167,28 +1214,19 @@ function BuchungDetail({
 
   return (
     <Sheet open onClose={onClose}>
-      <div className="flex justify-end">
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Schließen"
-          className="-m-1.5 flex h-11 w-11 items-center justify-center rounded-full transition active:scale-90"
-        >
-          <span className="flex h-[30px] w-[30px] items-center justify-center rounded-full bg-[rgb(118_118_128/0.12)] text-[13px] font-bold text-tinte-leise dark:bg-[rgb(118_118_128/0.24)]">
-            ✕
-          </span>
-        </button>
-      </div>
+      {/* Derselbe klebende Kopf wie in allen Blättern (Titel links, ✕ rechts) –
+          vorher ein eigener Kopf, dessen ✕ beim Scrollen verschwand. */}
+      <SheetKopf
+        titel={b.titel || zuweisungText(b, aktionName)}
+        unter={new Date(b.datum + "T12:00:00").toLocaleDateString("de-DE", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
+        onClose={onClose}
+      />
 
-      {/* Kopf: Kachel, Betrag, Titel, Datum */}
-      <div className="flex flex-col items-center px-2 pb-5 pt-1 text-center">
+      {/* Kachel und Betrag mittig – wie eine Buchung in Wallet */}
+      <div className="flex flex-col items-center px-2 pb-5 pt-2 text-center">
         <Kachel b={b} gross kategorien={kategorien} />
-        <div className="mt-4">
+        <div className="mt-3">
           <Betrag b={b} gross />
-        </div>
-        <div className="mt-2 text-[17px] font-semibold leading-snug">{b.titel || zuweisungText(b, aktionName)}</div>
-        <div className="mt-0.5 text-[14px] text-tinte-leise">
-          {new Date(b.datum + "T12:00:00").toLocaleDateString("de-DE", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
         </div>
       </div>
 
@@ -1221,22 +1259,23 @@ function BuchungDetail({
         </p>
       )}
 
+      {/* Löschen ganz unten als eigene Gruppe, mit Rückfrage (Design-Regeln §2) */}
       {darf && !b.automatisch && (
-        <button
-          disabled={busy}
-          onClick={async () => {
-            if (!(await frage(`Buchung „${b.titel}“ über ${euro(Math.abs(b.cent))} löschen?`, "Löschen", true))) return;
-            setBusy(true);
-            const f = await onLoeschen(b.id);
-            setBusy(false);
-            if (f) meldeFehler("Löschen hat nicht geklappt: " + f);
-            else onClose();
-          }}
-          className="mt-4 flex min-h-[2.75rem] w-full items-center justify-center gap-2 rounded-[1.25rem] bg-papier text-[16px] font-medium text-red-600 transition active:scale-[.99] disabled:opacity-50 dark:bg-slate-800/60 dark:text-red-400"
-        >
-          <Icon name="muell" size={18} />
-          Buchung löschen
-        </button>
+        <Gruppe className="mt-6">
+          <Zeile
+            label="Buchung löschen"
+            rot
+            disabled={busy}
+            onClick={async () => {
+              if (!(await frage(`Buchung „${b.titel}“ über ${euro(Math.abs(b.cent))} löschen?`, "Löschen", true))) return;
+              setBusy(true);
+              const f = await onLoeschen(b.id);
+              setBusy(false);
+              if (f) meldeFehler("Löschen hat nicht geklappt: " + f);
+              else onClose();
+            }}
+          />
+        </Gruppe>
       )}
     </Sheet>
   );
@@ -1273,8 +1312,9 @@ function Kreis({
   const hervor = aktiv ? sichtbare.find((t) => t.key === aktiv) : null;
 
   return (
-    <div className="relative shrink-0" style={{ width: G, height: G }}>
-      <svg width={G} height={G} viewBox={`0 0 ${G} ${G}`} className="-rotate-90" role="img" aria-label="Einnahmen nach Quelle">
+    // Am Handy 120 px statt 176 px – das SVG skaliert mit (viewBox bleibt)
+    <div className="relative h-[120px] w-[120px] shrink-0 sm:h-[176px] sm:w-[176px]">
+      <svg viewBox={`0 0 ${G} ${G}`} className="h-full w-full -rotate-90" role="img" aria-label="Einnahmen nach Quelle">
         <circle cx={G / 2} cy={G / 2} r={r} fill="none" strokeWidth={dicke} stroke={dunkel ? "#3A3A3C" : "#E5E5EA"} />
         {boegen.map((b) => (
           <circle
@@ -1296,20 +1336,20 @@ function Kreis({
           </circle>
         ))}
       </svg>
-      <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center px-6 text-center leading-tight">
+      <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center px-4 text-center leading-tight sm:px-6">
         {hervor ? (
           <>
-            <span className="text-[12px] font-semibold text-tinte-leise">{hervor.label}</span>
-            <span className="zahl text-[1.15rem] font-extrabold">{euroKurz(hervor.cent)}</span>
+            <span className="max-w-full truncate text-[12px] font-semibold text-tinte-leise">{hervor.label}</span>
+            <span className="zahl text-[1rem] font-extrabold sm:text-[1.15rem]">{euroKurz(hervor.cent)}</span>
           </>
         ) : prozent !== null ? (
           <>
-            <span className="zahl text-[1.7rem] font-extrabold">{prozent} %</span>
+            <span className="zahl text-[1.35rem] font-extrabold sm:text-[1.7rem]">{prozent} %</span>
             <span className="text-[12px] text-tinte-leise">vom Ziel</span>
           </>
         ) : (
           <>
-            <span className="zahl text-[1.15rem] font-extrabold">{euroKurz(summe)}</span>
+            <span className="zahl text-[1rem] font-extrabold sm:text-[1.15rem]">{euroKurz(summe)}</span>
             <span className="text-[12px] text-tinte-leise">eingenommen</span>
           </>
         )}

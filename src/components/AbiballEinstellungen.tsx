@@ -11,7 +11,7 @@ import { Schalter } from "./Schalter";
 import { zeitpunktSchoen } from "./AbiTicket";
 
 /**
- * Abiball-Optionen im Reiter „Beiträge → Ticket“ – dort, wo auch Grundpreis
+ * Abiball-Optionen unter Kasse → „Beiträge & Abiball“ (Ticket) – dort, wo auch Grundpreis
  * und Helferzuschuss stehen:
  *   • Bonus über 100 % (Standard aus) mit zwei Reglern
  *   • Ort und Datum (erscheinen erst dann auf dem Ticket)
@@ -36,17 +36,25 @@ function morgenAbend(): string {
   return d.toISOString();
 }
 
-export function AbiballEinstellungen() {
+export type AbiballTeil = "bonus" | "abiball" | "verkauf" | "bestellungen";
+
+/**
+ * `nur`: nur diese Gruppen zeigen. Am Laptop verteilt BeitraegeTab die Gruppen
+ * auf die drei Spalten (vorher hing alles in der dritten, die beiden anderen
+ * waren nach ~400 px leer). Ohne `nur` kommt alles wie bisher.
+ */
+export function AbiballEinstellungen({ nur }: { nur?: AbiballTeil[] } = {}) {
   const { settings, setSettings } = useStore();
   const a = abiballVon(settings);
   const setze = (patch: Partial<Abiball>) => setSettings({ abiball: { ...abiballVon(settings), ...patch } });
+  const zeig = (t: AbiballTeil) => !nur || nur.includes(t);
 
   return (
     <>
-      <BonusGruppe settings={settings} a={a} setze={setze} />
-      <AbiballGruppe a={a} setze={setze} />
-      <VerkaufGruppe settings={settings} a={a} setze={setze} />
-      <BestellListe />
+      {zeig("bonus") && <BonusGruppe settings={settings} a={a} setze={setze} />}
+      {zeig("abiball") && <AbiballGruppe a={a} setze={setze} />}
+      {zeig("verkauf") && <VerkaufGruppe settings={settings} a={a} setze={setze} />}
+      {zeig("bestellungen") && <BestellListe />}
     </>
   );
 }
@@ -92,7 +100,7 @@ function BonusGruppe({ settings, a, setze }: { settings: Settings; a: Abiball; s
                 );
               })}
             </div>
-            <div className="mt-1.5 text-[11.5px] text-tinte-leise">1. Ticket · ab {grenze} % kein weiterer Bonus</div>
+            <div className="mt-1.5 text-[12px] text-tinte-leise">1. Ticket · ab {grenze} % kein weiterer Bonus</div>
           </div>
         </>
       )}
@@ -140,7 +148,7 @@ function Regler({
         className="mt-2 h-2 w-full cursor-pointer accent-[#D9A92B]"
         aria-label={label}
       />
-      <span className="mt-0.5 flex justify-between text-[10.5px] text-tinte-leise">
+      <span className="mt-0.5 flex justify-between text-[12px] text-tinte-leise">
         <span>
           {min} {einheit}
         </span>
@@ -341,11 +349,11 @@ function BestellListe() {
     <Gruppe titel={`Bestellungen · ${tickets} Tickets`}>
       <div className="grid grid-cols-2 gap-2 px-4 py-3">
         <div className="rounded-xl bg-bezahlt-grund px-3 py-2">
-          <div className="text-[11px] font-semibold text-bezahlt">Eingegangen</div>
+          <div className="text-[12px] font-semibold text-bezahlt">Eingegangen</div>
           <div className="zahl text-[17px] font-extrabold">{euroAusCent(eingang)}</div>
         </div>
         <div className="rounded-xl bg-offen-grund px-3 py-2">
-          <div className="text-[11px] font-semibold text-offen">Noch offen</div>
+          <div className="text-[12px] font-semibold text-offen">Noch offen</div>
           <div className="zahl text-[17px] font-extrabold">{euroAusCent(offenSumme)}</div>
         </div>
       </div>

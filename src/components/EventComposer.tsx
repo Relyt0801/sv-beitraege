@@ -11,14 +11,16 @@ import { useEvents } from "../events-store";
 import { normalize, offenGesamt, sortStudents } from "../lib/logic";
 import { NEUE_TYPEN, TYPE_META, type EventType } from "../lib/events";
 import { useFunktionen } from "../lib/funktionen";
+import { terminNeuAnfordern } from "./TerminSheet";
 
 /**
  * „Neu erstellen“ im Events-Reiter.
  *
  * Oben die zwei Arten, die hier im Blatt ausgefüllt werden (Info, Abstimmung).
- * Direkt darunter – nicht mehr hinter „Vorlagen“ versteckt – die zwei Dinge,
- * die ein eigenes Fenster haben: die Aktion mit Schichten (Waffelverkauf &
- * Co.) und die Pop-up-Umfrage.
+ * Direkt darunter – nicht mehr hinter „Vorlagen“ versteckt – die Dinge, die
+ * ein eigenes Fenster haben: der Termin (für alle mit „Termine verwalten“ –
+ * „Neu“ ist fürs Team DER Knopf zum Anlegen), die Aktion mit Schichten
+ * (Waffelverkauf & Co.) und die Pop-up-Umfrage.
  */
 export function EventComposer({
   open,
@@ -34,8 +36,9 @@ export function EventComposer({
   onUmfrage?: () => void;
 }) {
   const { students, settings, punkte } = useStore();
-  const { can } = useRole();
+  const { can, isStaff } = useRole();
   const { sichtbar } = useFunktionen();
+  const termineErlaubt = isStaff || can("termine.manage");
   const umfragenErlaubt = Boolean(onUmfrage) && sichtbar("umfragen") && (can("umfragen.verwalten") || can("umfragen.ergebnisse"));
   const { createEvent } = useEvents();
 
@@ -123,9 +126,24 @@ export function EventComposer({
         ))}
       </div>
 
-      {/* Die zwei Dinge mit eigenem Fenster stehen gleich sichtbar daneben */}
-      {(onVorlagen || umfragenErlaubt) && (
+      {/* Die Dinge mit eigenem Fenster stehen gleich sichtbar daneben */}
+      {(termineErlaubt || onVorlagen || umfragenErlaubt) && (
         <Gruppe titel="Oder etwas anderes anlegen" className="mb-4">
+          {termineErlaubt && (
+            <Zeile
+              onClick={() => {
+                onClose();
+                terminNeuAnfordern();
+              }}
+              symbol={
+                <Symbol farbe="bg-[#FF3B30]">
+                  <Icon name="kalender" size={17} strich={2.2} />
+                </Symbol>
+              }
+              label="Termin"
+              unter="Sitzung, Klausur, Ferien – steht im Kalender"
+            />
+          )}
           {onVorlagen && (
             <Zeile
               onClick={onVorlagen}

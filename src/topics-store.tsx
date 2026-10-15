@@ -552,7 +552,7 @@ export function TopicsProvider({ children }: { children: ReactNode }) {
       if (userIds.length)
         await supabase!.from("tag_members").insert(userIds.map((user_id) => ({ tag, user_id })));
       if (added.length)
-        void pushToUsers(added, `${committeeIcon(tag)} Komitee ${committeeLabel(tag)}`, "Du bist jetzt dabei – schau in die Übersicht!", "./#chats");
+        void pushToUsers(added, `${committeeIcon(tag)} Komitee ${committeeLabel(tag)}`, "Du bist jetzt dabei – schau auf die Pinnwand!", "./#chats");
     }
   }, []);
 
@@ -565,7 +565,7 @@ export function TopicsProvider({ children }: { children: ReactNode }) {
     if (hasSupabase) {
       if (on) {
         await supabase!.from("tag_members").upsert({ tag: slug, user_id: userId });
-        void pushToUsers([userId], `${committeeIcon(slug)} Komitee ${committeeLabel(slug)}`, "Das Stufenteam hat dich hinzugefügt – schau in die Übersicht!", "./#chats");
+        void pushToUsers([userId], `${committeeIcon(slug)} Komitee ${committeeLabel(slug)}`, "Das Stufenteam hat dich hinzugefügt – schau auf die Pinnwand!", "./#chats");
       } else {
         await supabase!.from("tag_members").delete().eq("tag", slug).eq("user_id", userId);
       }

@@ -15,7 +15,7 @@ import { PersonAnlegenSheet } from "./PersonAnlegenSheet";
 import { KinderSheet } from "./KinderSheet";
 import { Icon } from "./Icon";
 import { Schalter } from "./Schalter";
-import { Gruppe, Zeile, ZeileMitSchalter } from "./Liste";
+import { Gruppe, Wert, Zeile, ZeileMitSchalter } from "./Liste";
 import { Sheet, SheetKopf } from "./Sheet";
 // Sperrdauern und die Ist-gesperrt-Frage stehen beim Chat-Knopf – eine Quelle fuer beide.
 import { DAUERN, isBanned } from "./MuteKnopf";
@@ -171,7 +171,7 @@ export function RolesTab() {
               </div>
               {banned && <span className="shrink-0 text-[13px] font-semibold text-red-600 dark:text-red-400">gesperrt</span>}
               {!istEltern && koms.length > 0 && (
-                <span className="hidden shrink-0 text-[13px] text-tinte-leise sm:inline">
+                <span className="shrink-0 text-[13px] text-tinte-leise">
                   {koms.length} {koms.length === 1 ? "Komitee" : "Komitees"}
                 </span>
               )}
@@ -212,10 +212,14 @@ export function RolesTab() {
             auswahl={ROLLEN_AUSWAHL.filter((r) => isAdmin || !NUR_ADMIN.includes(r) || p.role === r)}
             vergeben={(r) => NUR_EINMAL.includes(r) && profiles.some((x) => x.role === r && x.user_id !== p.user_id)}
             onRolle={async (neu) => {
-              if (neu === p.role) return;
+              if (neu === p.role) return true;
+              // Jeder Rollenwechsel mit Rückfrage – vorher wurde z. B. aus
+              // Schüler mit einem einzigen Tipp Kassenwart.
               const heikel = p.role === "eltern" || neu === "eltern" || neu === "admin";
-              if (heikel && !(await frage(`${p.username ?? "Dieses Konto"} wirklich zu „${rolleName(neu)}“ machen?`, "Ändern"))) return;
+              const text = `${name} wirklich von „${rolleName(p.role)}“ zu „${rolleName(neu)}“ machen?${heikel ? " Das ändert, was das Konto sehen darf." : ""}`;
+              if (!(await frage(text, "Ändern"))) return false;
               void setRole(p.user_id, neu);
+              return true;
             }}
             kinder={istEltern ? { text: kinder.length === 0 ? (darfKinder ? "Kind wählen" : "Kein Kind") : kinder.join(", "), warnt: kinder.length === 0, oeffnen: () => setKinderFuer(p) } : undefined}
             komitees={!istEltern && canAssignKom ? { gewaehlt: koms, setzen: (slug, an) => setUserCommittee(p.user_id, slug, an) } : undefined}
@@ -250,16 +254,19 @@ const ROLLE_HINWEIS: Partial<Record<Role, string>> = {
   schueler: "Normales Mitglied der Stufe",
   sprecher: "Gibt es nur einmal",
   stv_sprecher: "Stellvertretung – gibt es nur einmal",
-  stufenteam: "Organisation – Rechte im Rechte-Reiter",
-  kassenwart: "Kassenbuch – Rechte im Rechte-Reiter",
+  stufenteam: "Organisation – Rechte unter „Rechte je Rolle“",
+  kassenwart: "Kassenbuch – Rechte unter „Rechte je Rolle“",
   admin: "Alle Rechte",
   eltern: "Sieht nur die eigenen Kinder",
 };
 
 /**
  * Blatt einer Person – aufgebaut wie eine Seite der iOS-Einstellungen:
- * Rolle als Auswahlliste mit Häkchen (ein Satz Erklärung je Rolle,
- * gesperrte mit Grund), Komitees mit Häkchen, dann Rechte und Konto.
+ * oben EINE Zeile „Rolle“ (selten geändert – die Auswahl mit Häkchen und
+ * einem Satz je Rolle liegt auf einer Unterseite im selben Blatt), darunter
+ * das Häufige: Komitees mit Häkchen, einzelne Rechte und Konto. Vorher
+ * füllten sieben Rollen-Zeilen den ersten Bildschirm, Rechte und Konto
+ * lagen unter dem Rand.
  */
 function PersonBlatt({
   name, profil, onClose, rolleGesperrt, gesperrtGrund, auswahl, vergeben, onRolle,
@@ -272,7 +279,8 @@ function PersonBlatt({
   gesperrtGrund?: string;
   auswahl: Role[];
   vergeben: (r: Role) => boolean;
-  onRolle: (r: Role) => void;
+  /** true = gewechselt (oder dieselbe Rolle), false = in der Rückfrage abgebrochen */
+  onRolle: (r: Role) => boolean | Promise<boolean>;
   kinder?: { text: string; warnt: boolean; oeffnen: () => void };
   komitees?: { gewaehlt: string[]; setzen: (slug: string, an: boolean) => void };
   onRechte?: () => void;
@@ -281,21 +289,26 @@ function PersonBlatt({
   sperre?: { gesperrt: boolean; aufheben: () => void; sperren: (ms: number | null) => void };
 }) {
   const [dauerWahl, setDauerWahl] = useState(false);
-  return (
-    <Sheet open onClose={onClose}>
-      <SheetKopf titel={name} unter={`${profil.username ?? ""} · ${rolleName(profil.role)}`} onClose={onClose} />
+  const [seite, setSeite] = useState<null | "rolle">(null);
 
-      <Gruppe titel="Rolle" className="" fuss={gesperrtGrund}>
-        {(rolleGesperrt ? [profil.role] : auswahl).map((r) => {
+  if (seite === "rolle")
+    return (
+      <Sheet open onClose={onClose}>
+        <SheetKopf titel="Rolle" zurueck={{ text: name, onClick: () => setSeite(null) }} onClose={onClose} />
+        <Gruppe className="" fuss="Was jede Rolle darf, steht unter „Rechte je Rolle“.">
+        {auswahl.map((r) => {
           const aktiv = r === profil.role;
           const belegt = vergeben(r);
           return (
             <button
               key={r}
               type="button"
-              disabled={rolleGesperrt || belegt}
+              disabled={belegt}
               aria-pressed={aktiv}
-              onClick={() => onRolle(r)}
+              onClick={async () => {
+                // Abbrechen in der Rückfrage: auf der Rollenliste bleiben
+                if (await onRolle(r)) setSeite(null);
+              }}
               className="flex min-h-[52px] w-full items-center gap-3 px-4 py-2 text-left transition enabled:active:bg-black/[0.04] disabled:cursor-default dark:enabled:active:bg-white/[0.06]"
             >
               <span className="min-w-0 flex-1">
@@ -312,6 +325,18 @@ function PersonBlatt({
             </button>
           );
         })}
+        </Gruppe>
+      </Sheet>
+    );
+
+  return (
+    <Sheet open onClose={onClose}>
+      <SheetKopf titel={name} unter={`${profil.username ?? ""} · ${rolleName(profil.role)}`} onClose={onClose} />
+
+      <Gruppe className="" fuss={gesperrtGrund}>
+        <Zeile label="Rolle" onClick={rolleGesperrt ? undefined : () => setSeite("rolle")}>
+          <Wert>{rolleName(profil.role)}</Wert>
+        </Zeile>
       </Gruppe>
 
       {kinder && (

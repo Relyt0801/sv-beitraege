@@ -120,7 +120,7 @@ function Haken() {
 /** Kleine Erklärung im Kalender – nur, wenn man überhaupt Schichten hat. */
 export function SchichtLegende() {
   return (
-    <div className="mb-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-tinte-matt dark:text-slate-300">
+    <div className="auf-bild mb-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 px-1 text-[12px] text-tinte-matt dark:text-slate-300">
       <span className="inline-flex items-center gap-1.5">
         <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-emerald-500/30" aria-hidden /> Eingeteilt
       </span>

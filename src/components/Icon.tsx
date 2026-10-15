@@ -42,7 +42,10 @@ export type IconName =
   | "umfrage"
   | "schild"
   | "stimme"
-  | "x";
+  | "x"
+  | "glocke"
+  | "glocke-aus"
+  | "mehr";
 
 const PFADE: Record<IconName, JSX.Element> = {
   buch: (
@@ -87,6 +90,27 @@ const PFADE: Record<IconName, JSX.Element> = {
     </>
   ),
   x: <path d="M6 6l12 12M18 6 6 18" />,
+  // Mitteilungen an/aus (wie das Glocken-Symbol in iOS)
+  glocke: (
+    <>
+      <path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z" />
+      <path d="M10 21h4" />
+    </>
+  ),
+  "glocke-aus": (
+    <>
+      <path d="M8.5 5.6A6 6 0 0 1 18 11v4M6 11v5l-1.5 2H16" />
+      <path d="M10 21h4M3 3l18 18" />
+    </>
+  ),
+  // „…“ – weitere Aktionen (öffnet ein Blatt)
+  mehr: (
+    <>
+      <circle cx="5.5" cy="12" r="1.1" />
+      <circle cx="12" cy="12" r="1.1" />
+      <circle cx="18.5" cy="12" r="1.1" />
+    </>
+  ),
   kasse: (
     <>
       <rect x="2" y="6" width="20" height="13" rx="2" />

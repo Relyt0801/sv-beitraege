@@ -7,6 +7,7 @@ import { Gruppe, Zeile, ZeileEingabe, ZeileHaken, ZeileMitSchalter } from "./Lis
 import { Schalter } from "./Schalter";
 import { FussLeiste } from "./FussLeiste";
 import { ZeitFeld } from "./ZeitFeld";
+import { Icon } from "./Icon";
 import {
   PAUSEN, WOCHENTAG_WAHL, heuteKey, plusTage, tagLang, uhr, wiederholungsTage,
   type Aktion, type NeuerTermin,
@@ -40,7 +41,7 @@ interface Fenster {
  */
 export function AktionSheet({ offen, onSchliessen }: { offen: boolean; onSchliessen: () => void }) {
   const { aktionen, termine: alleTermine, aktionAnlegen, aktionAendern, aktionProzent, aktionLoeschen, anlegenViele } = useTermine();
-  // Wie viel eine Schicht zählt, kommt aus dem Beiträge-Reiter – so passen
+  // Wie viel eine Schicht zählt, kommt aus Kasse → „Beiträge & Abiball“ – so passen
   // Aktionen und eingetragene Mithilfe immer zusammen.
   const { templates } = useStore();
   const vorlagen = useMemo(
@@ -221,7 +222,7 @@ export function AktionSheet({ offen, onSchliessen }: { offen: boolean; onSchlies
           onEntfernen={async () => {
             const alle = alleTermine.filter((t) => t.aktion_id === gewaehlt.id).length;
             if (alle === 0) {
-              if (await frage(`Die Vorlage „${gewaehlt.titel}" löschen?`, "Löschen", true)) {
+              if (await frage(`Die Vorlage „${gewaehlt.titel}“ löschen?`, "Löschen", true)) {
                 await aktionLoeschen(gewaehlt.id);
                 setAktionId("");
               }
@@ -229,7 +230,7 @@ export function AktionSheet({ offen, onSchliessen }: { offen: boolean; onSchlies
             }
             // Mit Schichten: nicht löschen (sonst verschwinden sie samt
             // Einteilung), sondern aus der Auswahl nehmen.
-            if (await frage(`„${gewaehlt.titel}" aus der Auswahl nehmen? Die ${alle} vorhandenen Schichten bleiben stehen.`, "Entfernen", true)) {
+            if (await frage(`„${gewaehlt.titel}“ aus der Auswahl nehmen? Die ${alle} vorhandenen Schichten bleiben stehen.`, "Entfernen", true)) {
               await aktionAendern(gewaehlt.id, { geschlossen: true });
               setAktionId("");
             }
@@ -262,7 +263,7 @@ export function AktionSheet({ offen, onSchliessen }: { offen: boolean; onSchlies
           </Gruppe>
           <Gruppe
             titel="Wie viel zählt eine Schicht?"
-            fuss="Die Werte kommen aus dem Reiter Beiträge. So passen Aktion und eingetragene Mithilfe immer zusammen."
+            fuss="Die Werte kommen aus Kasse → „Beiträge & Abiball“. So passen Aktion und eingetragene Mithilfe immer zusammen."
           >
             <ProzentWahl vorlagen={vorlagen} wert={Number(neuProzent) || 0} setzen={(p) => setNeuProzent(String(p))} />
           </Gruppe>
@@ -373,10 +374,10 @@ export function AktionSheet({ offen, onSchliessen }: { offen: boolean; onSchlies
                 {fenster.length > 1 && (
                   <button
                     onClick={() => setFenster((prev) => prev.filter((x) => x.id !== f.id))}
-                    className="flex h-11 w-11 shrink-0 items-center justify-center text-[16px] text-tinte-leise active:opacity-50"
+                    className="flex h-11 w-11 shrink-0 items-center justify-center text-tinte-leise active:opacity-50"
                     aria-label={`Schicht ${i + 1} entfernen`}
                   >
-                    ✕
+                    <Icon name="x" size={15} strich={2.4} />
                   </button>
                 )}
               </div>
@@ -460,7 +461,7 @@ export type Vorlage = { id: string; titel: string; punkte: number };
 /** Prozent aus den Beitrags-Vorlagen wählen – keine freie Zahl mehr. */
 export function ProzentWahl({ vorlagen, wert, setzen }: { vorlagen: Vorlage[]; wert: number; setzen: (p: number) => void }) {
   if (!vorlagen.length) {
-    return <p className="px-4 py-3 text-[13px] text-tinte-leise">Im Beiträge-Reiter sind noch keine Möglichkeiten angelegt.</p>;
+    return <p className="px-4 py-3 text-[13px] text-tinte-leise">Unter Kasse → „Beiträge & Abiball“ sind noch keine Möglichkeiten angelegt.</p>;
   }
   const passt = vorlagen.some((v) => v.punkte === wert);
   return (
@@ -476,7 +477,7 @@ export function ProzentWahl({ vorlagen, wert, setzen }: { vorlagen: Vorlage[]; w
       ))}
       {!passt && (
         <p className="px-4 py-2.5 text-[13px] font-semibold text-amber-700 dark:text-amber-300">
-          Zählt gerade +{wert} % – das steht so nicht im Beiträge-Reiter. Bitte eine Zeile wählen.
+          Zählt gerade +{wert} % – das steht so nicht unter „Beiträge & Abiball“. Bitte eine Zeile wählen.
         </p>
       )}
     </>
@@ -500,7 +501,7 @@ function AktionVerwalten({
     <>
       <Gruppe
         className="mt-4"
-        fuss={!passt && !offen ? "Passt nicht zum Reiter Beiträge – unter „Anpassen“ angleichen." : undefined}
+        fuss={!passt && !offen ? "Passt nicht zu „Beiträge & Abiball“ – unter „Anpassen“ angleichen." : undefined}
       >
         <Zeile
           label={schichtenAb > 0 ? `${schichtenAb} kommende Schicht${schichtenAb === 1 ? "" : "en"}` : "Keine kommenden Schichten"}

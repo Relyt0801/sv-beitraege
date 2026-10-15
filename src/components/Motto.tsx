@@ -337,7 +337,7 @@ function MottoSheet({
 
   return (
     <>
-      <Sheet open={offen} onClose={schliessen}>
+      <Sheet hoch open={offen} onClose={schliessen}>
         {ansicht === "neu" ? (
           <Vorschlagen
             m={m}
@@ -778,12 +778,12 @@ function MottoZeile({
             <div className="mb-1 flex flex-wrap gap-1.5">
               {gewinner && <GewinnerMarke art={gewinner} />}
               {x.ausgeblendet && (
-                <span className="rounded-full bg-[rgb(118_118_128/0.12)] px-2 py-0.5 text-[11.5px] font-semibold text-tinte-matt dark:bg-[rgb(118_118_128/0.24)] dark:text-slate-300">
+                <span className="rounded-full bg-[rgb(118_118_128/0.12)] px-2 py-0.5 text-[12px] font-semibold text-tinte-matt dark:bg-[rgb(118_118_128/0.24)] dark:text-slate-300">
                   Ausgeblendet
                 </span>
               )}
               {antrag && (
-                <span className={`rounded-full px-2 py-0.5 text-[11.5px] font-semibold ${TEIL_FARBE[antrag.nach].grund} ${TEIL_FARBE[antrag.nach].text}`}>
+                <span className={`rounded-full px-2 py-0.5 text-[12px] font-semibold ${TEIL_FARBE[antrag.nach].grund} ${TEIL_FARBE[antrag.nach].text}`}>
                   → {TEIL_NAME[antrag.nach]} · {antrag.stimmen}/{antrag.noetig}
                 </span>
               )}
@@ -1323,13 +1323,13 @@ function Vorschlagen({ m, startTeil, fertig, schliessen }: { m: MottoWahl; start
       <SheetKopf titel="Motto vorschlagen" unter="Alle aus der Stufe sehen den Vorschlag sofort." onClose={schliessen} zurueck={{ text: "Abimotto", onClick: () => fertig(startTeil) }} />
       <TeilUmschalter teil={teil} setTeil={setTeil} />
       <div className="mt-4 rounded-[1.25rem] zelle p-4">
-        <div className={`text-[11px] font-semibold uppercase tracking-[0.12em] ${TEIL_FARBE[teil].text}`}>Vorschau · {TEIL_NAME[teil]}</div>
+        <div className={`text-[12px] font-semibold uppercase tracking-[0.08em] ${TEIL_FARBE[teil].text}`}>Vorschau · {TEIL_NAME[teil]}</div>
         <div className="mt-1 min-h-[1.8rem] text-[1.3rem] font-extrabold leading-tight [overflow-wrap:anywhere]">{text.trim() || "Dein Motto"}</div>
         {erkl.trim() && <div className="mt-0.5 text-[13px] text-tinte-matt dark:text-slate-300">{erkl.trim()}</div>}
       </div>
       <input className="field mt-3" maxLength={80} placeholder="z. B. ABIgeschlossen" value={text} onChange={(e) => setText(e.target.value)} autoFocus />
       <input className="field mt-2" maxLength={200} placeholder="Erklärung oder Wortspiel (optional)" value={erkl} onChange={(e) => setErkl(e.target.value)} />
-      <div className="mt-1 px-1 text-right text-[11.5px] text-tinte-leise">{text.length}/80</div>
+      <div className="mt-1 px-1 text-right text-[12px] text-tinte-leise">{text.length}/80</div>
       <button
         className="btn-primary mt-3 w-full"
         disabled={text.trim().length < 2 || sendet}

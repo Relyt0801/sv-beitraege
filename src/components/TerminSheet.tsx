@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { COMMITTEES, committeeIcon } from "../lib/committees";
 import { normalize, sortStudents } from "../lib/logic";
 import { useStore } from "../store";
-import { useTermine } from "../termine-store";
+import { useSchichtStatus, useTermine } from "../termine-store";
 import { useRole } from "../auth/RoleProvider";
 import { Sheet, SheetKopf } from "./Sheet";
 import { Gruppe, Zeile, ZeileHaken, ZeileMitSchalter } from "./Liste";
@@ -10,8 +10,9 @@ import { Schalter } from "./Schalter";
 import { Icon } from "./Icon";
 import { FussLeiste } from "./FussLeiste";
 import { ZeitFeld } from "./ZeitFeld";
+import { SchichtSheet } from "./AktionenListe";
 import {
-  FARBEN, STUNDEN, SYMBOLE, WOCHENTAG_WAHL, heuteKey, istKuerzel, plusTage, tagLang, uhr, wiederholungsTage, zeitText,
+  FARBEN, STUNDEN, SYMBOLE, WOCHENTAG_WAHL, heuteKey, istKuerzel, plusTage, schichtEnde, tagLang, uhr, wiederholungsTage, zeitText,
   type NeuerTermin, type Sichtbarkeit, type Termin,
 } from "../lib/termine";
 import { committeeLabel } from "../lib/committees";
@@ -19,6 +20,27 @@ import { umfangText } from "../lib/termine";
 
 import { frage } from "../lib/melder";
 import { terminAlsDatei, useKalenderDemo } from "../lib/kalender-sync";
+
+/**
+ * „Neu“ → „Termin“ (EventComposer): Termin-Formular im Reiter Events öffnen.
+ * Ist der Reiter schon da, fängt EventsTab das Ereignis ab und meldet
+ * `erledigt`. Sonst bleibt ein Merker in sessionStorage, den EventsTab beim
+ * ersten Zeichnen abholt, und die Adresse #events öffnet den Reiter.
+ */
+export const TERMIN_NEU_EREIGNIS = "sv:termin-neu";
+export const TERMIN_NEU_MERKER = "sv:termin-neu";
+export type TerminNeuDetail = { erledigt: boolean };
+export function terminNeuAnfordern() {
+  const detail: TerminNeuDetail = { erledigt: false };
+  window.dispatchEvent(new CustomEvent<TerminNeuDetail>(TERMIN_NEU_EREIGNIS, { detail }));
+  if (detail.erledigt) return;
+  try {
+    sessionStorage.setItem(TERMIN_NEU_MERKER, "1");
+  } catch {
+    /* privates Fenster – dann öffnet sich nur der Reiter */
+  }
+  window.location.hash = "events";
+}
 
 /**
  * Termin anlegen oder ändern.
@@ -522,7 +544,7 @@ export function TerminSheet({
             rot
             label="Termin löschen …"
             onClick={async () => {
-              if (await frage(`Den Termin „${termin.titel}" wirklich löschen?`, "Löschen", true)) {
+              if (await frage(`Den Termin „${termin.titel}“ wirklich löschen?`, "Löschen", true)) {
                 void loeschen(termin.id);
                 onSchliessen();
               }
@@ -587,14 +609,21 @@ function StundenWahl({ von, bis, setzen }: { von: string; bis: string; setzen: (
   );
 }
 
-/** Ein Termin zum Ansehen – für alle, die ihn nicht ändern dürfen. */
+/**
+ * Ein Termin zum Ansehen (Wochenstreifen, Kalender). Fürs Team mit „Ändern“
+ * oben rechts wie im iOS-Kalender – unten kein zweites „Fertig“ mehr, das ✕
+ * schließt. Schichten öffnen fürs Team dasselbe Blatt wie unter „Mitmachen“
+ * (SchichtSheet: einteilen, Mithilfe bestätigen); Schüler können sich hier
+ * direkt eintragen.
+ */
 export function TerminAnsehen({
   termin, onSchliessen, onBearbeiten,
 }: { termin: Termin | null; onSchliessen: () => void; onBearbeiten?: () => void }) {
-  const { termine, loeschen, loeschenViele, zuteilen } = useTermine();
+  const { termine, aktionen, loeschen, loeschenViele, bewerbungen, bewerben, meineUid, meineStudentIds } = useTermine();
   const { students } = useStore();
   const { isStaff, can } = useRole();
   const darf = isStaff || can("termine.manage");
+  const st = useSchichtStatus();
   // „In meinen Kalender“ (.ics) – zurzeit aus: KALENDER_SYNC_AN in lib/kalender-sync.ts
   const kalenderDemo = useKalenderDemo();
   // Immer den frischen Stand zeigen (z. B. nach dem Austragen einer Person)
@@ -612,13 +641,44 @@ export function TerminAnsehen({
   }, [termine, t]);
 
   if (!t) return null;
+  // Team + Schicht: dasselbe Blatt wie unter „Mitmachen“
+  if (t.aktion_id && darf)
+    return (
+      <SchichtSheet
+        schicht={t}
+        aktion={aktionen.find((a) => a.id === t.aktion_id) || null}
+        onSchliessen={onSchliessen}
+        onAendern={onBearbeiten}
+      />
+    );
   const termin_ = t;
   const namen = new Map(students.map((s) => [s.id, `${s.vorname} ${s.nachname}`]));
   /** Wert rechts in einer Zeile – darf umbrechen, nichts wird abgeschnitten */
   const wert = (text: string) => <span className="min-w-0 text-right text-[15px] leading-snug text-tinte-matt dark:text-slate-300">{text}</span>;
+
+  // Schüler und Schicht: hier direkt eintragen – wie unter „Mitmachen“
+  const status = termin_.aktion_id ? st(termin_) : null;
+  const ichGemeldet = Boolean(meineUid && (bewerbungen[termin_.id] || []).includes(meineUid));
+  const schichtVoll = termin_.personen.length >= (termin_.plaetze ?? 1);
+  const schichtVorbei = schichtEnde(termin_).getTime() < Date.now();
+  const kannEintragen =
+    Boolean(termin_.aktion_id) && !darf && meineStudentIds.length > 0 && !termin_.abschluss && !schichtVorbei &&
+    status !== "eingeteilt" && (ichGemeldet || !schichtVoll);
+
   return (
     <Sheet open onClose={onSchliessen}>
-      <SheetKopf titel={termin_.titel} unter={umfangText(termin_, committeeLabel) || undefined} onClose={onSchliessen} />
+      <SheetKopf
+        titel={termin_.titel}
+        unter={umfangText(termin_, committeeLabel) || undefined}
+        onClose={onSchliessen}
+        extra={
+          onBearbeiten && (
+            <button type="button" onClick={onBearbeiten} className="btn-klein-grau -mt-1 shrink-0 !px-3.5">
+              Ändern
+            </button>
+          )
+        }
+      />
 
       <Gruppe className="mt-0">
         <Zeile label="Wann">
@@ -627,6 +687,23 @@ export function TerminAnsehen({
         <Zeile label="Uhrzeit">{wert(zeitText(termin_))}</Zeile>
         {termin_.ort && <Zeile label="Ort">{wert(termin_.ort)}</Zeile>}
       </Gruppe>
+
+      {kannEintragen && (
+        <Gruppe
+          className="mt-4"
+          fuss={
+            ichGemeldet
+              ? "Du bist angemeldet – das Stufenteam teilt ein, wer wenig Mithilfe hat, zuerst."
+              : "Du meldest dich an – das Stufenteam teilt dann ein, wer wenig Mithilfe hat, zuerst."
+          }
+        >
+          {ichGemeldet ? (
+            <Zeile blau label="Anmeldung zurückziehen" onClick={() => void bewerben(termin_.id, false)} />
+          ) : (
+            <Zeile blau label="Für diese Schicht eintragen" onClick={() => void bewerben(termin_.id, true)} />
+          )}
+        </Gruppe>
+      )}
 
       {termin_.beschreibung && (
         <Gruppe titel="Notiz">
@@ -637,20 +714,9 @@ export function TerminAnsehen({
       {termin_.personen.length > 0 && (termin_.aktion_id || darf) && (
         <Gruppe titel={termin_.aktion_id ? "Eingeteilt" : "Für diese Personen"}>
           {termin_.personen.map((sid) => (
-            <div key={sid} className="flex min-h-[48px] items-center gap-2 py-1.5 pl-4 pr-2">
+            // Austragen geht fürs Team im Schicht-Blatt (SchichtSheet)
+            <div key={sid} className="flex min-h-[48px] items-center gap-2 py-1.5 pl-4 pr-4">
               <span className="min-w-0 flex-1 truncate text-[15px] font-semibold">{namen.get(sid) || "Unbekannt"}</span>
-              {darf && termin_.aktion_id && (
-                <button
-                  onClick={async () => {
-                    if (await frage(`${namen.get(sid) || "Diese Person"} aus der Schicht nehmen? Sie bekommt Bescheid.`, "Austragen", true))
-                      void zuteilen(termin_.id, sid, false);
-                  }}
-                  className="btn-klein-grau shrink-0"
-                  aria-label={`${namen.get(sid) || "Person"} austragen`}
-                >
-                  Austragen
-                </button>
-              )}
             </div>
           ))}
         </Gruppe>
@@ -663,14 +729,14 @@ export function TerminAnsehen({
         </button>
       )}
 
-      {/* Löschen: ganz unten, rot, jeweils mit Rückfrage – nicht neben „Fertig“ */}
+      {/* Löschen: ganz unten, rot, jeweils mit Rückfrage */}
       {darf && (
         <Gruppe className="mt-8">
           <Zeile
             rot
             label="Nur diesen Termin löschen …"
             onClick={async () => {
-              if (await frage(`„${termin_.titel}" am ${tagLang(termin_.datum)} löschen?`, "Löschen", true)) {
+              if (await frage(`„${termin_.titel}“ am ${tagLang(termin_.datum)} löschen?`, "Löschen", true)) {
                 void loeschen(termin_.id);
                 onSchliessen();
               }
@@ -679,9 +745,9 @@ export function TerminAnsehen({
           {reihe.length > 1 && (
             <Zeile
               rot
-              label={`Alle ${reihe.length} kommenden „${termin_.titel}" löschen …`}
+              label={`Alle ${reihe.length} kommenden „${termin_.titel}“ löschen …`}
               onClick={async () => {
-                if (await frage(`Alle ${reihe.length} kommenden Termine „${termin_.titel}" löschen?`, "Alle löschen", true)) {
+                if (await frage(`Alle ${reihe.length} kommenden Termine „${termin_.titel}“ löschen?`, "Alle löschen", true)) {
                   void loeschenViele(reihe.map((x) => x.id));
                   onSchliessen();
                 }
@@ -690,19 +756,6 @@ export function TerminAnsehen({
           )}
         </Gruppe>
       )}
-
-      <FussLeiste>
-        <div className="flex gap-2">
-          {onBearbeiten && (
-            <button onClick={onBearbeiten} className="btn-grau min-w-0 flex-1">
-              Ändern
-            </button>
-          )}
-          <button onClick={onSchliessen} className="btn-primary min-w-0 flex-1">
-            Fertig
-          </button>
-        </div>
-      </FussLeiste>
     </Sheet>
   );
 }

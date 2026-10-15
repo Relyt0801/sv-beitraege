@@ -62,7 +62,7 @@ export function KalenderSyncSheet({ open, onClose }: { open: boolean; onClose: (
         {/* Klar gekennzeichnet: nur die Termine der STUFE, nur in EINE Richtung. */}
         <div className="flex flex-wrap items-center gap-2">
           <h3 className="text-[15px] font-bold">Stufen-Termine ins Handy</h3>
-          <span className="rounded-full bg-brand/10 px-2 py-0.5 text-[11px] font-bold text-brand-dark dark:bg-brand/20 dark:text-brand-soft">
+          <span className="rounded-full bg-brand/10 px-2 py-0.5 text-[12px] font-bold text-brand-dark dark:bg-brand/20 dark:text-brand-soft">
             nur Stufe → Handy
           </span>
         </div>

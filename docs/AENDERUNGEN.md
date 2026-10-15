@@ -11,6 +11,105 @@ ausführlich (auf Deutsch); hier steht der Überblick dazu.
 
 ---
 
+## Rollen-Prüfung: 121 Funde umgesetzt (15.10.2026, nachts)
+
+Alle Rollen (Schüler, Stufenteam, Kassenwart, Admin, Eltern) auf iPhone, SE,
+iPad hoch/quer und Laptop durchgespielt; 121 bestätigte Funde in sieben
+Bereichen umgesetzt, jeder Bereich danach gegengeprüft.
+
+**Kopfzeile und Ebenen**
+- Am Laptop legt nur die **oberste** offene Chat-Ebene ihren Kopf in die
+  Kopfzeile (vorher zwei Zurück-Knöpfe nebeneinander) – Ebenen-Stapel in
+  `ChatBlasen.tsx`. Esc schließt die oberste Ebene (`onSchliessen`), aber
+  nicht, solange unten noch Text im Eingabefeld steht.
+- **Kalender** ist eine `ChatEbene`: am Laptop stehen Zurück, Monat,
+  Monat|Woche|Tag, ‹ ›, Heute und + Termin in der EINEN Kopfzeile; Reiterleiste
+  bleibt. Am Handy Monat wie im iOS-Kalender (Punkte, Liste des Tages).
+- **Reiter noch einmal antippen** (`useReiter`, Ereignis `sv:reiter-wurzel`)
+  schließt offenen Chat bzw. Kalender – wie in iOS. Ein Reiterwechsel vergisst
+  den offenen Chat nicht mehr.
+- **Blätter** (`Sheet.tsx`): ab 640 px oben angedockt statt mittig (✕ springt
+  nicht mehr); ein Blatt über einem offenen Blatt ist eine Unterseite an
+  derselben Stelle mit „‹ <Seite davor>“, ✕ schließt den ganzen Stapel.
+  Neue Bausteine `SchliessenKnopf`, `ZurueckKnopf`, `useBlattKopf`, `<Sheet hoch>`.
+- Kopfband, Reiterleisten (App und Eltern), Kopf/Fuß der Chat-Ebene und die
+  Auswahl-Leiste sind ganz deckend. Seiten-Umschalter in der Kopfzeile alle
+  19 rem breit und enden direkt vor den App-Knöpfen. Am Laptop ist der Titel
+  der Kopfzeile die Seitenüberschrift (Bildschirmleser).
+
+**Übersicht**
+- „**Für dich offen**“ (Schüler) bzw. „**Zu erledigen**“ (Team) ganz oben:
+  offene Abstimmungen, wichtige Infos, eigene nächste Schicht; fürs Team
+  zusätzlich Schichten bestätigen, Termin-/Kosten-/Nachtrags-/Komitee-/
+  Entsperr-Anfragen, Fotos, Meldungen, Zitate prüfen – je mit Sprung
+  (`ZuErledigen.tsx`, `lib/offen.ts`). Team ohne eigene Person sieht es über
+  der Kasse.
+- Ticket vor dem Verkauf klein neben „Mithilfe“, keine leeren Karten mehr;
+  ab iPad hoch zweispaltig.
+
+**Chats / Komitees**
+- Komitee-„Übersicht“ heißt **Pinnwand** (vorher zweimal „Übersicht“
+  untereinander). Reihenfolge: Angepinnt → To-dos → offene Abstimmungen,
+  beendete zugeklappt zuletzt. Kachel sagt „5 neu auf der Pinnwand“ und das
+  Komitee öffnet dort, wenn nur dort Neues ist.
+- Unter den Kacheln (Schüler/Komitee-Mitglieder) steht, was im Komitee
+  wartet. Kachel „Mithilfe nachtragen“ entfällt (oben „+ Nachtragen“).
+- Keine Mülleimer mehr in Zeilen (To-dos, Angepinntes, Gespräche, Infos):
+  Zeile antippen → Blatt, Löschen unten mit Rückfrage. Eltern-Gespräche und
+  „Infos für Eltern“ wie die übrigen Unterseiten. Symbole statt Emojis.
+
+**Events**
+- „Bitte ansehen“ (offene Abstimmungen, wichtige Infos) als kurze Zeilen vor
+  „Mitmachen“; am Laptop rechts neben „Diese Woche“ mit „Deine Schichten“.
+- Eine Schicht öffnet überall dasselbe Blatt (Einteilen, Mithilfe bestätigen,
+  „Ändern“ oben rechts). Angemeldete als Auswahlliste statt ✕ je Zeile.
+- „Neu“ → „Termin“ legt einen Termin an (Ereignis `sv:termin-neu`).
+- Abschnittstitel mit `auf-bild` (Hintergrundbild lesbar).
+
+**Kasse (Team)**
+- Suche: Kennzahlen treten zurück, Treffer stehen direkt unter dem Feld.
+- Halbjahr-Kästchen in der Liste: nur offen ↔ bezahlt (mit Meldung);
+  erlassen geht nur im Blatt der Person. Kästchen 44 px hoch.
+- Filter öffnet direkt am Knopf und enthält nur Filter; Export/Import als
+  Gruppe „Daten“ unten. Spaltenköpfe stehen genau über den Werten.
+- „Mehrere auswählen“ steht auf dem laufenden Halbjahr (vorher fest EF.1),
+  Halbjahr per Häkchen-Liste statt `<select>`.
+- Personenblatt: künftige Halbjahre „später“ (grau) wie in der Liste,
+  „Dabei ab/Verlässt ab“ als Unterseite, „Person löschen“ als eigene Gruppe.
+- Am Handy drei flache Kennzahlen statt 2 × 2 (erste Person ~150 px früher).
+- Beiträge & Abiball am Laptop passt auf einen Bildschirm.
+
+**Finanzen**
+- „Für alle“ ab iPad zweispaltig; Kassenwart am Laptop mit klebender
+  Buchungsliste rechts, am Handy Buchungen direkt nach dem Kontostand.
+- Kategorien als Zeilen mit Unterseite; Buchungsblatt mit normalem Kopf,
+  „Buchung löschen“ als rote Zeile unten. Eltern lesen „Noch offen in der
+  ganzen Stufe“ statt „Offene Elternbeiträge“.
+
+**Rollen & Rechte (Admin)**
+- Personenblatt: Rolle als eine Zeile mit Unterseite und Rückfrage;
+  „Rechte je Rolle“ als eine Gruppe; Album- und Umfrage-Rechte wieder
+  einstellbar; „Fremdzugriff auf Komitees“ im iOS-Stil.
+
+**Blätter**
+- Ranking-Abstimmung, Steckbrief, „Mithilfe nachtragen“ mit normalem
+  Blatt-Kopf; „Antrag senden“ und „Ansehen | Speichern“ kleben unten;
+  Zitatwand-Filter in einer Zeile; Funktionen-Links als Zeilen mit „›“;
+  Lehrkräfte als Liste mit Blatt statt Mülleimer.
+
+**Eltern-App**
+- Eigenes Hintergrundbild jetzt sichtbar. Geschwister ab iPad nebeneinander,
+  Gäste-Ticket und Halbjahr-Erklärung nur einmal. Zeile „Neu“ auf der
+  Übersicht und Zähler am Reiter „Infos“. Fragen ans Stufenteam als Liste mit
+  Blatt statt dauernd offenem Formular. Konto kompakter; „kopieren“ hat einen
+  zweiten Weg, falls der Browser die Zwischenablage verweigert.
+
+**Allgemein**
+- Schrift überall mindestens 12 px (Ausnahme Reiterleiste Handy 10 px);
+  obere Reiter mit 45 px Tippfläche.
+- `tests/geraet.mjs`: Service Worker gesperrt (sonst lädt die Seite beim
+  ersten Besuch nach ~2 s neu) und `BILD=1` wird vor jedem Foto neu gesetzt.
+
 ## Rückmeldung zur Vorschau (15.10.2026, spätabends)
 
 - **Kopfzeile am Laptop entrümpelt**: oben stehen nur noch Titel, der

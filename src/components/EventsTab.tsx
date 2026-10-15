@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { SkelettKarten } from "./Skelett";
 import { useEvents } from "../events-store";
 import { useRole } from "../auth/RoleProvider";
@@ -8,16 +8,30 @@ import { committeeLabel } from "../lib/committees";
 import { AELTER_AB_TAGEN, TYPE_META, gruppiereAehnliche, nachAlter, titelSchluessel, type EventItem } from "../lib/events";
 import { Wochenstreifen } from "./Wochenstreifen";
 import { Kalender } from "./Kalender";
-import { TerminSheet, TerminAnsehen } from "./TerminSheet";
+import { TERMIN_NEU_EREIGNIS, TERMIN_NEU_MERKER, TerminSheet, TerminAnsehen, type TerminNeuDetail } from "./TerminSheet";
 import { anfrageAlsEntwurf, heuteKey, type NeuerTermin, type Termin, type TerminAnfrage } from "../lib/termine";
-import { AktionenListe, MeineSchichten, Winkel } from "./AktionenListe";
-import { AbschlussHinweis } from "./SchichtAbschluss";
+import { AktionenListe, MeineSchichten, Winkel, ZweiSpalten, useMeineSchichten } from "./AktionenListe";
+import { AbschlussHinweis, useOffeneAbschluesse } from "./SchichtAbschluss";
 import { AnfragenFuerTeam, MeineAnfragen } from "./TerminAnfragen";
 import { useTermine } from "../termine-store";
 import { PrivatTerminSheet } from "./KalenderSyncSheet";
 import { UmfragenKarte } from "./Umfragen";
+import { Sheet, SheetKopf } from "./Sheet";
+import { Gruppe, Symbol, Zeile } from "./Liste";
+import { Icon } from "./Icon";
+import { useBreit } from "../lib/gescrollt";
 
 import { frage } from "../lib/melder";
+
+/** Kleiner Abschnittstitel direkt auf dem Hintergrund (wie Gruppe in Liste.tsx). */
+const ABSCHNITT = "auf-bild mb-1.5 px-4 text-[13px] uppercase tracking-[0.02em] text-tinte-leise";
+
+/** Geschätzte Höhe einer Karte im Feed (für die zwei Laptop-Spalten). */
+function kartenHoehe(e: EventItem): number {
+  const text = Math.ceil((e.body || "").length / 90);
+  return e.type === "umfrage" ? 2.5 + e.options.length * 1.3 + text : 2 + text;
+}
+
 export function EventsTab() {
   const { events, ready, myVotes, voteCounts, voters, reads, vote, deleteEvent, markRead } = useEvents();
   const { isStaff, can } = useRole();
@@ -41,13 +55,31 @@ export function EventsTab() {
   // danach abgehakt wird.
   const [entwurf, setEntwurf] = useState<NeuerTermin | null>(null);
   const [ausAnfrage, setAusAnfrage] = useState<string | null>(null);
+  // Beitrag, dessen „…“-Blatt offen ist (Löschen fürs Team)
+  const [mehrVon, setMehrVon] = useState<EventItem | null>(null);
+  // Eintrag unter „Bitte ansehen“, dessen Blatt offen ist (abstimmen, lesen)
+  const [bitteOffen, setBitteOffen] = useState<string | null>(null);
   const darfTermine = isStaff || can("termine.manage");
+  const meineSchichten = useMeineSchichten(streifenTag);
+  const offeneAbschluesse = useOffeneAbschluesse();
+  // Laptop/iPad quer (ab 1024 px): rechts neben „Diese Woche“ eine Spalte mit
+  // dem, was jetzt dran ist – sonst endete dort alles in der Bildschirmmitte.
+  const breit = useBreit();
 
   const terminNeu = (datum: string) => {
     setBearbeite(null);
     setEntwurf(null);
     setAusAnfrage(null);
     setStartDatum(datum);
+    setFormOffen(true);
+  };
+
+  const terminAendern = (t: Termin) => {
+    setBearbeite(t);
+    setEntwurf(null);
+    setAusAnfrage(null);
+    setStartDatum(t.datum);
+    setAngesehen(null);
     setFormOffen(true);
   };
 
@@ -59,6 +91,48 @@ export function EventsTab() {
     setFormOffen(true);
   };
 
+  // „Neu“ → „Termin“ (EventComposer): Formular am gewählten Tag öffnen. Kommt
+  // das Ereignis, während der Reiter noch nicht da ist, liegt ein Merker in
+  // sessionStorage – den holen wir beim ersten Zeichnen ab.
+  const tagRef = useRef(streifenTag);
+  tagRef.current = streifenTag;
+  useEffect(() => {
+    if (!darfTermine) return;
+    const auf = (e?: Event) => {
+      const d = (e as CustomEvent<TerminNeuDetail> | undefined)?.detail;
+      if (d) d.erledigt = true;
+      try {
+        sessionStorage.removeItem(TERMIN_NEU_MERKER);
+      } catch {
+        /* privates Fenster */
+      }
+      setKalenderOffen(false);
+      setAngesehen(null);
+      terminNeu(tagRef.current);
+    };
+    let gemerkt = false;
+    try {
+      gemerkt = sessionStorage.getItem(TERMIN_NEU_MERKER) === "1";
+    } catch {
+      /* privates Fenster */
+    }
+    if (gemerkt) auf();
+    window.addEventListener(TERMIN_NEU_EREIGNIS, auf);
+    return () => window.removeEventListener(TERMIN_NEU_EREIGNIS, auf);
+    // terminNeu setzt nur State – bewusst nicht als Abhängigkeit
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [darfTermine]);
+
+  // Reiter „Events“ noch einmal angetippt (lib/gescrollt.ts): zurück zur
+  // Wurzel – ein offener Kalender schließt, wie ein Chat in „Chats“.
+  useEffect(() => {
+    const wurzel = (e: Event) => {
+      if ((e as CustomEvent<string>).detail === "events") setKalenderOffen(false);
+    };
+    window.addEventListener("sv:reiter-wurzel", wurzel);
+    return () => window.removeEventListener("sv:reiter-wurzel", wurzel);
+  }, []);
+
   // ----------------------------------------------------------- Feed ordnen
   // 1. Ältere Beiträge (> 14 Tage) wandern in den eingeklappten Teil – außer
   //    Abstimmungen, bei denen man noch nicht abgestimmt hat.
@@ -66,36 +140,115 @@ export function EventsTab() {
   //    – neue Schichten“): Die Aktion steht schon unter „Mitmachen“, die Infos
   //    dazu nicht noch einmal ganz oben (Prüfung 15.10.2026: Waffelverkauf
   //    stand an vier Stellen). Wichtiges (rot) und Abstimmungen bleiben oben.
-  // 3. Offene Abstimmungen und Wichtiges nach oben: das ist die Aktion, die
-  //    man hier tun soll.
+  // 3. Offene Abstimmungen und (für Schüler) Wichtiges stehen ganz oben unter
+  //    „Bitte ansehen“ – VOR den Aktionen. Vorher standen sie zwar oben im
+  //    Feed, der Feed aber unter allen Aktionen (iPhone SE: bei 1200 bzw.
+  //    1620 px). Wer einmal oben war, bleibt dort, solange der Reiter offen
+  //    ist – sonst springt die Karte beim Abstimmen unter dem Finger weg.
   // 4. Gleichartige Beiträge (ab drei) zu einer aufklappbaren Gruppe – siehe
   //    gruppiereAehnliche in lib/events.ts.
   const [aelterOffen, setAelterOffen] = useState(false);
+  const obenGemerkt = useRef(new Map<string, number>());
   const aktionsSchluessel = useMemo(
     () => new Set(aktionen.filter((a) => !a.geschlossen).map((a) => titelSchluessel(a.titel))),
     [aktionen],
   );
-  const { feed, aelter, nurAktion } = useMemo(() => {
+  const { bitte, feed, aelter, nurAktion } = useMemo(() => {
     const offen = (e: EventItem) => e.type === "umfrage" && !(myVotes[e.id] || []).length;
     const { aktuell, aelter: alt } = nachAlter(events, offen);
     const zuAktion = (e: EventItem) =>
       e.type !== "umfrage" && !e.is_warning && aktionsSchluessel.has(titelSchluessel(e.title));
-    const oben = aktuell.filter((e) => !zuAktion(e));
+    // Merken, was nach oben gehört (0 = offene Abstimmung, 1 = Wichtiges) –
+    // erst wenn auch die eigenen Stimmen geladen sind (ready)
+    const gemerkt = obenGemerkt.current;
+    if (ready) for (const e of aktuell) {
+      if (gemerkt.has(e.id) || zuAktion(e)) continue;
+      if (offen(e)) gemerkt.set(e.id, 0);
+      else if (e.is_warning && !isStaff) gemerkt.set(e.id, 1);
+    }
+    const oben = aktuell.filter((e) => !zuAktion(e) && !gemerkt.has(e.id));
     const beiAktion = aktuell.filter(zuAktion);
     const vorne = (e: EventItem) => (offen(e) ? 0 : e.is_warning ? 1 : 2);
     const sortiert = [...oben].sort((a, b) => vorne(a) - vorne(b) || b.created_at.localeCompare(a.created_at));
     return {
+      bitte: events
+        .filter((e) => gemerkt.has(e.id))
+        .sort((a, b) => gemerkt.get(a.id)! - gemerkt.get(b.id)! || b.created_at.localeCompare(a.created_at)),
       feed: gruppiereAehnliche(sortiert, (e) => e.title),
       // Neueste zuerst, dann die wirklich alten
-      aelter: [...beiAktion, ...alt],
+      aelter: [...beiAktion, ...alt.filter((e) => !gemerkt.has(e.id))],
       nurAktion: beiAktion.length,
     };
-  }, [events, myVotes, aktionsSchluessel]);
+  }, [events, myVotes, aktionsSchluessel, isStaff, ready]);
 
   // Beim Ansehen als gelesen markieren
   useEffect(() => {
     for (const e of events) if (!reads.has(e.id)) markRead(e.id);
   }, [events, reads, markRead]);
+
+  // Eine Karte bauen – im Feed, in einer Gruppe und unter „Älter“ gleich
+  const karte = (e: EventItem, flach = false) => (
+    <EventCard
+      key={e.id}
+      e={e}
+      flach={flach}
+      mine={myVotes[e.id] || []}
+      counts={voteCounts[e.id] || {}}
+      stimmen={voters[e.id] || []}
+      canSeeResults={e.poll_show_results || isStaff}
+      zeigeWaehler={!e.poll_anon || isStaff}
+      onMehr={isStaff ? () => setMehrVon(e) : undefined}
+      onVote={(optId) => vote(e.id, optId, e.poll_multiple)}
+    />
+  );
+
+  const loeschenFragen = async (e: EventItem, danach: () => void) => {
+    if (await frage(`„${e.title}“ wirklich löschen?`, "Löschen", true)) {
+      danach();
+      void deleteEvent(e.id);
+    }
+  };
+
+  // „Bitte ansehen“: offene Abstimmungen und (für Schüler) Wichtiges als
+  // kurze Zeilen – antippen öffnet das Blatt zum Abstimmen bzw. Lesen. Als
+  // ganze Karten schoben sie „Mitmachen“ am Handy um eine Bildschirmhöhe nach
+  // unten (iPhone SE: erstes „Eintragen“ bei 1318 statt 736 px).
+  const bitteBlock =
+    ready && bitte.length > 0 ? (
+      <Gruppe titel="Bitte ansehen" className="mb-5">
+        {bitte.map((e) => {
+          const umfrage = e.type === "umfrage";
+          const abgestimmt = umfrage && (myVotes[e.id] || []).length > 0;
+          return (
+            <Zeile
+              key={e.id}
+              onClick={() => setBitteOffen(e.id)}
+              symbol={
+                <Symbol farbe={e.is_warning ? "bg-[#FF3B30]" : "bg-[#0A84FF]"}>
+                  <Icon name={umfrage ? "umfrage" : "info"} size={17} strich={2.2} />
+                </Symbol>
+              }
+              label={<span className="line-clamp-2 font-semibold">{e.title}</span>}
+              unter={
+                umfrage ? (
+                  abgestimmt ? (
+                    "Abstimmung · du hast abgestimmt"
+                  ) : (
+                    <span className="font-semibold text-brand-dark dark:text-brand">Abstimmung · stimm ab</span>
+                  )
+                ) : (
+                  <span className="line-clamp-1">{e.body || "Wichtige Info"}</span>
+                )
+              }
+            />
+          );
+        })}
+      </Gruppe>
+    ) : null;
+  const offenesBitte = bitteOffen ? events.find((e) => e.id === bitteOffen) ?? null : null;
+
+  // Rechte Spalte am Laptop: nur, wenn etwas drinsteht
+  const rechteSpalte = breit && (offeneAbschluesse.length > 0 || meineSchichten.length > 0 || bitteBlock !== null);
 
   // Rund um den Feed stehen immer der Wochenstreifen und die Aufbauten fuer
   // Kalender und Termine – auch waehrend die Events noch laden.
@@ -105,27 +258,44 @@ export function EventsTab() {
           1. Diese Woche (heute sofort sichtbar), fürs Team mit „+“ zum Eintragen
           2. Was jetzt zu tun ist: Anfragen, vorbei-Schichten bestätigen
           3. Deine Schichten (grüne Tickets)
-          4. Mitmachen – gleichartige Aktionen zu Gruppen zusammengefasst
-          5. Infos & Abstimmungen – offene zuerst, Ältere eingeklappt */}
-      <Wochenstreifen
-        onKalender={(tag) => {
-          setKalenderTag(tag);
-          setKalenderOffen(true);
-          termineGesehen();
-        }}
-        onOeffnen={(t) => setAngesehen(t)}
-        onNeu={darfTermine ? terminNeu : undefined}
-        onTag={setStreifenTag}
-      />
+          4. Bitte ansehen: offene Abstimmungen, Wichtiges (kurze Zeilen)
+          5. Mitmachen – gleichartige Aktionen zu Gruppen zusammengefasst
+          6. Infos & Abstimmungen – Ältere eingeklappt
+          Am Laptop stehen 2–4 als Spalte rechts neben „Diese Woche“ (sonst
+          endeten die Tickets in der Bildschirmmitte, daneben war alles leer). */}
+      <div className={rechteSpalte ? "grid grid-cols-[minmax(0,1.65fr)_minmax(0,1fr)] items-start gap-4" : undefined}>
+        <Wochenstreifen
+          onKalender={(tag) => {
+            setKalenderTag(tag);
+            setKalenderOffen(true);
+            termineGesehen();
+          }}
+          onOeffnen={(t) => setAngesehen(t)}
+          onNeu={darfTermine ? terminNeu : undefined}
+          onTag={setStreifenTag}
+        />
+        {rechteSpalte && (
+          <div className="min-w-0">
+            <AbschlussHinweis />
+            <MeineSchichten ausserTag={streifenTag} spalte />
+            {bitteBlock}
+          </div>
+        )}
+      </div>
 
       <MeineAnfragen />
       <AnfragenFuerTeam onUebernehmen={anfrageUebernehmen} />
 
-      {/* Offene Schichten zum Bestätigen – bleibt, auch wenn das Pop-up weggewischt wurde */}
-      <AbschlussHinweis />
+      {!rechteSpalte && (
+        <>
+          {/* Offene Schichten zum Bestätigen – bleibt, auch wenn das Pop-up weggewischt wurde */}
+          <AbschlussHinweis />
+          <MeineSchichten ausserTag={streifenTag} />
+          {bitteBlock}
+        </>
+      )}
 
-      <MeineSchichten ausserTag={streifenTag} />
-      <AktionenListe />
+      <AktionenListe onAendern={darfTermine ? terminAendern : undefined} />
 
       {/* Pop-up-Umfragen: laufende auf einen Blick (Team mit Recht) */}
       <UmfragenKarte />
@@ -164,19 +334,56 @@ export function EventsTab() {
         <TerminAnsehen
           termin={angesehen}
           onSchliessen={() => setAngesehen(null)}
-          onBearbeiten={
-            darfTermine
-              ? () => {
-                  setBearbeite(angesehen);
-                  setEntwurf(null);
-                  setAusAnfrage(null);
-                  setStartDatum(angesehen.datum);
-                  setAngesehen(null);
-                  setFormOffen(true);
-                }
-              : undefined
-          }
+          onBearbeiten={darfTermine ? () => terminAendern(angesehen) : undefined}
         />
+      )}
+
+      {/* „…“ an einer Karte: Löschen weg von der Karte, unten im Blatt mit Rückfrage */}
+      {mehrVon && (
+        <Sheet open onClose={() => setMehrVon(null)}>
+          <SheetKopf
+            titel={mehrVon.title}
+            unter={`${mehrVon.type === "umfrage" ? "Abstimmung" : mehrVon.is_warning ? "Wichtige Info" : "Info"} · ${wann(mehrVon.created_at)}`}
+            onClose={() => setMehrVon(null)}
+          />
+          <Gruppe className="mt-2" fuss="Gelöscht ist der Beitrag für alle weg – auch abgegebene Stimmen.">
+            <Zeile
+              rot
+              label={mehrVon.type === "umfrage" ? "Abstimmung löschen …" : "Info löschen …"}
+              onClick={() => void loeschenFragen(mehrVon, () => setMehrVon(null))}
+            />
+          </Gruppe>
+        </Sheet>
+      )}
+
+      {/* „Bitte ansehen“: Abstimmung bzw. wichtige Info im Blatt */}
+      {offenesBitte && (
+        <Sheet open onClose={() => setBitteOffen(null)}>
+          <SheetKopf
+            titel={offenesBitte.title}
+            unter={`${offenesBitte.type === "umfrage" ? "Abstimmung" : offenesBitte.is_warning ? "Wichtige Info" : "Info"} · ${wann(offenesBitte.created_at)}`}
+            onClose={() => setBitteOffen(null)}
+          />
+          <EventCard
+            e={offenesBitte}
+            imBlatt
+            mine={myVotes[offenesBitte.id] || []}
+            counts={voteCounts[offenesBitte.id] || {}}
+            stimmen={voters[offenesBitte.id] || []}
+            canSeeResults={offenesBitte.poll_show_results || isStaff}
+            zeigeWaehler={!offenesBitte.poll_anon || isStaff}
+            onVote={(optId) => vote(offenesBitte.id, optId, offenesBitte.poll_multiple)}
+          />
+          {isStaff && (
+            <Gruppe className="mt-8" fuss="Gelöscht ist der Beitrag für alle weg – auch abgegebene Stimmen.">
+              <Zeile
+                rot
+                label={offenesBitte.type === "umfrage" ? "Abstimmung löschen …" : "Info löschen …"}
+                onClick={() => void loeschenFragen(offenesBitte, () => setBitteOffen(null))}
+              />
+            </Gruppe>
+          )}
+        </Sheet>
       )}
     </>
   );
@@ -189,55 +396,51 @@ export function EventsTab() {
   if (events.length === 0)
     return rahmen(
       <section className="mb-5">
-        <h3 className="mb-1.5 px-4 text-[13px] uppercase tracking-[0.02em] text-tinte-leise">Infos & Abstimmungen</h3>
+        <h3 className={ABSCHNITT}>Infos & Abstimmungen</h3>
         <div className="card px-5 py-6 text-center">
           <div className="text-[15px] font-semibold">Noch keine Infos</div>
           <div className="mt-1 text-[13px] text-tinte-leise">
-            {isStaff ? "Mit „Neu“ unten rechts schreibst du die erste Info oder Abstimmung." : "Sobald das Stufenteam etwas schreibt, steht es hier."}
+            {isStaff ? (
+              // „Neu“ schwebt am Handy unten rechts, ab iPad steht es oben rechts im Kopf
+              <>
+                Mit „Neu“ <span className="md:hidden">unten rechts</span>
+                <span className="hidden md:inline">oben rechts</span> schreibst du die erste Info oder Abstimmung.
+              </>
+            ) : (
+              "Sobald das Stufenteam etwas schreibt, steht es hier."
+            )}
           </div>
         </div>
       </section>,
     );
 
-  // Eine Karte bauen – im Feed, in einer Gruppe und unter „Älter“ gleich
-  const karte = (e: EventItem, flach = false) => (
-    <EventCard
-      key={e.id}
-      e={e}
-      flach={flach}
-      mine={myVotes[e.id] || []}
-      counts={voteCounts[e.id] || {}}
-      stimmen={voters[e.id] || []}
-      canSeeResults={e.poll_show_results || isStaff}
-      zeigeWaehler={!e.poll_anon || isStaff}
-      canDelete={isStaff}
-      onVote={(optId) => vote(e.id, optId, e.poll_multiple)}
-      onDelete={async () => {
-        if (await frage("Dieses Event wirklich löschen?", "Löschen", true)) void deleteEvent(e.id);
-      }}
-    />
-  );
+  // Steht alles Aktuelle schon unter „Bitte ansehen“, braucht es hier kein
+  // „Gerade nichts Neues“.
+  if (feed.length === 0 && aelter.length === 0 && bitte.length > 0) return rahmen(null);
 
   return rahmen(
     <section className="mb-5">
-      <h3 className="mb-1.5 px-4 text-[13px] uppercase tracking-[0.02em] text-tinte-leise">Infos & Abstimmungen</h3>
+      <h3 className={ABSCHNITT}>Infos & Abstimmungen</h3>
       {feed.length > 0 ? (
-        <div className="grid items-start gap-3 lg:grid-cols-2">
-          {feed.map((g) =>
+        <ZweiSpalten
+          eintraege={feed}
+          hoehe={(g) => (g.art === "einzeln" ? kartenHoehe(g.eintrag) : 2)}
+        >
+          {(g) =>
             g.art === "einzeln" ? (
               karte(g.eintrag)
             ) : (
               <EventGruppe key={`g-${g.schluessel}`} titel={g.titel} events={g.eintraege} karte={(e) => karte(e, true)} />
-            ),
-          )}
-        </div>
-      ) : (
+            )
+          }
+        </ZweiSpalten>
+      ) : bitte.length === 0 ? (
         <div className="card px-5 py-5 text-center text-[14px] text-tinte-leise">Gerade nichts Neues.</div>
-      )}
+      ) : null}
 
       {/* Weitere Beiträge: eingeklappt, damit oben nur Aktuelles steht */}
       {aelter.length > 0 && (
-        <div className="mt-3">
+        <div className={feed.length > 0 ? "mt-3" : ""}>
           <button
             onClick={() => setAelterOffen(!aelterOffen)}
             aria-expanded={aelterOffen}
@@ -256,7 +459,9 @@ export function EventsTab() {
             </span>
           </button>
           {aelterOffen && (
-            <div className="mt-3 grid animate-fadeIn items-start gap-3 lg:grid-cols-2">{aelter.map((e) => karte(e))}</div>
+            <ZweiSpalten eintraege={aelter} hoehe={kartenHoehe} className="mt-3 animate-fadeIn">
+              {(e) => karte(e)}
+            </ZweiSpalten>
           )}
         </div>
       )}
@@ -321,27 +526,29 @@ function EventGruppe({
 function EventCard({
   e,
   flach = false,
+  imBlatt = false,
   mine,
   counts,
   stimmen,
   canSeeResults,
   zeigeWaehler,
-  canDelete,
+  onMehr,
   onVote,
-  onDelete,
 }: {
   e: EventItem;
   /** ohne eigene Karte – als Zeile in einer Gruppe */
   flach?: boolean;
+  /** im Blatt: Art, Datum und Titel stehen schon im SheetKopf */
+  imBlatt?: boolean;
   mine: string[];
   counts: Record<string, number>;
   stimmen: { option_id: string; user_id: string }[];
   canSeeResults: boolean;
   /** darf man sehen, WER gestimmt hat? sonst graue Kreise */
   zeigeWaehler: boolean;
-  canDelete: boolean;
+  /** Team: „…“ oben rechts öffnet das Blatt mit „Löschen“ (statt eines roten „Löschen“ in jeder Karte) */
+  onMehr?: () => void;
   onVote: (optionId: string) => void;
-  onDelete: () => void;
 }) {
   const total = Object.values(counts).reduce((a, b) => a + b, 0);
   const meta = TYPE_META[e.type];
@@ -353,11 +560,14 @@ function EventCard({
   return (
     <div
       className={
-        flach
-          ? "px-4 py-3.5"
-          : `card p-4 sm:p-5 ${e.is_warning ? "!bg-[#FFF2F1] dark:!bg-[#2A1514]" : ""}`
+        imBlatt
+          ? ""
+          : flach
+            ? "px-4 py-3.5"
+            : `card p-4 sm:p-5 ${e.is_warning ? "!bg-[#FFF2F1] dark:!bg-[#2A1514]" : ""}`
       }
     >
+      {!imBlatt && (
       <div className="mb-1 flex items-center gap-1.5 text-[12px] font-semibold">
         {e.is_warning && <span aria-hidden className="h-2 w-2 rounded-full bg-red-500" />}
         <span className={`uppercase tracking-[0.03em] ${artFarbe}`}>{art}</span>
@@ -366,18 +576,36 @@ function EventCard({
           <span className="truncate text-tinte-leise">· {(e.tags || []).map(committeeLabel).join(", ") || "Komitees"}</span>
         )}
         <span className="ml-auto shrink-0 font-normal text-tinte-leise">{wann(e.created_at)}</span>
-        {canDelete && (
-          <button onClick={onDelete} className="ml-2 shrink-0 text-[12px] font-semibold text-red-500" aria-label="Löschen">
-            Löschen
+        {onMehr && (
+          <button
+            type="button"
+            onClick={onMehr}
+            aria-label={`Mehr zu „${e.title}“`}
+            title="Mehr"
+            className="-my-3 -mr-2.5 ml-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-tinte-leise transition active:bg-black/[0.05] dark:active:bg-white/[0.08]"
+          >
+            <MehrPunkte />
           </button>
         )}
       </div>
+      )}
 
-      <div className={`text-[17px] font-semibold leading-snug ${e.is_warning ? "text-red-700 dark:text-red-300" : ""}`}>{e.title}</div>
-      {e.body && <div className="mt-1 whitespace-pre-wrap text-[15px] leading-relaxed text-tinte-matt dark:text-slate-300">{e.body}</div>}
+      {!imBlatt && (
+        <div className={`text-[17px] font-semibold leading-snug ${e.is_warning ? "text-red-700 dark:text-red-300" : ""}`}>{e.title}</div>
+      )}
+      {e.body && (
+        <div className={`whitespace-pre-wrap text-[15px] leading-relaxed text-tinte-matt dark:text-slate-300 ${imBlatt ? "mb-1 px-1" : "mt-1"}`}>
+          {e.body}
+        </div>
+      )}
+      {imBlatt && e.audience !== "all" && (
+        <div className="mt-1 px-1 text-[13px] text-tinte-leise">
+          {e.audience === "selected" ? "Gezielt an einzelne Personen" : `Für ${(e.tags || []).map(committeeLabel).join(", ") || "Komitees"}`}
+        </div>
+      )}
 
       {e.type === "umfrage" && (
-        <div className="mt-3">
+        <div className={imBlatt ? "mt-2" : "mt-3"}>
           {/* Antworten als Liste mit Trennlinien und dünnem Balken – wie Umfragen in iMessage */}
           <div className="overflow-hidden rounded-[14px] bg-[rgb(118_118_128/0.12)] dark:bg-[rgb(118_118_128/0.24)]">
             {e.options.map((o, i) => {
@@ -443,5 +671,16 @@ function EventCard({
         </div>
       )}
     </div>
+  );
+}
+
+/** Drei Punkte („…“) wie der Mehr-Knopf in iOS – nimmt die Schriftfarbe an. */
+function MehrPunkte() {
+  return (
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden>
+      <circle cx="5.5" cy="12" r="1.8" />
+      <circle cx="12" cy="12" r="1.8" />
+      <circle cx="18.5" cy="12" r="1.8" />
+    </svg>
   );
 }

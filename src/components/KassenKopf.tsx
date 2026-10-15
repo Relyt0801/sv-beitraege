@@ -1,4 +1,4 @@
-import { memo, useState } from "react";
+import { memo, useId, useState } from "react";
 import { HY, type Halbjahr, type Settings, type Student } from "../lib/types";
 import { basisOffen, beitragFuer, isActive, idx, prozentVon } from "../lib/logic";
 
@@ -25,6 +25,8 @@ function KassenKopfRoh({
 }) {
   const bis = idx(settings.aktuelles_halbjahr);
   const [aendern, setAendern] = useState(false);
+  const gruppenId = useId();
+  const waehlen = aendern && Boolean(halbjahrSetzen);
 
   // Soll: was bis einschließlich heute fällig wäre, wenn alle dabei sind.
   // Ist: davon bezahlt. Erlassene Halbjahre zählen weder als Soll noch als offen.
@@ -71,9 +73,8 @@ function KassenKopfRoh({
   });
 
   // Eine Kennzahl: Bezeichnung, Wert, eine kurze Zeile darunter, dünner Balken.
-  // Alle vier in EINER Karte (Handy 2 × 2, Laptop 1 × 4) – vorher vier
-  // einzelne Karten plus Halbjahres-Karte: am Handy sah man erst nach
-  // 430 px die erste Person der Liste.
+  // Alle vier in EINER Karte (ab iPad 1 × 4) – vorher vier einzelne Karten
+  // plus Halbjahres-Karte. Am Handy steht stattdessen die flache Reihe (kurz).
   const kennzahl = (label: string, wert: React.ReactNode, unter: React.ReactNode, balken: number, farbe: string, wertFarbe = "") => (
     <div className="min-w-0 px-3.5 py-3 sm:px-4">
       <div className="kennlabel truncate">{label}</div>
@@ -85,11 +86,39 @@ function KassenKopfRoh({
     </div>
   );
 
+  // Handy: nur Wert und eine kurze Zeile darunter
+  const kurz = (wert: React.ReactNode, label: string, wertFarbe = "") => (
+    <div className="min-w-0 px-3 py-2.5">
+      <div className={`zahl truncate text-[1.25rem] font-extrabold leading-tight ${wertFarbe}`}>{wert}</div>
+      <div className="truncate text-[12px] text-tinte-matt">{label}</div>
+    </div>
+  );
+
   return (
     <div className="mx-auto mt-3 max-w-5xl space-y-2.5">
-      {/* --------------------------------------------- vier Kennzahlen */}
+      {/* --------------------------------------------- Handy: drei Zahlen
+          Am Handy war die 2 × 2-Karte 210 px hoch – mit den Halbjahren darunter
+          stand die erste Person erst bei 690 px (Prüfung Okt. 2026). Für die
+          Kasse zählt dort nur: was ist da, was fehlt, wer ist durch. Eine
+          flache Reihe, ohne Balken; „Mithilfe im Schnitt“ steht ab iPad. */}
       <div
-        className="card grid grid-cols-2 overflow-hidden [&>*:nth-child(odd)]:border-r [&>*:nth-child(-n+2)]:border-b [&>*]:border-black/[0.06] dark:[&>*]:border-white/[0.08] md:grid-cols-4 md:[&>*:nth-child(-n+2)]:border-b-0 md:[&>*:not(:last-child)]:border-r"
+        className="card grid grid-cols-3 overflow-hidden md:hidden [&>*:not(:last-child)]:border-r [&>*]:border-black/[0.06] dark:[&>*]:border-white/[0.08]"
+        data-tour="kassenkopf"
+      >
+        {kurz(`${ein} €`, "eingegangen")}
+        {kurz(`${offen} €`, `offen bei ${students.length - fertig}`, "text-offen")}
+        {kurz(
+          <>
+            {fertig}
+            <span className="text-[0.95rem] font-semibold text-tinte-matt">/{students.length}</span>
+          </>,
+          "ganz bezahlt",
+        )}
+      </div>
+
+      {/* --------------------------------------------- ab iPad: vier Kennzahlen */}
+      <div
+        className="card hidden overflow-hidden md:grid md:grid-cols-4 [&>*:not(:last-child)]:border-r [&>*]:border-black/[0.06] dark:[&>*]:border-white/[0.08]"
         data-tour="kassenkopf"
       >
         {kennzahl(
@@ -132,6 +161,7 @@ function KassenKopfRoh({
             <button
               onClick={() => setAendern((v) => !v)}
               aria-expanded={aendern}
+              aria-controls={gruppenId}
               className="-mr-1.5 flex min-h-[2.25rem] items-center gap-1 rounded-full px-2 text-[13px] font-semibold text-brand-dark dark:text-brand"
             >
               {settings.aktuelles_halbjahr} läuft · {aendern ? "fertig" : "ändern"}
@@ -141,10 +171,16 @@ function KassenKopfRoh({
           )}
         </div>
         {/* Eine Reihe mit allen sechs – auch am Handy (früher 3 × 2 bzw. eine
-            Wischleiste, in der Q2.1/Q2.2 niemand fand). */}
-        <div aria-label="Die sechs Halbjahre" className="grid grid-cols-6 gap-1 sm:gap-1.5">
+            Wischleiste, in der Q2.1/Q2.2 niemand fand). Unter 375 px (kleine
+            Android-Handys) passt „38 %“ nicht in ein Sechstel: dort 3 × 2. */}
+        <div
+          id={gruppenId}
+          role={waehlen ? "radiogroup" : "group"}
+          aria-label={waehlen ? "Laufendes Halbjahr" : "Die sechs Halbjahre"}
+          className="grid grid-cols-3 gap-1 min-[375px]:grid-cols-6 sm:gap-1.5"
+        >
           {halbjahre.map((h) =>
-            aendern && halbjahrSetzen ? (
+            waehlen && halbjahrSetzen ? (
               <button
                 key={h.name}
                 role="radio"
@@ -161,7 +197,7 @@ function KassenKopfRoh({
             ) : (
               <div
                 key={h.name}
-                className={`min-w-0 rounded-xl border px-1.5 py-1.5 sm:p-2 ${
+                className={`min-w-0 rounded-xl border px-1 py-1.5 sm:p-2 ${
                   h.laeuft ? "border-brand/40 bg-brand/[0.06]" : "border-transparent bg-papier dark:bg-slate-800/60"
                 }`}
               >
@@ -169,10 +205,15 @@ function KassenKopfRoh({
                   <span className={`text-[12px] font-bold ${h.laeuft ? "text-brand" : ""}`}>{h.name}</span>
                   <span className="zahl hidden text-[12px] font-semibold text-tinte-leise sm:inline">{h.preis} €</span>
                 </div>
-                <div className={`zahl mt-1 text-[15px] font-bold leading-none sm:text-[17px] ${h.laeuft ? "text-brand" : ""}`}>
-                  {h.kommtNoch ? "–" : `${h.quote} %`}
+                <div
+                  className={`zahl mt-1 whitespace-nowrap text-[13px] font-bold leading-none tracking-[-0.02em] min-[400px]:text-[15px] sm:text-[17px] sm:tracking-normal ${h.laeuft ? "text-brand" : ""}`}
+                >
+                  {/* schmales, festes Leerzeichen: „100 %“ bricht nie um */}
+                  {h.kommtNoch ? "–" : `${h.quote}\u202f%`}
                 </div>
-                <div className="mt-0.5 truncate text-[12px] text-tinte-leise">
+                {/* Kein Abschneiden („12 off…“ bei 375 px): passt „87 offen“ nicht
+                    in die Kachel, bricht „offen“ in die nächste Zeile um. */}
+                <div className="mt-0.5 text-[12px] leading-tight text-tinte-leise">
                   {h.kommtNoch ? "später" : h.rest === 0 ? "fertig" : `${h.rest} offen`}
                 </div>
               </div>

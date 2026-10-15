@@ -6,7 +6,7 @@ import type { Student } from "../lib/types";
 
 /**
  * Wie eine Person in den Verwaltungslisten steht – im Rollen-Reiter genauso
- * wie im Rechte-Reiter.
+ * wie unter Rollen → „Rechte je Rolle“.
  *
  * Immer dieselben drei Dinge: Namenskreis, "Nachname, Vorname" und darunter
  * der Nutzername mit der Rolle. Konten ohne eigene Person (Elternzugänge,

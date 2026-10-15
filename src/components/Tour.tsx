@@ -332,7 +332,7 @@ export function schuelerSchritte(staffel: Staffel, o: { nachtragen?: boolean; fi
       tab: "kasse",
       anchor: "meine-halbjahre",
       title: "Deine sechs Halbjahre",
-      text: "Jede Kachel ist ein Halbjahr: Haken = bezahlt, € = offen, Schrägstrich = erlassen. Blau umrandet ist das laufende, graue sind noch nicht fällig.",
+      text: "Jede Kachel ist ein Halbjahr: Haken = bezahlt, € = offen, Schrägstrich = erlassen. Blau umrandet ist das laufende, graue kommen später.",
     },
     {
       tab: "kasse",
@@ -396,7 +396,7 @@ export function teamSchritte(o: {
       anchor: "person",
       title: "Eine Person",
       text: o.kasseBearbeiten
-        ? "Ein Tipp auf ein Halbjahr schaltet zwischen offen, bezahlt und erlassen. Ein Tipp auf den Namen öffnet alle Details und die Mithilfe."
+        ? "Ein Tipp auf ein Halbjahr schaltet zwischen offen und bezahlt. Ein Tipp auf den Namen öffnet alle Details und die Mithilfe – dort kannst du ein Halbjahr auch erlassen."
         : "Ein Tipp auf den Namen öffnet alle Details – dort trägst du auch ein, wobei jemand geholfen hat.",
     },
   );
@@ -418,7 +418,7 @@ export function teamSchritte(o: {
   if (o.finanzen)
     s.push({ tab: "finanzen", anchor: "tab-finanzen", title: "Finanzen", text: "Das Kassenbuch: Kontostand, Einnahmen und Ausgaben. Ein Tipp auf eine Buchung zeigt alle Details." });
   if (o.rollen || o.rechte)
-    s.push({ tab: "rollen", anchor: "tab-rollen", title: "Rollen & Rechte", text: "Oben umschalten: „Rollen“ zeigt alle Personen – Person antippen für ihre einzelnen Rechte. „Rechte“ legt fest, was jede Rolle darf." });
+    s.push({ tab: "rollen", anchor: "tab-rollen", title: "Rollen", text: "Oben umschalten: „Personen“ zeigt alle – Person antippen für ihre Rolle und einzelnen Rechte. „Rechte je Rolle“ legt fest, was jede Rolle darf." });
   s.push({
     tab: "kasse",
     anchor: "profil",
@@ -448,7 +448,7 @@ export function elternSchritte(o: { mehrereKinder: boolean }): TourStep[] {
       tab: "uebersicht",
       anchor: "kind-halbjahre",
       title: "Sechs Halbjahre",
-      text: "✓ bezahlt, € offen, / erlassen. Blau umrandet ist das laufende Halbjahr, graue sind noch nicht fällig. EF ist die 11, Q1 und Q2 die 12 und 13.",
+      text: "✓ bezahlt, € offen, / erlassen. Blau umrandet ist das laufende Halbjahr, graue kommen später. EF ist die 11, Q1 und Q2 die 12 und 13.",
     },
     {
       tab: "uebersicht",

@@ -9,7 +9,7 @@ import { useBreit } from "../lib/gescrollt";
  * Ort und Stelle über dem Inhalt.
  *
  * So steht auf jedem Gerät alles, was die Seite steuert, an derselben
- * Stelle wie im geöffneten Chat „Chat | Übersicht“ – und am Laptop kostet
+ * Stelle wie im geöffneten Chat „Chat | Pinnwand“ – und am Laptop kostet
  * es keine eigene Zeile (Design-Regeln, Abschnitt 3).
  *
  * `className` gilt nur für die Stelle im Inhalt (Handy), `kopfClassName`

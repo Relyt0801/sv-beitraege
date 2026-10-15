@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Sheet, SheetKopf } from "./Sheet";
-import { Gruppe, Wert, Zeile } from "./Liste";
+import { Gruppe, Wert, Zeile, ZeileEingabe, ZeileMitSchalter } from "./Liste";
+import { FussLeiste as FussLeisteBlatt } from "./FussLeiste";
 import { Schalter } from "./Schalter";
 import { AusHinweis } from "./Funktionen";
 import { useRole } from "../auth/RoleProvider";
@@ -143,7 +144,7 @@ export function RankingKarten({ className = "" }: { className?: string }) {
                   <span key={x.n} className="w-[14px] rounded-t-[3px] sm:w-5" style={{ height: x.h, background: x.f }} />
                 ))}
               </div>
-              <div className="pr-14 text-[11px] font-semibold uppercase tracking-[0.12em] text-white/80">Abi-Ranking</div>
+              <div className="pr-12 text-[12px] font-semibold uppercase tracking-[0.02em] text-white/80">Abi-Ranking</div>
               <div className="mt-0.5 text-[1.2rem] font-bold leading-tight">{ART_STIL[art].kurz}</div>
               <div className="mt-1 text-[12.5px] leading-snug text-white/80">
                 {wahlen
@@ -209,6 +210,23 @@ function RankingSheet({ art, onClose, r, runden }: { art: RankingArt | null; onC
   const q = suche.trim().toLowerCase();
   const gefiltert = q ? imTeil.filter((k) => k.titel.toLowerCase().includes(q)) : imTeil;
   const offenAnzahl = imTeil.filter((k) => !(k.id in r.meine)).length;
+  // Die Kachel zählt beide Teile („Noch 8 von 8 offen“) – das Blatt zeigt einen
+  // Teil. Was im anderen Teil noch offen ist, steht darum in der Stand-Karte.
+  const andererTeil: Teil = teil === "offiziell" ? "inoffiziell" : "offiziell";
+  const offenAnders = alleArt.filter((k) => k.bereich === andererTeil && !(k.id in r.meine)).length;
+  // Beim Öffnen: ist im gemerkten Teil alles erledigt, im anderen aber nicht,
+  // gleich dorthin (nur einmal je Öffnen, nie mitten im Abstimmen).
+  const teilGeprueft = useRef(false);
+  // vor dem Zeichnen, damit nicht kurz der erledigte Teil aufblitzt
+  useLayoutEffect(() => {
+    if (!open) {
+      teilGeprueft.current = false;
+      return;
+    }
+    if (teilGeprueft.current || !r.bereit || alleArt.length === 0) return;
+    teilGeprueft.current = true;
+    if (offenAnzahl === 0 && offenAnders > 0) setTeil(andererTeil);
+  }, [open, r.bereit, alleArt.length, offenAnzahl, offenAnders, andererTeil, setTeil]);
   // Ohne eigene Wahl: gibt es noch Offenes, zuerst „Abstimmen“, sonst „Ergebnisse“
   const ansicht: Ansicht = ansichtWahl ?? (offenAnzahl > 0 || imTeil.some((k) => runden.offeneVon(k.id)) ? "abstimmen" : "ergebnisse");
   const wahl = wahlId ? r.kategorien.find((k) => k.id === wahlId) || null : null;
@@ -247,7 +265,8 @@ function RankingSheet({ art, onClose, r, runden }: { art: RankingArt | null; onC
   };
   return (
     <>
-      <Sheet open={open && !einstellungen && !kueren} onClose={schliessen}>
+      {/* Bleibt offen unter Einstellungen/Küren: die stehen als Unterseite an seiner Stelle („‹ …“) */}
+      <Sheet hoch open={open} onClose={schliessen}>
         {wahl ? (
           <Abstimmen
             key={wahl.id}
@@ -309,7 +328,15 @@ function RankingSheet({ art, onClose, r, runden }: { art: RankingArt | null; onC
               className="mb-4"
             />
             <TeilWischer teil={teil} setTeil={setTeil}>
-              <StandKarte art={zuletzt} teil={teil} kategorien={imTeil} r={r} runden={runden} onOeffnen={(k) => setWahlId(k.id)} />
+              <StandKarte
+                art={zuletzt}
+                teil={teil}
+                kategorien={imTeil}
+                r={r}
+                runden={runden}
+                onOeffnen={(k) => setWahlId(k.id)}
+                anders={offenAnders > 0 ? { anzahl: offenAnders, teil: andererTeil, wechseln: () => (setTeil(andererTeil), setSuche("")) } : undefined}
+              />
 
               {/* Ein Weg zu den Ergebnissen: dieses Segment (die Karte oben hat keinen zweiten Knopf mehr) */}
               {imTeil.length > 0 && (
@@ -347,7 +374,7 @@ function RankingSheet({ art, onClose, r, runden }: { art: RankingArt | null; onC
       </Sheet>
       <KategorieNeuSheet open={open && neuOffen} onClose={() => setNeuOffen(false)} r={r} art={zuletzt} startTeil={teil} />
       <RankingEinstellungen
-        open={open && einstellungen && !kueren}
+        open={open && einstellungen}
         onClose={() => setEinstellungen(false)}
         r={r}
         runden={runden}
@@ -429,6 +456,7 @@ function StandKarte({
   r,
   runden,
   onOeffnen,
+  anders,
 }: {
   art: RankingArt;
   teil: Teil;
@@ -436,6 +464,8 @@ function StandKarte({
   r: Rankings;
   runden: RundenStand;
   onOeffnen: (k: RankingKategorie) => void;
+  /** Offenes im anderen Teil – mit Sprung dorthin */
+  anders?: { anzahl: number; teil: Teil; wechseln: () => void };
 }) {
   if (!kategorien.length) return null;
   const stil = KARTEN_STIL[art];
@@ -454,6 +484,16 @@ function StandKarte({
       <div className="relative mt-2 text-[1.25rem] font-bold leading-tight tracking-[-0.01em]">
         {offen.length ? `Noch ${offen.length} ${offen.length === 1 ? "Kategorie" : "Kategorien"} offen` : "Alles abgestimmt"}
       </div>
+      {anders && (
+        <button
+          type="button"
+          onClick={anders.wechseln}
+          className="relative -my-1.5 flex min-h-[44px] items-center gap-1 text-left text-[13px] font-semibold text-white/90 transition active:opacity-60"
+        >
+          + {anders.anzahl} offen in „{TEIL_NAME[anders.teil]}“
+          <span aria-hidden className="text-[15px] leading-none">›</span>
+        </button>
+      )}
       <div className="relative mt-2 h-1.5 overflow-hidden rounded-full bg-white/25" aria-hidden>
         <div className="h-full rounded-full bg-white transition-[width] duration-700 ease-ios" style={{ width: `${Math.round((fertig / kategorien.length) * 100)}%` }} />
       </div>
@@ -608,12 +648,12 @@ function ErgebnisKacheln({
               {(g || h) && (
                 <span className="mt-1.5 flex flex-col gap-0.5">
                   {g && (
-                    <span className="flex items-center gap-1 truncate rounded-full bg-[#F5B53F]/20 px-2 py-0.5 text-[11.5px] font-bold text-[#9A5B00] dark:text-[#FFD66B]">
+                    <span className="flex items-center gap-1 truncate rounded-full bg-[#F5B53F]/20 px-2 py-0.5 text-[12px] font-bold text-[#9A5B00] dark:text-[#FFD66B]">
                       <Krone /> <span className="truncate">{g.label}</span>
                     </span>
                   )}
                   {h && (
-                    <span className="flex items-center gap-1 truncate rounded-full bg-[#FF4F7B]/15 px-2 py-0.5 text-[11.5px] font-bold text-[#C2185B] dark:text-[#FF8FB1]">
+                    <span className="flex items-center gap-1 truncate rounded-full bg-[#FF4F7B]/15 px-2 py-0.5 text-[12px] font-bold text-[#C2185B] dark:text-[#FF8FB1]">
                       ♥ <span className="truncate">{h.label}</span>
                     </span>
                   )}
@@ -625,11 +665,11 @@ function ErgebnisKacheln({
                     const t = st?.top[i];
                     return (
                       <li key={i} className="flex items-center gap-1.5 text-[12.5px]">
-                        <span className="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full text-[10.5px] font-bold text-[#1C1C1E]" style={{ background: MEDAILLE[i] }}>
+                        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[12px] font-bold leading-none text-[#1C1C1E]" style={{ background: MEDAILLE[i] }}>
                           {i + 1}
                         </span>
                         <span className={`min-w-0 flex-1 truncate ${t ? "font-medium" : "text-tinte-leise"}`}>{t ? name(t.ziel) : "–"}</span>
-                        {t && <span className="zahl shrink-0 text-[11.5px] font-semibold text-tinte-leise">{t.n}</span>}
+                        {t && <span className="zahl shrink-0 text-[12px] font-semibold text-tinte-leise">{t.n}</span>}
                       </li>
                     );
                   })}
@@ -747,22 +787,15 @@ function Abstimmen({
   const aktiveLehrer = lehrer.filter((l) => l.aktiv);
   return (
     <div className="animate-vonRechts">
-      <div className="mb-3 flex items-center justify-between">
-        <button onClick={zurueck} className="py-1 text-[16px] font-semibold text-brand">
-          ‹ {ART_STIL[k.art].titel}
-        </button>
-        <button onClick={onClose} aria-label="Schließen" className="flex h-[30px] w-[30px] items-center justify-center rounded-full bg-[rgb(118_118_128/0.12)] text-[13px] font-bold text-tinte-leise dark:bg-[rgb(118_118_128/0.24)]">
-          ✕
-        </button>
-      </div>
+      {/* Derselbe klebende Kopf wie überall: „‹ Schüler-Ranking“, Titel, ✕ */}
+      <SheetKopf titel={k.titel} zurueck={{ text: ART_STIL[k.art].titel, onClick: zurueck }} onClose={onClose} />
 
-      {/* Kopf: Teil, Titel, Podest – das Wichtigste ohne Scrollen */}
-      <div className="feld-grau p-4 shadow-[0_1px_3px_rgba(0,0,0,.05)]">
+      {/* Teil, Art, Podest – das Wichtigste ohne Scrollen (Titel steht im Kopf) */}
+      <div className="feld-grau mt-1 p-4 shadow-[0_1px_3px_rgba(0,0,0,.05)]">
         <div className="flex items-center gap-2">
           <TeilMarke teil={k.bereich} />
           <span className="text-[12px] font-semibold uppercase tracking-[0.06em] text-tinte-leise">{ART_STIL[k.art].kurz}</span>
         </div>
-        <h2 className="mt-1.5 text-[1.3rem] font-bold leading-snug tracking-[-0.01em]">{k.titel}</h2>
         {topSichtbar ? (
           <div className="mt-3 flex items-end justify-center gap-2">
             {[1, 0, 2].map((i) => {
@@ -902,7 +935,7 @@ export function ZielWahl({
                 {p.kuerzel}
               </span>
               <span className="w-full truncate text-center text-[12.5px] font-semibold">{p.oben}</span>
-              {p.unten && <span className="-mt-1 w-full truncate text-center text-[11px] text-tinte-leise">{p.unten}</span>}
+              {p.unten && <span className="-mt-1 w-full truncate text-center text-[12px] text-tinte-leise">{p.unten}</span>}
             </button>
           );
         })}
@@ -963,8 +996,9 @@ export function RankingVerwaltungSheet({ open, onClose }: { open: boolean; onClo
   const name = useNamen(personen, lehrer);
   return (
     <>
+      {/* Bleibt offen unter „Küren“ – das steht als Unterseite an seiner Stelle */}
       <RankingEinstellungen
-        open={open && !kueren}
+        open={open}
         onClose={onClose}
         r={r}
         runden={runden}
@@ -1033,7 +1067,8 @@ function RankingEinstellungen({
 
   return (
     <>
-      <Sheet open={open && !lehrerOffen && !stichwahlWahl && !startK} onClose={schliessen}>
+      {/* Bleibt offen unter Lehrkräfte/Runde starten (Unterseiten, Stapel in Sheet.tsx) */}
+      <Sheet open={open} onClose={schliessen}>
         <SheetKopf titel="Einstellungen" unter="Rankings – gilt für den gewählten Teil und die gewählte Art." onClose={schliessen} />
         <TeilUmschalter teil={teil} setTeil={setTeil} className="mb-3" />
         <div className="seg mb-1" role="tablist" aria-label="Art">
@@ -1380,67 +1415,108 @@ function KategorieNeuSheet({ open, onClose, r, art, startTeil }: { open: boolean
 }
 
 /** Lehrkräfte pflegen – auch aus der Zitatwand erreichbar */
+/**
+ * Lehrkräfte pflegen – iOS-Liste: je Lehrkraft eine Zeile mit „›“, alles
+ * Weitere (Name, Fächer, auswählbar, löschen) im Blatt darüber. „Neue
+ * Lehrkraft“ ist die letzte Zeile in Blau (Design-Regeln 2: ein
+ * Bedienelement je Zeile, kein Mülleimer in der Liste).
+ */
 export function LehrerListe({ aktiv }: { aktiv: boolean }) {
   const l = useLehrer(aktiv);
-  const [name, setName] = useState("");
-  const [faecher, setFaecher] = useState("");
-  const [bearbeite, setBearbeite] = useState<Lehrer | null>(null);
+  // null = zu, "neu" = anlegen, sonst die Lehrkraft
+  const [blatt, setBlatt] = useState<Lehrer | "neu" | null>(null);
 
   return (
     <>
-      <Gruppe titel={`Lehrkräfte (${l.lehrer.length})`} className="mt-0">
-        {l.lehrer.map((x) =>
-          bearbeite?.id === x.id ? (
-            <div key={x.id} className="space-y-2 px-3 py-2.5">
-              <input className="field" value={bearbeite.name} maxLength={60} onChange={(e) => setBearbeite({ ...bearbeite, name: e.target.value })} />
-              <input className="field" value={bearbeite.faecher} maxLength={60} placeholder="Fächer (optional)" onChange={(e) => setBearbeite({ ...bearbeite, faecher: e.target.value })} />
-              <div className="flex gap-2">
-                <button className="btn-grau flex-1 !min-h-[40px] !text-[15px]" onClick={() => setBearbeite(null)}>
-                  Abbrechen
-                </button>
-                <button
-                  className="btn-primary flex-1 !min-h-[40px] !text-[15px]"
-                  onClick={async () => {
-                    const f = await l.speichern(bearbeite);
-                    if (f) return meldeFehler(f);
-                    setBearbeite(null);
-                  }}
-                >
-                  Sichern
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div key={x.id} className={`flex min-h-[52px] items-center gap-2 px-4 ${x.aktiv ? "" : "opacity-50"}`}>
-              <button className="min-w-0 flex-1 py-2 text-left" onClick={() => setBearbeite(x)}>
-                <span className="block truncate text-[15px]">{x.name}</span>
-                {x.faecher && <span className="block truncate text-[12px] text-tinte-leise">{x.faecher}</span>}
-              </button>
-              <Schalter an={x.aktiv} label={`${x.name} auswählbar`} onChange={(v) => void l.speichern({ ...x, aktiv: v })} />
-              <LoeschKnopf label={x.name} text={`${x.name} aus der Liste löschen? Stimmen für diese Lehrkraft gehen verloren.`} loeschen={() => l.loeschen(x.id)} />
-            </div>
-          ),
-        )}
+      <Gruppe titel={`Lehrkräfte (${l.lehrer.length})`} className="mt-0" fuss="Ausgeschaltet: bleibt gespeichert, ist aber nicht mehr auswählbar.">
         {l.lehrer.length === 0 && <p className="px-4 py-3 text-[13px] text-tinte-leise">Noch niemand eingetragen.</p>}
+        {l.lehrer.map((x) => (
+          <Zeile key={x.id} label={x.name} unter={x.faecher || undefined} onClick={() => setBlatt(x)}>
+            {!x.aktiv && <Wert>aus</Wert>}
+          </Zeile>
+        ))}
+        <Zeile label="Neue Lehrkraft" blau onClick={() => setBlatt("neu")} />
       </Gruppe>
-      <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
-        <input className="field" maxLength={60} placeholder="Name, z. B. Frau …" value={name} onChange={(e) => setName(e.target.value)} />
-        <input className="field" maxLength={60} placeholder="Fächer (optional)" value={faecher} onChange={(e) => setFaecher(e.target.value)} />
-        <button
-          className="btn-primary !min-h-[44px] px-4 !text-[15px] sm:!w-auto"
-          disabled={!name.trim()}
-          onClick={async () => {
-            const f = await l.speichern({ name, faecher });
-            if (f) return meldeFehler(f);
-            setName("");
-            setFaecher("");
-          }}
-        >
-          Hinzufügen
-        </button>
-      </div>
-      <p className="mt-2 px-1 text-[12px] text-tinte-leise">Schalter aus: bleibt gespeichert, ist aber nicht mehr auswählbar.</p>
+      <LehrerBlatt lehrer={blatt} onClose={() => setBlatt(null)} speichern={l.speichern} loeschen={l.loeschen} />
     </>
+  );
+}
+
+/** Eine Lehrkraft anlegen oder ändern (Unterseite der Liste, „‹ Lehrkräfte“) */
+function LehrerBlatt({
+  lehrer,
+  onClose,
+  speichern,
+  loeschen,
+}: {
+  lehrer: Lehrer | "neu" | null;
+  onClose: () => void;
+  speichern: (l: Partial<Lehrer> & { name: string }) => Promise<string | null>;
+  loeschen: (id: string) => Promise<string | null>;
+}) {
+  const offen = lehrer !== null;
+  const x = lehrer && lehrer !== "neu" ? lehrer : null;
+  const [name, setName] = useState("");
+  const [faecher, setFaecher] = useState("");
+  const [an, setAn] = useState(true);
+  const [busy, setBusy] = useState(false);
+
+  // Beim Öffnen die Werte der gewählten Lehrkraft übernehmen
+  const kennung = x?.id ?? (offen ? "neu" : null);
+  useEffect(() => {
+    if (!kennung) return;
+    setName(x?.name ?? "");
+    setFaecher(x?.faecher ?? "");
+    setAn(x?.aktiv ?? true);
+    setBusy(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [kennung]);
+
+  async function sichern() {
+    if (!name.trim() || busy) return;
+    setBusy(true);
+    const f = await speichern({ id: x?.id, name, faecher, aktiv: an });
+    setBusy(false);
+    if (f) return meldeFehler(f);
+    onClose();
+  }
+
+  return (
+    <Sheet open={offen} onClose={onClose}>
+      <SheetKopf titel={x ? x.name : "Neue Lehrkraft"} onClose={onClose} />
+      <Gruppe>
+        <ZeileEingabe label="Name" value={name} onChange={setName} placeholder="z. B. Frau …" maxLength={60} autoFocus={!x} onEnter={() => void sichern()} />
+        <ZeileEingabe label="Fächer" value={faecher} onChange={setFaecher} placeholder="optional" maxLength={60} onEnter={() => void sichern()} />
+      </Gruppe>
+      {x && (
+        <Gruppe fuss="Aus: bleibt gespeichert, ist aber bei Zitaten und im Lehrer-Ranking nicht mehr auswählbar.">
+          <ZeileMitSchalter label="Auswählbar">
+            <Schalter an={an} onChange={setAn} label="Auswählbar" />
+          </ZeileMitSchalter>
+        </Gruppe>
+      )}
+      {x && (
+        <Gruppe>
+          <Zeile
+            label="Lehrkraft löschen"
+            rot
+            onClick={() =>
+              void frage(`${x.name} aus der Liste löschen? Stimmen für diese Lehrkraft gehen verloren.`, "Löschen", true).then(async (ok) => {
+                if (!ok) return;
+                const f = await loeschen(x.id);
+                if (f) return meldeFehler("Ging nicht: " + f);
+                onClose();
+              })
+            }
+          />
+        </Gruppe>
+      )}
+      <FussLeisteBlatt>
+        <button type="button" className="btn-primary w-full disabled:opacity-40" disabled={!name.trim() || busy} onClick={() => void sichern()}>
+          {busy ? "…" : x ? "Sichern" : "Hinzufügen"}
+        </button>
+      </FussLeisteBlatt>
+    </Sheet>
   );
 }
 

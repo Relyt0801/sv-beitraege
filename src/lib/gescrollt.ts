@@ -52,16 +52,26 @@ export function useBreit(): boolean {
  * erst nach oben, solange die alte, lange Seite noch da ist, und dann erst
  * zum neuen Reiter. Ein Tipp auf den Reiter, in dem man schon ist, scrollt
  * sanft nach oben – wie in iOS-Apps.
+ *
+ * `angetippt` (nur aus der Reiterleiste, GlasLeiste.tsx): Tippt man den Reiter
+ * an, in dem man schon ist, geht es wie in iOS zurück zur Wurzel – das
+ * Ereignis „sv:reiter-wurzel“ (detail = Reiter) schließt offene Ebenen, z. B.
+ * einen geöffneten Chat (ChatsTab hört darauf). Programmatische Wechsel
+ * (Sprung aus einer Mitteilung, #chat-…, Einführung) feuern es bewusst NICHT,
+ * sonst schlösse ein Sprung in einen Chat diesen gleich wieder.
  */
-export function useReiter<T>(start: T | (() => T)): [T, (neu: T) => void] {
+export const REITER_WURZEL = "sv:reiter-wurzel";
+export function useReiter<T>(start: T | (() => T)): [T, (neu: T, angetippt?: boolean) => void] {
   const [reiter, setReiterRoh] = useState<T>(start);
   const aktuell = useRef(reiter);
   aktuell.current = reiter;
-  const setReiter = useCallback((neu: T) => {
+  const setReiter = useCallback((neu: T, angetippt?: boolean) => {
+    const gleich = neu === aktuell.current;
     if (window.scrollY > 0) {
-      if (neu === aktuell.current) window.scrollTo({ top: 0, behavior: "smooth" });
+      if (gleich) window.scrollTo({ top: 0, behavior: "smooth" });
       else window.scrollTo(0, 0);
     }
+    if (gleich && angetippt) window.dispatchEvent(new CustomEvent(REITER_WURZEL, { detail: neu }));
     aktuell.current = neu;
     setReiterRoh(neu);
   }, []);

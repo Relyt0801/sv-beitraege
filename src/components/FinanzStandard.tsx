@@ -11,6 +11,7 @@ import {
 import { DEMO_KATEGORIEN } from "../lib/demo";
 import { Kennzahlen, PostenBereiche } from "./FinanzBereiche";
 import { useDunkel } from "../lib/dunkel";
+import { useRole } from "../auth/RoleProvider";
 
 /**
  * Finanzen – Standard-Ansicht: was die ganze Stufe (und die Eltern) sehen.
@@ -54,6 +55,9 @@ function useDemoUebersicht(aktiv: boolean, aktionName?: (id: string) => string):
 
 export function FinanzStandardInhalt({ d }: { d: FinanzUebersicht }) {
   const dunkel = useDunkel();
+  // Eltern lasen „Offene Elternbeiträge 125 €“ als eigene Schuld – es ist die
+  // Summe der ganzen Stufe (die eigene steht auf ihrer Übersicht).
+  const { role } = useRole();
   const prozent = d.ziel_cent > 0 ? Math.max(0, Math.min(100, Math.round((d.stand_cent / d.ziel_cent) * 100))) : null;
   const beitraegeSumme = d.beitraege.reduce((n, b) => n + b.cent, 0);
 
@@ -67,10 +71,16 @@ export function FinanzStandardInhalt({ d }: { d: FinanzUebersicht }) {
     return summe > 0 ? [...m.entries()].map(([farbe, cent]) => ({ farbe, anteil: cent / summe })) : [];
   })();
 
+  // Ab iPad hoch zwei Spalten: links Kontostand und darunter „Geplante
+  // Aktionen“, rechts die lange Liste „Aktionen, Beiträge und Sonstiges“.
+  // Vorher ging der Kontostand über die volle Breite (Einnahmen und Ausgaben
+  // 550 px auseinander), darunter blieb rechts eine große leere Fläche und die
+  // Seite musste am Laptop gescrollt werden. Zeile 2 nimmt den Rest auf
+  // (auto_1fr), damit zwischen Kontostand und „Geplant“ keine Lücke entsteht.
   return (
-    <div className="grid grid-cols-[minmax(0,1fr)] gap-3 pb-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-start">
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-3 pb-6 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] md:grid-rows-[auto_1fr] md:items-start">
       {/* ------------------------------------------------ Stand und Ziel */}
-      <section className="card p-5 lg:col-span-2">
+      <section className="card min-w-0 p-5 md:col-start-1 md:row-start-1">
         <div className="text-[14px] font-medium text-tinte-leise">Kontostand der Stufe</div>
         <div className={`zahl mt-1 font-zahl text-[2.5rem] font-bold leading-none tracking-[-0.03em] ${d.stand_cent < 0 ? "text-red-600 dark:text-red-400" : ""}`}>
           {euro(d.stand_cent)}
@@ -111,10 +121,19 @@ export function FinanzStandardInhalt({ d }: { d: FinanzUebersicht }) {
           </div>
         )}
 
-        <Kennzahlen ein={d.einnahmen_cent} aus={d.ausgaben_cent} offen={{ cent: d.offen_cent, halbjahr: d.halbjahr }} />
+        <Kennzahlen
+          ein={d.einnahmen_cent}
+          aus={d.ausgaben_cent}
+          offen={{ cent: d.offen_cent, halbjahr: d.halbjahr }}
+          offenTitel={role === "eltern" ? "Noch offen in der ganzen Stufe" : undefined}
+        />
       </section>
 
-      <PostenBereiche d={d} />
+      <PostenBereiche
+        d={d}
+        listeKlasse="md:col-start-2 md:row-start-1 md:row-span-2"
+        geplantKlasse="md:col-start-1 md:row-start-2"
+      />
     </div>
   );
 }

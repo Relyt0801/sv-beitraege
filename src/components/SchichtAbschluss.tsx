@@ -6,6 +6,7 @@ import { pushAnPersonen } from "../lib/push";
 import { hasSupabase } from "../lib/supabase";
 import { heuteKey, schichtEnde as endeVon, tagLang, terminIcon, uhr, type Termin } from "../lib/termine";
 import { Sheet, SheetKopf } from "./Sheet";
+import { Icon } from "./Icon";
 
 /** Ereignis, mit dem der Hinweis im Events-Reiter das Fenster wieder öffnet. */
 const OEFFNEN = "sv:schicht-abschluss";
@@ -73,10 +74,11 @@ export function AbschlussHinweis() {
   return (
     <button
       onClick={abschlussOeffnen}
-      className="mb-3 flex w-full items-center gap-3 rounded-2xl border border-amber-500/40 bg-amber-50 px-4 py-3 text-left transition active:scale-[.99] dark:border-amber-400/30 dark:bg-amber-500/10"
+      className="mb-3 flex w-full items-center gap-3 rounded-2xl border border-amber-500/40 bg-amber-50 px-4 py-3 text-left transition active:scale-[.99] dark:border-amber-400/30 dark:bg-[#2b2214]"
     >
-      <span className="text-xl leading-none" aria-hidden>
-        🙌
+      {/* Symbol aus Icon statt Emoji (Design-Regeln 5) */}
+      <span className="symbol bg-[#FF9500]" aria-hidden>
+        <Icon name="haken" size={17} strich={2.4} />
       </span>
       <span className="min-w-0 flex-1">
         <span className="block text-[14px] font-bold text-amber-800 dark:text-amber-200">
@@ -179,7 +181,7 @@ export function SchichtAbschluss() {
     <Sheet open onClose={wegLegen}>
       <SheetKopf
         titel={offen.length === 1 ? "Eine Schicht ist vorbei" : `${offen.length} Schichten sind vorbei`}
-        unter="Haben alle Eingeteilten mitgemacht? Dann bekommen sie mit einem Tipp ihre Mithilfe. Wer nicht da war, vorher in der Schicht austragen. Weggewischt? Im Reiter Events steht es weiter oben, bis alles bestätigt ist."
+        unter="Haben alle Eingeteilten mitgemacht? Dann bekommen sie mit einem Tipp ihre Mithilfe. Wer nicht da war, vorher in der Schicht austragen. Weggewischt? Es steht weiter in der Übersicht unter „Zu erledigen“ und oben in Events, bis alles bestätigt ist."
         onClose={wegLegen}
       />
 
@@ -197,7 +199,7 @@ export function SchichtAbschluss() {
                     {t.von ? ` · ${uhr(t.von)}${t.bis ? `–${uhr(t.bis)}` : ""}` : ""}
                   </span>
                 </span>
-                <span className="zahl shrink-0 rounded-full bg-brand/10 px-2 py-0.5 text-[11px] font-bold text-brand dark:bg-brand/20">
+                <span className="zahl shrink-0 rounded-full bg-brand/10 px-2 py-0.5 text-[12px] font-bold text-brand dark:bg-brand/20">
                   +{a.prozent} %
                 </span>
               </div>

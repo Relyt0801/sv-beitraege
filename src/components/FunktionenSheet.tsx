@@ -75,6 +75,8 @@ export function FunktionenSheet({ open, onClose }: { open: boolean; onClose: () 
 
   useEffect(() => {
     if (open) void rechteLaden();
+    // Beim Wiederöffnen nicht in der zuletzt offenen Unterseite landen
+    else setFenster(null);
   }, [open, rechteLaden]);
 
   async function fuerAlle(perm: PermKey, wert: boolean) {
@@ -102,7 +104,10 @@ export function FunktionenSheet({ open, onClose }: { open: boolean; onClose: () 
 
   return (
     <>
-      <Sheet open={open && !fenster} onClose={onClose}>
+      {/* Bleibt offen, solange eine Unterseite (Lehrkräfte …) darüber liegt:
+          die Unterseite steht an seiner Stelle, „‹ Funktionen“ führt zurück
+          (Stapel in Sheet.tsx) – Scrollstand und Aufgeklapptes bleiben. */}
+      <Sheet open={open} onClose={onClose}>
         <SheetKopf titel="Funktionen" unter="Pro Funktion ein Schalter: an oder aus für alle. Darunter, wer sie nutzen darf." onClose={onClose} />
         <div className="space-y-2.5">
           {sichtbareThemen.map((t) => {
@@ -169,15 +174,18 @@ export function FunktionenSheet({ open, onClose }: { open: boolean; onClose: () 
                         {WF[k].map((b) => (
                           <WortfilterSchalter key={b} bereich={b} zeile className="!pl-[58px]" />
                         ))}
-                        {verwalten.length > 0 && (
-                          <div className="flex flex-wrap gap-2 py-2.5 pl-[58px] pr-4">
-                            {verwalten.map((x) => (
-                              <button key={x.l} onClick={() => setFenster(x.f)} className="btn-klein-grau">
-                                {x.l}
-                              </button>
-                            ))}
-                          </div>
-                        )}
+                        {/* Verwaltung als Zeilen mit „›“ (wie iOS) – öffnet die Unterseite */}
+                        {verwalten.map((x) => (
+                          <button
+                            key={x.l}
+                            type="button"
+                            onClick={() => setFenster(x.f)}
+                            className="flex min-h-[48px] w-full items-center gap-3 py-2 pl-[58px] pr-4 text-left transition active:bg-black/[0.04] dark:active:bg-white/[0.06]"
+                          >
+                            <span className="min-w-0 flex-1 text-[15px]">{x.l}</span>
+                            <span aria-hidden className="shrink-0 text-[17px] leading-none text-tinte-leise">›</span>
+                          </button>
+                        ))}
                       </div>
                     );
                   })}
@@ -187,17 +195,17 @@ export function FunktionenSheet({ open, onClose }: { open: boolean; onClose: () 
           })}
         </div>
         <p className="mt-3 px-4 text-[13px] leading-snug text-tinte-leise">
-          Ausgeschaltetes sehen nur, wer es schalten darf (mit Hinweis). Einzelne Bereiche lassen sich auch Komitees geben: Rollen &amp; Rechte → Rechte → Komitee-Rechte.
+          Ausgeschaltetes sehen nur, wer es schalten darf (mit Hinweis). Einzelne Bereiche lassen sich auch Komitees geben: Rollen → „Rechte je Rolle“ → Komitee-Rechte.
         </p>
-      </Sheet>
 
-      {album && <KategorienSheet open={open && fenster === "steckbrief"} album={album} onClose={() => setFenster(null)} />}
-      <Sheet open={open && fenster === "lehrer"} onClose={() => setFenster(null)}>
-        <SheetKopf titel="Lehrkräfte" unter="Zum Auswählen bei Zitaten und im Lehrer-Ranking." onClose={() => setFenster(null)} />
-        <LehrerListe aktiv={open && fenster === "lehrer"} />
+        {album && <KategorienSheet open={open && fenster === "steckbrief"} album={album} onClose={() => setFenster(null)} />}
+        <Sheet open={open && fenster === "lehrer"} onClose={() => setFenster(null)}>
+          <SheetKopf titel="Lehrkräfte" unter="Zum Auswählen bei Zitaten und im Lehrer-Ranking." onClose={() => setFenster(null)} />
+          <LehrerListe aktiv={open && fenster === "lehrer"} />
+        </Sheet>
+        <RankingVerwaltungSheet open={open && fenster === "rankings"} onClose={() => setFenster(null)} />
+        <UmfragenSheet open={open && fenster === "umfragen"} onClose={() => setFenster(null)} />
       </Sheet>
-      <RankingVerwaltungSheet open={open && fenster === "rankings"} onClose={() => setFenster(null)} />
-      <UmfragenSheet open={open && fenster === "umfragen"} onClose={() => setFenster(null)} />
     </>
   );
 }

@@ -53,6 +53,30 @@ export const PATCH: PatchVersion = {
           farbe: "bg-[#34C759]",
         },
         {
+          titel: "Für dich offen",
+          text: "Ganz oben in der Übersicht: offene Abstimmungen, wichtige Infos und deine nächste Schicht – ein Tipp, und du bist da.",
+          icon: "haken",
+          farbe: "bg-[#FF9500]",
+        },
+        {
+          titel: "Komitee-Pinnwand",
+          text: "Im Komitee heißt es jetzt „Chat | Pinnwand“: erst Angepinntes und To-dos, dann offene Abstimmungen. Die Kachel sagt, was neu ist.",
+          icon: "pin",
+          farbe: "bg-[#5856D6]",
+        },
+        {
+          titel: "Kalender wie auf dem iPhone",
+          text: "Monat mit Punkten, darunter die Termine des Tages. Der Kalender öffnet wie ein Chat – Kopf und Reiter bleiben, wo sie sind.",
+          icon: "kalender",
+          farbe: "bg-[#FF3B30]",
+        },
+        {
+          titel: "Blätter wie in iOS",
+          text: "Öffnet sich etwas aus einem Blatt heraus, kommst du oben links mit „‹ Zurück“ wieder hin; das ✕ schließt alles.",
+          icon: "chevron",
+          farbe: "bg-[#32ADE6]",
+        },
+        {
           titel: "Offiziell & Inoffiziell",
           text: "Rankings, Zitate, Mottos und Kommentare gibt es zweimal: offiziell fürs Abibuch, inoffiziell nur für die Stufe.",
           icon: "schild",
@@ -110,6 +134,20 @@ export const PATCH: PatchVersion = {
         {
           titel: "Beiträge in der Kasse",
           text: "„Beiträge & Abiball“ ist kein eigener Reiter mehr: oben in der Kasse umschalten. Einnahme und Ausgabe stehen in Finanzen ganz oben.",
+          icon: "kasse",
+          farbe: "bg-brand",
+          nur: "team",
+        },
+        {
+          titel: "Zu erledigen",
+          text: "Die Übersicht zählt, was auf dich wartet: Schichten bestätigen, Anfragen, Zitate prüfen – mit Sprung an die richtige Stelle. „Neu“ legt jetzt auch Termine an.",
+          icon: "haken",
+          farbe: "bg-[#FF9500]",
+          nur: "team",
+        },
+        {
+          titel: "Kasse & Finanzen schneller",
+          text: "Suche zeigt Treffer direkt unter dem Feld, ein Tipp aufs Halbjahr schaltet nur offen ↔ bezahlt (erlassen im Blatt der Person). Finanzen am Laptop zweispaltig mit Buchungen rechts.",
           icon: "kasse",
           farbe: "bg-brand",
           nur: "team",

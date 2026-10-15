@@ -59,6 +59,17 @@ interface ElternCtx {
   konten: Elternkonto[];
   /** Wie viele Gespräche ungelesene Nachrichten haben. */
   ungelesen: number;
+  /** Welche Gespräche das sind (neueste zuerst) – zum direkten Öffnen. */
+  ungelesenIds: string[];
+  /**
+   * Wie viele Infos vom Stufenteam neu sind (jünger als der letzte Blick in
+   * den Reiter „Infos“). Nur für Eltern; der Merker gilt je Gerät.
+   */
+  infosNeu: number;
+  /** Bis wann die Infos gesehen sind (ISO-Zeit) – für die „Neu“-Marke. */
+  infosGesehen: string;
+  /** Merken, dass die Infos jetzt gesehen sind. */
+  infosGelesen: () => void;
   /**
    * Welches Elternkonto gehoert zu welchen Kindern. Fuer das Stufenteam
    * gefuellt, damit zwei Zugaenge mit gleichem Nachnamen auseinanderzuhalten
@@ -99,6 +110,24 @@ export const useEltern = () => {
 
 const LEER: BankKonto = { inhaber: "", iban: "", bic: "", bank: "", hinweis: "" };
 
+/** Merker je Gerät: bis wann die Infos vom Stufenteam gesehen sind. */
+const INFOS_MERKER = "sv:eltern:infos-gesehen";
+
+/**
+ * Startwert für „Infos gesehen bis“. Fehlt der Merker (erster Start, privates
+ * Fenster), gelten Infos der letzten 14 Tage als neu – sonst stünden beim
+ * ersten Öffnen alle alten Infos als neu da.
+ */
+function infosGesehenStart(): string {
+  try {
+    const v = localStorage.getItem(INFOS_MERKER);
+    if (v) return v;
+  } catch {
+    /* privates Fenster */
+  }
+  return new Date(Date.now() - 14 * 864e5).toISOString();
+}
+
 /**
  * Alles rund um die Eltern: die angehefteten Infos, ihre Anfragen ans
  * Stufenteam und die Kontodaten der Stufenkasse.
@@ -119,6 +148,7 @@ export function ElternProvider({ children }: { children: ReactNode }) {
   const [zuordnung, setZuordnung] = useState<Record<string, string[]>>({});
   const [konten, setKonten] = useState<Elternkonto[]>([]);
   const [zuordnungFehlt, setZuordnungFehlt] = useState(false);
+  const [infosGesehen, setInfosGesehen] = useState(infosGesehenStart);
   const istTeam = useRef(false);
   /** Kennungen des Stufenteams – damit Antworten der Eltern dort ankommen. */
   const teamIds = useRef<string[]>([]);
@@ -141,7 +171,9 @@ export function ElternProvider({ children }: { children: ReactNode }) {
         text: "Wir freuen uns über jede Kuchenspende – bitte bis 7:45 Uhr im Foyer abgeben.",
         angeheftet: true,
         autor: null,
-        created_at: new Date().toISOString(),
+        // Heute 0 Uhr statt „jetzt“: sonst wäre die Info nach jedem Neuladen
+        // wieder „neu“, obwohl man sie schon gesehen hat
+        created_at: new Date(new Date().setHours(0, 0, 0, 0)).toISOString(),
       },
     ]);
     istTeam.current = uid.current === "local-user";
@@ -244,7 +276,21 @@ export function ElternProvider({ children }: { children: ReactNode }) {
   }, [laden]);
 
   const neuesTicket = useCallback<ElternCtx["neuesTicket"]>(async (betreff, text) => {
-    if (!hasSupabase || !uid.current) return "Nicht angemeldet – bitte einmal ab- und wieder anmelden.";
+    // Demo (ohne Datenbank): das Gespräch nur hier im Browser anlegen, damit
+    // sich der Ablauf in der Vorschau durchspielen lässt. Nach dem Neuladen
+    // ist es wieder weg.
+    if (!hasSupabase) {
+      const id = crypto.randomUUID();
+      const jetzt = new Date().toISOString();
+      const ich = uid.current ?? "local-user";
+      setTickets((prev) => [
+        { id, user_id: ich, betreff: betreff.trim(), erledigt: false, created_at: jetzt, updated_at: jetzt, gelesen_eltern: jetzt, gelesen_team: null, von_team: false },
+        ...prev,
+      ]);
+      setNachrichten((prev) => [...prev, { id: crypto.randomUUID(), ticket_id: id, user_id: ich, text: text.trim(), created_at: jetzt }]);
+      return null;
+    }
+    if (!uid.current) return "Nicht angemeldet – bitte einmal ab- und wieder anmelden.";
     const { data, error } = await supabase!
       .from("eltern_tickets")
       .insert({ user_id: uid.current, betreff: betreff.trim() })
@@ -262,7 +308,16 @@ export function ElternProvider({ children }: { children: ReactNode }) {
   }, [laden]);
 
   const antworten = useCallback<ElternCtx["antworten"]>(async (ticketId, text) => {
-    if (!hasSupabase || !uid.current || !text.trim()) return;
+    if (!text.trim()) return;
+    // Demo (ohne Datenbank): die Antwort nur hier im Browser anhängen
+    if (!hasSupabase) {
+      const ich = uid.current ?? "local-user";
+      const jetzt = new Date().toISOString();
+      setNachrichten((prev) => [...prev, { id: crypto.randomUUID(), ticket_id: ticketId, user_id: ich, text: text.trim(), created_at: jetzt }]);
+      setTickets((prev) => prev.map((t) => (t.id === ticketId ? { ...t, updated_at: jetzt } : t)));
+      return;
+    }
+    if (!uid.current) return;
     // Die Kennung wird hier erzeugt und beim Speichern mitgegeben. Sonst kommt
     // dieselbe Nachricht ueber die Live-Verbindung mit einer anderen Kennung
     // zurueck und stuende zweimal im Verlauf.
@@ -324,10 +379,12 @@ export function ElternProvider({ children }: { children: ReactNode }) {
 
   /** Gespraech als gelesen markieren – je nachdem, wer gerade schaut. */
   const alsGelesen = useCallback<ElternCtx["alsGelesen"]>((ticketId) => {
-    if (!hasSupabase || !uid.current) return;
+    if (!uid.current) return;
     const jetzt = new Date().toISOString();
     const feld = istTeam.current ? "gelesen_team" : "gelesen_eltern";
     setTickets((prev) => prev.map((t) => (t.id === ticketId ? { ...t, [feld]: jetzt } : t)));
+    // Demo: nur im Browser merken
+    if (!hasSupabase) return;
     supabase!.from("eltern_tickets").update({ [feld]: jetzt }).eq("id", ticketId).then(({ error }) => { if (error) console.warn("[speichern]", error.message); }); // then() nötig, sonst wird nie gesendet
   }, []);
 
@@ -427,7 +484,7 @@ export function ElternProvider({ children }: { children: ReactNode }) {
    * Neu heisst: die letzte Nachricht kommt nicht von mir und ist juenger als
    * der Zeitpunkt, an dem ich zuletzt reingeschaut habe.
    */
-  const ungelesen = tickets.filter((t) => {
+  const ungeleseneTickets = tickets.filter((t) => {
     // Erledigte Gespräche zählen fürs Team nicht mehr mit (vorher stand
     // dadurch dauerhaft eine Zahl am Chats-Reiter)
     if (istTeam.current && t.erledigt) return false;
@@ -437,7 +494,24 @@ export function ElternProvider({ children }: { children: ReactNode }) {
     const letzte = fremd[fremd.length - 1].created_at;
     const gesehen = istTeam.current ? t.gelesen_team : t.gelesen_eltern;
     return !gesehen || letzte > gesehen;
-  }).length;
+  });
+  const ungelesen = ungeleseneTickets.length;
+  const ungelesenIds = ungeleseneTickets.map((t) => t.id);
+
+  /** Neue Infos vom Stufenteam – nur Eltern bekommen dafür einen Hinweis. */
+  // Als Zeit vergleichen, nicht als Text: Die Datenbank liefert „+00:00“ und
+  // Mikrosekunden, der Browser „Z“ und Millisekunden.
+  const gesehenMs = Date.parse(infosGesehen) || 0;
+  const infosNeu = istTeam.current ? 0 : infos.filter((i) => Date.parse(i.created_at) > gesehenMs).length;
+  const infosGelesen = useCallback(() => {
+    const jetzt = new Date().toISOString();
+    setInfosGesehen(jetzt);
+    try {
+      localStorage.setItem(INFOS_MERKER, jetzt);
+    } catch {
+      /* privates Fenster – dann gilt der Merker nur bis zum Neuladen */
+    }
+  }, []);
 
   return (
     <Ctx.Provider
@@ -452,6 +526,10 @@ export function ElternProvider({ children }: { children: ReactNode }) {
         zuordnungFehlt,
         konten,
         ungelesen,
+        ungelesenIds,
+        infosNeu,
+        infosGesehen,
+        infosGelesen,
         neuesTicket,
         anEltern,
         alsGelesen,

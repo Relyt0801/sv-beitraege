@@ -1,8 +1,9 @@
-import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { scrollSperren } from "../lib/scrollsperre";
 import { useBreit } from "../lib/gescrollt";
 import { Icon } from "./Icon";
+import { useEscapeSchliesst } from "./Sheet";
 import { REAKTIONEN, erstesEmoji, useTopicsOptional, type Reaktion, type TopicItem } from "../topics-store";
 import { Avatar, PersonName } from "./Avatar";
 import { MuteKnopf } from "./MuteKnopf";
@@ -97,7 +98,7 @@ export function ChatBlase({
             </button>
           </div>
         )}
-        <div className={`mt-0.5 text-right text-[11px] ${meins ? "text-white/90" : "text-tinte-leise"}`}>
+        <div className={`mt-0.5 text-right text-[12px] ${meins ? "text-white/90" : "text-tinte-leise"}`}>
           {new Date(m.created_at).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })}
           {(meins || darfLoeschen) && (
             <button
@@ -228,7 +229,7 @@ function ReaktionsSchild({
       {reihe.slice(0, 3).map((e) => (
         <span key={e}>{e}</span>
       ))}
-      {liste.length > 1 && <span className="zahl ml-0.5 text-[11.5px] font-semibold text-tinte-matt dark:text-slate-300">{liste.length}</span>}
+      {liste.length > 1 && <span className="zahl ml-0.5 text-[12px] font-semibold text-tinte-matt dark:text-slate-300">{liste.length}</span>}
     </button>
   );
 }
@@ -290,11 +291,9 @@ function ReaktionsMenue({
   onMelden?: () => void;
   onSchliessen: () => void;
 }) {
-  useEffect(() => {
-    const esc = (e: KeyboardEvent) => e.key === "Escape" && onSchliessen();
-    window.addEventListener("keydown", esc);
-    return () => window.removeEventListener("keydown", esc);
-  }, [onSchliessen]);
+  // Im gemeinsamen Escape-Stapel (Sheet.tsx): Escape schließt nur das Menü,
+  // nicht zusätzlich den Chat darunter
+  useEscapeSchliesst(true, onSchliessen);
   const vw = window.innerWidth;
   // Leiste in zwei Zeilen à 5 (Schnellauswahl + „+“) – passt auch aufs
   // schmalste Handy und wird nicht zu breit
@@ -641,11 +640,49 @@ function useHoehe() {
 }
 
 /**
+ * Stapel der sichtbaren Ebenen – nur die OBERSTE legt am Rechner ihren Kopf
+ * in die Kopfzeile der App (#kopf-ebene).
+ *
+ * Anlass (Okt. 2026): Liste „Schüler“ offen, darin ein Gespräch geöffnet –
+ * am Laptop standen plötzlich zwei Köpfe mit zwei Zurück-Knöpfen in der
+ * Kopfzeile, und der linke schloss die verdeckte Liste statt des Chats.
+ * Die Liste bleibt absichtlich eingehängt und sichtbar (Scrollstand, kein
+ * erneutes Hereinschieben beim Zurückgehen), sie ist nur verdeckt.
+ *
+ * Reihenfolge = Reihenfolge des Sichtbarwerdens. Das passt zur Reihenfolge
+ * der Portale an <body>: eine später geöffnete Ebene liegt auch oben.
+ */
+const offeneEbenen: object[] = [];
+const ebenenHoerer = new Set<() => void>();
+const ebenenMelden = () => ebenenHoerer.forEach((f) => f());
+const ebenenAbo = (f: () => void) => {
+  ebenenHoerer.add(f);
+  return () => {
+    ebenenHoerer.delete(f);
+  };
+};
+function useObersteEbene(sichtbar: boolean): boolean {
+  const [ich] = useState<object>(() => ({}));
+  useLayoutEffect(() => {
+    if (!sichtbar) return;
+    offeneEbenen.push(ich);
+    ebenenMelden();
+    return () => {
+      const i = offeneEbenen.indexOf(ich);
+      if (i >= 0) offeneEbenen.splice(i, 1);
+      ebenenMelden();
+    };
+  }, [sichtbar, ich]);
+  return useSyncExternalStore(ebenenAbo, () => offeneEbenen[offeneEbenen.length - 1] === ich);
+}
+
+/**
  * Ein geöffneter Chat (oder eine Unterseite wie „Anfragen“) als Vollbild-Ebene.
  *
  * Vorher hing der Chat mitten in der Seite: oben die App-Kopfleiste mit
  * Profilbild, darunter der große Titel „Chats“ und erst dann – etwa im
- * zweiten Fünftel des Bildschirms – der dunkle Balken mit „Chat | Übersicht“.
+ * zweiten Fünftel des Bildschirms – der dunkle Balken mit „Chat | Übersicht“
+ * (heute „Chat | Pinnwand“).
  * Jetzt liegt der Chat wie in iMessage/WhatsApp als eigene Ebene ÜBER allem:
  *
  *   - oben EINE Glas-Kopfleiste (Zurück, Name, Umschalter) – der Verlauf
@@ -662,7 +699,7 @@ function useHoehe() {
  *
  * Am Rechner/iPad quer gibt es KEINE zweite Kopfleiste (Okt. 2026: „die
  * Headbar ist nach unten verschoben“ – unter der App-Leiste stand ein
- * zweites Band mit Zurück, Name und „Chat | Übersicht“). Dort wandert der
+ * zweites Band mit Zurück, Name und „Chat | Pinnwand“). Dort wandert der
  * Kopf in die Kopfzeile der App (Platzhalter #kopf-ebene in App.tsx) und
  * ersetzt Seitentitel und Seiten-Knöpfe – Zurück steht genau dort, wo
  * sonst der Titel steht. Gibt es den Platzhalter nicht (Eltern-App), bleibt
@@ -674,6 +711,12 @@ function useHoehe() {
  *
  * sichtbar=false: bleibt eingehängt, aber unsichtbar – z. B. damit die
  * Anfragen im Hintergrund weiter zählen und auf Benachrichtigungen reagieren.
+ *
+ * Mehrere Ebenen übereinander (Liste → Gespräch): Nur die oberste zeigt am
+ * Rechner ihren Kopf in der Kopfzeile (useObersteEbene). onSchliessen:
+ * Escape schließt die oberste Ebene (gemeinsamer Stapel mit den Blättern –
+ * ein offenes Blatt schließt zuerst). Steht noch ein Entwurf in der Eingabe,
+ * nimmt Escape nur den Fokus heraus und schließt nicht.
  */
 export function ChatEbene({
   kopf,
@@ -682,22 +725,44 @@ export function ChatEbene({
   sichtbar = true,
   label,
   start = "unten",
+  onSchliessen,
 }: {
   kopf: ReactNode;
   fuss?: ReactNode;
   children: ReactNode;
   sichtbar?: boolean;
+  /** Escape schließt die Ebene (wie Zurück) – meist dieselbe Funktion wie onBack im ChatKopf */
+  onSchliessen?: () => void;
   /** Vorlesetext der Ebene, z. B. der Chat-Name */
   label?: string;
   /**
    * Wo der Inhalt beim Öffnen beginnt: "unten" = bei der neuesten Nachricht (Chat, Standard),
    * "oben" = ganz oben (Übersichten und Listen – Angepinntes darf nicht übersprungen werden).
-   * Darf sich im Betrieb ändern (Reiter Chat ⇄ Übersicht): beim Wechsel springt die Ebene an
+   * Darf sich im Betrieb ändern (Chat ⇄ Pinnwand): beim Wechsel springt die Ebene an
    * den passenden Rand und merkt sich, dass sie bei „oben“ nicht mit der Tastatur nach unten soll.
    */
   start?: "unten" | "oben";
 }) {
   const sicht = useSichtfenster(sichtbar);
+  const oben = useObersteEbene(sichtbar);
+  const ebeneRef = useRef<HTMLDivElement>(null);
+  useEscapeSchliesst(sichtbar && Boolean(onSchliessen), () => {
+    // Ein angefangener Text geht mit Esc nicht verloren: Steht noch etwas in
+    // der Eingabe unten (oder im Feld, in dem man gerade tippt), nimmt Esc nur
+    // den Fokus heraus – schließen geht dann mit Zurück.
+    const ebene = ebeneRef.current;
+    const fokus = document.activeElement;
+    const fokusFeld =
+      (fokus instanceof HTMLTextAreaElement || fokus instanceof HTMLInputElement) && ebene?.contains(fokus) ? fokus : null;
+    const entwurf = ebene?.querySelector<HTMLTextAreaElement | HTMLInputElement>(
+      "[data-ebene-fuss] textarea, [data-ebene-fuss] input[type=text], [data-ebene-fuss] input:not([type])",
+    );
+    if (fokusFeld?.value.trim() || entwurf?.value.trim()) {
+      fokusFeld?.blur();
+      return;
+    }
+    onSchliessen?.();
+  });
   const [kopfRef, kopfH] = useHoehe();
   const [fussRef, fussH] = useHoehe();
   const scroller = useRef<HTMLDivElement>(null);
@@ -741,6 +806,7 @@ export function ChatEbene({
 
   return createPortal(
     <div
+      ref={ebeneRef}
       role="region"
       aria-label={label}
       className={`ebene-grund fixed inset-x-0 top-0 z-[45] flex h-[100dvh] flex-col bg-papier dark:bg-slate-950 lg:bottom-0 lg:top-[var(--kopf)] lg:z-[15] lg:h-auto ${
@@ -761,12 +827,15 @@ export function ChatEbene({
         <div className="mx-auto max-w-5xl px-3 sm:px-5">{children}</div>
       </div>
 
+      {/* Am Rechner: nur die oberste Ebene legt ihren Kopf in die Kopfzeile –
+          eine verdeckte zeigt dort nichts (sonst zwei Zurück-Knöpfe) */}
       {kopfZiel ? (
-        createPortal(<KopfArt.Provider value="zeile">{kopf}</KopfArt.Provider>, kopfZiel)
+        oben ? createPortal(<KopfArt.Provider value="zeile">{kopf}</KopfArt.Provider>, kopfZiel) : null
       ) : (
         <div
           ref={kopfRef}
-          className="glas absolute inset-x-0 top-0 z-10 !bg-[rgb(var(--glas)/0.97)] pb-2 pt-[calc(env(safe-area-inset-top)+0.5rem)] shadow-[0_0.5px_0_rgba(0,0,0,0.16)] dark:shadow-[0_0.5px_0_rgba(255,255,255,0.14)] lg:pt-2"
+          // Deckend (Design-Regeln 3): darunter scrollt der Verlauf, nichts davon darf lesbar durchscheinen
+          className="glas absolute inset-x-0 top-0 z-10 !bg-[rgb(var(--glas))] pb-2 pt-[calc(env(safe-area-inset-top)+0.5rem)] shadow-[0_0.5px_0_rgba(0,0,0,0.16)] dark:shadow-[0_0.5px_0_rgba(255,255,255,0.14)] lg:pt-2"
         >
           <div className="mx-auto max-w-5xl px-3 sm:px-5">{kopf}</div>
         </div>
@@ -775,7 +844,8 @@ export function ChatEbene({
       {fuss && (
         <div
           ref={fussRef}
-          className={`glas absolute inset-x-0 bottom-0 z-10 !bg-[rgb(var(--glas)/0.97)] pt-2 shadow-[0_-0.5px_0_rgba(0,0,0,0.16)] dark:shadow-[0_-0.5px_0_rgba(255,255,255,0.14)] ${
+          data-ebene-fuss
+          className={`glas absolute inset-x-0 bottom-0 z-10 !bg-[rgb(var(--glas))] pt-2 shadow-[0_-0.5px_0_rgba(0,0,0,0.16)] dark:shadow-[0_-0.5px_0_rgba(255,255,255,0.14)] ${
             sicht.tastatur ? "pb-2" : "pb-[calc(env(safe-area-inset-bottom)+0.5rem)]"
           }`}
         >
@@ -793,7 +863,7 @@ const KopfArt = createContext<"band" | "zeile">("band");
 /**
  * Kopfleiste einer ChatEbene: links der runde Zurück-Knopf, in der Mitte
  * Symbol + Name (+ eine kleine Zeile, z. B. „8 Mitglieder“), rechts Platz
- * für Knöpfe. Darunter optional z. B. der Umschalter „Chat | Übersicht“.
+ * für Knöpfe. Darunter optional z. B. der Umschalter „Chat | Pinnwand“.
  * Der Name steht mittig wie in iOS – die Spalten links/rechts sind gleich
  * breit, solange rechts nicht mehr Knöpfe stehen als links.
  */
@@ -829,7 +899,10 @@ export function ChatKopf({
           </span>
         )}
         <div className="min-w-0">
-          <div className="auf-bild truncate text-[1.375rem] font-bold leading-tight tracking-[-0.02em]">{titel}</div>
+          {/* Am Rechner ist das die einzige Seitenüberschrift (das h1 im Inhalt ist dort ausgeblendet) */}
+          <div role="heading" aria-level={1} className="auf-bild truncate text-[1.375rem] font-bold leading-tight tracking-[-0.02em]">
+            {titel}
+          </div>
           {unter && <div className="auf-bild truncate text-[12px] leading-tight text-tinte-leise">{unter}</div>}
         </div>
         <div className="ml-auto flex shrink-0 items-center gap-2">
@@ -854,12 +927,14 @@ export function ChatKopf({
               {symbol}
             </span>
           )}
-          <div className="min-w-0">
+          {/* text-center: auch mit langem Untertitel steht der Name mittig (wie iOS) */}
+          <div className="min-w-0 text-center">
             <div className="truncate text-[16px] font-semibold leading-tight tracking-[-0.01em]">{titel}</div>
-            {unter && <div className="truncate text-[11.5px] leading-tight text-tinte-leise">{unter}</div>}
+            {unter && <div className="truncate text-[12px] leading-tight text-tinte-leise">{unter}</div>}
           </div>
         </div>
-        <div className="flex items-center justify-end gap-1.5">{rechts}</div>
+        {/* min-w-11 = so breit wie Zurück links – ohne Knöpfe rechts bleibt die Mitte mittig */}
+        <div className="flex min-w-11 items-center justify-end gap-1.5">{rechts}</div>
       </div>
       {children && <div className="mt-2">{children}</div>}
     </>

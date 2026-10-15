@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { SchliessenKnopf, ZurueckKnopf, useBlattKopf } from "./Sheet";
 
 /**
  * Bausteine im Stil der iOS-Einstellungen – überall in der App gleich:
@@ -222,6 +223,10 @@ export function ZeileAuswahl({
 /**
  * Kopf eines Blatts wie eine Rechnung bei Apple: oben mittig ein Bild, darunter
  * eine kleine Zeile, die große Zahl und ein Titel. Rechts oben schließen.
+ *
+ * Im Blatt-Stapel (siehe Sheet.tsx) wie SheetKopf: als Unterseite links
+ * „‹ <Seite davor>“, und ✕ schließt den ganzen Stapel. `zurueck` setzt einen
+ * eigenen Zurück-Knopf (Unterseite im selben Blatt).
  */
 export function RechnungKopf({
   bild,
@@ -231,6 +236,7 @@ export function RechnungKopf({
   titel,
   unter,
   onClose,
+  zurueck,
 }: {
   bild?: ReactNode;
   oben?: ReactNode;
@@ -239,23 +245,21 @@ export function RechnungKopf({
   titel?: ReactNode;
   unter?: ReactNode;
   onClose?: () => void;
+  zurueck?: { text: string; onClick: () => void };
 }) {
+  // Für „‹ …“ einer Unterseite zählt die kleine Zeile („Mithilfe nachtragen“)
+  const lage = useBlattKopf(oben ?? titel);
+  const zurueckJetzt = zurueck ?? (lage?.kind && onClose ? { text: lage.zurueckText, onClick: onClose } : undefined);
   return (
     <div className="relative flex flex-col items-center pt-1 text-center">
-      {onClose && (
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Schließen"
-          className="absolute -right-1.5 -top-1.5 flex h-11 w-11 items-center justify-center rounded-full transition active:scale-90"
-        >
-          <span className="flex h-[30px] w-[30px] items-center justify-center rounded-full bg-[rgb(118_118_128/0.12)] text-[13px] font-bold text-tinte-leise dark:bg-[rgb(118_118_128/0.24)]">
-            ✕
-          </span>
-        </button>
-      )}
+      {zurueckJetzt && <ZurueckKnopf text={zurueckJetzt.text} onClick={zurueckJetzt.onClick} className="absolute left-0 top-0.5 max-w-[38%]" />}
+      {onClose && <SchliessenKnopf onClick={lage?.kind ? lage.alleSchliessen : onClose} className="absolute -right-1.5 top-0.5" />}
       {bild}
-      {oben && <div className="mt-2 text-[13px] font-semibold text-tinte-leise">{oben}</div>}
+      {oben && (
+        <div id={lage?.titelId} className="mt-2 text-[13px] font-semibold text-tinte-leise">
+          {oben}
+        </div>
+      )}
       {wert !== undefined && (
         <div className={`zahl mt-1 text-[2.6rem] font-extrabold leading-none tracking-[-0.03em] ${wertKlasse}`}>{wert}</div>
       )}

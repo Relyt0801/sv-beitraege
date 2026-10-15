@@ -60,7 +60,8 @@ function ZahlFeld({
 }
 
 /**
- * Reiter "Beiträge": hier wird festgelegt, wofür es wie viel Prozent gibt und
+ * Kasse → „Beiträge & Abiball“ (Umschalter oben; früher ein eigener Reiter):
+ * hier wird festgelegt, wofür es wie viel Prozent gibt und
  * was das Abiballticket kostet. Beim Eintragen bei einer Person wird danach nur
  * noch aus dieser Liste ausgewählt.
  *
@@ -158,6 +159,9 @@ export function BeitraegeTab() {
               />
             ) : null;
           })()}
+
+          {/* Am Laptop: Bonus über 100 % gehört zu den Prozenten (Spalte 1) */}
+          {breit && <AbiballEinstellungen nur={["bonus"]} />}
         </div>
       )}
 
@@ -184,6 +188,9 @@ export function BeitraegeTab() {
               <Wert stark>{gesamt} €</Wert>
             </Zeile>
           </Gruppe>
+
+          {/* Am Laptop: Tag, Uhrzeit und Ort des Abiballs in Spalte 2 */}
+          {breit && <AbiballEinstellungen nur={["abiball"]} />}
         </div>
       )}
 
@@ -218,7 +225,10 @@ export function BeitraegeTab() {
             ))}
           </Gruppe>
 
-          <AbiballEinstellungen />
+          {/* Handy/iPad: alles unter „Ticket“. Laptop: hier nur Verkauf und
+              Bestellungen – Bonus und Abiball stehen in Spalte 1 und 2, damit
+              die drei Spalten etwa gleich lang sind. */}
+          {breit ? <AbiballEinstellungen nur={["verkauf", "bestellungen"]} /> : <AbiballEinstellungen />}
         </div>
       )}
     </div>

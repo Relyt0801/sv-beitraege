@@ -44,11 +44,9 @@ export function PunkteSheet({
   return (
     <Sheet open={open} onClose={onClose}>
       <div>
-        <SheetKopf
-          titel={`${student.vorname} ${student.nachname}`}
-          unter="Mithilfe und Ticketpreis"
-          onClose={onClose}
-        />
+        {/* Unterseite der Person: „‹ Name“ steht schon im Kopf (Stapel in Sheet.tsx),
+            der Titel sagt, was hier ist – wie in iOS */}
+        <SheetKopf titel="Mithilfe" unter={`${student.vorname} ${student.nachname} · Mithilfe und Ticketpreis`} onClose={onClose} />
 
         <Gruppe>
           <Zeile label="Mitgeholfen">

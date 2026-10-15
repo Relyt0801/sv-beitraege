@@ -441,28 +441,15 @@ html.mit-hintergrund .kopf-grund {
   width: 100vw;
   transform: translateX(-50%);
   z-index: -1;
-  /* 0.95: bei 0.88 schimmerte im Dunkeln der große Titel als Geist unter dem
-     kleinen Titel durch (zweimal „Chats“) – Design-Regel 3 */
-  background-color: rgb(var(--glas) / 0.95);
-  -webkit-backdrop-filter: blur(40px) saturate(1.8);
-  backdrop-filter: blur(40px) saturate(1.8);
+  /* DECKEND (K4): Mit 0.95 und Weichzeichner stand Inhalt („ABI-ALBUM“,
+     „Jetzt ausfüllen“) scharf lesbar hinter dem kleinen Titel – der
+     Weichzeichner wirkt am ::before eines klebenden Kopfs nicht zuverlässig.
+     Design-Regel 3: nie lesbar durchscheinen. */
+  background-color: rgb(var(--glas));
   box-shadow: 0 0.5px 0 rgba(0, 0, 0, 0.18);
-}
-@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .kopf-band::before {
-    background-color: rgb(var(--glas) / 0.97);
-  }
 }
 .dark .kopf-band::before {
   box-shadow: 0 0.5px 0 rgba(255, 255, 255, 0.15);
-}
-/* Mit eigenem Hintergrundbild: ruhige, fast deckende Leiste ohne Weichzeichner
-   und ohne Farbschein aus dem Bild */
-html.mit-hintergrund .kopf-band::before {
-  /* DECKEND: mit 0.94 schimmerte der große Titel/Inhalt als Geist durch */
-  background-color: rgb(var(--glas));
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
 }
 /* Text, der direkt auf dem Hintergrundbild steht (Abschnittstitel, Fußnoten
    von Gruppen, großer Seitentitel): kräftigere Farbe + Lichthof in der
@@ -513,6 +500,21 @@ html.dark.mit-hintergrund .ebene-grund .seg,
 html.dark.mit-hintergrund header .seg,
 html.dark.mit-hintergrund .feld-auf-bild {
   background-color: rgb(var(--glas));
+}
+/* Dunkel + Bild, gescrollt: Die Kopfzeile ist dann deckend in --glas – eine
+   Bahn in derselben Farbe war unsichtbar („Personen“ stand als loser Text da).
+   Ungescrollt (ohne kopf-band) bleibt die deckende Bahn auf dem Foto. */
+html.dark.mit-hintergrund header.kopf-band .seg {
+  background-color: rgb(118 118 128 / 0.24);
+}
+/* Segment IN einer Karte (z. B. „Alle | Nur offene“ in der Kassenliste) steht
+   nicht auf dem Foto: normale Bahn – sonst war sie im Dunkeln unsichtbar */
+html.mit-hintergrund .card .seg {
+  background-color: rgb(118 118 128 / 0.12);
+  box-shadow: none;
+}
+html.dark.mit-hintergrund .card .seg {
+  background-color: rgb(118 118 128 / 0.24);
 }
 html.mit-hintergrund .blatt .seg,
 html.mit-hintergrund .blatt .feld-auf-bild {

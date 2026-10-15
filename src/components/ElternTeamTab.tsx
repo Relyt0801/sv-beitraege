@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
-import { useState } from "react";
-import { useEltern } from "../eltern-store";
+import { useEffect, useMemo, useState } from "react";
+import { useEltern, type ElternInfo, type ElternTicket, type Elternkonto } from "../eltern-store";
 import { useRole } from "../auth/RoleProvider";
 import { useProfiles } from "../profiles-store";
 import { useStore } from "../store";
@@ -8,24 +8,32 @@ import { normalize } from "../lib/logic";
 import { datumLang } from "./BeitragsListe";
 
 import { frage } from "../lib/melder";
-import { ChatEbene, ChatKopf } from "./ChatBlasen";
-import { Icon } from "./Icon";
+import { ChatEbene, ChatEingabe, ChatKopf, useChatEndeIn } from "./ChatBlasen";
+import { Avatar } from "./Avatar";
+import { Icon, type IconName } from "./Icon";
 import { Schalter } from "./Schalter";
+import { Sheet, SheetKopf } from "./Sheet";
+import { Gruppe, Wert, Zeile, ZeileMitSchalter } from "./Liste";
+import { FussLeiste } from "./FussLeiste";
+
 /**
- * Was das Stufenteam mit den Eltern zu tun hat: Infos anheften und die
- * Anfragen der Eltern beantworten. Erscheint im Reiter Chats.
+ * Was das Stufenteam mit den Eltern zu tun hat – zwei Ebenen aus dem
+ * Chats-Reiter: „Infos für Eltern“ (anheften, für alle Eltern) und
+ * „Gespräche mit Eltern“ (Fragen beantworten, ein Elternhaus anschreiben).
+ *
+ * Seit Okt. 2026 wie die übrigen Unterseiten (TicketListe): „+“ oben rechts
+ * im Kopf öffnet ein Blatt mit Fußknopf, die Einträge sind iOS-Zeilen, ein
+ * Gespräch geht als eigener Chat auf. Vorher: Kapsel-Knopf in einer weißen
+ * Karte, Formular klappte gestrichelt in der Seite auf, seitenbreiter
+ * „Veröffentlichen“-Knopf, Mülleimer in jeder Zeile.
  */
-export function ElternTeamTab({ glocke, nur }: { glocke?: ReactNode; nur?: "infos" | "gespraeche" } = {}) {
-  const { infos, tickets, nachrichten, infoAnlegen, infoLoeschen, antworten, ticketSchliessen, ticketLoeschen, zuordnung, konten, anEltern, alsGelesen } = useEltern();
-  const { uid } = useRole();
+
+/** Wer fragt da? „Familie Müller“ allein reicht nicht – es kann zwei geben. Deshalb steht das Kind dahinter. */
+function useAbsender() {
+  const { zuordnung } = useEltern();
   const { profile } = useProfiles();
   const { students } = useStore();
-
-  /**
-   * Wer fragt da? "Familie Mueller" allein reicht nicht – es kann zwei davon
-   * geben. Deshalb steht das Kind dahinter.
-   */
-  const absender = (userId: string) => {
+  return (userId: string) => {
     const name = profile[userId]?.anzeigename || "Elternzugang";
     const kinder = (zuordnung[userId] || [])
       .map((id) => students.find((s) => s.id === id))
@@ -33,386 +41,18 @@ export function ElternTeamTab({ glocke, nur }: { glocke?: ReactNode; nur?: "info
       .map((s) => `${s!.vorname} ${s!.nachname}`);
     return kinder.length ? `${name} · ${kinder.join(" und ")}` : name;
   };
-  const [titel, setTitel] = useState("");
-  const [text, setText] = useState("");
-  const [anheften, setAnheften] = useState(false);
-  const [sendet, setSendet] = useState(false);
-  const [offen, setOffen] = useState<string | null>(null);
-  const [neuOffen, setNeuOffen] = useState(false);
-  const [schreibOffen, setSchreibOffen] = useState(false);
+}
 
-  const offeneTickets = tickets.filter((t) => !t.erledigt);
-  const erledigte = tickets.filter((t) => t.erledigt);
-
-  /** Hat hier jemand geschrieben, seit wir zuletzt geschaut haben? */
-  const neu = (t: (typeof tickets)[number]) => {
+/** Hat in diesem Gespräch jemand geschrieben, seit das Team zuletzt geschaut hat? */
+function useIstNeu() {
+  const { nachrichten } = useEltern();
+  const { uid } = useRole();
+  return (t: ElternTicket) => {
     const fremd = nachrichten.filter((n) => n.ticket_id === t.id && n.user_id !== uid);
     if (!fremd.length) return false;
     return !t.gelesen_team || fremd[fremd.length - 1].created_at > t.gelesen_team;
   };
-
-  const wer = (userId: string) =>
-    userId === uid ? "Du" : profile[userId]?.anzeigename || "Eltern";
-
-  return (
-    <div className="grid grid-cols-1 gap-3">
-      {/* -------------------------------------------- Infos anheften */}
-      {nur !== "gespraeche" && <section className="card p-4 sm:p-5">
-        <div className="flex items-center gap-2">
-          <h2 className={`min-w-0 flex-1 text-lg font-bold ${nur === "infos" ? "sr-only" : ""}`}>Infos für die Eltern</h2>
-          <button
-            onClick={() => setNeuOffen((v) => !v)}
-            className={`${neuOffen ? "btn-klein-grau" : "btn-klein"} ml-auto shrink-0`}
-          >
-            {neuOffen ? "Abbrechen" : "Neue Info"}
-          </button>
-        </div>
-        <p className="mt-0.5 text-[13px] leading-relaxed text-tinte-matt dark:text-slate-400">
-          Was hier steht, sehen alle Eltern in ihrem Reiter Infos. Wer Mitteilungen erlaubt hat, bekommt
-          sie zusätzlich aufs Handy.
-        </p>
-
-        {neuOffen && (
-          <div className="mt-3 grid grid-cols-1 gap-2 rounded-2xl border border-dashed border-brand/50 p-3">
-            <input
-              className="field"
-              placeholder="Überschrift, zum Beispiel Termin Abiball"
-              value={titel}
-              onChange={(e) => setTitel(e.target.value)}
-            />
-            <textarea
-              className="field min-h-[90px]"
-              placeholder="Text …"
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-            />
-            <label className="flex min-h-[44px] cursor-pointer items-center gap-3 text-[15px]">
-              <span className="min-w-0 flex-1">Ganz oben anheften</span>
-              <Schalter an={anheften} onChange={setAnheften} label="Ganz oben anheften" />
-            </label>
-            <button
-              disabled={!titel.trim() || !text.trim() || sendet}
-              onClick={async () => {
-                // Doppeltipp: sonst entsteht die Info zweimal (und zwei Mitteilungen).
-                if (sendet) return;
-                setSendet(true);
-                try {
-                  await infoAnlegen(titel, text, anheften);
-                  setTitel("");
-                  setText("");
-                  setAnheften(false);
-                  setNeuOffen(false);
-                } finally {
-                  setSendet(false);
-                }
-              }}
-              className="btn-primary disabled:opacity-40"
-            >
-              {sendet ? "Wird veröffentlicht …" : "Veröffentlichen"}
-            </button>
-          </div>
-        )}
-
-        {infos.length === 0 ? (
-          <p className="mt-3 text-[13px] text-tinte-leise">Noch nichts veröffentlicht.</p>
-        ) : (
-          <ul className="mt-3 grid grid-cols-1 gap-2">
-            {infos.map((i) => (
-              <li
-                key={i.id}
-                className="flex items-start gap-2 rounded-2xl border border-papier-linie p-3 dark:border-slate-700"
-              >
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-baseline gap-1.5">
-                    {i.angeheftet && <span className="shrink-0 self-center text-brand-dark dark:text-brand" title="Angeheftet"><Icon name="pin" size={13} /></span>}
-                    <span className="truncate text-[14px] font-bold">{i.titel}</span>
-                  </div>
-                  <p className="mt-0.5 line-clamp-2 text-[12px] text-tinte-matt">{i.text}</p>
-                  <span className="text-[12px] text-tinte-leise">{datumLang(i.created_at.slice(0, 10))}</span>
-                </div>
-                <button
-                  onClick={() => void frage(`„${i.titel}" wirklich löschen?`, "Löschen", true).then((ok) => { if (ok) void infoLoeschen(i.id); })}
-                  className="-mr-1 -mt-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-tinte-leise transition active:scale-90"
-                  aria-label="Löschen"
-                >
-                  <Icon name="muell" size={18} />
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>}
-
-      {/* -------------------------------------------- Anfragen */}
-      {nur !== "infos" && <section className="card p-4 sm:p-5">
-        <div className="flex items-center gap-2">
-          <h2 className={`min-w-0 flex-1 text-lg font-bold ${nur === "gespraeche" ? "sr-only" : ""}`}>
-            Gespräche mit Eltern{offeneTickets.length > 0 && ` (${offeneTickets.length} offen)`}
-            {tickets.filter(neu).length > 0 && (
-              <span className="ml-2 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 align-middle text-[12px] font-bold text-white">
-                {tickets.filter(neu).length} neu
-              </span>
-            )}
-          </h2>
-          <button
-            onClick={() => setSchreibOffen((v) => !v)}
-            className={`${schreibOffen ? "btn-klein-grau" : "btn-klein"} ml-auto shrink-0`}
-          >
-            {schreibOffen ? "Abbrechen" : "Anschreiben"}
-          </button>
-        </div>
-
-        {schreibOffen && <AnEltern konten={konten} onSenden={anEltern} onFertig={() => setSchreibOffen(false)} />}
-
-        {tickets.length === 0 ? (
-          <p className="mt-2 text-[13px] text-tinte-leise">Bisher hat niemand etwas gefragt.</p>
-        ) : (
-          <ul className="mt-3 grid grid-cols-1 gap-2">
-            {[...offeneTickets, ...erledigte].map((t) => {
-              const verlauf = nachrichten.filter((n) => n.ticket_id === t.id);
-              const auf = offen === t.id;
-              return (
-                <li
-                  key={t.id}
-                  className={`rounded-2xl border ${
-                    t.erledigt ? "border-papier-linie opacity-70 dark:border-slate-700" : "border-amber-300 dark:border-amber-500/40"
-                  }`}
-                >
-                  <div className="flex items-center">
-                    <button
-                      onClick={() => {
-                        const jetztOffen = auf ? null : t.id;
-                        setOffen(jetztOffen);
-                        if (jetztOffen) alsGelesen(t.id);
-                      }}
-                      className="flex min-w-0 flex-1 items-center gap-2 p-3.5 text-left"
-                    >
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-[15px] font-bold">
-                          {neu(t) && <span className="mr-1.5 inline-block h-2 w-2 rounded-full bg-red-500 align-middle" />}
-                          {t.betreff}
-                        </span>
-                        <span className="block truncate text-[12px] text-tinte-leise">
-                          {absender(t.user_id)} · {verlauf.length}{" "}
-                          {verlauf.length === 1 ? "Nachricht" : "Nachrichten"}
-                        </span>
-                      </span>
-                      <span className={`shrink-0 text-tinte-leise transition-transform ${auf ? "rotate-90" : ""}`}><Icon name="chevron" size={16} strich={2.4} /></span>
-                    </button>
-                    {/* Weg damit: geloeschte Gespraeche sind endgueltig weg, auch
-                        fuer die Eltern. Deshalb die Rueckfrage. */}
-                    <button
-                      onClick={() =>
-                        void frage(
-                          `Das Gespräch „${t.betreff}" endgültig löschen?\n\nAlle Nachrichten darin verschwinden – auch für die Eltern.`,
-                          "Löschen",
-                          true,
-                        ).then((ok) => { if (ok) void ticketLoeschen(t.id); })
-                      }
-                      className="mr-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-tinte-leise transition hover:text-red-500 active:scale-90"
-                      aria-label="Gespräch löschen"
-                      title="Gespräch löschen"
-                    >
-                      <Icon name="muell" size={18} />
-                    </button>
-                  </div>
-
-                  {auf && (
-                    <div className="border-t border-papier-linie p-3.5 dark:border-slate-700">
-                      <ul className="grid grid-cols-1 gap-2">
-                        {verlauf.map((n) => (
-                          <li
-                            key={n.id}
-                            className={`rounded-xl px-3 py-2 text-[13px] leading-relaxed ${
-                              n.user_id === uid ? "bg-brand/10" : "bg-papier-matt dark:bg-slate-800"
-                            }`}
-                          >
-                            <div className="mb-0.5 text-[12px] font-semibold text-tinte-leise">{wer(n.user_id)}</div>
-                            <div className="whitespace-pre-wrap">{n.text}</div>
-                          </li>
-                        ))}
-                      </ul>
-                      <Antwort onSenden={(txt) => antworten(t.id, txt)} />
-                      <div className="mt-2 flex gap-2">
-                        <button
-                          onClick={() => ticketSchliessen(t.id, !t.erledigt)}
-                          className="btn-klein-grau min-w-0 flex-1"
-                        >
-                          {t.erledigt ? "Wieder öffnen" : "Als erledigt markieren"}
-                        </button>
-                        <button
-                          onClick={() =>
-                            void frage(
-                              `Das Gespräch „${t.betreff}" endgültig löschen?\n\nAlle Nachrichten darin verschwinden – auch für die Eltern.`,
-                              "Löschen",
-                              true,
-                            ).then((ok) => { if (ok) void ticketLoeschen(t.id); })
-                          }
-                          className="btn-klein-grau shrink-0 !text-red-600 dark:!text-red-400"
-                        >
-                          Löschen
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        )}
-        {glocke && <div className="-mx-4 -mb-4 mt-3 sm:-mx-5 sm:-mb-5">{glocke}</div>}
-      </section>}
-    </div>
-  );
 }
-
-function Antwort({ onSenden }: { onSenden: (text: string) => void }) {
-  const [text, setText] = useState("");
-  return (
-    <div className="mt-2 flex gap-2">
-      <input
-        className="field min-w-0 flex-1"
-        placeholder="Antwort ans Elternhaus …"
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" && text.trim()) {
-            onSenden(text);
-            setText("");
-          }
-        }}
-      />
-      <button
-        disabled={!text.trim()}
-        onClick={() => {
-          onSenden(text);
-          setText("");
-        }}
-        className="btn-klein shrink-0"
-      >
-        Senden
-      </button>
-    </div>
-  );
-}
-
-/**
- * Ein bestimmtes Elternhaus anschreiben.
- *
- * Erst die Familie suchen, dann Betreff und Text. Die Eltern sehen das
- * Gespraech danach in ihrem Reiter Infos und bekommen eine Benachrichtigung.
- */
-function AnEltern({
-  konten,
-  onSenden,
-  onFertig,
-}: {
-  konten: import("../eltern-store").Elternkonto[];
-  onSenden: (userId: string, betreff: string, text: string) => Promise<string | null>;
-  onFertig: () => void;
-}) {
-  const { students } = useStore();
-  const [suche, setSuche] = useState("");
-  const [gewaehlt, setGewaehlt] = useState<string | null>(null);
-  const [betreff, setBetreff] = useState("");
-  const [text, setText] = useState("");
-  const [fehler, setFehler] = useState("");
-  const [busy, setBusy] = useState(false);
-
-  const kindNamen = (ids: string[]) =>
-    ids
-      .map((id) => students.find((s) => s.id === id))
-      .filter(Boolean)
-      .map((s) => `${s!.vorname} ${s!.nachname}`)
-      .join(" und ");
-
-  const q = normalize(suche);
-  const treffer = konten
-    .filter((k) => !q || normalize(`${k.anzeigename} ${k.username} ${kindNamen(k.kinder)}`).includes(q))
-    .slice(0, 8);
-  const ziel = konten.find((k) => k.user_id === gewaehlt);
-
-  return (
-    <div className="mt-3 grid grid-cols-1 gap-2 rounded-2xl border border-dashed border-brand/50 p-3">
-      {!ziel ? (
-        <>
-          <input
-            className="field"
-            placeholder="Familie oder Kind suchen …"
-            value={suche}
-            onChange={(e) => setSuche(e.target.value)}
-            autoFocus
-          />
-          {konten.length === 0 ? (
-            <p className="text-[13px] text-tinte-leise">Es gibt noch keine Elternzugänge.</p>
-          ) : (
-            <ul className="grid grid-cols-1 gap-1">
-              {treffer.map((k) => (
-                <li key={k.user_id}>
-                  <button
-                    onClick={() => setGewaehlt(k.user_id)}
-                    className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left hover:bg-papier-matt dark:hover:bg-slate-800"
-                  >
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[14px] font-semibold">{k.anzeigename}</span>
-                      <span className="block truncate text-[12px] text-tinte-leise">
-                        {kindNamen(k.kinder) || k.username}
-                      </span>
-                    </span>
-                  </button>
-                </li>
-              ))}
-              {treffer.length === 0 && (
-                <li className="px-1 py-2 text-[13px] text-tinte-leise">Niemand gefunden.</li>
-              )}
-            </ul>
-          )}
-        </>
-      ) : (
-        <>
-          <div className="flex items-center gap-2 rounded-xl bg-papier-matt px-3 py-2 dark:bg-slate-800">
-            <span className="min-w-0 flex-1 truncate text-[14px] font-semibold">
-              An {ziel.anzeigename}
-              {kindNamen(ziel.kinder) && ` · ${kindNamen(ziel.kinder)}`}
-            </span>
-            <button onClick={() => setGewaehlt(null)} className="shrink-0 text-[12px] font-bold text-brand">
-              ändern
-            </button>
-          </div>
-          <input className="field" placeholder="Betreff" value={betreff} onChange={(e) => setBetreff(e.target.value)} />
-          <textarea
-            className="field min-h-[90px]"
-            placeholder="Ihre Nachricht …"
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-          />
-          {fehler && <p className="text-[13px] font-semibold text-amber-600">{fehler}</p>}
-          <button
-            disabled={busy || !betreff.trim() || !text.trim()}
-            onClick={async () => {
-              setBusy(true);
-              const problem = await onSenden(ziel.user_id, betreff, text);
-              setBusy(false);
-              if (problem) {
-                setFehler(problem);
-                return;
-              }
-              setBetreff("");
-              setText("");
-              setGewaehlt(null);
-              setSuche("");
-              onFertig();
-            }}
-            className="rounded-xl bg-brand py-2.5 text-sm font-bold text-white disabled:opacity-40"
-          >
-            Abschicken
-          </button>
-        </>
-      )}
-    </div>
-  );
-}
-
 
 /**
  * Zahlen für die Kacheln im Chats-Reiter: offene Gespräche mit Eltern, davon
@@ -431,43 +71,517 @@ export function useElternZahlen(aktiv: boolean) {
   return { offen: offene.length, neu, infos: infos.length };
 }
 
-/**
- * Die Karten in ElternTeamTab bringen ihre eigene Überschrift mit (für den Fall, dass
- * sie nicht in einer Ebene stehen). In den Vollbild-Ebenen steht der Titel schon oben
- * in der Kopfleiste – dort wird die Überschrift der Karte nur für Vorlesegeräte
- * behalten (sr-only), und der Knopf daneben rückt nach rechts. So steht der Titel
- * nicht zweimal da.
- */
-const OHNE_DOPPELTITEL = "[&_section>div:first-child]:justify-end [&_section>div:first-child>h2]:sr-only";
+/** Leerer Zustand einer Unterseite: Liniensymbol, ein Satz, was als Nächstes passiert (wie in ChatsTab). */
+function Leer({ icon, text }: { icon: IconName; text: string }) {
+  return (
+    <div className="flex flex-col items-center px-8 py-12 text-center">
+      <span aria-hidden className="flex h-14 w-14 items-center justify-center rounded-full bg-brand/10 text-brand dark:bg-brand/20">
+        <Icon name={icon} size={26} />
+      </span>
+      <p className="auf-bild mx-auto mt-3 max-w-xs text-[14px] leading-snug text-tinte-leise">{text}</p>
+    </div>
+  );
+}
+
+/** Rundes „+“ rechts im Kopf einer Ebene (wie bei „Schüler“) */
+function PlusKnopf({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <button type="button" className="iconbtn" onClick={onClick} aria-label={label} title={label}>
+      <Icon name="plus" size={19} strich={2.4} />
+    </button>
+  );
+}
+
+const kurzDatum = (iso: string) => new Date(iso).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" });
+
+/* ====================================================================== */
+/* Infos für Eltern                                                        */
+/* ====================================================================== */
+
+/** Eigene Ebene „Infos für Eltern“ (aus der Kachel im Chats-Reiter) */
+export function ElternInfosEbene({ onBack }: { onBack: () => void }) {
+  const { infos } = useEltern();
+  const [neu, setNeu] = useState(false);
+  const [zeigId, setZeigId] = useState<string | null>(null);
+  const zeig = zeigId ? infos.find((i) => i.id === zeigId) ?? null : null;
+  return (
+    <ChatEbene
+      label="Infos für Eltern"
+      start="oben"
+      onSchliessen={onBack}
+      kopf={
+        <ChatKopf
+          onBack={onBack}
+          symbol={<Icon name="info" size={17} strich={2.2} />}
+          titel="Infos für Eltern"
+          unter={infos.length ? `${infos.length} veröffentlicht` : "Noch nichts veröffentlicht"}
+          rechts={<PlusKnopf label="Neue Info" onClick={() => setNeu(true)} />}
+        />
+      }
+    >
+      <div className="py-4">
+        {infos.length === 0 ? (
+          <Leer icon="info" text="Noch nichts veröffentlicht. Mit „+“ oben rechts schreibst du die erste Info für alle Eltern." />
+        ) : (
+          <Gruppe
+            className=""
+            titel="Veröffentlicht"
+            fuss="Was hier steht, sehen alle Eltern in ihrem Reiter Infos. Wer Mitteilungen erlaubt hat, bekommt es zusätzlich aufs Handy."
+          >
+            {infos.map((i) => (
+              <Zeile
+                key={i.id}
+                label={
+                  <span className="flex min-w-0 items-center gap-1.5 font-semibold">
+                    {i.angeheftet && (
+                      <span className="shrink-0 text-brand-dark dark:text-brand" title="Ganz oben angeheftet">
+                        <Icon name="pin" size={14} />
+                      </span>
+                    )}
+                    <span className="line-clamp-1 [overflow-wrap:anywhere]">{i.titel}</span>
+                  </span>
+                }
+                unter={<span className="line-clamp-2 [overflow-wrap:anywhere]">{i.text}</span>}
+                onClick={() => setZeigId(i.id)}
+              >
+                <Wert>{kurzDatum(i.created_at)}</Wert>
+              </Zeile>
+            ))}
+          </Gruppe>
+        )}
+      </div>
+      <InfoNeuBlatt open={neu} onClose={() => setNeu(false)} />
+      <InfoBlatt info={zeig} onClose={() => setZeigId(null)} />
+    </ChatEbene>
+  );
+}
+
+/** Neue Info für alle Eltern – Blatt mit Fußknopf (statt Formular in der Seite). */
+function InfoNeuBlatt({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { infoAnlegen } = useEltern();
+  const [titel, setTitel] = useState("");
+  const [text, setText] = useState("");
+  const [anheften, setAnheften] = useState(false);
+  const [sendet, setSendet] = useState(false);
+  useEffect(() => {
+    if (!open) return;
+    setTitel("");
+    setText("");
+    setAnheften(false);
+  }, [open]);
+
+  async function veroeffentlichen() {
+    // Doppeltipp: sonst entsteht die Info zweimal (und zwei Mitteilungen).
+    if (sendet || !titel.trim() || !text.trim()) return;
+    setSendet(true);
+    try {
+      await infoAnlegen(titel, text, anheften);
+      onClose();
+    } finally {
+      setSendet(false);
+    }
+  }
+
+  return (
+    <Sheet open={open} onClose={onClose}>
+      <SheetKopf titel="Neue Info" unter="Für alle Eltern im Reiter Infos" onClose={onClose} />
+      <Gruppe className="mt-0">
+        <input
+          className="block w-full bg-transparent px-4 py-3 text-[16px] font-semibold outline-none placeholder:font-normal placeholder:text-tinte-leise"
+          placeholder="Überschrift, z. B. Termin Abiball"
+          aria-label="Überschrift"
+          value={titel}
+          autoFocus
+          onChange={(e) => setTitel(e.target.value)}
+        />
+        {/* in einer Hülle: ein Textfeld selbst kann keine Trennlinie (::before) tragen */}
+        <div>
+          <textarea
+            className="block min-h-[7.5rem] w-full resize-y bg-transparent px-4 py-3 text-[16px] outline-none placeholder:text-tinte-leise"
+            placeholder="Text …"
+            aria-label="Text"
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+          />
+        </div>
+      </Gruppe>
+      <Gruppe fuss="Angeheftete Infos stehen bei den Eltern immer ganz oben.">
+        <ZeileMitSchalter label="Ganz oben anheften">
+          <Schalter an={anheften} onChange={setAnheften} label="Ganz oben anheften" />
+        </ZeileMitSchalter>
+      </Gruppe>
+      <FussLeiste>
+        <button className="btn-primary" disabled={!titel.trim() || !text.trim() || sendet} onClick={() => void veroeffentlichen()}>
+          {sendet ? "Wird veröffentlicht …" : "Veröffentlichen"}
+        </button>
+      </FussLeiste>
+    </Sheet>
+  );
+}
+
+/** Eine veröffentlichte Info: ganzer Text, Löschen ganz unten (mit Rückfrage). */
+function InfoBlatt({ info, onClose }: { info: ElternInfo | null; onClose: () => void }) {
+  const { infoLoeschen } = useEltern();
+  return (
+    <Sheet open={Boolean(info)} onClose={onClose}>
+      {info && (
+        <>
+          <SheetKopf
+            titel={info.titel}
+            unter={`Veröffentlicht am ${datumLang(info.created_at.slice(0, 10))}${info.angeheftet ? " · ganz oben angeheftet" : ""}`}
+            onClose={onClose}
+          />
+          <Gruppe className="mt-0">
+            <p className="whitespace-pre-wrap px-4 py-3 text-[15px] leading-relaxed [overflow-wrap:anywhere]">{info.text}</p>
+          </Gruppe>
+          <Gruppe fuss="Die Info verschwindet auch bei allen Eltern.">
+            <Zeile
+              label="Info löschen"
+              rot
+              onClick={() =>
+                void frage(`„${info.titel}" wirklich löschen?`, "Löschen", true).then((ok) => {
+                  if (!ok) return;
+                  void infoLoeschen(info.id);
+                  onClose();
+                })
+              }
+            />
+          </Gruppe>
+        </>
+      )}
+    </Sheet>
+  );
+}
+
+/* ====================================================================== */
+/* Gespräche mit Eltern                                                    */
+/* ====================================================================== */
 
 /** Eigene Ebene „Gespräche mit Eltern“ (aus der Kachel im Chats-Reiter) */
 export function ElternGespraecheEbene({ onBack, glocke }: { onBack: () => void; glocke?: ReactNode }) {
-  const z = useElternZahlen(true);
+  const { tickets, nachrichten } = useEltern();
+  const absender = useAbsender();
+  const istNeu = useIstNeu();
+  const [neu, setNeu] = useState(false);
+  const [offenId, setOffenId] = useState<string | null>(null);
+  const offene = tickets.filter((t) => !t.erledigt);
+  const erledigte = tickets.filter((t) => t.erledigt);
+  const offen = offenId ? tickets.find((t) => t.id === offenId) ?? null : null;
+  const zeile = (t: ElternTicket) => (
+    <GespraechZeile
+      key={t.id}
+      ticket={t}
+      wer={absender(t.user_id)}
+      anzahl={nachrichten.filter((n) => n.ticket_id === t.id).length}
+      neu={istNeu(t)}
+      onOpen={() => setOffenId(t.id)}
+    />
+  );
+
   return (
     <ChatEbene
       label="Gespräche mit Eltern"
       start="oben"
-      kopf={<ChatKopf onBack={onBack} symbol={<Icon name="rollen" size={17} strich={2.2} />} titel="Gespräche mit Eltern" unter={z.offen ? `${z.offen} offen` : "Nichts offen"} />}
+      onSchliessen={onBack}
+      kopf={
+        <ChatKopf
+          onBack={onBack}
+          symbol={<Icon name="rollen" size={17} strich={2.2} />}
+          titel="Gespräche mit Eltern"
+          unter={offene.length ? `${offene.length} offen` : "Nichts offen"}
+          rechts={<PlusKnopf label="Eltern anschreiben" onClick={() => setNeu(true)} />}
+        />
+      }
     >
-      <div className={`grid gap-3 py-4 ${OHNE_DOPPELTITEL}`}>
-        <ElternTeamTab nur="gespraeche" glocke={glocke} />
+      <div className="py-4">
+        {offene.length === 0 ? (
+          <Leer
+            icon="rollen"
+            text={
+              tickets.length
+                ? "Gerade ist nichts offen. Mit „+“ oben rechts schreibst du ein Elternhaus an."
+                : "Bisher hat niemand etwas gefragt. Mit „+“ oben rechts schreibst du ein Elternhaus an."
+            }
+          />
+        ) : (
+          <Gruppe className="" titel="Offen">
+            {offene.map(zeile)}
+          </Gruppe>
+        )}
+
+        {erledigte.length > 0 && (
+          <details className="group mt-6">
+            <summary className="auf-bild flex min-h-[44px] cursor-pointer list-none items-center gap-1.5 px-4 text-[13px] uppercase tracking-[0.02em] text-tinte-leise [&::-webkit-details-marker]:hidden">
+              Erledigt ({erledigte.length})
+              <span className="transition group-open:rotate-90" aria-hidden>
+                <Icon name="chevron" size={13} />
+              </span>
+            </summary>
+            <div className="gruppe-zellen mt-1">{erledigte.map(zeile)}</div>
+          </details>
+        )}
+
+        {glocke}
+      </div>
+
+      <AnElternBlatt open={neu} onClose={() => setNeu(false)} />
+      {/* Ein geöffnetes Gespräch liegt als eigener Chat darüber – Zurück führt in die Liste */}
+      {offen && <ElternGespraech key={offen.id} ticket={offen} wer={absender(offen.user_id)} onBack={() => setOffenId(null)} />}
+    </ChatEbene>
+  );
+}
+
+/** Eine Zeile in der Liste der Gespräche: Kreis, Betreff, wer · wie viele Nachrichten, roter Punkt bei Neuem. */
+function GespraechZeile({
+  ticket, wer, anzahl, neu, onOpen,
+}: { ticket: ElternTicket; wer: string; anzahl: number; neu: boolean; onOpen: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className="flex min-h-[60px] w-full min-w-0 items-center gap-3 px-4 py-2 text-left transition active:bg-black/[0.04] dark:active:bg-white/[0.06]"
+    >
+      <Avatar userId={ticket.user_id} name={wer.split(" · ")[0]} size={36} />
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-[15.5px] font-semibold">{ticket.betreff}</span>
+        <span className="block truncate text-[12.5px] text-tinte-leise">
+          {wer} · {anzahl} {anzahl === 1 ? "Nachricht" : "Nachrichten"}
+        </span>
+      </span>
+      {neu && (
+        <span className="flex h-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[12px] font-bold text-white">neu</span>
+      )}
+      {ticket.erledigt && (
+        <span className="text-[#248A3D] dark:text-[#30D158]">
+          <Icon name="haken" size={16} strich={2.6} />
+        </span>
+      )}
+      <span aria-hidden className="shrink-0 text-[17px] leading-none text-tinte-leise">›</span>
+    </button>
+  );
+}
+
+/**
+ * Ein Gespräch mit einem Elternhaus als Chat (wie die Gespräche mit Schülern):
+ * oben Betreff und Familie, rechts „Erledigt“ und Löschen, unten die Eingabe.
+ */
+function ElternGespraech({ ticket, wer, onBack }: { ticket: ElternTicket; wer: string; onBack: () => void }) {
+  const { nachrichten, antworten, ticketSchliessen, ticketLoeschen, alsGelesen } = useEltern();
+  const { uid } = useRole();
+  const { profile } = useProfiles();
+  const [text, setText] = useState("");
+  const verlauf = useMemo(
+    () => nachrichten.filter((n) => n.ticket_id === ticket.id).sort((a, b) => (a.created_at < b.created_at ? -1 : 1)),
+    [nachrichten, ticket.id],
+  );
+  const letzte = verlauf[verlauf.length - 1];
+  const ende = useChatEndeIn(verlauf.length, Boolean(letzte && letzte.user_id === uid));
+
+  // Gelesen, sobald man es sieht – und bei jeder neuen Nachricht, solange es offen ist
+  useEffect(() => {
+    alsGelesen(ticket.id);
+  }, [ticket.id, verlauf.length, alsGelesen]);
+
+  const senden = () => {
+    const t = text.trim();
+    if (!t) return;
+    setText("");
+    void antworten(ticket.id, t);
+  };
+  const name = (userId: string) => (userId === uid ? "Du" : profile[userId]?.anzeigename || "Eltern");
+  const zeit = (iso: string) => {
+    const d = new Date(iso);
+    const heute = d.toDateString() === new Date().toDateString();
+    return heute
+      ? d.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })
+      : d.toLocaleString("de-DE", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+  };
+
+  return (
+    <ChatEbene
+      label={ticket.betreff}
+      onSchliessen={onBack}
+      kopf={
+        <ChatKopf
+          onBack={onBack}
+          symbol={<Avatar userId={ticket.user_id} name={wer.split(" · ")[0]} size={32} />}
+          titel={ticket.betreff}
+          unter={ticket.erledigt ? `Erledigt · ${wer}` : wer}
+          rechts={
+            <>
+              <button
+                type="button"
+                className={`flex h-10 items-center gap-1 rounded-full px-3 text-[13px] font-semibold transition active:scale-95 ${
+                  ticket.erledigt
+                    ? "bg-[rgb(118_118_128/0.12)] text-brand-dark dark:bg-[rgb(118_118_128/0.24)] dark:text-brand"
+                    : "bg-[#248A3D] text-white dark:bg-[#30D158] dark:text-black"
+                }`}
+                onClick={() => void ticketSchliessen(ticket.id, !ticket.erledigt)}
+                title={ticket.erledigt ? "Wieder öffnen" : "Als erledigt markieren"}
+              >
+                {!ticket.erledigt && <Icon name="haken" size={15} strich={2.6} />}
+                {ticket.erledigt ? "Öffnen" : "Erledigt"}
+              </button>
+              <button
+                type="button"
+                className="iconbtn"
+                title="Gespräch löschen"
+                aria-label="Gespräch löschen"
+                onClick={async () => {
+                  if (
+                    await frage(
+                      `Das Gespräch „${ticket.betreff}" endgültig löschen?\n\nAlle Nachrichten darin verschwinden – auch für die Eltern.`,
+                      "Löschen",
+                      true,
+                    )
+                  ) {
+                    void ticketLoeschen(ticket.id);
+                    onBack();
+                  }
+                }}
+              >
+                <Icon name="muell" size={17} />
+              </button>
+            </>
+          }
+        />
+      }
+      fuss={<ChatEingabe wert={text} setWert={setText} onSenden={senden} platzhalter="Antwort ans Elternhaus" />}
+    >
+      <div className="space-y-2 py-3">
+        {verlauf.length === 0 && <p className="auf-bild py-8 text-center text-[14px] text-tinte-leise">Noch keine Nachricht.</p>}
+        {verlauf.map((n) => {
+          const meins = n.user_id === uid;
+          return (
+            <div key={n.id} className={`flex ${meins ? "justify-end" : "justify-start"}`}>
+              <div
+                className={`min-w-0 max-w-[78%] rounded-2xl px-3.5 py-2 sm:max-w-[65%] lg:max-w-[50%] ${
+                  meins ? "bg-brand text-white" : "bg-white shadow-card dark:bg-slate-900 dark:shadow-cardDark"
+                }`}
+              >
+                <div className={`mb-0.5 text-[12px] font-bold leading-tight ${meins ? "text-right text-white/90" : "text-tinte-leise"}`}>{name(n.user_id)}</div>
+                <div className="whitespace-pre-wrap text-[15px] leading-snug [overflow-wrap:anywhere]">{n.text}</div>
+                <div className={`mt-0.5 text-right text-[12px] ${meins ? "text-white/90" : "text-tinte-leise"}`}>{zeit(n.created_at)}</div>
+              </div>
+            </div>
+          );
+        })}
+        <div ref={ende} />
       </div>
     </ChatEbene>
   );
 }
 
-/** Eigene Ebene „Infos für Eltern“ (aus der Kachel im Chats-Reiter) */
-export function ElternInfosEbene({ onBack }: { onBack: () => void }) {
-  const z = useElternZahlen(true);
+/**
+ * Ein bestimmtes Elternhaus anschreiben – im Blatt: erst die Familie suchen,
+ * dann Betreff und Text, unten „Senden“. Die Eltern sehen das Gespräch danach
+ * in ihrem Reiter Infos und bekommen eine Benachrichtigung.
+ */
+function AnElternBlatt({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { konten, anEltern } = useEltern();
+  const { students } = useStore();
+  const [suche, setSuche] = useState("");
+  const [gewaehlt, setGewaehlt] = useState<string | null>(null);
+  const [betreff, setBetreff] = useState("");
+  const [text, setText] = useState("");
+  const [fehler, setFehler] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    setSuche("");
+    setGewaehlt(null);
+    setBetreff("");
+    setText("");
+    setFehler("");
+  }, [open]);
+
+  const kindNamen = (ids: string[]) =>
+    ids
+      .map((id) => students.find((s) => s.id === id))
+      .filter(Boolean)
+      .map((s) => `${s!.vorname} ${s!.nachname}`)
+      .join(" und ");
+
+  const q = normalize(suche);
+  const treffer: Elternkonto[] = konten
+    .filter((k) => !q || normalize(`${k.anzeigename} ${k.username} ${kindNamen(k.kinder)}`).includes(q))
+    .slice(0, 30);
+  const ziel = konten.find((k) => k.user_id === gewaehlt);
+
+  async function senden() {
+    if (!ziel || busy || !betreff.trim() || !text.trim()) return;
+    setBusy(true);
+    const problem = await anEltern(ziel.user_id, betreff, text);
+    setBusy(false);
+    if (problem) return setFehler(problem);
+    onClose();
+  }
+
   return (
-    <ChatEbene
-      label="Infos für Eltern"
-      start="oben"
-      kopf={<ChatKopf onBack={onBack} symbol={<Icon name="info" size={17} strich={2.2} />} titel="Infos für Eltern" unter={`${z.infos} veröffentlicht`} />}
-    >
-      <div className={`grid gap-3 py-4 ${OHNE_DOPPELTITEL}`}>
-        <ElternTeamTab nur="infos" />
-      </div>
-    </ChatEbene>
+    <Sheet open={open} onClose={onClose}>
+      <SheetKopf titel="Eltern anschreiben" unter="Kommt bei den Eltern im Reiter Infos an – mit Mitteilung." onClose={onClose} />
+      {!ziel ? (
+        <>
+          <input className="field" placeholder="Familie oder Kind suchen …" value={suche} autoFocus onChange={(e) => setSuche(e.target.value)} />
+          <div className="gruppe-zellen mt-3 max-h-[50vh] overflow-y-auto">
+            {konten.length === 0 ? (
+              <p className="px-4 py-3 text-[14px] text-tinte-leise">Es gibt noch keine Elternzugänge.</p>
+            ) : treffer.length === 0 ? (
+              <p className="px-4 py-3 text-[14px] text-tinte-leise">Niemand gefunden.</p>
+            ) : (
+              treffer.map((k) => (
+                <Zeile
+                  key={k.user_id}
+                  label={k.anzeigename}
+                  unter={kindNamen(k.kinder) || k.username}
+                  symbol={<Avatar userId={k.user_id} name={k.anzeigename} size={28} />}
+                  onClick={() => setGewaehlt(k.user_id)}
+                />
+              ))
+            )}
+          </div>
+        </>
+      ) : (
+        <>
+          <Gruppe className="mt-0">
+            <Zeile
+              label={<span className="font-semibold">{ziel.anzeigename}</span>}
+              unter={kindNamen(ziel.kinder) || undefined}
+              symbol={<Avatar userId={ziel.user_id} name={ziel.anzeigename} size={28} />}
+              onClick={() => setGewaehlt(null)}
+              ohnePfeil
+            >
+              <span className="text-[15px] text-brand-dark dark:text-brand">Ändern</span>
+            </Zeile>
+          </Gruppe>
+          <Gruppe
+            fuss={fehler ? <span className="font-semibold text-amber-700 dark:text-amber-400">{fehler}</span> : undefined}
+          >
+            <input
+              className="block w-full bg-transparent px-4 py-3 text-[16px] font-semibold outline-none placeholder:font-normal placeholder:text-tinte-leise"
+              placeholder="Betreff"
+              aria-label="Betreff"
+              value={betreff}
+              onChange={(e) => setBetreff(e.target.value)}
+            />
+            <div>
+              <textarea
+                className="block min-h-[7.5rem] w-full resize-y bg-transparent px-4 py-3 text-[16px] outline-none placeholder:text-tinte-leise"
+                placeholder="Ihre Nachricht …"
+                aria-label="Nachricht"
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+              />
+            </div>
+          </Gruppe>
+          <FussLeiste>
+            <button className="btn-primary" disabled={busy || !betreff.trim() || !text.trim()} onClick={() => void senden()}>
+              {busy ? "Wird gesendet …" : "Senden"}
+            </button>
+          </FussLeiste>
+        </>
+      )}
+    </Sheet>
   );
 }

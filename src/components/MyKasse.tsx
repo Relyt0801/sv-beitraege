@@ -10,6 +10,8 @@ import { Sheet, SheetKopf } from "./Sheet";
 import { Icon, type IconName } from "./Icon";
 import { useState } from "react";
 import { TicketBereich } from "./AbiTicket";
+import { ZuErledigen } from "./ZuErledigen";
+import { useFunktionen } from "../lib/funktionen";
 import { AlbumKarte } from "./Album";
 import { ZitateKarte } from "./Zitate";
 import { RankingKarten } from "./Rankings";
@@ -51,7 +53,11 @@ export function MyKasse({
   ready: boolean;
 }) {
   const { contributions } = useStore();
+  const { sichtbar } = useFunktionen();
   const [ueberweisen, setUeberweisen] = useState(false);
+  // Läuft der Ticketverkauf (rechts die Kasse)? Dann braucht das Ticket die
+  // volle Breite – sonst steht es neben „Mithilfe bei Aktionen“.
+  const [ticketBreit, setTicketBreit] = useState(false);
 
   if (!ready)
     return (
@@ -60,11 +66,15 @@ export function MyKasse({
 
   if (!student)
     return (
-      <div className="card mx-auto max-w-2xl p-6 text-center text-sm text-tinte-matt">
-        Zu deinem Konto ist noch keine Person verknüpft.
-        <br />
-        Sag dem Stufenteam Bescheid, dann schalten sie dich frei.
-      </div>
+      <>
+        {/* Abstimmungen & Co. gibt es auch ohne verknüpfte Person */}
+        <ZuErledigen className="mb-4" />
+        <div className="card mx-auto max-w-2xl p-6 text-center text-sm text-tinte-matt">
+          Zu deinem Konto ist noch keine Person verknüpft.
+          <br />
+          Sag dem Stufenteam Bescheid, dann schalten sie dich frei.
+        </div>
+      </>
     );
 
   const offen = basisOffen(student, settings.aktuelles_halbjahr, settings);
@@ -77,32 +87,45 @@ export function MyKasse({
     .filter((c) => c.student_id === student.id)
     .sort((a, b) => (a.datum < b.datum ? 1 : -1));
 
+  // Spalten ab iPad (Prüfung Okt. 2026: Ticket ohne Verkauf über die volle
+  // Breite, „Mithilfe“ erst unter dem Rand, leere Liste in halber Breite):
+  //   Ticket mit Kasse → volle Breite, darunter Mithilfe | Beiträge
+  //   Ticket ohne Kasse → Ticket | Mithilfe, darunter Beiträge (volle Breite)
+  //   ohne Beiträge-Einträge fällt die Karte weg; Mithilfe nimmt dann die Reihe
+  const ticketDa = sichtbar("abiball");
+  const hatBeitraege = meine.length > 0;
+  const mithilfeBreit = !hatBeitraege && (!ticketDa || ticketBreit);
+  const beitraegeBreit = ticketDa && !ticketBreit;
+
   return (
-    <div
-      className="mx-auto grid max-w-3xl items-start gap-3 lg:max-w-5xl lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-stretch"
-    >
-      {/* Reihenfolge: Handy = Zahl, Abizeitung, Halbjahre … (das Häufige
-          zuerst). Am Rechner stehen Zahl und Halbjahre nebeneinander – beides
-          ist „meine Kasse“, und die dunkle Karte war über die volle Breite
-          zu zwei Dritteln leer. */}
+    <div className="grid items-start gap-3 md:grid-cols-2 md:items-stretch">
+      {/* Reihenfolge: Handy = was offen ist, Zahl, Abizeitung, Halbjahre …
+          (das Häufige zuerst). Ab iPad stehen Zahl und Halbjahre
+          nebeneinander – beides ist „meine Kasse“. Keine eigene Breite: alles
+          fluchtet an der Spalte aus App.tsx (vorher max-w-3xl → am iPad
+          schmaler als Kopf und Reiterleiste). */}
+      {/* ------------------------------------------ für dich offen */}
+      <ZuErledigen className="order-1 md:col-span-2" />
+
       {/* ------------------------------------------ die eine Zahl */}
-      <section className="leitkarte order-1 flex flex-col" data-tour="meine-karte">
+      <section className="leitkarte order-2 flex flex-col" data-tour="meine-karte">
         <div className="text-[13px] font-medium text-white/60">
           {offen > 0 ? "Du musst noch zahlen" : "Deine Stufenkasse"}
         </div>
         <div className="mt-1.5 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-          <span className={`leitwert ${offen > 0 ? "text-white" : "text-[#30D158]"}`}>{offen} €</span>
+          {/* Nichts offen: am Handy kleiner – die Karte soll nicht den halben Bildschirm füllen */}
+          <span className={`leitwert ${offen > 0 ? "text-white" : "text-[#30D158] max-md:!text-[2.25rem]"}`}>{offen} €</span>
           <span className="text-[13px] text-white/60">
             {offen > 0 ? `fällig bis ${settings.aktuelles_halbjahr}` : "Aktuell ist nichts fällig. Danke!"}
           </span>
         </div>
-        <div className="mt-2 text-[12px] text-white/50">
+        <div className={`mt-2 text-[12px] text-white/50 ${offen > 0 ? "" : "max-md:hidden"}`}>
           {student.vorname} {student.nachname} · {gesamt} € über alle sechs Halbjahre
         </div>
         {/* Überweisen – falls Schüler selbst zahlen (sonst die Eltern) */}
         <button
           onClick={() => setUeberweisen(true)}
-          className="mt-3 inline-flex min-h-[44px] items-center gap-1.5 self-start rounded-full bg-white/15 px-4 text-[14px] font-semibold text-white transition active:scale-95 lg:mt-auto"
+          className="mt-3 inline-flex min-h-[44px] items-center gap-1.5 self-start rounded-full bg-white/15 px-4 text-[14px] font-semibold text-white transition active:scale-95 md:mt-auto"
         >
           <Icon name="bank" size={15} />
           Überweisen – Kontodaten
@@ -116,7 +139,7 @@ export function MyKasse({
       {/* ------------------------------------------ Abi-Album (nur mit Recht) */}
       {/* Abizeitung & Co. als ruhige Kacheln: Handy untereinander, ab iPad zwei nebeneinander */}
       {/* data-tour: Einführung zeigt hier auf die Kacheln (Tour.tsx) */}
-      <div data-tour="kacheln" className="order-2 grid gap-3 sm:grid-cols-2 lg:order-3 lg:col-span-2 [&:empty]:hidden">
+      <div data-tour="kacheln" className="order-3 grid gap-3 sm:grid-cols-2 md:order-4 md:col-span-2 [&:empty]:hidden">
         <AlbumKarte />
         <MottoKarte />
         <ZitateKarte />
@@ -125,7 +148,7 @@ export function MyKasse({
       </div>
 
       {/* ------------------------------------------ Halbjahre mit Preis */}
-      <section className="card order-3 p-4 sm:p-5 lg:order-2">
+      <section className="card order-4 p-4 sm:p-5 md:order-3">
         <div className="flex items-center justify-between gap-2">
           <Titel icon="kalender" farbe="bg-[#0A84FF]">Deine Halbjahre</Titel>
           <span className="text-[12px] text-tinte-leise">
@@ -150,11 +173,17 @@ export function MyKasse({
       </section>
 
       {/* ------------------------------------------ Abiballticket */}
-      {/* Links die Tickets, rechts bestellen und überweisen */}
-      <TicketBereich student={student} settings={settings} prozent={pct} className="order-4 lg:col-span-2" />
+      {/* Verkauf läuft: links die Tickets, rechts bestellen und überweisen */}
+      <TicketBereich
+        student={student}
+        settings={settings}
+        prozent={pct}
+        onMitKasse={setTicketBreit}
+        className={`order-5 ${ticketBreit ? "md:col-span-2" : ""}`}
+      />
 
       {/* ------------------------------------------ Prozentstand */}
-      <section className="card order-5 p-4 sm:p-5" data-tour="meine-punkte">
+      <section className={`card order-6 p-4 sm:p-5 ${mithilfeBreit ? "md:col-span-2" : ""}`} data-tour="meine-punkte">
         <Titel icon="herz" farbe="bg-[#34C759]">Mithilfe bei Aktionen</Titel>
 
         <div className="mt-3 flex items-center gap-4">
@@ -179,16 +208,22 @@ export function MyKasse({
         </div>
 
         <StaffelKacheln pct={pct} settings={settings} />
+
+        {/* Noch nichts eingetragen: eine Zeile hier statt einer leeren Karte */}
+        {!hatBeitraege && (
+          <p className="mt-3 text-[13px] leading-snug text-tinte-leise">
+            Noch keine Mithilfe eingetragen. Wenn du bei einer Aktion hilfst, trägt das Stufenteam sie ein.
+          </p>
+        )}
       </section>
 
       {/* ------------------------------------------ meine Beiträge */}
-      <section className="card order-6 p-4 sm:p-5">
-        <Titel icon="beitraege" farbe="bg-[#FF9500]">Wobei du geholfen hast</Titel>
-        <BeitragsListe
-          eintraege={meine}
-          leerText="Noch nichts eingetragen. Wenn du mithilfst, trägt das Stufenteam es hier ein."
-        />
-      </section>
+      {hatBeitraege && (
+        <section className={`card order-7 p-4 sm:p-5 ${beitraegeBreit ? "md:col-span-2" : ""}`}>
+          <Titel icon="beitraege" farbe="bg-[#FF9500]">Wobei du geholfen hast</Titel>
+          <BeitragsListe eintraege={meine} leerText="" />
+        </section>
+      )}
     </div>
   );
 }

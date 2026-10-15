@@ -35,6 +35,8 @@ function useNameVon(): (uid: string) => string {
   }, [profile, profiles, students]);
 }
 import { Sheet, SheetKopf } from "./Sheet";
+import { Gruppe, Wert, Zeile, ZeileHaken } from "./Liste";
+import { FussLeiste } from "./FussLeiste";
 
 /**
  * Die beiden Vorsitzenden eines Komitees festlegen.
@@ -98,54 +100,43 @@ export function VorsitzSheet({
 
   return (
     <Sheet open={offen} onClose={onSchliessen}>
-      <SheetKopf titel={<>{committeeIcon(tag)} Vorsitz {committeeLabel(tag)}</>} onClose={onSchliessen} />
-      <p className="mb-3 text-[12px] leading-relaxed text-tinte-leise">
-        Zwei Vorsitzende je Komitee. Sie dürfen Termine <b>anfragen</b> – eintragen
-        tut sie weiterhin nur das Stufenteam.
-      </p>
+      <SheetKopf titel={`Vorsitz ${committeeLabel(tag)}`} unter={`${wahl.length} von 2 gewählt`} onClose={onSchliessen} />
 
       {mitglieder.length === 0 ? (
-        <p className="rounded-xl bg-papier-matt p-3 text-[13px] text-tinte-matt dark:bg-slate-800 dark:text-slate-300">
-          In diesem Komitee ist noch niemand. Ordne zuerst Leute zu.
-        </p>
+        <Gruppe className="mt-0">
+          <p className="px-4 py-3 text-[14px] leading-snug text-tinte-leise">In diesem Komitee ist noch niemand. Ordne zuerst Leute zu.</p>
+        </Gruppe>
       ) : (
-        <div className="mb-3 max-h-72 overflow-y-auto rounded-2xl border border-papier-linie p-1.5 dark:border-slate-700">
-          {mitglieder.map((uid) => {
-            const an = wahl.includes(uid);
-            return (
-              <button
-                key={uid}
-                onClick={() => umschalten(uid)}
-                className={`flex w-full items-center gap-2.5 rounded-xl px-2 py-2 text-left transition ${
-                  an ? "bg-brand/10" : "hover:bg-papier-matt dark:hover:bg-slate-800"
-                }`}
-              >
-                <span
-                  className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border text-[11px] text-white ${
-                    an ? "border-brand bg-brand" : "border-papier-linie dark:border-slate-600"
-                  }`}
-                >
-                  {an ? "✓" : ""}
-                </span>
-                <Avatar userId={uid} name={fuerKreis(nameVon(uid))} size={30} />
-                <span className={`min-w-0 flex-1 truncate text-[14px] ${an ? "font-bold text-brand" : "font-semibold"}`}>
-                  {nameVon(uid)}
-                </span>
-              </button>
-            );
-          })}
-        </div>
+        // Auswahl wie in iOS: Liste mit Haken rechts (kein Kästchen links)
+        <Gruppe
+          className="mt-0"
+          fuss={
+            fehler ? (
+              <span className="font-semibold text-amber-700 dark:text-amber-400">{fehler}</span>
+            ) : (
+              <>
+                Zwei Vorsitzende je Komitee. Sie dürfen Termine <b>anfragen</b> – eintragen tut sie weiterhin nur das Stufenteam.
+              </>
+            )
+          }
+        >
+          {mitglieder.map((uid) => (
+            <ZeileHaken
+              key={uid}
+              label={nameVon(uid)}
+              symbol={<Avatar userId={uid} name={fuerKreis(nameVon(uid))} size={30} />}
+              gewaehlt={wahl.includes(uid)}
+              onClick={() => umschalten(uid)}
+            />
+          ))}
+        </Gruppe>
       )}
 
-      <div className="mb-3 text-[12px] font-semibold text-tinte-leise">
-        {wahl.length} von 2 gewählt
-      </div>
-
-      {fehler && <p className="mb-2 text-[13px] font-semibold text-amber-600">{fehler}</p>}
-
-      <button disabled={busy} onClick={speichern} className="btn-primary w-full disabled:opacity-50">
-        {busy ? "…" : "Übernehmen"}
-      </button>
+      <FussLeiste>
+        <button disabled={busy} onClick={speichern} className="btn-primary">
+          {busy ? "Wird gespeichert …" : "Übernehmen"}
+        </button>
+      </FussLeiste>
     </Sheet>
   );
 }
@@ -164,34 +155,28 @@ export function VorsitzZeile({ tag }: { tag: string }) {
   const ids = vorsitz[tag] || [];
   const namen = ids.map(nameVon);
 
+  // Für Mitglieder ohne festgelegten Vorsitz gibt es nichts zu sehen und nichts
+  // zu tun – dann fällt die Zeile ganz weg (die Hülle in KomiteePage ist empty:hidden).
+  if (!darf && ids.length === 0) return null;
+
   return (
     <>
-      <div className="card flex items-center gap-2.5 p-3">
-        <span className="shrink-0 text-[15px]">🪑</span>
-        <div className="min-w-0 flex-1">
-          <div className="text-[12px] font-semibold text-tinte-leise">Vorsitz</div>
-          <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-            {ids.length === 0 ? (
-              <span className="text-[13px] text-tinte-matt dark:text-slate-300">Noch niemand festgelegt</span>
-            ) : (
-              ids.map((u, i) => (
+      <Gruppe className="" fuss="Der Vorsitz darf für das Komitee Termine anfragen.">
+        <Zeile label="Vorsitz" onClick={darf ? () => setOffen(true) : undefined}>
+          {ids.length ? (
+            <span className="flex min-w-0 items-center justify-end gap-1.5">
+              {ids.map((u, i) => (
                 <span key={u} className="flex min-w-0 items-center gap-1.5">
-                  <Avatar userId={u} name={fuerKreis(namen[i])} size={22} />
-                  <span className="min-w-0 truncate text-[13px] font-semibold">{namen[i]}</span>
+                  <Avatar userId={u} name={fuerKreis(namen[i])} size={24} />
+                  <span className="min-w-0 truncate text-[15px] text-tinte-matt dark:text-slate-300">{namen[i]}</span>
                 </span>
-              ))
-            )}
-          </div>
-        </div>
-        {darf && (
-          <button
-            onClick={() => setOffen(true)}
-            className="shrink-0 rounded-lg border border-papier-linie px-2.5 py-1.5 text-[12px] font-bold text-tinte-matt dark:border-slate-700 dark:text-slate-300"
-          >
-            Ändern
-          </button>
-        )}
-      </div>
+              ))}
+            </span>
+          ) : (
+            <Wert>Noch niemand</Wert>
+          )}
+        </Zeile>
+      </Gruppe>
       {darf && <VorsitzSheet tag={tag} offen={offen} onSchliessen={() => setOffen(false)} />}
     </>
   );

@@ -112,17 +112,19 @@ export function Wochenstreifen({
         </h2>
         <button
           onClick={() => woche(-1)}
-          className="flex h-11 w-10 shrink-0 items-center justify-center rounded-full text-[22px] text-brand transition active:scale-90 active:bg-black/[0.04] dark:active:bg-white/[0.06]"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-brand transition active:scale-90 active:bg-black/[0.04] dark:active:bg-white/[0.06]"
           aria-label="Woche zurück"
         >
-          ‹
+          <span className="block rotate-180">
+            <Icon name="chevron" size={20} strich={2.4} />
+          </span>
         </button>
         <button
           onClick={() => woche(1)}
-          className="flex h-11 w-10 shrink-0 items-center justify-center rounded-full text-[22px] text-brand transition active:scale-90 active:bg-black/[0.04] dark:active:bg-white/[0.06]"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-brand transition active:scale-90 active:bg-black/[0.04] dark:active:bg-white/[0.06]"
           aria-label="Woche vor"
         >
-          ›
+          <Icon name="chevron" size={20} strich={2.4} />
         </button>
         {/* Beschriftung steht immer dabei. Ein Kalender-Icon allein sagt nicht,
             dass dahinter Monat, Woche und Tag stecken. */}

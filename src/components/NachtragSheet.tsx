@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
 import { Sheet, SheetKopf } from "./Sheet";
 import { Icon } from "./Icon";
-import { Gruppe, Zeile, ZeileHaken } from "./Liste";
+import { Gruppe, RechnungKopf, Zeile, ZeileHaken } from "./Liste";
+import { FussLeiste } from "./FussLeiste";
 import { useStore } from "../store";
 import { useRole } from "../auth/RoleProvider";
 import { heuteKey, tagLang } from "../lib/termine";
@@ -14,8 +15,9 @@ const SONSTIGES = "__sonstiges__";
 
 /**
  * Mithilfe nachtragen – aufgebaut wie eine Rechnung bei Apple: oben groß der
- * Wert, darunter in einer Liste, wofür, wann und was. Unten der Knopf. Nach
- * dem Senden ein grüner Haken; darunter die eigenen Anträge mit Stand.
+ * Wert (RechnungKopf mit ✕), darunter in einer Liste, wofür, wann und was,
+ * dann die eigenen Anträge mit Stand. Der Knopf klebt unten (FussLeiste).
+ * Nach dem Senden ein grüner Haken.
  */
 export function NachtragSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { templates, students } = useStore();
@@ -80,142 +82,146 @@ export function NachtragSheet({ open, onClose }: { open: boolean; onClose: () =>
 
   const meine = liste.filter((n) => n.student_id === studentId);
 
+  // Schließen: erst zu, dann (nach der Animation) alles zurücksetzen.
+  // Gilt für ✕, Escape, Tipp daneben und Wischen.
+  function schliessen() {
+    onClose();
+    setTimeout(zuruecksetzen, 300);
+  }
+
   return (
-    <Sheet
-      open={open}
-      onClose={() => {
-        onClose();
-        setTimeout(zuruecksetzen, 300);
-      }}
-    >
-      <div className="mx-auto max-w-md">
-        {waehlen ? (
-          <AktionWahl
-            vorlagen={treffer}
-            leer={vorlagen.length === 0}
-            wahl={wahl}
-            suche={suche}
-            setSuche={setSuche}
-            onNimm={nimm}
-            onZurueck={() => setWaehlen(false)}
-          />
-        ) : (
+    <Sheet open={open} onClose={schliessen}>
+      {waehlen ? (
+        <AktionWahl
+          vorlagen={treffer}
+          leer={vorlagen.length === 0}
+          wahl={wahl}
+          suche={suche}
+          setSuche={setSuche}
+          onNimm={nimm}
+          onZurueck={() => setWaehlen(false)}
+          onSchliessen={schliessen}
+        />
+      ) : (
         <>
-        {/* ------------------------------------------------ Kopf wie eine Rechnung */}
-        <div className="flex flex-col items-center pt-1 text-center">
-          <span aria-hidden className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#1E7B34] text-white">
-            <Icon name="rollen" size={26} strich={2} />
-          </span>
-          <div className="mt-2 text-[13px] font-semibold text-tinte-leise">Mithilfe nachtragen</div>
-          {fertig ? (
-            <Erfolg />
-          ) : (
-            <>
-              <div className="zahl mt-1 text-[2.6rem] font-extrabold leading-none tracking-[-0.03em]">
-                {wert !== null ? `+${wert} %` : <span className="text-tinte-leise">– %</span>}
-              </div>
-              <div className="mt-1.5 min-h-[1.25rem] text-[14px] font-semibold">
-                {titel || <span className="text-tinte-leise">Wähle aus, wobei du geholfen hast</span>}
-              </div>
-              {(sonstiges || vorlage?.variabel) && (
-                <div className="mt-0.5 text-[13px] text-tinte-leise">Den Wert legt das Stufenteam fest.</div>
-              )}
-            </>
-          )}
-        </div>
+          {/* ------------------------------------------------ Kopf wie eine Rechnung (✕ in der Ecke des Blatts) */}
+          <RechnungKopf
+            bild={
+              <span aria-hidden className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#1E7B34] text-white">
+                <Icon name="rollen" size={26} strich={2} />
+              </span>
+            }
+            oben="Mithilfe nachtragen"
+            wert={fertig ? undefined : wert !== null ? `+${wert} %` : <span className="text-tinte-leise">– %</span>}
+            titel={fertig ? undefined : titel || <span className="text-tinte-leise">Wähle aus, wobei du geholfen hast</span>}
+            unter={!fertig && (sonstiges || vorlage?.variabel) ? "Den Wert legt das Stufenteam fest." : undefined}
+            onClose={schliessen}
+          />
 
-        {fertig ? (
-          <div className="mt-5 grid gap-2">
-            <p className="text-center text-[14px] leading-relaxed text-tinte-matt dark:text-slate-300">
-              Das Stufenteam prüft deinen Antrag. Du bekommst Bescheid, sobald entschieden ist.
-            </p>
-            <button onClick={zuruecksetzen} className="btn-primary mt-2">
-              Noch etwas nachtragen
-            </button>
-          </div>
-        ) : (
-          <>
-            {/* ------------------------------------------------ Wofür */}
-            <Gruppe titel="Wofür">
-              <button
-                onClick={() => setWaehlen(true)}
-                className="flex min-h-[48px] w-full items-center gap-3 px-4 py-2 text-left transition active:bg-black/[0.04] dark:active:bg-white/[0.06]"
-              >
-                <span className="shrink-0 text-[15px]">Aktion</span>
-                <span className={`min-w-0 flex-1 truncate text-right text-[15px] ${wahl ? "text-tinte-matt dark:text-slate-300" : "text-brand"}`}>
-                  {sonstiges ? "Sonstiges" : vorlage?.titel || "Auswählen"}
-                </span>
-                <span className="text-tinte-leise">›</span>
-              </button>
-              {sonstiges && (
-                <Zeile label="Name">
-                  <input
-                    autoFocus
-                    className="w-full bg-transparent text-right text-[15px] outline-none placeholder:text-tinte-leise"
-                    placeholder="Name der Aktion"
-                    maxLength={80}
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                  />
-                </Zeile>
-              )}
-            </Gruppe>
+          <div className="mx-auto max-w-md">
+            {fertig ? (
+              <>
+                <Erfolg />
+                <p className="mt-4 text-center text-[14px] leading-relaxed text-tinte-matt dark:text-slate-300">
+                  Das Stufenteam prüft deinen Antrag. Du bekommst Bescheid, sobald entschieden ist.
+                </p>
+              </>
+            ) : (
+              <>
+                {/* ------------------------------------------------ Wofür */}
+                <Gruppe titel="Wofür">
+                  <button
+                    onClick={() => setWaehlen(true)}
+                    className="flex min-h-[48px] w-full items-center gap-3 px-4 py-2 text-left transition active:bg-black/[0.04] dark:active:bg-white/[0.06]"
+                  >
+                    <span className="shrink-0 text-[15px]">Aktion</span>
+                    <span className={`min-w-0 flex-1 truncate text-right text-[15px] ${wahl ? "text-tinte-matt dark:text-slate-300" : "text-brand"}`}>
+                      {sonstiges ? "Sonstiges" : vorlage?.titel || "Auswählen"}
+                    </span>
+                    <span className="text-tinte-leise">›</span>
+                  </button>
+                  {sonstiges && (
+                    <Zeile label="Name">
+                      <input
+                        autoFocus
+                        className="w-full bg-transparent text-right text-[15px] outline-none placeholder:text-tinte-leise"
+                        placeholder="Name der Aktion"
+                        maxLength={80}
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                      />
+                    </Zeile>
+                  )}
+                </Gruppe>
 
-            {/* ------------------------------------------------ Details */}
-            <Gruppe titel="Details">
-              <Zeile label="Für">
-                <span className="truncate text-[15px] text-tinte-matt dark:text-slate-300">
-                  {ich ? `${ich.vorname} ${ich.nachname}` : "–"}
-                </span>
-              </Zeile>
-              <Zeile label="Datum">
-                <input
-                  type="date"
-                  max={heuteKey()}
-                  className="bg-transparent text-right text-[15px] outline-none"
-                  value={datum}
-                  onChange={(e) => setDatum(e.target.value)}
-                />
-              </Zeile>
-              <div className="px-4 py-3">
-                <textarea
-                  className="min-h-[72px] w-full resize-none bg-transparent text-[15px] outline-none placeholder:text-tinte-leise"
-                  placeholder={sonstiges ? "Was hast du gemacht? (Pflicht bei Sonstiges)" : "Was hast du gemacht? (freiwillig)"}
-                  maxLength={500}
-                  value={text}
-                  onChange={(e) => setText(e.target.value)}
-                />
-              </div>
-            </Gruppe>
+                {/* ------------------------------------------------ Details */}
+                <Gruppe titel="Details">
+                  <Zeile label="Für">
+                    <span className="truncate text-[15px] text-tinte-matt dark:text-slate-300">
+                      {ich ? `${ich.vorname} ${ich.nachname}` : "–"}
+                    </span>
+                  </Zeile>
+                  <Zeile label="Datum">
+                    <input
+                      type="date"
+                      max={heuteKey()}
+                      className="bg-transparent text-right text-[15px] outline-none"
+                      value={datum}
+                      onChange={(e) => setDatum(e.target.value)}
+                    />
+                  </Zeile>
+                  <div className="px-4 py-3">
+                    <textarea
+                      className="min-h-[72px] w-full resize-none bg-transparent text-[15px] outline-none placeholder:text-tinte-leise"
+                      placeholder={sonstiges ? "Was hast du gemacht? (Pflicht bei Sonstiges)" : "Was hast du gemacht? (freiwillig)"}
+                      maxLength={500}
+                      value={text}
+                      onChange={(e) => setText(e.target.value)}
+                    />
+                  </div>
+                </Gruppe>
 
-            {!ich && (
-              <p className="mt-3 text-center text-[13px] text-amber-700 dark:text-amber-300">
-                Dein Zugang ist mit keinem Eintrag in der Stufe verknüpft – frag das Stufenteam.
-              </p>
+                {!ich && (
+                  <p className="mt-3 text-center text-[13px] text-amber-700 dark:text-amber-300">
+                    Dein Zugang ist mit keinem Eintrag in der Stufe verknüpft – frag das Stufenteam.
+                  </p>
+                )}
+                <GesperrtZeile className="mt-3" />
+                {fehler && <p className="mt-3 text-center text-[13px] font-semibold text-red-600">Das hat nicht geklappt: {fehler}</p>}
+              </>
             )}
-            <GesperrtZeile className="mt-3" />
-            {fehler && <p className="mt-3 text-center text-[13px] font-semibold text-red-600">Das hat nicht geklappt: {fehler}</p>}
 
-            <button disabled={!geht || sendet} onClick={() => void senden()} className="btn-primary mt-4 w-full disabled:opacity-40">
-              {sendet ? "Wird gesendet …" : "Antrag senden"}
-            </button>
-            <p className="mt-2 text-center text-[12px] text-tinte-leise">
-              Das Stufenteam sieht deinen Namen, die Aktion, das Datum und deinen Text.
-            </p>
-          </>
-        )}
+            {/* ------------------------------------------------ Meine Anträge (vor dem Knopf, der unten klebt) */}
+            {meine.length > 0 && (
+              <Gruppe titel="Deine Anträge">
+                {meine.slice(0, 12).map((n) => (
+                  <EigeneZeile key={n.id} n={n} onZurueck={() => void zurueckziehen(n.id)} />
+                ))}
+              </Gruppe>
+            )}
+          </div>
 
-        {/* ------------------------------------------------ Meine Anträge */}
-        {meine.length > 0 && (
-          <Gruppe titel="Deine Anträge">
-            {meine.slice(0, 12).map((n) => (
-              <EigeneZeile key={n.id} n={n} onZurueck={() => void zurueckziehen(n.id)} />
-            ))}
-          </Gruppe>
-        )}
+          {/* Hauptknopf klebt unten – nie erst nach dem Scrollen erreichbar */}
+          <FussLeiste>
+            <div className="mx-auto max-w-md">
+              {fertig ? (
+                <button onClick={zuruecksetzen} className="btn-primary w-full">
+                  Noch etwas nachtragen
+                </button>
+              ) : (
+                <>
+                  <button disabled={!geht || sendet} onClick={() => void senden()} className="btn-primary w-full disabled:opacity-40">
+                    {sendet ? "Wird gesendet …" : "Antrag senden"}
+                  </button>
+                  <p className="mt-2 text-center text-[12px] text-tinte-leise">
+                    Das Stufenteam sieht deinen Namen, die Aktion, das Datum und deinen Text.
+                  </p>
+                </>
+              )}
+            </div>
+          </FussLeiste>
         </>
-        )}
-      </div>
+      )}
     </Sheet>
   );
 }
@@ -228,6 +234,7 @@ function AktionWahl({
   setSuche,
   onNimm,
   onZurueck,
+  onSchliessen,
 }: {
   vorlagen: { id: string; titel: string; punkte: number; variabel?: boolean }[];
   leer: boolean;
@@ -236,35 +243,39 @@ function AktionWahl({
   setSuche: (s: string) => void;
   onNimm: (id: string) => void;
   onZurueck: () => void;
+  /** ✕ schließt das ganze Blatt (nicht nur diese Unterseite) */
+  onSchliessen: () => void;
 }) {
   return (
     <>
-      <SheetKopf titel="Aktion wählen" zurueck={{ text: "Zurück", onClick: onZurueck }} onClose={onZurueck} />
-      <input
-        type="search"
-        placeholder="Suchen"
-        aria-label="Aktion suchen"
-        value={suche}
-        onChange={(e) => setSuche(e.target.value)}
-        className="field"
-      />
-      <Gruppe className="mt-3">
-        {vorlagen.length === 0 && (
-          <div className="px-4 py-4 text-center text-[14px] text-tinte-leise">{leer ? "Noch keine Aktionen angelegt." : "Nichts gefunden."}</div>
-        )}
-        {vorlagen.map((v) => (
-          <ZeileHaken
-            key={v.id}
-            gewaehlt={wahl === v.id}
-            onClick={() => onNimm(v.id)}
-            label={v.titel}
-            rechts={<span className="zahl shrink-0 text-[14px] font-bold text-brand-dark dark:text-brand">{v.variabel ? "% frei" : `+${v.punkte} %`}</span>}
-          />
-        ))}
-      </Gruppe>
-      <Gruppe className="mt-3">
-        <ZeileHaken gewaehlt={wahl === SONSTIGES} onClick={() => onNimm(SONSTIGES)} label="Sonstiges …" rechts={<span className="shrink-0 text-[13px] text-tinte-leise">eigene Aktion</span>} />
-      </Gruppe>
+      <SheetKopf titel="Aktion wählen" zurueck={{ text: "Mithilfe nachtragen", onClick: onZurueck }} onClose={onSchliessen} />
+      <div className="mx-auto max-w-md">
+        <input
+          type="search"
+          placeholder="Suchen"
+          aria-label="Aktion suchen"
+          value={suche}
+          onChange={(e) => setSuche(e.target.value)}
+          className="field"
+        />
+        <Gruppe className="mt-3">
+          {vorlagen.length === 0 && (
+            <div className="px-4 py-4 text-center text-[14px] text-tinte-leise">{leer ? "Noch keine Aktionen angelegt." : "Nichts gefunden."}</div>
+          )}
+          {vorlagen.map((v) => (
+            <ZeileHaken
+              key={v.id}
+              gewaehlt={wahl === v.id}
+              onClick={() => onNimm(v.id)}
+              label={v.titel}
+              rechts={<span className="zahl shrink-0 text-[14px] font-bold text-brand-dark dark:text-brand">{v.variabel ? "% frei" : `+${v.punkte} %`}</span>}
+            />
+          ))}
+        </Gruppe>
+        <Gruppe className="mt-3">
+          <ZeileHaken gewaehlt={wahl === SONSTIGES} onClick={() => onNimm(SONSTIGES)} label="Sonstiges …" rechts={<span className="shrink-0 text-[13px] text-tinte-leise">eigene Aktion</span>} />
+        </Gruppe>
+      </div>
     </>
   );
 }

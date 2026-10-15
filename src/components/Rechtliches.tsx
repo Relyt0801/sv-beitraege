@@ -242,7 +242,7 @@ function Datenschutz() {
       <P>
         Innerhalb der App: das Stufenteam und der Kassenwart sehen die Personen- und Beitragsliste; Schülerinnen
         und Schüler sehen nur ihre eigene Zeile; Eltern nur ihr Kind. Chats sehen nur die Personen im jeweiligen
-        Ordner. Wer welche Rechte hat, steht im Rechte-Reiter.
+        Ordner. Wer welche Rechte hat, steht in der App unter Rollen → Rechte je Rolle.
       </P>
       <P>
         Außerhalb der App arbeiten wir mit Dienstleistern, die die Daten in unserem Auftrag verarbeiten
@@ -339,7 +339,7 @@ export function RechtLinks({ klein = false }: { klein?: boolean }) {
   const [seite, setSeite] = useState<"impressum" | "datenschutz" | null>(null);
   return (
     <>
-      <div className={`flex items-center justify-center gap-3 ${klein ? "text-[11px]" : "text-[12px]"} text-tinte-leise`}>
+      <div className={`flex items-center justify-center gap-3 ${klein ? "text-[12px]" : "text-[12px]"} text-tinte-leise`}>
         {/* type="button" ist Pflicht: die Links stehen im Anmeldeformular, und
             ein Knopf ohne type schickt das Formular ab. */}
         <button type="button" className="font-semibold underline underline-offset-2" onClick={() => setSeite("impressum")}>

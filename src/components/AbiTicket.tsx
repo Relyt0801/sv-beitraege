@@ -1,6 +1,6 @@
 import { useFunktionen } from "../lib/funktionen";
 import { AusHinweis } from "./Funktionen";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Abiball, Settings, Student } from "../lib/types";
 import { abiballVon, bestellBetrag, ticketPreise } from "../lib/logic";
 import {
@@ -460,8 +460,19 @@ function TicketAnsicht({
         {a.ueber100 && (
           <Zeile label="✦ Bonus">{wert(p.rabatt > 0 ? `−${p.rabatt} €` : "0 €", "text-[#8A650A] dark:text-[#E9C460]")}</Zeile>
         )}
-        <Zeile label="Preis">
-          <span className="zahl text-[17px] font-extrabold">{p.preisSteht ? `${p.erstes} €` : `+${p.aufschlag - p.rabatt} €`}</span>
+        {/* Steht der Grundpreis noch nicht fest, gibt es auch keinen Endpreis –
+            „Preis +50 €“ las sich wie ein Endpreis (Prüfung Okt. 2026). */}
+        <Zeile
+          label="Preis"
+          unter={
+            p.preisSteht
+              ? undefined
+              : p.aufschlag - p.rabatt > 0
+                ? `Grundpreis + ${p.aufschlag - p.rabatt} € Aufschlag`
+                : "nur der Grundpreis, kein Aufschlag"
+          }
+        >
+          <span className="zahl text-[17px] font-extrabold">{p.preisSteht ? `${p.erstes} €` : "folgt"}</span>
         </Zeile>
       </Gruppe>
 
@@ -490,18 +501,39 @@ function TicketAnsicht({
  * Der Ticket-Bereich auf der eigenen Seite (und bei den Eltern). Links die
  * Tickets, rechts die Kasse – die gibt es erst, wenn der Verkauf freigegeben
  * ist; vorher nur eine kleine Info. Eltern sehen ihr Gäste-Ticket zuerst.
+ *
+ * Prüfung Okt. 2026:
+ *   • Vor dem Verkauf standen auf der Übersicht zwei große Tickets mit „Preis
+ *     folgt“ über die volle Breite (~300 px ohne Information). Jetzt: nur
+ *     das eigene Ticket in klein und eine Zeile – die Karte passt neben
+ *     „Mithilfe bei Aktionen“ (davon hängt der Preis ja ab).
+ *   • `onMitKasse` sagt der Übersicht, ob rechts eine Kasse steht (dann
+ *     braucht der Bereich die volle Breite).
+ *   • `ohneGaeste`: Bei mehreren Kindern zeigen Eltern das Gäste-Ticket nur
+ *     einmal (es hängt nicht vom Kind ab).
+ *   • `eineSpalte`: Steht der Bereich in einer halben Spalte (Geschwister
+ *     nebeneinander), kommen Tickets und Kasse untereinander statt gequetscht.
  */
 export function TicketBereich({
   student,
   settings,
   prozent,
   fuerEltern,
+  ohneGaeste,
+  eineSpalte,
+  onMitKasse,
   className = "",
 }: {
   student: Student;
   settings: Settings;
   prozent: number;
   fuerEltern?: boolean;
+  /** Gäste-Ticket ausblenden (z. B. beim zweiten Kind) */
+  ohneGaeste?: boolean;
+  /** Tickets und Kasse immer untereinander (schmale Spalte) */
+  eineSpalte?: boolean;
+  /** Meldet, ob der Verkauf läuft bzw. Bestellungen da sind (rechts die Kasse) */
+  onMitKasse?: (mitKasse: boolean) => void;
   className?: string;
 }) {
   // Profil → Funktionen: Tickets ganz ausgeblendet (nur wer verwaltet, sieht sie mit Hinweis)
@@ -511,11 +543,20 @@ export function TicketBereich({
   const { status } = useVerkauf(settings);
   const { liste } = useTicketBestellungen(zeigen);
   const mitKasse = status !== "aus" || liste.some((b) => b.student_id === student.id);
-
-  const eigenes = <AbiTicket art="erstes" student={student} settings={settings} prozent={prozent} fuerEltern={fuerEltern} onClick={() => setAuf(true)} />;
-  const gaeste = <AbiTicket art="weiteres" student={student} settings={settings} prozent={prozent} onClick={() => setAuf(true)} klein />;
+  useEffect(() => {
+    onMitKasse?.(zeigen && mitKasse);
+  }, [zeigen, mitKasse, onMitKasse]);
 
   if (!zeigen) return null;
+  const p = ticketPreise(prozent, settings);
+  // Vor dem Verkauf (nicht bei Eltern): klein und knapp
+  const knapp = !mitKasse && !fuerEltern;
+
+  const eigenes = (
+    <AbiTicket art="erstes" student={student} settings={settings} prozent={prozent} fuerEltern={fuerEltern} onClick={() => setAuf(true)} klein={knapp} />
+  );
+  const gaeste = <AbiTicket art="weiteres" student={student} settings={settings} prozent={prozent} onClick={() => setAuf(true)} klein />;
+
   return (
     <section className={`card p-4 sm:p-5 ${className}`} data-tour="abiball-ticket">
       <AusHinweis funktion="abiball" className="mb-2" />
@@ -525,20 +566,34 @@ export function TicketBereich({
           Details <Icon name="chevron" size={14} strich={2.4} />
         </button>
       </div>
-      <div className={`mt-3 grid gap-4 ${mitKasse ? "lg:grid-cols-[minmax(0,1.4fr)_minmax(280px,1fr)]" : ""}`}>
+      <div className={`mt-3 grid gap-4 ${mitKasse && !eineSpalte ? "md:grid-cols-[minmax(0,1.4fr)_minmax(260px,1fr)]" : ""}`}>
         <div className="grid content-start gap-2.5">
-          {fuerEltern ? (
+          {knapp ? (
             <>
-              {gaeste}
+              {eigenes}
+              {/* Ab iPad steht die Karte neben „Mithilfe“ – dort ist Platz für
+                  das Gäste-Ticket, am Handy reicht eine Zeile */}
+              {!ohneGaeste && <div className="hidden md:block">{gaeste}</div>}
+              <Info>
+                {/* EIN Textstück – Info ist eine flex-Zeile, zwei Kinder stünden nebeneinander */}
+                <span>
+                  Verkauf noch nicht gestartet
+                  <span className="md:hidden"> · weitere Tickets: {p.preisSteht ? `je ${p.weiteres} €` : "Preis folgt"}</span>
+                </span>
+              </Info>
+            </>
+          ) : fuerEltern ? (
+            <>
+              {!ohneGaeste && gaeste}
               {eigenes}
             </>
           ) : (
             <>
               {eigenes}
-              {gaeste}
+              {!ohneGaeste && gaeste}
             </>
           )}
-          {!mitKasse && <Info>Der Ticketverkauf ist noch nicht gestartet.</Info>}
+          {!mitKasse && fuerEltern && <Info>Der Ticketverkauf ist noch nicht gestartet.</Info>}
         </div>
         {mitKasse && <TicketKasse student={student} settings={settings} prozent={prozent} fuerEltern={fuerEltern} />}
       </div>

@@ -190,7 +190,7 @@ function UmfrageLauf({
         {/* Kopf: Farbverlauf, Fortschritt in Segmenten */}
         <div className="relative shrink-0 overflow-hidden bg-brand px-5 pb-5 pt-4 text-white">
           <div className="relative flex items-center gap-2">
-            <span className="rounded-full bg-white/20 px-2.5 py-1 text-[11.5px] font-bold uppercase tracking-[0.08em]">
+            <span className="rounded-full bg-white/20 px-2.5 py-1 text-[12px] font-bold uppercase tracking-[0.08em]">
               {umfrage.pflicht ? "Kurze Umfrage" : "Umfrage"}
             </span>
             {nochWeitere > 0 && <span className="text-[12px] font-semibold text-white/75">+{nochWeitere} weitere</span>}
@@ -410,7 +410,7 @@ function Antwort({ f, wert, personen, setzen }: { f: Frage; wert: Wert | undefin
                     {p.nachname[0]}
                   </span>
                   <span className="w-full truncate text-center text-[12.5px] font-semibold">{p.vorname}</span>
-                  <span className="-mt-1 w-full truncate text-center text-[11px] text-tinte-leise">{p.nachname}</span>
+                  <span className="-mt-1 w-full truncate text-center text-[12px] text-tinte-leise">{p.nachname}</span>
                 </button>
               );
             })}
@@ -496,7 +496,7 @@ function EigenesFeld({ start, sichern }: { start: string; sichern: (t: string) =
         onChange={(e) => setText(e.target.value)}
         onBlur={() => raus(text)}
       />
-      <p className="mt-1 px-1 text-right text-[11.5px] text-tinte-leise">{text.length} / 120</p>
+      <p className="mt-1 px-1 text-right text-[12px] text-tinte-leise">{text.length} / 120</p>
     </div>
   );
 }
@@ -536,7 +536,7 @@ function TextAntwort({ art, text, setText, speichern }: { art: TextArt; text: st
         onBlur={() => sichern(text)}
       />
       {!ok && <p className="mt-1.5 px-1 text-[13px] font-semibold text-red-600 dark:text-red-400">Bitte nur eine Zahl eingeben.</p>}
-      {art === "kurz" && <p className="mt-1 px-1 text-right text-[11.5px] text-tinte-leise">{text.length} / 120</p>}
+      {art === "kurz" && <p className="mt-1 px-1 text-right text-[12px] text-tinte-leise">{text.length} / 120</p>}
     </div>
   );
 }
@@ -615,7 +615,7 @@ export function UmfragenSheet({ open, onClose }: { open: boolean; onClose: () =>
 
   return (
     <>
-      <Sheet open={open && !bearbeite && !ergebnisVon} onClose={onClose}>
+      <Sheet open={open} onClose={onClose}>
         <SheetKopf titel="Umfragen" unter="Erscheinen als Pop-up beim nächsten Öffnen der App. Fortschritt wird gespeichert." onClose={onClose} />
         <WortfilterSchalter bereich="umfragen" className="mb-4" />
         <AusHinweis funktion="umfragen" className="-mt-2 mb-3" />
@@ -1161,7 +1161,7 @@ function ErgebnisZeile({ label, n, pct, vorne, kursiv }: { label: string; n: num
       <span className={`relative min-w-0 flex-1 truncate text-[14.5px] ${vorne ? "font-bold" : "font-medium"} ${kursiv ? "italic" : ""}`}>{label}</span>
       <span className="relative shrink-0 text-right leading-none">
         <span className={`zahl block text-[14px] font-bold ${vorne ? "text-brand-dark dark:text-brand" : ""}`}>{pct} %</span>
-        <span className="zahl mt-0.5 block text-[11px] text-tinte-leise">{n}×</span>
+        <span className="zahl mt-0.5 block text-[12px] text-tinte-leise">{n}×</span>
       </span>
     </div>
   );

@@ -1,11 +1,11 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { HY, type Halbjahr, type Status, type Student } from "../lib/types";
-import { basisOffen, beitragFuer, isDead, isPreJoin, prozentVon, ticketPreise } from "../lib/logic";
+import { basisOffen, beitragFuer, idx, isDead, isPreJoin, prozentVon, ticketPreise } from "../lib/logic";
 import { useStore } from "../store";
 import { useRole } from "../auth/RoleProvider";
 import { Sheet, SheetKopf } from "./Sheet";
 import { PunkteSheet } from "./PunkteSheet";
-import { Gruppe, Wert, Zeile, ZeileAuswahl } from "./Liste";
+import { Gruppe, Wert, Zeile, ZeileHaken } from "./Liste";
 
 import { frage } from "../lib/melder";
 import { usePasswortNeu } from "./PasswortNeu";
@@ -16,12 +16,21 @@ const ART: Record<Status, { text: string; klasse: string }> = {
   erlassen: { text: "erlassen", klasse: "bg-erlassen-grund text-erlassen dark:bg-blue-500/20 dark:text-blue-300" },
 };
 
+/** Noch nicht fällig und noch nicht bezahlt: grau wie in der Liste (TermChip) –
+ *  ein künftiges Halbjahr soll nicht wie eine Schuld aussehen. */
+const SPAETER = "bg-[rgb(118_118_128/0.12)] text-tinte-leise dark:bg-[rgb(118_118_128/0.24)]";
+
 /** Ein Tipp schaltet weiter – kein Menue, keine drei Knoepfe nebeneinander. */
 const NAECHSTER: Record<Status, Status> = { offen: "bezahlt", bezahlt: "erlassen", erlassen: "offen" };
 
 /**
  * Eine Person – aufgebaut wie eine Rechnung: oben groß, was offen ist,
  * darunter die Halbjahre (antippen schaltet um), Mithilfe und Stammdaten.
+ *
+ * Prüfung Okt. 2026: künftige Halbjahre heißen „später“ (grau) wie in Liste
+ * und Kopf, nicht „offen“ (orange). „Dabei ab“ / „Verlässt ab“ öffnen eine
+ * Unterseite mit Häkchen-Liste (statt nativer Auswahl), und „Person löschen“
+ * steht als eigene Gruppe ganz unten.
  */
 export function StudentSheet({
   student,
@@ -36,6 +45,28 @@ export function StudentSheet({
   const { canEditBeitrag, canEditData, canEditHilfen, userByStudent } = useRole();
   const pw = usePasswortNeu();
   const [showPunkte, setShowPunkte] = useState(false);
+  // Unterseite im Blatt: Halbjahr wählen (wie „‹ Zurück“ in den iOS-Einstellungen)
+  const [wahl, setWahl] = useState<"dabei" | "verlaesst" | null>(null);
+  // Neues Blatt (andere Person oder wieder geöffnet): immer auf der Hauptseite beginnen
+  const sid = student?.id ?? null;
+  const warUnterseite = useRef(false);
+  useEffect(() => {
+    warUnterseite.current = false;
+    setWahl(null);
+  }, [sid]);
+  // Zurück von der Unterseite: wieder bei den Stammdaten stehen (wie in iOS),
+  // nicht oben im Blatt – sonst sieht man den neuen Wert erst nach Scrollen.
+  const stammRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (wahl) {
+      warUnterseite.current = true;
+      return;
+    }
+    if (!warUnterseite.current) return;
+    warUnterseite.current = false;
+    const t = requestAnimationFrame(() => stammRef.current?.scrollIntoView({ block: "center" }));
+    return () => cancelAnimationFrame(t);
+  }, [wahl]);
 
   if (!student) return <Sheet open={false} onClose={onClose}>{null}</Sheet>;
 
@@ -43,11 +74,46 @@ export function StudentSheet({
   const pct = prozentVon(punkte, settings);
   const ticket = ticketPreise(pct, settings);
 
+  const jetztIdx = idx(settings.aktuelles_halbjahr);
+  const name = `${student.vorname} ${student.nachname}`;
+
+  if (wahl && canEditData) {
+    const istDabei = wahl === "dabei";
+    const aktuell = istDabei ? student.beigetreten_ab : student.verlaesst_ab ?? null;
+    const setzen = (h: Halbjahr | null) => {
+      if (istDabei && h) updateStudent(student.id, { beigetreten_ab: h });
+      if (!istDabei) updateStudent(student.id, { verlaesst_ab: h });
+      setWahl(null);
+    };
+    return (
+      <Sheet open onClose={onClose}>
+        <SheetKopf
+          titel={istDabei ? "Dabei ab" : "Verlässt ab"}
+          unter={istDabei ? "Halbjahre davor zählen nicht zum Beitrag." : "Ab diesem Halbjahr zählt kein Beitrag mehr."}
+          zurueck={{ text: student.vorname, onClick: () => setWahl(null) }}
+          onClose={onClose}
+        />
+        <Gruppe className="">
+          {!istDabei && <ZeileHaken label="bleibt" unter="bis zum Abitur dabei" gewaehlt={aktuell === null} onClick={() => setzen(null)} />}
+          {HY.map((h) => (
+            <ZeileHaken
+              key={h}
+              label={h}
+              unter={h === settings.aktuelles_halbjahr ? "läuft gerade" : undefined}
+              gewaehlt={aktuell === h}
+              onClick={() => setzen(h)}
+            />
+          ))}
+        </Gruppe>
+      </Sheet>
+    );
+  }
+
   return (
     <Sheet open onClose={onClose}>
       <div>
         <SheetKopf
-          titel={`${student.vorname} ${student.nachname}`}
+          titel={name}
           unter={`dabei seit ${student.beigetreten_ab}`}
           onClose={onClose}
         />
@@ -71,6 +137,7 @@ export function StudentSheet({
             const aus = pre || tot;
             const art = ART[t.status];
             const jetzt = h === settings.aktuelles_halbjahr;
+            const spaeter = !aus && t.status === "offen" && i > jetztIdx;
             return (
               <button
                 key={h}
@@ -88,10 +155,10 @@ export function StudentSheet({
                 </span>
                 <span
                   className={`shrink-0 rounded-full px-2.5 py-1 text-[12.5px] font-semibold transition-colors duration-200 ${
-                    aus ? "text-tinte-leise" : art.klasse
+                    aus ? "text-tinte-leise" : spaeter ? SPAETER : art.klasse
                   }`}
                 >
-                  {pre ? "noch nicht dabei" : tot ? "verlassen" : art.text}
+                  {pre ? "noch nicht dabei" : tot ? "verlassen" : spaeter ? "später" : art.text}
                 </span>
               </button>
             );
@@ -110,38 +177,29 @@ export function StudentSheet({
 
         {/* ------------------------------------------------- Stammdaten */}
         {canEditData && (
-          <Gruppe titel="Stammdaten">
-            <Zeile label="Dabei ab">
-              <ZeileAuswahl
-                label="Dabei ab"
-                value={student.beigetreten_ab}
-                onChange={(v) => updateStudent(student.id, { beigetreten_ab: v as Halbjahr })}
-              >
-                {HY.map((h) => (
-                  <option key={h}>{h}</option>
-                ))}
-              </ZeileAuswahl>
-            </Zeile>
-            <Zeile label="Verlässt ab">
-              <ZeileAuswahl
-                label="Verlässt ab"
-                value={student.verlaesst_ab ?? ""}
-                onChange={(v) => updateStudent(student.id, { verlaesst_ab: (v || null) as Halbjahr | null })}
-              >
-                <option value="">bleibt</option>
-                {HY.map((h) => (
-                  <option key={h}>{h}</option>
-                ))}
-              </ZeileAuswahl>
-            </Zeile>
-            {pw.darf && userByStudent[student.id] && (
-              <Zeile label={pw.busy ? "Neues Passwort wird erzeugt …" : "Neues Passwort generieren"} onClick={() => void pw.zuruecksetzen(userByStudent[student.id], `${student.vorname} ${student.nachname}`)} />
-            )}
+          <div ref={stammRef}>
+            <Gruppe titel="Stammdaten">
+              <Zeile label="Dabei ab" onClick={() => setWahl("dabei")}>
+                <Wert>{student.beigetreten_ab}</Wert>
+              </Zeile>
+              <Zeile label="Verlässt ab" onClick={() => setWahl("verlaesst")}>
+                <Wert>{student.verlaesst_ab ?? "bleibt"}</Wert>
+              </Zeile>
+              {pw.darf && userByStudent[student.id] && (
+                <Zeile label={pw.busy ? "Neues Passwort wird erzeugt …" : "Neues Passwort generieren"} onClick={() => void pw.zuruecksetzen(userByStudent[student.id], name)} />
+              )}
+            </Gruppe>
+          </div>
+        )}
+
+        {/* Löschen: eigene Gruppe ganz unten, mit Rückfrage */}
+        {canEditData && (
+          <Gruppe className="mt-8">
             <Zeile
               label="Person löschen"
               rot
               onClick={async () => {
-                if (await frage(`${student.vorname} ${student.nachname} wirklich löschen?`, "Löschen", true)) {
+                if (await frage(`${name} wirklich löschen?`, "Löschen", true)) {
                   removeStudent(student.id);
                   onClose();
                 }

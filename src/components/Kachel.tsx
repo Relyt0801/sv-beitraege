@@ -135,7 +135,8 @@ export function KleinerRing({ prozent, groesse = 40 }: { prozent: number; groess
           className="stroke-brand transition-[stroke-dashoffset] duration-700 ease-ios"
         />
       </svg>
-      <span className="zahl absolute text-[11px] font-semibold">{prozent}</span>
+      {/* 12 px = Mindestschrift (Design-Regeln 5); „100“ passt auch in den 40-px-Ring */}
+      <span className="zahl absolute text-[12px] font-semibold">{prozent}</span>
     </span>
   );
 }
@@ -228,7 +229,7 @@ export function FarbKachel({
   verlauf: string;
   /** farbiger Schatten, z. B. "shadow-[0_10px_24px_-14px_rgba(0,102,204,.9)]" */
   schatten?: string;
-  /** Emoji oder <Icon …/> */
+  /** <Icon …/> (Design-Regeln 5) – Komitee-Emojis aus lib/committees sind Daten und bleiben erlaubt */
   symbol: ReactNode;
   titel: ReactNode;
   /** eine (höchstens zwei) Zeilen Stand, z. B. „2 offen“ oder die letzte Nachricht */
@@ -257,8 +258,9 @@ export function FarbKachel({
         breit ? "col-span-2" : ""
       } ${gedaempft ? "opacity-80 saturate-[.85]" : ""}`}
     >
-      {/* Deko: das Symbol noch einmal groß und blass in der Ecke */}
-      <span aria-hidden className="pointer-events-none absolute -bottom-4 -right-3 text-[4.75rem] leading-none opacity-[0.16] [filter:grayscale(1)_brightness(3)]">
+      {/* Deko: das Symbol noch einmal groß und blass in der Ecke. Ein <Icon> hat eine
+          feste Pixelgröße – hier wird es auf Deko-Größe gezogen (Emoji: über die Schrift). */}
+      <span aria-hidden className="pointer-events-none absolute -bottom-4 -right-3 text-[4.75rem] leading-none opacity-[0.16] [filter:grayscale(1)_brightness(3)] [&_svg]:h-[4.75rem] [&_svg]:w-[4.75rem]">
         {symbol}
       </span>
       <span className="relative flex items-start justify-between gap-2">
