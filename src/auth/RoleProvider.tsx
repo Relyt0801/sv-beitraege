@@ -63,6 +63,12 @@ interface RoleCtx {
 }
 
 const Ctx = createContext<RoleCtx | null>(null);
+/**
+ * Wie useRole, aber ohne Fehler außerhalb des Providers (null) – für
+ * Bausteine, die auch vor dem Anmelden erscheinen (z. B. Install-Hinweis auf
+ * der Anmeldeseite).
+ */
+export const useRoleOptional = () => useContext(Ctx);
 export const useRole = () => {
   const v = useContext(Ctx);
   if (!v) throw new Error("useRole outside provider");

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { appleAberNichtSafari, istApple, useInstall } from "../lib/install";
-import { useRole } from "../auth/RoleProvider";
+import { useRoleOptional } from "../auth/RoleProvider";
 import { Icon } from "./Icon";
 import { useTourOffen } from "./Tour";
 import { useEscapeSchliesst } from "./Sheet";
@@ -76,7 +76,8 @@ function Schritte({ sie }: { sie: boolean }) {
 /** Die Karte auf der Startseite. */
 export function InstallKarte() {
   const inst = useInstall();
-  const { role } = useRole();
+  // Auch auf der Anmeldeseite (ohne RoleProvider) – dann ohne Rolle
+  const role = useRoleOptional()?.role ?? null;
   const sie = role === "eltern";
   const [offen, setOffen] = useState(false);
 
@@ -136,7 +137,8 @@ export function InstallKarte() {
  */
 export function InstallOverlay() {
   const inst = useInstall();
-  const { role } = useRole();
+  // Auch auf der Anmeldeseite (ohne RoleProvider) – dann ohne Rolle
+  const role = useRoleOptional()?.role ?? null;
   const sie = role === "eltern";
   // Nie gleichzeitig mit einer Einführung (Update 1.4, U3): Die Einführung
   // startet beim ersten Öffnen ~0,7 s nach dem Laden, der Home-Bildschirm-
