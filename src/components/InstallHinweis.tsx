@@ -73,8 +73,12 @@ function Schritte({ sie }: { sie: boolean }) {
   );
 }
 
-/** Die Karte auf der Startseite. */
-export function InstallKarte() {
+/**
+ * Die Karte auf der Startseite. `className` = Abstand nach außen (Standard
+ * mt-2.5). In einem Raster mit gap (Eltern-Übersicht) leer lassen – dann
+ * sorgt das Raster für denselben Abstand wie zwischen den anderen Karten.
+ */
+export function InstallKarte({ className = "mt-2.5" }: { className?: string } = {}) {
   const inst = useInstall();
   // Auch auf der Anmeldeseite (ohne RoleProvider) – dann ohne Rolle
   const role = useRoleOptional()?.role ?? null;
@@ -87,7 +91,7 @@ export function InstallKarte() {
   // Hintergrundbild schien das Foto durch). Ab Tablet-Breite eine Zeile:
   // Symbol, Text, Knöpfe – statt eines halben Bildschirms am Laptop.
   return (
-    <div className="card mt-2.5 !border-brand/30 p-3.5 sm:p-4">
+    <div className={`card ${className} !border-brand/30 p-3.5 sm:p-4`}>
       <div className="flex flex-wrap items-start gap-x-3 gap-y-2.5 sm:items-center">
         <span aria-hidden className="symbol bg-brand">
           <Icon name="haus" size={17} strich={2.2} />

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { SkelettKarten } from "./Skelett";
 import { useEvents } from "../events-store";
 import { useRole } from "../auth/RoleProvider";
@@ -20,6 +20,7 @@ import { Sheet, SheetKopf } from "./Sheet";
 import { Gruppe, Symbol, Zeile } from "./Liste";
 import { Icon } from "./Icon";
 import { useBreit } from "../lib/gescrollt";
+import { hinScrollen } from "../lib/sprung";
 
 import { frage } from "../lib/melder";
 
@@ -32,10 +33,24 @@ function kartenHoehe(e: EventItem): number {
   return e.type === "umfrage" ? 2.5 + e.options.length * 1.3 + text : 2 + text;
 }
 
+/**
+ * Ziel aus der Adresse „#events/<ziel>“ (Absprache R2: App.tsx öffnet den
+ * Reiter und lässt die Marke stehen, der Reiter liest das Ziel selbst):
+ *   <event-id>     Abstimmung oder Info im Blatt öffnen
+ *   termin-<id>    einen Termin (eine Schicht) im Blatt öffnen
+ *   bitte          zu „Bitte ansehen“ scrollen (fehlt der Block: wie „infos“)
+ *   infos          zum Abschnitt „Infos & Abstimmungen“ (Wichtiges fürs Team
+ *                  steht dort, nicht unter „Bitte ansehen“)
+ */
+function zielAusAdresse(): string | null {
+  const m = window.location.hash.match(/^#events\/(.+)$/);
+  return m ? decodeURIComponent(m[1]) : null;
+}
+
 export function EventsTab() {
   const { events, ready, myVotes, voteCounts, voters, reads, vote, deleteEvent, markRead } = useEvents();
   const { isStaff, can } = useRole();
-  const { anfrageEntscheiden, termineGesehen, aktionen } = useTermine();
+  const { anfrageEntscheiden, termineGesehen, aktionen, termine, ready: termineBereit } = useTermine();
 
   // Kalender und Terminformular liegen ueber dem Reiter, nicht darin.
   const [kalenderOffen, setKalenderOffen] = useState(false);
@@ -74,12 +89,15 @@ export function EventsTab() {
     setFormOffen(true);
   };
 
+  // Das Blatt, aus dem „Ändern“ kam (Termin/Schicht), bleibt offen: das
+  // Formular geht als Unterseite darüber auf („‹ Waffelteig backen“), Esc und
+  // Speichern führen dorthin zurück, ✕ schließt beide (Sheet.tsx, Stapel).
+  // Vorher ersetzte das Formular das Blatt, und Esc landete in der Liste.
   const terminAendern = (t: Termin) => {
     setBearbeite(t);
     setEntwurf(null);
     setAusAnfrage(null);
     setStartDatum(t.datum);
-    setAngesehen(null);
     setFormOffen(true);
   };
 
@@ -123,6 +141,48 @@ export function EventsTab() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [darfTermine]);
 
+  // Sprung zu einem Eintrag (#events/<ziel>, z. B. aus „Für dich offen“ in der
+  // Übersicht): Marke sofort aus der Adresse nehmen (sonst springt ein
+  // Neuladen wieder hin), Ziel merken und ausführen, sobald die Daten da sind.
+  const [ziel, setZiel] = useState<string | null>(null);
+  useLayoutEffect(() => {
+    const lesen = () => {
+      const z = zielAusAdresse();
+      if (!z) return;
+      history.replaceState(null, "", window.location.pathname + window.location.search);
+      setZiel(z);
+    };
+    lesen();
+    window.addEventListener("hashchange", lesen);
+    return () => window.removeEventListener("hashchange", lesen);
+  }, []);
+  useEffect(() => {
+    if (!ziel || !ready || !termineBereit) return;
+    setZiel(null);
+    if (ziel === "bitte" || ziel === "infos") {
+      // Erst zeichnen lassen (Reiterwechsel springt nach oben), dann hin
+      setTimeout(() => {
+        if (ziel === "bitte" && document.getElementById("events-bitte")) return hinScrollen("events-bitte");
+        // Abschnitt beginnt knapp unter dem Kopf (scroll-mt) – mittig stünde
+        // bei einem langen Feed nur die Mitte der Karten im Bild
+        document.getElementById("events-infos")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 150);
+      return;
+    }
+    if (ziel.startsWith("termin-")) {
+      const t = termine.find((x) => x.id === ziel.slice(7));
+      if (t) {
+        setKalenderOffen(false);
+        setAngesehen(t);
+      }
+      return;
+    }
+    if (events.some((e) => e.id === ziel)) {
+      setKalenderOffen(false);
+      setBitteOffen(ziel);
+    }
+  }, [ziel, ready, termineBereit, events, termine]);
+
   // Reiter „Events“ noch einmal angetippt (lib/gescrollt.ts): zurück zur
   // Wurzel – ein offener Kalender schließt, wie ein Chat in „Chats“.
   useEffect(() => {
@@ -140,11 +200,13 @@ export function EventsTab() {
   //    – neue Schichten“): Die Aktion steht schon unter „Mitmachen“, die Infos
   //    dazu nicht noch einmal ganz oben (Prüfung 15.10.2026: Waffelverkauf
   //    stand an vier Stellen). Wichtiges (rot) und Abstimmungen bleiben oben.
-  // 3. Offene Abstimmungen und (für Schüler) Wichtiges stehen ganz oben unter
-  //    „Bitte ansehen“ – VOR den Aktionen. Vorher standen sie zwar oben im
-  //    Feed, der Feed aber unter allen Aktionen (iPhone SE: bei 1200 bzw.
-  //    1620 px). Wer einmal oben war, bleibt dort, solange der Reiter offen
-  //    ist – sonst springt die Karte beim Abstimmen unter dem Finger weg.
+  // 3. Offene Abstimmungen und (für Schüler) Wichtiges stehen als kurze
+  //    Zeilen unter „Bitte ansehen“ – am Laptop rechts neben „Diese Woche“,
+  //    am Handy direkt hinter „Mitmachen“ (davor verdrängten sie das erste
+  //    „Eintragen“ vom Bildschirm; in der Übersicht stehen sie ohnehin oben).
+  //    Vorher standen sie als Karten im Feed unter allen Aktionen (iPhone SE:
+  //    bei 1200 bzw. 1620 px). Wer einmal dort war, bleibt, solange der
+  //    Reiter offen ist – sonst springt die Karte beim Abstimmen weg.
   // 4. Gleichartige Beiträge (ab drei) zu einer aufklappbaren Gruppe – siehe
   //    gruppiereAehnliche in lib/events.ts.
   const [aelterOffen, setAelterOffen] = useState(false);
@@ -211,11 +273,14 @@ export function EventsTab() {
 
   // „Bitte ansehen“: offene Abstimmungen und (für Schüler) Wichtiges als
   // kurze Zeilen – antippen öffnet das Blatt zum Abstimmen bzw. Lesen. Als
-  // ganze Karten schoben sie „Mitmachen“ am Handy um eine Bildschirmhöhe nach
-  // unten (iPhone SE: erstes „Eintragen“ bei 1318 statt 736 px).
+  // ganze Karten vor „Mitmachen“ schoben sie das am Handy um eine
+  // Bildschirmhöhe nach unten (iPhone SE: erstes „Eintragen“ bei 1318 statt
+  // 736 px); darum am Handy jetzt hinter „Mitmachen“.
   const bitteBlock =
     ready && bitte.length > 0 ? (
-      <Gruppe titel="Bitte ansehen" className="mb-5">
+      // id: Sprungziel „#events/bitte“ (Weitere Abstimmungen/Infos in der Übersicht)
+      <div id="events-bitte" className="mb-5 scroll-mt-[calc(var(--kopf)+1rem)]">
+      <Gruppe titel="Bitte ansehen" className="">
         {bitte.map((e) => {
           const umfrage = e.type === "umfrage";
           const abgestimmt = umfrage && (myVotes[e.id] || []).length > 0;
@@ -244,6 +309,7 @@ export function EventsTab() {
           );
         })}
       </Gruppe>
+      </div>
     ) : null;
   const offenesBitte = bitteOffen ? events.find((e) => e.id === bitteOffen) ?? null : null;
 
@@ -258,11 +324,15 @@ export function EventsTab() {
           1. Diese Woche (heute sofort sichtbar), fürs Team mit „+“ zum Eintragen
           2. Was jetzt zu tun ist: Anfragen, vorbei-Schichten bestätigen
           3. Deine Schichten (grüne Tickets)
-          4. Bitte ansehen: offene Abstimmungen, Wichtiges (kurze Zeilen)
-          5. Mitmachen – gleichartige Aktionen zu Gruppen zusammengefasst
+          4. Mitmachen – gleichartige Aktionen zu Gruppen zusammengefasst
+          5. Bitte ansehen: offene Abstimmungen, Wichtiges (kurze Zeilen)
           6. Infos & Abstimmungen – Ältere eingeklappt
-          Am Laptop stehen 2–4 als Spalte rechts neben „Diese Woche“ (sonst
-          endeten die Tickets in der Bildschirmmitte, daneben war alles leer). */}
+          Am Laptop stehen 2, 3 und 5 als Spalte rechts neben „Diese Woche“
+          (sonst endeten die Tickets in der Bildschirmmitte, daneben war alles
+          leer). Am Handy steht „Bitte ansehen“ HINTER „Mitmachen“: davor schob
+          es das erste „Eintragen“ unter die Reiterleiste (iPhone: 855 statt
+          736 px) – und dieselben Zeilen stehen schon in der Übersicht unter
+          „Für dich offen“. */}
       <div className={rechteSpalte ? "grid grid-cols-[minmax(0,1.65fr)_minmax(0,1fr)] items-start gap-4" : undefined}>
         <Wochenstreifen
           onKalender={(tag) => {
@@ -291,11 +361,12 @@ export function EventsTab() {
           {/* Offene Schichten zum Bestätigen – bleibt, auch wenn das Pop-up weggewischt wurde */}
           <AbschlussHinweis />
           <MeineSchichten ausserTag={streifenTag} />
-          {bitteBlock}
         </>
       )}
 
       <AktionenListe onAendern={darfTermine ? terminAendern : undefined} />
+
+      {!rechteSpalte && bitteBlock}
 
       {/* Pop-up-Umfragen: laufende auf einen Blick (Team mit Recht) */}
       <UmfragenKarte />
@@ -330,7 +401,7 @@ export function EventsTab() {
 
       <PrivatTerminSheet termin={privatAngesehen} onClose={() => setAngesehen(null)} />
 
-      {angesehen && !formOffen && (
+      {angesehen && (
         <TerminAnsehen
           termin={angesehen}
           onSchliessen={() => setAngesehen(null)}
@@ -419,7 +490,8 @@ export function EventsTab() {
   if (feed.length === 0 && aelter.length === 0 && bitte.length > 0) return rahmen(null);
 
   return rahmen(
-    <section className="mb-5">
+    // id: Sprungziel „#events/infos“ (Weitere wichtige Infos fürs Team)
+    <section id="events-infos" className="mb-5 scroll-mt-[calc(var(--kopf)+1rem)]">
       <h3 className={ABSCHNITT}>Infos & Abstimmungen</h3>
       {feed.length > 0 ? (
         <ZweiSpalten

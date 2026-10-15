@@ -116,30 +116,41 @@ export function Kalender({
   }
 
   // ---------------------------------------------------------- Kopf
-  // Wie ein geöffneter Chat (ChatEbene + ChatKopf): am Handy eigene Kopfzeile
-  // mit „‹“ links, am Laptop/iPad quer in der EINEN Kopfzeile der App –
-  // App-Knöpfe und Reiterleiste bleiben sichtbar (Design-Regeln 3).
+  // Wie ein geöffneter Chat (ChatEbene + ChatKopf): am Handy eigene Kopfzeile,
+  // am Laptop/iPad quer in der EINEN Kopfzeile der App – App-Knöpfe und
+  // Reiterleiste bleiben sichtbar (Design-Regeln 3).
+  // Zurück ist beschriftet („‹ Events“), die Pfeile zum Blättern sind blau und
+  // ohne Kreis wie bei „Diese Woche“ (Wochenstreifen) – vorher waren Zurück
+  // und „Vorheriger Monat“ zwei gleiche graue Kreise mit demselben „‹“.
+  // Am Laptop stehen sie direkt auf dem Hintergrundbild: dort mit Lichthof wie
+  // auf-bild (am Handy liegt der Kopf auf deckendem Glas – kein Lichthof).
+  // 44 × 44 px Trefferfläche (Design-Regel 5) – das Paar rückt nur über die
+  // Pfeil-Zeichen zusammen, nicht über kleinere Knöpfe
+  const pfeil = `flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-brand-dark transition active:scale-90 active:bg-black/[0.04] dark:text-brand dark:active:bg-white/[0.06] ${
+    breit ? "[.mit-hintergrund_&]:[filter:drop-shadow(0_0_2px_rgb(var(--papier)))_drop-shadow(0_0_6px_rgb(var(--papier)))]" : ""
+  }`;
+  // Eng beieinander (ein Paar wie „Diese Woche ‹ ›“), deutlich getrennt vom Zurück links
   const blaettern = (
-    <>
+    <div className="flex shrink-0 items-center">
       <button
         onClick={() => weiter(-1)}
-        className="iconbtn shrink-0"
+        className={pfeil}
         aria-label={`Vorheriger ${SCHRITT[ansicht]}`}
         title={`Vorheriger ${SCHRITT[ansicht]}`}
       >
         <span className="block rotate-180">
-          <Icon name="chevron" size={20} strich={2.4} />
+          <Icon name="chevron" size={22} strich={2.6} />
         </span>
       </button>
       <button
         onClick={() => weiter(1)}
-        className="iconbtn shrink-0"
+        className={pfeil}
         aria-label={`Nächster ${SCHRITT[ansicht]}`}
         title={`Nächster ${SCHRITT[ansicht]}`}
       >
-        <Icon name="chevron" size={20} strich={2.4} />
+        <Icon name="chevron" size={22} strich={2.6} />
       </button>
-    </>
+    </div>
   );
   // Sichtbarer Umschalter mit Rahmen: so erkennt man, dass es drei Ansichten
   // gibt und welche gerade läuft. Am Laptop füllt er die Breite, die ChatKopf
@@ -186,6 +197,7 @@ export function Kalender({
   const kopf = (
     <ChatKopf
       onBack={onSchliessen}
+      zurueckText="Events"
       titel={<span className="font-zahl">{titel}</span>}
       // Am Handy keine zweite Zeile: die Ansicht zeigt der Umschalter darunter,
       // und ChatKopf setzt sie dort in 11,5 px (unter der 12-px-Grenze).
@@ -194,8 +206,10 @@ export function Kalender({
         breit ? (
           <>
             {/* Schmaler als die 17rem, die ChatKopf einem Umschalter gibt –
-                sonst bleibt am iPad quer vom Monatsnamen nur „Oktober 2…“ */}
-            <div className="w-[13.5rem]">{segment}</div>
+                sonst bleibt am iPad quer vom Monatsnamen nur „Oktober 2…“.
+                12,5rem: „‹ Events“ und die 44-px-Pfeile brauchen mehr Platz
+                als der alte runde Zurück-Knopf (iPad quer: „30. Aug. – 5. Sep.“) */}
+            <div className="w-[12.5rem]">{segment}</div>
             {blaettern}
             {heuteKnopf}
             {terminKnopf}
@@ -372,13 +386,25 @@ function MonatsAnsicht({
               const band = ferien ? farbeVon(ferien)?.band ?? "bg-emerald-200/60 dark:bg-emerald-500/20" : "";
               // Name der Ferien am ersten Tag und am Wochenanfang
               const ferienName = ferien && (k === ferien.datum || spalte === 0) ? ferien.titel : "";
+              // Ab 640 px stehen die Termine als Schilder im Feld – ein Tipp auf
+              // ein Schild öffnet den Termin direkt (wie in der Woche), ein Tipp
+              // auf die Zahl oder die freie Fläche den Tag. Deshalb ist das Feld
+              // kein <button> (keine Knöpfe in Knöpfen), sondern ein Bereich mit
+              // Knopf-Rolle.
               return (
-                <button
+                <div
                   key={k}
+                  role="button"
+                  tabIndex={0}
                   onClick={() => onTag(k)}
+                  onKeyDown={(e) => {
+                    if (e.target !== e.currentTarget || (e.key !== "Enter" && e.key !== " ")) return;
+                    e.preventDefault();
+                    onTag(k);
+                  }}
                   aria-label={`${tagLang(k)}${ferien ? `, ${ferien.titel}` : ""}${alle.length ? `, ${alle.length} Termine` : ""}`}
                   aria-pressed={gewaehlt}
-                  className={`flex min-h-[3.25rem] min-w-0 flex-col items-center gap-1 rounded-xl px-0.5 py-1 text-left transition active:scale-[.98] sm:min-h-[max(7.5rem,calc((100dvh_-_16rem)/5.5))] sm:items-stretch sm:gap-0.5 sm:p-2 ${
+                  className={`flex min-h-[3.25rem] cursor-pointer select-none min-w-0 flex-col items-center gap-1 rounded-xl px-0.5 py-1 text-left transition active:scale-[.98] sm:min-h-[max(7.5rem,calc((100dvh_-_16rem)/5.5))] sm:items-stretch sm:gap-0.5 sm:p-2 ${
                     istHeute ? "sm:ring-2 sm:ring-inset sm:ring-brand" : ""
                   } ${ferien ? band : "zelle"} ${imMonat ? "" : "opacity-40"}`}
                 >
@@ -422,14 +448,20 @@ function MonatsAnsicht({
                     )}
                     {klausuren.length > 0 && <KuerzelLeiste liste={klausuren} klein max={3} />}
                     {liste.slice(0, platz).map((t) => (
-                      <span
+                      <button
                         key={t.id}
-                        className={`truncate rounded px-1 py-0.5 text-[12px] font-semibold leading-tight ${chipKlasse(t, meins(t), st(t))}`}
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onOeffnen(t);
+                        }}
+                        aria-label={`${t.titel}${t.von ? `, ${uhr(t.von)}` : ""} öffnen`}
+                        className={`block min-w-0 truncate rounded px-1 py-0.5 text-left text-[12px] font-semibold leading-tight transition hover:brightness-95 active:scale-[.97] ${chipKlasse(t, meins(t), st(t))}`}
                       >
                         {schichtVorzeichen(st(t))}
                         {t.icon ? `${t.icon} ` : t.von ? `${uhr(t.von)} ` : ""}
                         {t.titel}
-                      </span>
+                      </button>
                     ))}
                     {liste.length > platz && (
                       <span className="px-1 text-[12px] font-semibold text-tinte-leise">
@@ -437,7 +469,7 @@ function MonatsAnsicht({
                       </span>
                     )}
                   </span>
-                </button>
+                </div>
               );
             })}
           </div>
@@ -600,8 +632,10 @@ function TagesAnsicht({
   const liste = anTag(termine, anker);
   const mehrtaegig = liste.filter((t) => !laeuftAn(t, anker) || (t.bis_datum && t.bis_datum !== t.datum));
 
+  // Volle Spaltenbreite wie Monat, Woche und Legende (Design-Regel 1) – vorher
+  // eine schmale Karte mitten am Laptop, darunter alles leer.
   return (
-    <div className="mx-auto max-w-2xl">
+    <div>
       {mehrtaegig.length > 0 && (
         <p className="auf-bild mb-2 px-1 text-[12px] text-tinte-leise">
           Mehrtägige Termine stehen an jedem Tag, an dem sie laufen.

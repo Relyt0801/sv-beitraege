@@ -39,12 +39,20 @@ export function KomiteePage({
   topic,
   onBack,
   startTeil,
+  startZiel,
   onTeil,
 }: {
   topic: Topic;
   onBack: () => void;
   /** Mit welchem Teil die Seite aufgeht (z. B. aus der Vorschau im Chats-Reiter) */
   startTeil?: KomiteeTeil;
+  /**
+   * Eintrag der Pinnwand, zu dem die Seite beim Öffnen springt und den sie
+   * kurz hervorhebt (Angepinntes, Abstimmung, To-do) – z. B. die angetippte
+   * Abstimmung aus der Vorschau im Chats-Reiter. Vorher ging die Pinnwand
+   * oben auf, und die angetippte Abstimmung lag am iPhone unter dem Rand.
+   */
+  startZiel?: string;
   /** Meldet jeden Wechsel Chat ⇄ Pinnwand (der Chats-Reiter merkt sich den Stand) */
   onTeil?: (t: KomiteeTeil) => void;
 }) {
@@ -71,6 +79,19 @@ export function KomiteePage({
     onTeil?.(tab);
     // onTeil ist meist eine neue Funktion je Zeichnen – nur der Wechsel zählt
   }, [tab]);
+
+  // Einmal nach dem Öffnen zum Ziel springen – nach dem Start-Scroll der
+  // Ebene („oben“), ohne Gleiten: man soll sofort sehen, was man angetippt hat.
+  useEffect(() => {
+    if (!startZiel || tab !== "uebersicht") return;
+    const t = setTimeout(() => {
+      const el = document.getElementById(`pinn-${startZiel}`);
+      if (el) hervorheben(el);
+    }, 120);
+    return () => clearTimeout(t);
+    // nur beim Öffnen
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const alle = useMemo(
     () => items.filter((i) => i.topic_id === topic.id).sort((a, b) => (a.created_at < b.created_at ? -1 : 1)),
@@ -230,6 +251,7 @@ export function KomiteePage({
               return darf ? (
                 <button
                   key={p.id}
+                  id={`pinn-${p.id}`}
                   type="button"
                   onClick={() => setEintragId(p.id)}
                   className="flex w-full items-start gap-3 px-4 py-3 text-left transition active:bg-black/[0.04] dark:active:bg-white/[0.06]"
@@ -238,7 +260,7 @@ export function KomiteePage({
                   <span aria-hidden className="shrink-0 self-center text-[17px] leading-none text-tinte-leise">›</span>
                 </button>
               ) : (
-                <div key={p.id} className="flex items-start gap-3 px-4 py-3">
+                <div key={p.id} id={`pinn-${p.id}`} className="flex items-start gap-3 px-4 py-3">
                   {inhalt}
                 </div>
               );
@@ -252,7 +274,7 @@ export function KomiteePage({
           >
             {todos.map((t) => (
               // Wie in „Erinnerungen“: der Kreis hakt ab, ein Tipp auf den Text öffnet das To-do
-              <div key={t.id} className="flex items-center">
+              <div key={t.id} id={`pinn-${t.id}`} className="flex items-center">
                 <button
                   type="button"
                   onClick={() => !banned && updateItem(t.id, { done: !t.done })}
@@ -292,14 +314,16 @@ export function KomiteePage({
             zweiSpalten={breit}
           >
             {umfragen.map((u) => (
-              <AbstimmungKarte
-                key={u.id}
-                item={u}
-                kannLoeschen={u.created_by === uid || darfEintraege}
-                onDelete={() => deleteItem(u.id)}
-                // Beendete nur mit Frage und Ergebnis – antippen klappt sie auf
-                kompakt
-              />
+              // Hülle mit Kennung: Sprungziel aus der Vorschau im Chats-Reiter
+              <div key={u.id} id={`pinn-${u.id}`} className="rounded-[1.25rem]">
+                <AbstimmungKarte
+                  item={u}
+                  kannLoeschen={u.created_by === uid || darfEintraege}
+                  onDelete={() => deleteItem(u.id)}
+                  // Beendete nur mit Frage und Ergebnis – antippen klappt sie auf
+                  kompakt
+                />
+              </div>
             ))}
           </Abschnitt>
 
@@ -366,6 +390,37 @@ export function KomiteePage({
         }}
       />
     </ChatEbene>
+  );
+}
+
+/**
+ * Zum Eintrag scrollen (mittig) und ihn kurz hervorheben: Karten mit einem
+ * blauen Ring, Zeilen in einer Gruppe (dort schneidet die Gruppe einen Ring
+ * ab) mit einem kurzen blauen Hauch – wie die Sprünge aus Benachrichtigungen.
+ */
+function hervorheben(el: HTMLElement) {
+  // Im Verlauf der Ebene: Kopf und Fuß liegen ÜBER dem Verlauf (Abstand oben/
+  // unten = ihre Höhe). Passt der Eintrag in den freien Teil, steht er dort
+  // mittig – sonst (lange Abstimmung) beginnt er knapp unter dem Kopf, statt
+  // mit Frage und Ring unter dem Kopf zu verschwinden.
+  const sc = el.closest<HTMLElement>("[data-chat-scroller]");
+  if (sc) {
+    const stil = getComputedStyle(sc);
+    const oben = parseFloat(stil.paddingTop) || 0;
+    const sicht = sc.clientHeight - oben - (parseFloat(stil.paddingBottom) || 0);
+    const r = el.getBoundingClientRect();
+    const y = r.top - sc.getBoundingClientRect().top + sc.scrollTop;
+    const luft = r.height < sicht - 32 ? (sicht - r.height) / 2 : 12;
+    sc.scrollTop = Math.max(0, y - oben - luft);
+  } else el.scrollIntoView({ block: "center" });
+  if (typeof el.animate !== "function" || window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+  const brand = getComputedStyle(document.documentElement).getPropertyValue("--brand").trim() || "10 132 255";
+  const inZeile = Boolean(el.closest(".gruppe-zellen"));
+  el.animate(
+    inZeile
+      ? [{ backgroundColor: `rgb(${brand} / 0.18)` }, { backgroundColor: `rgb(${brand} / 0.18)`, offset: 0.5 }, { backgroundColor: `rgb(${brand} / 0)` }]
+      : [{ boxShadow: `0 0 0 3px rgb(${brand} / 0.6)` }, { boxShadow: `0 0 0 3px rgb(${brand} / 0.6)`, offset: 0.55 }, { boxShadow: `0 0 0 3px rgb(${brand} / 0)` }],
+    { duration: 2200, easing: "ease-out" },
   );
 }
 

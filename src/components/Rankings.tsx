@@ -28,7 +28,7 @@ import { TEIL_NAME, useGewinner, useTeil, useVerschiebungen, type GewinnerArt, t
 import { TEIL_FARBE, TeilMarke, TeilUmschalter, TeilWischer, useVerschiebenRueckfrage } from "./TeilUmschalter";
 import { GewinnerBuehne, KuerenBlatt, type Kandidat as KuerKandidat } from "./Gewinner";
 import { KachelVerwaltung } from "./KachelVerwaltung";
-import { FussLeiste, KARTE_KLICK_KLASSE, VerwaltetVon, karteKlick } from "./Kachel";
+import { KARTE_KLICK_KLASSE, VerwaltetVon, karteKlick } from "./Kachel";
 
 /**
  * Abi-Rankings: „Wird am ehesten berühmt“ & Co. – je Kategorie eine geheime
@@ -144,7 +144,8 @@ export function RankingKarten({ className = "" }: { className?: string }) {
                   <span key={x.n} className="w-[14px] rounded-t-[3px] sm:w-5" style={{ height: x.h, background: x.f }} />
                 ))}
               </div>
-              <div className="pr-12 text-[12px] font-semibold uppercase tracking-[0.02em] text-white/80">Abi-Ranking</div>
+              {/* Platz für das Treppchen (Handy 46 px, ab sm 64 px) plus Luft – sonst läuft der Text hinein */}
+              <div className="pr-14 text-[12px] font-semibold uppercase tracking-[0.02em] text-white/80 sm:pr-[4.5rem]">Abi-Ranking</div>
               <div className="mt-0.5 text-[1.2rem] font-bold leading-tight">{ART_STIL[art].kurz}</div>
               <div className="mt-1 text-[12.5px] leading-snug text-white/80">
                 {wahlen
@@ -1265,110 +1266,165 @@ function RankingSichtbarkeit() {
   );
 }
 
-/** Kategorien des gewählten Teils und der gewählten Art: umbenennen, an/aus, verschieben, löschen, neu */
+/**
+ * Kategorien des gewählten Teils und der gewählten Art – iOS-Liste wie bei
+ * den Lehrkräften: je Kategorie eine Zeile mit „›“, alles Weitere
+ * (umbenennen, an/aus, verschieben, löschen) im Blatt darüber („‹ Einstellungen“).
+ * „Neue Kategorie“ ist die letzte Zeile in Blau (Design-Regeln 2).
+ */
 function KategorienListe({ r, art, teil, v }: { r: Rankings; art: RankingArt; teil: Teil; v: ReturnType<typeof useVerschiebungen> }) {
-  const verschiebenFrage = useVerschiebenRueckfrage();
-  const [neu, setNeu] = useState("");
-  const [bearbeite, setBearbeite] = useState<string | null>(null);
-  const [titel, setTitel] = useState("");
+  const [blatt, setBlatt] = useState<string | null>(null);
+  const [neuOffen, setNeuOffen] = useState(false);
   const liste = r.kategorien.filter((k) => k.art === art && k.bereich === teil);
-  const anderer: Teil = teil === "offiziell" ? "inoffiziell" : "offiziell";
-
-  const anlegen = async () => {
-    if (!neu.trim()) return;
-    const f = await r.kategorieSpeichern({ titel: neu, art, bereich: teil });
-    if (f) return meldeFehler(f);
-    setNeu("");
-  };
 
   return (
     <>
-      <Gruppe titel={`Kategorien · ${TEIL_NAME[teil]} · ${liste.length}`} fuss="Titel antippen zum Umbenennen. Schalter aus: ausgeblendet, Stimmen bleiben.">
+      <Gruppe
+        titel={`Kategorien · ${TEIL_NAME[teil]} · ${liste.length}`}
+        fuss="Aus: ausgeblendet, die Stimmen bleiben. Tipp: per Umfrage sammeln und im Ergebnis mit einem Tipp übernehmen."
+      >
         {liste.map((k) => {
           const antrag = v.antragZu(k.id);
-          return bearbeite === k.id ? (
-            <div key={k.id} className="flex gap-2 px-3 py-2.5">
-              <input className="field" value={titel} maxLength={120} onChange={(e) => setTitel(e.target.value)} autoFocus />
-              <button
-                className="btn-primary !min-h-[44px] !w-auto shrink-0 px-4 !text-[15px]"
-                onClick={async () => {
-                  const f = await r.kategorieSpeichern({ ...k, titel });
-                  if (f) return meldeFehler(f);
-                  setBearbeite(null);
-                }}
-              >
-                Sichern
-              </button>
-            </div>
-          ) : (
-            <div key={k.id} className={`${k.aktiv ? "" : "opacity-50"}`}>
-              {/* Zeile 1: Titel (antippen = umbenennen) und Schalter */}
-              <div className="flex min-h-[52px] items-center gap-3 pl-4 pr-3">
-                <button
-                  className="min-w-0 flex-1 py-2 text-left"
-                  onClick={() => {
-                    setBearbeite(k.id);
-                    setTitel(k.titel);
-                  }}
-                >
-                  <span className="block text-[15px] leading-snug">{k.titel}</span>
-                  {antrag && (
-                    <span className="block text-[12px] font-semibold text-tinte-leise">
-                      Antrag nach {TEIL_NAME[antrag.nach]} · {antrag.stimmen}/{antrag.noetig}
-                    </span>
-                  )}
-                </button>
-                <Schalter an={k.aktiv} label={`${k.titel} anzeigen`} onChange={(val) => void r.kategorieSpeichern({ ...k, aktiv: val })} />
-              </div>
-              {/* Zeile 2: Verschieben als Textlink, Löschen getrennt am rechten Rand (rot, mit Rückfrage) */}
-              <div className="flex min-h-[44px] items-center gap-3 pl-4 pr-2">
-                <button
-                  disabled={!!antrag}
-                  className={`min-h-[44px] pr-2 text-left text-[13.5px] font-semibold transition active:opacity-60 disabled:opacity-40 ${TEIL_FARBE[anderer].text}`}
-                  onClick={() =>
-                    void verschiebenFrage(anderer, k.titel).then(async (ok) => {
-                      if (!ok) return;
-                      if (await v.beantragen(k.id, anderer)) await r.nachVerschieben(k.id, anderer);
-                    })
-                  }
-                >
-                  Nach {TEIL_NAME[anderer]} verschieben
-                </button>
-                <span className="flex-1" />
-                <LoeschKnopf label={k.titel} text={`„${k.titel}“ samt allen Stimmen löschen? Das lässt sich nicht rückgängig machen.`} loeschen={() => r.kategorieLoeschen(k.id)} />
-              </div>
-            </div>
+          const stimmen = r.stand.find((x) => x.kategorie_id === k.id)?.stimmen ?? 0;
+          // Zweite Zeile immer (Stimmen, ggf. Antrag): so darf auch ein langer Titel umbrechen
+          const unter = [stimmen ? `${stimmen} ${stimmen === 1 ? "Stimme" : "Stimmen"}` : "Noch keine Stimmen", antrag ? `Antrag nach ${TEIL_NAME[antrag.nach]} ${antrag.stimmen}/${antrag.noetig}` : ""]
+            .filter(Boolean)
+            .join(" · ");
+          return (
+            <Zeile key={k.id} label={k.titel} unter={unter} onClick={() => setBlatt(k.id)}>
+              {!k.aktiv && <Wert>Aus</Wert>}
+            </Zeile>
           );
         })}
         {liste.length === 0 && <p className="px-4 py-3 text-[14px] text-tinte-leise">Hier noch keine.</p>}
+        <Zeile label="Neue Kategorie" blau onClick={() => setNeuOffen(true)} />
       </Gruppe>
-      <div className="mt-2 flex gap-2">
-        <input
-          className="field"
-          maxLength={120}
-          placeholder="z. B. Wird am ehesten berühmt"
-          value={neu}
-          onChange={(e) => setNeu(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") void anlegen();
-          }}
-        />
-        <button className="btn-primary !min-h-[44px] !w-auto shrink-0 px-4 !text-[15px]" disabled={!neu.trim()} onClick={() => void anlegen()}>
-          Anlegen
-        </button>
-      </div>
-      <p className="mt-1.5 px-4 text-[13px] leading-snug text-tinte-leise">
-        Neue Kategorien landen in <span className={`font-semibold ${TEIL_FARBE[teil].text}`}>{TEIL_NAME[teil]}</span> · {ART_STIL[art].titel}. Tipp: per Umfrage sammeln
-        und im Ergebnis mit einem Tipp übernehmen.
-      </p>
+      <RankingKategorieBlatt k={blatt ? r.kategorien.find((k) => k.id === blatt) ?? null : null} r={r} v={v} onClose={() => setBlatt(null)} />
+      <KategorieNeuSheet open={neuOffen} onClose={() => setNeuOffen(false)} r={r} art={art} startTeil={teil} />
     </>
   );
 }
 
+/** Eine Ranking-Kategorie bearbeiten: Titel, an/aus, in den anderen Teil verschieben, löschen */
+function RankingKategorieBlatt({
+  k,
+  r,
+  v,
+  onClose,
+}: {
+  k: RankingKategorie | null;
+  r: Rankings;
+  v: ReturnType<typeof useVerschiebungen>;
+  onClose: () => void;
+}) {
+  const verschiebenFrage = useVerschiebenRueckfrage();
+  const [titel, setTitel] = useState("");
+  const [an, setAn] = useState(true);
+  const [busy, setBusy] = useState(false);
+
+  // Beim Öffnen die Werte der gewählten Kategorie übernehmen
+  const kennung = k?.id ?? null;
+  useEffect(() => {
+    if (!k) return;
+    setTitel(k.titel);
+    setAn(k.aktiv);
+    setBusy(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [kennung]);
+
+  const antrag = k ? v.antragZu(k.id) : null;
+  const anderer: Teil = k?.bereich === "offiziell" ? "inoffiziell" : "offiziell";
+
+  async function sichern() {
+    if (!k || !titel.trim() || busy) return;
+    setBusy(true);
+    const f = await r.kategorieSpeichern({ ...k, titel: titel.trim(), aktiv: an });
+    setBusy(false);
+    if (f) return meldeFehler("Ging nicht: " + f);
+    onClose();
+  }
+
+  return (
+    <Sheet open={k !== null} onClose={onClose}>
+      {k && (
+        <>
+          <SheetKopf titel={k.titel} unter={`${ART_STIL[k.art].titel} · ${TEIL_NAME[k.bereich]}`} onClose={onClose} />
+          {/* Titel als mehrzeiliges Feld – Ranking-Titel sind oft lang */}
+          <Gruppe titel="Titel" className="mt-1">
+            <textarea
+              rows={2}
+              maxLength={120}
+              value={titel}
+              onChange={(e) => setTitel(e.target.value.replace(/\n/g, " "))}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  void sichern();
+                }
+              }}
+              aria-label="Titel"
+              className="block w-full resize-none bg-transparent px-4 py-3 text-[16px] leading-snug outline-none placeholder:text-tinte-leise"
+            />
+          </Gruppe>
+          <Gruppe fuss="Aus: Die Kategorie ist ausgeblendet, die Stimmen bleiben.">
+            <ZeileMitSchalter label="Zum Abstimmen zeigen">
+              <Schalter an={an} onChange={setAn} label="Zum Abstimmen zeigen" />
+            </ZeileMitSchalter>
+          </Gruppe>
+          <Gruppe
+            fuss={
+              antrag
+                ? `Antrag nach ${TEIL_NAME[antrag.nach]} läuft: ${antrag.stimmen} von ${antrag.noetig} Zustimmungen.`
+                : anderer === "offiziell"
+                  ? "Offiziell kommt ins Abibuch."
+                  : "Inoffiziell bleibt in der Stufe."
+            }
+          >
+            <Zeile
+              label={`Nach ${TEIL_NAME[anderer]} verschieben`}
+              blau
+              disabled={Boolean(antrag)}
+              onClick={() =>
+                void verschiebenFrage(anderer, k.titel).then(async (ok) => {
+                  if (!ok) return;
+                  if (await v.beantragen(k.id, anderer)) {
+                    await r.nachVerschieben(k.id, anderer);
+                    onClose();
+                  }
+                })
+              }
+            />
+          </Gruppe>
+          <Gruppe>
+            <Zeile
+              label="Kategorie löschen"
+              rot
+              onClick={() =>
+                void frage(`„${k.titel}“ samt allen Stimmen löschen? Das lässt sich nicht rückgängig machen.`, "Löschen", true).then(async (ok) => {
+                  if (!ok) return;
+                  const f = await r.kategorieLoeschen(k.id);
+                  if (f) return meldeFehler("Ging nicht: " + f);
+                  onClose();
+                })
+              }
+            />
+          </Gruppe>
+          <FussLeisteBlatt>
+            <button type="button" className="btn-primary w-full disabled:opacity-40" disabled={!titel.trim() || busy} onClick={() => void sichern()}>
+              {busy ? "…" : "Sichern"}
+            </button>
+          </FussLeisteBlatt>
+        </>
+      )}
+    </Sheet>
+  );
+}
+
 /**
- * „+“ im Blattkopf: neue Kategorie anlegen – wie bei Motto und Zitaten ein
- * kleines eigenes Blatt. Der Teil (Offiziell | Inoffiziell) startet mit dem,
- * was gerade im Blatt offen ist; die Art (Schüler | Lehrer) kommt vom Blatt.
+ * „+“ im Blattkopf oder „Neue Kategorie“ in den Einstellungen: neue Kategorie
+ * anlegen – wie bei Motto und Zitaten ein kleines eigenes Blatt. Der Teil
+ * (Offiziell | Inoffiziell) startet mit dem, was gerade offen ist; die Art
+ * (Schüler | Lehrer) kommt vom Blatt.
  */
 function KategorieNeuSheet({ open, onClose, r, art, startTeil }: { open: boolean; onClose: () => void; r: Rankings; art: RankingArt; startTeil: Teil }) {
   const [titel, setTitel] = useState("");
@@ -1395,21 +1451,15 @@ function KategorieNeuSheet({ open, onClose, r, art, startTeil }: { open: boolean
   return (
     <Sheet open={open} onClose={onClose}>
       <SheetKopf titel="Neue Kategorie" unter={`${ART_STIL[art].titel} – darüber wird abgestimmt.`} onClose={onClose} />
-      <input
-        className="field"
-        maxLength={120}
-        autoFocus
-        placeholder="z. B. Wird am ehesten berühmt"
-        value={titel}
-        onChange={(e) => setTitel(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") void anlegen();
-        }}
-      />
-      <TeilUmschalter teil={teil} setTeil={setTeil} className="mt-3" />
-      <button type="button" className="btn-primary mt-4" disabled={!titel.trim() || busy} onClick={() => void anlegen()}>
-        {busy ? "…" : `In ${TEIL_NAME[teil]} anlegen`}
-      </button>
+      <Gruppe className="mt-1">
+        <ZeileEingabe label="Titel" value={titel} onChange={setTitel} placeholder="z. B. Wird am ehesten berühmt" maxLength={120} autoFocus onEnter={() => void anlegen()} />
+      </Gruppe>
+      <TeilUmschalter teil={teil} setTeil={setTeil} className="mt-4" />
+      <FussLeisteBlatt>
+        <button type="button" className="btn-primary w-full disabled:opacity-40" disabled={!titel.trim() || busy} onClick={() => void anlegen()}>
+          {busy ? "…" : `In ${TEIL_NAME[teil]} anlegen`}
+        </button>
+      </FussLeisteBlatt>
     </Sheet>
   );
 }
@@ -1517,25 +1567,5 @@ function LehrerBlatt({
         </button>
       </FussLeisteBlatt>
     </Sheet>
-  );
-}
-
-function LoeschKnopf({ label, text, loeschen }: { label: string; text: string; loeschen: () => Promise<string | null> }) {
-  return (
-    <button
-      aria-label={`${label} löschen`}
-      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-red-500 transition active:scale-90 active:bg-red-500/10"
-      onClick={() =>
-        void frage(text, "Löschen", true).then(async (ok) => {
-          if (!ok) return;
-          const f = await loeschen();
-          if (f) meldeFehler("Ging nicht: " + f);
-        })
-      }
-    >
-      <svg viewBox="0 0 24 24" className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-        <path d="M4 7h16M10 11v6M14 11v6M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-12M9 7V4h6v3" />
-      </svg>
-    </button>
   );
 }

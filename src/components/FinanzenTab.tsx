@@ -7,7 +7,7 @@ import { useTermine } from "../termine-store";
 import { useProfiles } from "../profiles-store";
 import { basisOffen } from "../lib/logic";
 import { FinanzStandard } from "./FinanzStandard";
-import { BuchungSheet, FarbWahl, Kennzahlen, PostenBereiche } from "./FinanzBereiche";
+import { BuchungSheet, FarbWahl, Kennzahlen, PostenBereiche, type BuchungStart } from "./FinanzBereiche";
 import { committeeLabel } from "../lib/committees";
 import {
   EINNAHME_QUELLEN, KASSEN_FARBEN, QUELLE_NAME, STANDARD_FARBE, buchungFarbe, centAus, euro, euroKurz, farbHex,
@@ -51,8 +51,14 @@ export function FinanzenTab({ kosten }: { kosten: KostenValue }) {
   const fin = useFinanzen(darfSehen);
   const { students, settings } = useStore();
   const { aktionen, meineVorsitze } = useTermine();
-  const [buchen, setBuchen] = useState<"ein" | "aus" | null>(null);
+  // Das Start-Objekt steht im State: ein bei jedem Zeichnen neu gebautes
+  // `{ typ }` setzte das Blatt bei jedem Neuzeichnen der Seite zurück
+  // (Rollen-Prüfung Okt. 2026: getippter Betrag nach ~3 s wieder leer)
+  const [buchen, setBuchen] = useState<BuchungStart | null>(null);
   const [einstellungen, setEinstellungen] = useState(false);
+  // Eine Buchung aus „Aktionen, Beiträge und Sonstiges“ → Posten → Eintrag:
+  // dieselbe Detailseite wie aus der Buchungsliste
+  const [buchungAuf, setBuchungAuf] = useState<Buchung | null>(null);
   const darfStandard = can("finanzen.basis");
   // Wer alles sieht, kann zur Kontrolle auf die Ansicht für alle umschalten.
   const [ansicht, setAnsicht] = useState<"standard" | "erweitert">("erweitert");
@@ -196,14 +202,14 @@ export function FinanzenTab({ kosten }: { kosten: KostenValue }) {
           // abgeschaltet wirkten): grün = Einnahme, rot = Ausgabe, weiße Schrift.
           <div className="grid grid-cols-2 gap-2 lg:flex">
             <button
-              onClick={() => setBuchen("ein")}
+              onClick={() => setBuchen({ typ: "ein" })}
               className="flex min-h-[3rem] items-center justify-center gap-1.5 rounded-full bg-[#1E7B34] text-[16px] font-semibold text-white transition duration-200 ease-ios active:scale-[.97] lg:min-h-[2.5rem] lg:px-4 lg:text-[15px]"
             >
               <Icon name="plus" size={17} strich={2.4} />
               Einnahme
             </button>
             <button
-              onClick={() => setBuchen("aus")}
+              onClick={() => setBuchen({ typ: "aus" })}
               className="flex min-h-[3rem] items-center justify-center gap-1.5 rounded-full bg-red-600 text-[16px] font-semibold text-white transition duration-200 ease-ios active:scale-[.97] lg:min-h-[2.5rem] lg:px-4 lg:text-[15px]"
             >
               <span className="text-[20px] leading-none">−</span>
@@ -242,7 +248,13 @@ export function FinanzenTab({ kosten }: { kosten: KostenValue }) {
         {kostenOben && <div className="min-w-0 max-lg:order-1">{kostenKarte}</div>}
 
         {/* ================================================ Aktionen, Beiträge, Ausgaben */}
-        <PostenBereiche d={postenDaten} fin={darfBuchen ? fin : null} listeKlasse="max-lg:order-3" geplantKlasse="max-lg:order-3" />
+        <PostenBereiche
+          d={postenDaten}
+          fin={darfBuchen ? fin : null}
+          listeKlasse="max-lg:order-3"
+          geplantKlasse="max-lg:order-3"
+          onBuchung={darfBuchen ? setBuchungAuf : undefined}
+        />
 
         {/* ================================================ Kostenanfragen (sonst hier) */}
         {zeigeAnfragen && !kostenOben && <div className="min-w-0 max-lg:order-3">{kostenKarte}</div>}
@@ -260,7 +272,16 @@ export function FinanzenTab({ kosten }: { kosten: KostenValue }) {
 
       {darfBuchen && (
         <>
-          <BuchungSheet start={buchen ? { typ: buchen } : null} fin={fin} onClose={() => setBuchen(null)} />
+          <BuchungSheet start={buchen} fin={fin} onClose={() => setBuchen(null)} />
+          <BuchungDetail
+            buchung={buchungAuf ? fin.buchungen.find((x) => x.id === buchungAuf.id) ?? null : null}
+            kategorien={fin.kategorien}
+            onClose={() => setBuchungAuf(null)}
+            darf={darfBuchen}
+            onLoeschen={fin.loeschen}
+            onKategorie={fin.buchungKategorie}
+            aktionName={aktionName}
+          />
           <EinstellungenSheet
             open={einstellungen}
             onClose={() => setEinstellungen(false)}
@@ -461,14 +482,18 @@ function EinstellungenSheet({
   // den iOS-Einstellungen), mit „‹ Einstellungen“ zurück
   const [kat, setKat] = useState<KassenKategorie | "neu" | null>(null);
 
+  // Nur beim Öffnen (bzw. wenn sich das Ziel wirklich ändert) vorbelegen –
+  // ein Neuladen mit denselben Werten leert nichts, was man gerade tippt
+  const { ziel_titel, ziel_cent } = fin.ziel;
   useEffect(() => {
     if (!open) return;
-    setTitel(fin.ziel.ziel_titel);
-    setBetrag(fin.ziel.ziel_cent ? String(fin.ziel.ziel_cent / 100).replace(".", ",") : "");
-    setBank("");
-  }, [open, fin.ziel]);
+    setTitel(ziel_titel);
+    setBetrag(ziel_cent ? String(ziel_cent / 100).replace(".", ",") : "");
+  }, [open, ziel_titel, ziel_cent]);
   useEffect(() => {
-    if (open) setKat(null);
+    if (!open) return;
+    setBank("");
+    setKat(null);
   }, [open]);
 
   const c = centAus(bank);
@@ -476,13 +501,14 @@ function EinstellungenSheet({
 
   if (kat)
     return (
-      <Sheet open={open} onClose={onClose}>
+      <Sheet open={open} onClose={onClose} hoch>
         <KategorieSeite key={kat === "neu" ? "neu" : kat.id} k={kat} fin={fin} onZurueck={() => setKat(null)} onClose={onClose} />
       </Sheet>
     );
 
   return (
-    <Sheet open={open} onClose={onClose}>
+    // Unterseite „Kategorie“ im selben Blatt → am Handy volle Höhe
+    <Sheet open={open} onClose={onClose} hoch>
       <SheetKopf titel="Ziel, Kategorien & Bank" onClose={onClose} />
 
       <Gruppe titel="Sparziel" className="">
@@ -755,15 +781,21 @@ function KostenAnfrageSheet({
   const [fehler, setFehler] = useState("");
   const [busy, setBusy] = useState(false);
 
+  // Nur beim Öffnen leeren – ein Neuladen der Vorsitze (neues Array) darf
+  // die angefangene Anfrage nicht löschen
   useEffect(() => {
     if (!open) return;
-    setTag(vorsitze[0] || "");
     setTitel("");
     setBetrag("");
     setBis("");
     setNachricht("");
     setFehler("");
-  }, [open, vorsitze]);
+  }, [open]);
+  const erstesKomitee = vorsitze[0] || "";
+  const komiteeGueltig = vorsitze.includes(tag);
+  useEffect(() => {
+    if (open && !komiteeGueltig) setTag(erstesKomitee);
+  }, [open, komiteeGueltig, erstesKomitee]);
 
   async function senden() {
     setFehler("");
@@ -1043,7 +1075,7 @@ function VerlaufKarte({
           onChange={(e) => setQ(e.target.value)}
         />
         {q && (
-          <button onClick={() => setQ("")} aria-label="Suche leeren" className="px-1 text-tinte-leise">
+          <button onClick={() => setQ("")} aria-label="Suche leeren" className="-mr-3 flex h-11 w-11 shrink-0 items-center justify-center text-tinte-leise">
             ✕
           </button>
         )}
@@ -1060,8 +1092,13 @@ function VerlaufKarte({
             const summe = zeilen.reduce((n, b) => n + (b.quelle === "abgleich" ? 0 : b.cent), 0);
             const auf = istOffen(monat);
             return (
-              <ul key={monat} className="liste border border-black/[0.04] dark:border-white/[0.06]">
-                <li>
+              // Am Laptop scrollt die Spalte in sich: der Monatskopf klebt
+              // dann oben (wie die Abschnittsköpfe in Mail), statt beim
+              // ersten Mausrad-Ruck angeschnitten zu verschwinden. „clip“
+              // statt „hidden“: schneidet die runden Ecken weiter ab, macht
+              // die Liste aber nicht selbst zur Scrollfläche (sonst klebt nichts).
+              <ul key={monat} className="liste border border-black/[0.04] dark:border-white/[0.06] lg:!overflow-clip">
+                <li className="lg:sticky lg:top-0 lg:z-[1] lg:bg-[rgb(var(--zelle))]">
                 <button
                   onClick={() => umschalten(monat)}
                   aria-expanded={auf}

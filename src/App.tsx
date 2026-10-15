@@ -34,6 +34,7 @@ import { Icon, type IconName } from "./components/Icon";
 import { HintergrundEbene } from "./components/HintergrundEbene";
 import { InstallKarte, InstallOverlay } from "./components/InstallHinweis";
 import { ZuErledigen } from "./components/ZuErledigen";
+import { TeamAufgabenQuelle, useTeamAufgaben, type TeamArt } from "./lib/offen";
 import { useBreit, useGescrollt, useHoeheAlsVariable, useReiter } from "./lib/gescrollt";
 import { GlasLeiste } from "./components/GlasLeiste";
 import { InKopf } from "./components/InKopf";
@@ -127,7 +128,9 @@ function NachRolle() {
             <ElternProvider>
               <AlbumProvider>
                 <HintergrundEbene />
-                <Main />
+                <TeamAufgabenQuelle>
+                  <Main />
+                </TeamAufgabenQuelle>
                 <MeldenWurzel />
               </AlbumProvider>
             </ElternProvider>
@@ -150,6 +153,15 @@ function tabAusAdresse(entfernen = true): Tab | null {
   const h = window.location.hash.replace("#", "");
   // Ein bestimmter Chat (#chat-<id>): Reiter Chats, den Chat öffnet ChatsTab
   if (h.startsWith("chat-")) return "themen";
+  // Adresse mit Unterziel („#events/<ziel>“, „#chats/<ziel>“): nur den Reiter
+  // öffnen. Die Marke bleibt stehen – der Reiter liest „<ziel>“ selbst und
+  // räumt danach per history.replaceState auf.
+  const unterziel = h.match(/^(events|chats)\/(.*)$/);
+  if (unterziel) {
+    // Ohne Ziel („#events/“) wie „#events“: Reiter öffnen, Marke weg
+    if (!unterziel[2] && entfernen) history.replaceState(null, "", window.location.pathname + window.location.search);
+    return unterziel[1] === "events" ? "events" : "themen";
+  }
   const t: Tab | null =
     h === "events" ? "events" : h === "chats" ? "themen" : h === "kasse" ? "kasse" : h === "finanzen" ? "finanzen" : h === "profil" ? "profil" : null;
   if (t && entfernen) history.replaceState(null, "", window.location.pathname + window.location.search);
@@ -258,14 +270,29 @@ function Main() {
   // Tab-Leiste, wenn der neue Reiter kürzer ist als die alte Scrollposition.
   // Vor dem ersten Speichern merken, ob es schon einen gemerkten Reiter gab
   const hatteGemerkt = useRef(letzterReiter() !== null);
-  // Der GEWÄHLTE Reiter (gemerkt, aus der Adresse, angetippt). Gezeigt wird
-  // er nur, wenn man ihn sehen darf – sonst die Kasse (siehe `tab` unten).
-  const [gewaehlt, setTab] = useReiter<Tab>(() => tabAusAdresse(false) || letzterReiter() || "kasse");
-  // Kasse: Personen oder (wer darf) Beiträge & Abiball – früher ein eigener Reiter
-  const [kasseTeil, setKasseTeil] = useState<"personen" | "beitraege">("personen");
   // Team mit eigenem Eintrag startet – wie alle Schüler – auf der eigenen
   // Ansicht (Reiter Profil). Nur beim Öffnen, nicht bei jedem Rollenwechsel.
   const hatProfilReiter = isStaff && Boolean(studentId);
+  // Der GEWÄHLTE Reiter (gemerkt, aus der Adresse, angetippt). Gezeigt wird
+  // er nur, wenn man ihn sehen darf – sonst die Kasse (siehe `tab` unten).
+  // Main wird erst gezeichnet, wenn die Rolle feststeht (NachRolle) – der
+  // Start-Reiter stimmt deshalb gleich beim ersten Bild. Vorher kam
+  // „Übersicht“ erst per Effekt danach: Kasse blitzte auf, die Linse flog.
+  const [gewaehlt, setTab] = useReiter<Tab>(
+    () => tabAusAdresse(false) || letzterReiter() || (roleReady && hatProfilReiter ? "profil" : "kasse"),
+  );
+  // Kasse: Personen oder (wer darf) Beiträge & Abiball – früher ein eigener Reiter
+  const [kasseTeil, setKasseTeil] = useState<"personen" | "beitraege">("personen");
+  // Prüfaufgaben des Teams („Zu erledigen“: Schichten bestätigen, Zitate,
+  // Nachträge …) als Zahl an dem Reiter, auf dem die Liste steht – vorher wies
+  // nichts darauf hin, wer zuletzt in Kasse, Rollen oder Events war. Was schon
+  // an einem anderen Reiter zählt, zählt hier nicht noch einmal:
+  // Kostenanfragen (Finanzen) und Terminanfragen (Events).
+  const teamAufgaben = useTeamAufgaben();
+  const aufgabenZahl = (Object.entries(teamAufgaben) as [TeamArt, number][]).reduce(
+    (summe, [art, n]) => summe + (art === "kosten" || art === "termin" ? 0 : n),
+    0,
+  );
 
   /*
    * Darf man den gewählten Reiter sehen? Vorher leitete ein Effekt sofort zur
@@ -571,8 +598,11 @@ function Main() {
   const navItems: { key: Tab; icon: IconName; label: string; badge?: number; show: boolean }[] = [
     // Team mit eigenem Eintrag: die eigene Ansicht wie bei den Schülern.
     // Schüler sehen sie im Reiter „kasse“ – beides heißt „Übersicht“.
-    { key: "profil", icon: "haus", label: "Übersicht", show: hatProfilReiter },
-    { key: "kasse", icon: teamView ? "kasse" : "haus", label: teamView ? "Kasse" : "Übersicht", show: true },
+    // Die Zahl der Prüfaufgaben steht dort, wo „Zu erledigen“ steht: auf der
+    // eigenen Übersicht – Team ohne eigene Person (und Schüler) hat die Liste
+    // über der Kasse bzw. auf seiner Übersicht im Reiter „kasse“.
+    { key: "profil", icon: "haus", label: "Übersicht", badge: aufgabenZahl, show: hatProfilReiter },
+    { key: "kasse", icon: teamView ? "kasse" : "haus", label: teamView ? "Kasse" : "Übersicht", badge: hatProfilReiter ? 0 : aufgabenZahl, show: true },
     { key: "events", icon: "events", label: "Events", badge: unread, show: true },
     { key: "themen", icon: "chats", label: "Chats", badge: topicsUnread, show: showTopicsTab },
     // „Beiträge & Abiball“ ist kein eigener Reiter mehr, sondern ein Teil der
@@ -680,7 +710,7 @@ function Main() {
     <div
       className={`mx-auto max-w-5xl px-3 sm:px-5 ${
         massMode
-          ? "pb-72"
+          ? "pb-[calc(var(--massleiste,18rem)+1.5rem)]"
           : neuKnopf
             ? "pb-[calc(var(--leiste)+6.5rem)] md:pb-[calc(var(--leiste)+2.5rem)] lg:pb-16"
             : "pb-[calc(var(--leiste)+2.5rem)] lg:pb-16"

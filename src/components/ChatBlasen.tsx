@@ -3,10 +3,11 @@ import { createPortal } from "react-dom";
 import { scrollSperren } from "../lib/scrollsperre";
 import { useBreit } from "../lib/gescrollt";
 import { Icon } from "./Icon";
-import { useEscapeSchliesst } from "./Sheet";
+import { Sheet, SheetKopf, useEscapeSchliesst, ZurueckKnopf } from "./Sheet";
 import { REAKTIONEN, erstesEmoji, useTopicsOptional, type Reaktion, type TopicItem } from "../topics-store";
 import { Avatar, PersonName } from "./Avatar";
 import { MuteKnopf } from "./MuteKnopf";
+import { Gruppe, Zeile } from "./Liste";
 import { useProfiles } from "../profiles-store";
 import { lesbarerName } from "../lib/profil";
 import { melden } from "../lib/melden";
@@ -866,9 +867,15 @@ const KopfArt = createContext<"band" | "zeile">("band");
  * für Knöpfe. Darunter optional z. B. der Umschalter „Chat | Pinnwand“.
  * Der Name steht mittig wie in iOS – die Spalten links/rechts sind gleich
  * breit, solange rechts nicht mehr Knöpfe stehen als links.
+ *
+ * zurueckText: statt des runden „‹“ ein beschrifteter Zurück-Knopf wie in
+ * iOS („‹ Events“) – für Ebenen, in deren Kopf noch andere Pfeile stehen
+ * (Kalender: Monat vor/zurück). Dort waren Zurück und „Vorheriger Monat“
+ * zwei gleiche graue Kreise (Rollen-Prüfung Okt. 2026).
  */
 export function ChatKopf({
   onBack,
+  zurueckText,
   symbol,
   titel,
   unter,
@@ -876,6 +883,7 @@ export function ChatKopf({
   children,
 }: {
   onBack: () => void;
+  zurueckText?: string;
   symbol?: ReactNode;
   titel: ReactNode;
   unter?: ReactNode;
@@ -885,14 +893,23 @@ export function ChatKopf({
   // Am Rechner in der Kopfzeile der App: alles in EINER Zeile – Zurück und
   // Name links (wo sonst der Seitentitel steht), Umschalter und Knöpfe rechts.
   const art = useContext(KopfArt);
+  const zurueck = (zeile: boolean) =>
+    zurueckText ? (
+      // auf-bild: steht am Rechner direkt auf dem Hintergrundbild. Dort ohne
+      // inneren Abstand rechts (danach kommt ohnehin gap-2.5) – der Titel
+      // braucht bei 1024 px jeden Pixel („Mi, 30. September“)
+      <ZurueckKnopf text={zurueckText} onClick={onBack} className={`shrink-0 ${zeile ? "auf-bild !pr-0" : ""}`} />
+    ) : (
+      <button type="button" className={`iconbtn ${zeile ? "shrink-0" : ""}`} onClick={onBack} aria-label="Zurück" title="Zurück">
+        <span className="block rotate-180">
+          <Icon name="chevron" size={20} strich={2.4} />
+        </span>
+      </button>
+    );
   if (art === "zeile")
     return (
       <div className="flex min-w-0 flex-1 items-center gap-2.5">
-        <button type="button" className="iconbtn shrink-0" onClick={onBack} aria-label="Zurück" title="Zurück">
-          <span className="block rotate-180">
-            <Icon name="chevron" size={20} strich={2.4} />
-          </span>
-        </button>
+        {zurueck(true)}
         {symbol && (
           <span aria-hidden className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[rgb(118_118_128/0.12)] text-[18px] leading-none dark:bg-[rgb(118_118_128/0.24)]">
             {symbol}
@@ -905,22 +922,20 @@ export function ChatKopf({
           </div>
           {unter && <div className="auf-bild truncate text-[12px] leading-tight text-tinte-leise">{unter}</div>}
         </div>
+        {/* Knöpfe („+ Neu“) VOR dem Umschalter (wie K3 in App.tsx): So endet
+            „Chat | Pinnwand“ immer direkt links vor den App-Knöpfen und steht in
+            Chat und Pinnwand an derselben Stelle – auch wenn „Neu“ nur auf der
+            Pinnwand da ist (vorher sprang er um 89 px). */}
         <div className="ml-auto flex shrink-0 items-center gap-2">
-          {children && <div className="w-[17rem]">{children}</div>}
           {rechts}
+          {children && <div className="w-[17rem]">{children}</div>}
         </div>
       </div>
     );
   return (
     <>
       <div className="grid grid-cols-[minmax(min-content,1fr)_minmax(0,max-content)_minmax(min-content,1fr)] items-center gap-2">
-        <div className="flex">
-          <button type="button" className="iconbtn" onClick={onBack} aria-label="Zurück" title="Zurück">
-            <span className="block rotate-180">
-              <Icon name="chevron" size={20} strich={2.4} />
-            </span>
-          </button>
-        </div>
+        <div className="flex">{zurueck(false)}</div>
         <div className="flex min-w-0 items-center justify-center gap-2">
           {symbol && (
             <span aria-hidden className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[rgb(118_118_128/0.12)] text-[17px] leading-none dark:bg-[rgb(118_118_128/0.24)]">
@@ -938,5 +953,116 @@ export function ChatKopf({
       </div>
       {children && <div className="mt-2">{children}</div>}
     </>
+  );
+}
+
+/**
+ * Rechts im Kopf eines Gesprächs mit einem Schüler oder einem Elternhaus:
+ * „Erledigt“ und „…“. Löschen (und „Wieder öffnen“) liegen im Blatt hinter
+ * „…“ (GespraechMehrBlatt) – kein Mülleimer im Kopf. Am Handy ist „Erledigt“
+ * ein grüner Haken-Kreis: vorher standen dort „✓ Erledigt“ und der
+ * Mülleimer, und vom Betreff blieben am iPhone nur etwa 12 Zeichen.
+ * Am Rechner (Kopfzeile der App, genug Platz) bleibt die Beschriftung.
+ */
+export function GespraechKnoepfe({
+  erledigt,
+  onErledigt,
+  onMehr,
+}: {
+  erledigt: boolean;
+  /** Umschalten offen ⇄ erledigt */
+  onErledigt: () => void;
+  onMehr: () => void;
+}) {
+  const breit = useBreit();
+  return (
+    <>
+      {breit ? (
+        <button
+          type="button"
+          className={`flex h-10 shrink-0 items-center gap-1 rounded-full px-3 text-[13px] font-semibold transition active:scale-95 ${
+            erledigt
+              ? "bg-[rgb(118_118_128/0.12)] text-brand-dark dark:bg-[rgb(118_118_128/0.24)] dark:text-brand"
+              : "bg-[#248A3D] text-white dark:bg-[#30D158] dark:text-black"
+          }`}
+          onClick={onErledigt}
+          title={erledigt ? "Wieder öffnen" : "Als erledigt markieren"}
+        >
+          {!erledigt && <Icon name="haken" size={15} strich={2.6} />}
+          {erledigt ? "Öffnen" : "Erledigt"}
+        </button>
+      ) : (
+        // Handy: nur solange offen – erledigt zeigt die Zeile darunter, „Wieder öffnen“ steht hinter „…“
+        !erledigt && (
+          <button
+            type="button"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition active:scale-90"
+            onClick={onErledigt}
+            aria-label="Als erledigt markieren"
+            title="Als erledigt markieren"
+          >
+            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#248A3D] text-white dark:bg-[#30D158] dark:text-black">
+              <Icon name="haken" size={18} strich={2.8} />
+            </span>
+          </button>
+        )
+      )}
+      <button type="button" className="iconbtn shrink-0" onClick={onMehr} aria-label="Weitere Aktionen" title="Weitere Aktionen">
+        <Icon name="mehr" size={22} strich={2.6} />
+      </button>
+    </>
+  );
+}
+
+/** Blatt hinter „…“ im Kopf eines Gesprächs: offen/erledigt umschalten, ganz unten Löschen (mit Rückfrage). */
+export function GespraechMehrBlatt({
+  open,
+  onClose,
+  titel,
+  unter,
+  erledigt,
+  onErledigt,
+  loeschen,
+}: {
+  open: boolean;
+  onClose: () => void;
+  titel: string;
+  unter?: string;
+  erledigt: boolean;
+  onErledigt: () => void;
+  /** Ohne Recht zum Löschen weglassen */
+  loeschen?: { frage: string; fuss?: string; onLoeschen: () => void };
+}) {
+  return (
+    <Sheet open={open} onClose={onClose}>
+      <SheetKopf titel={titel} unter={unter} onClose={onClose} />
+      <Gruppe
+        className="mt-0"
+        fuss={erledigt ? "Wieder offen steht das Gespräch oben in der Liste." : "Erledigte Gespräche stehen unten in der Liste unter „Erledigt“."}
+      >
+        <Zeile
+          blau
+          label={erledigt ? "Wieder öffnen" : "Als erledigt markieren"}
+          onClick={() => {
+            onErledigt();
+            onClose();
+          }}
+        />
+      </Gruppe>
+      {loeschen && (
+        <Gruppe className="mt-8" fuss={loeschen.fuss}>
+          <Zeile
+            rot
+            label="Gespräch löschen …"
+            onClick={async () => {
+              if (await frage(loeschen.frage, "Löschen", true)) {
+                onClose();
+                loeschen.onLoeschen();
+              }
+            }}
+          />
+        </Gruppe>
+      )}
+    </Sheet>
   );
 }

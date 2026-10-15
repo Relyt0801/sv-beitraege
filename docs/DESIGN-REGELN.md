@@ -74,6 +74,14 @@ wieder passieren.**
     (`#kopf-aktionen`) – wie „Chat | Pinnwand“ im Chat. Jeder Umschalter
     dort ist 19 rem breit; „+ Person/Neu“ steht links davon, damit alle
     Umschalter auf jeder Seite an derselben Stelle enden.
+  - Zahlen an Reitern stehen nie im Textfluss (`GlasLeiste`: absolut an der
+    Ecke) – sonst rutscht die mittig gesetzte Leiste, sobald eine Zahl kommt
+    oder geht. In einem `ChatKopf` stehen Seiten-Knöpfe („+ Neu“) VOR dem
+    Umschalter. Ebenen mit eigenen Pfeilen im Kopf (Kalender) beschriften den
+    Zurück-Knopf („‹ Events“), die Pfeile sind blau ohne Kreis.
+  - Zurück-Taste (Android/Browser) und Esc schliessen immer nur die oberste
+    Ebene (`useEscapeSchliesst` in `Sheet.tsx` führt eine History-Wache);
+    jede neue Ebene meldet sich dort an.
   - Reiter noch einmal antippen geht zur Wurzel zurück (wie iOS):
     `useReiter` feuert `sv:reiter-wurzel` (detail = Reiter); wer Ebenen
     öffnet (ChatsTab, EventsTab/Kalender), hört darauf und schließt sie.

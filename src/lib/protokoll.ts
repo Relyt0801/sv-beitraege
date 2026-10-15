@@ -1,5 +1,6 @@
 import { hasSupabase, supabase } from "./supabase";
 import { PERM_CATEGORIES, rolleName } from "./permissions";
+import type { IconName } from "../components/Icon";
 
 /**
  * Protokoll und Speicherstände.
@@ -31,19 +32,19 @@ export interface Speicherstand {
   zeilen: number;
 }
 
-/** Die Schubladen im Filter. Die Schlüssel stehen so in der Datenbank. */
-export const BEREICHE: { key: string; label: string; icon: string }[] = [
-  { key: "", label: "Alles", icon: "📋" },
-  { key: "konten", label: "Zugänge", icon: "👤" },
-  { key: "rollen", label: "Rollen", icon: "👑" },
-  { key: "rechte", label: "Rechte", icon: "🔐" },
-  { key: "komitees", label: "Komitees", icon: "🏷️" },
-  { key: "beitraege", label: "Beiträge", icon: "💶" },
-  { key: "mithilfe", label: "Mithilfe & Schichten", icon: "🙌" },
-  { key: "anfragen", label: "Anfragen & Meldungen", icon: "📨" },
-  { key: "moderation", label: "Wortfilter", icon: "🚫" },
-  { key: "kasse", label: "Kasse", icon: "💰" },
-  { key: "sicherung", label: "Sicherung", icon: "🗄️" },
+/** Die Schubladen im Filter. Die Schlüssel stehen so in der Datenbank. Symbole aus Icon.tsx (keine Emojis). */
+export const BEREICHE: { key: string; label: string; icon: IconName }[] = [
+  { key: "", label: "Alles", icon: "info" },
+  { key: "konten", label: "Zugänge", icon: "person" },
+  { key: "rollen", label: "Rollen", icon: "rollen" },
+  { key: "rechte", label: "Rechte", icon: "rechte" },
+  { key: "komitees", label: "Komitees", icon: "auswahl" },
+  { key: "beitraege", label: "Beiträge", icon: "beitraege" },
+  { key: "mithilfe", label: "Mithilfe & Schichten", icon: "herz" },
+  { key: "anfragen", label: "Anfragen & Meldungen", icon: "chats" },
+  { key: "moderation", label: "Wortfilter", icon: "schild" },
+  { key: "kasse", label: "Kasse", icon: "kasse" },
+  { key: "sicherung", label: "Sicherung", icon: "bank" },
 ];
 
 /**
@@ -152,7 +153,10 @@ export async function ladeProtokoll(opts: {
   suche?: string;
   vorId?: number | null;
 }): Promise<{ zeilen: LogZeile[]; mehr: boolean; fehler?: string }> {
-  if (!hasSupabase) return { zeilen: [], mehr: false };
+  // Demo (ohne Datenbank): erfundene Einträge, nur zum Ansehen. Mit echter
+  // Datenbank kommt dieser Zweig nie zum Zug – das echte Protokoll schreibt
+  // allein die Datenbank und lässt sich nicht ändern oder löschen.
+  if (!hasSupabase) return demoProtokoll(opts);
   let q = supabase!
     .from("audit_log")
     .select("id, at, aktion, bereich, akteur_id, akteur_name, ziel_id, ziel_name, klartext, details")
@@ -168,6 +172,32 @@ export async function ladeProtokoll(opts: {
   if (error) return { zeilen: [], mehr: false, fehler: fehlertext(error.message) };
   const alle = (data as LogZeile[]) || [];
   return { zeilen: alle.slice(0, SEITE), mehr: alle.length > SEITE };
+}
+
+/**
+ * Erfundene Protokollzeilen für den Demo-Modus (Namen aus den Demo-Personen
+ * in store.tsx). Gefiltert wie in der Datenbank: Bereich und Suche.
+ */
+function demoProtokoll(opts: { bereich?: string; suche?: string }): { zeilen: LogZeile[]; mehr: boolean } {
+  const jetzt = Date.now();
+  const vor = (stunden: number) => new Date(jetzt - stunden * 3_600_000).toISOString();
+  const roh: Omit<LogZeile, "id" | "akteur_id" | "ziel_id" | "details">[] = [
+    { at: vor(0.4), aktion: "beitrag.geaendert", bereich: "beitraege", akteur_name: "Deniz Çelik", ziel_name: "Schäfer, Mia", klartext: "Schäfer, Mia: Beitrag EF.1 bezahlt" },
+    { at: vor(2), aktion: "kasse.gebucht", bereich: "kasse", akteur_name: "Deniz Çelik", ziel_name: "Kuchenverkauf", klartext: "Kuchenverkauf: Einnahme 84,50 € gebucht" },
+    { at: vor(5), aktion: "komitee.zugeteilt", bereich: "komitees", akteur_name: "Lena Bauer", ziel_name: "Brandt, Finn", klartext: "Brandt, Finn: Komitee „Abiball“ zugeteilt" },
+    { at: vor(9), aktion: "rolle.geaendert", bereich: "rollen", akteur_name: "Lena Bauer", ziel_name: "Schäfer, Mia", klartext: "Schäfer, Mia: schueler → stufenteam" },
+    { at: vor(26), aktion: "recht.geaendert", bereich: "rechte", akteur_name: "Lena Bauer", ziel_name: "stufenteam", klartext: "stufenteam: Recht „album.kategorien“ erlaubt" },
+    { at: vor(30), aktion: "mithilfe.geaendert", bereich: "mithilfe", akteur_name: "Jonas Müller", ziel_name: "Weiß, Tom", klartext: "Weiß, Tom: Mithilfe Kuchenverkauf eingetragen" },
+    { at: vor(49), aktion: "anfrage.angenommen", bereich: "anfragen", akteur_name: "Mia Schäfer", ziel_name: "Özdemir, Elif", klartext: "Özdemir, Elif: Nachtrag „Deko Abiball“ angenommen" },
+    { at: vor(72), aktion: "passwort.zurueckgesetzt", bereich: "konten", akteur_name: "Lena Bauer", ziel_name: "Ackermann, Nour", klartext: "Ackermann, Nour: Passwort zurückgesetzt" },
+    { at: vor(96), aktion: "sicherung.erstellt", bereich: "sicherung", akteur_name: "", ziel_name: "", klartext: "Speicherstand der Nacht angelegt" },
+  ];
+  const q = (opts.suche || "").trim().toLowerCase();
+  const zeilen = roh
+    .map((z, i) => ({ ...z, id: roh.length - i, akteur_id: null, ziel_id: null, details: {} }))
+    .filter((z) => !opts.bereich || z.bereich === opts.bereich)
+    .filter((z) => !q || `${z.klartext} ${z.akteur_name} ${z.ziel_name}`.toLowerCase().includes(q));
+  return { zeilen, mehr: false };
 }
 
 export async function ladeSpeicherstaende(): Promise<{ staende: Speicherstand[]; fehler?: string }> {

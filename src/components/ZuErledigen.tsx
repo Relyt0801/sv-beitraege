@@ -9,6 +9,9 @@ import { abschlussOeffnen } from "./SchichtAbschluss";
 import { Gruppe, Symbol, Wert, Zeile, ZeileHaken } from "./Liste";
 import { Sheet, SheetKopf } from "./Sheet";
 import { FussLeiste } from "./FussLeiste";
+import { FaulGrenze, faul } from "./FaulLaden";
+import type { EventItem } from "../lib/events";
+import type { Termin } from "../lib/termine";
 import { Icon, type IconName } from "./Icon";
 
 /**
@@ -21,9 +24,14 @@ import { Icon, type IconName } from "./Icon";
  * vier Reiter verstreut. Jetzt steht hier alles, was auf einen wartet – und
  * nur dann: Ist nichts offen, gibt es die Gruppe nicht.
  *
- * Abstimmen und Wichtiges lesen geht direkt im Blatt, ohne Reiterwechsel.
- * Alles andere springt in den passenden Reiter (lib/offen.ts → springe).
+ * Abstimmen, Wichtiges lesen und die eigene Schicht ansehen geht direkt im
+ * Blatt, ohne Reiterwechsel. „In Events ansehen“ springt genau zu diesem
+ * Eintrag (#events/<id>), alles andere in den passenden Reiter
+ * (lib/offen.ts → springe).
  */
+
+/** Termin-Blatt erst laden, wenn man die Schicht antippt (eigene Datei, wie EventsTab) */
+const TerminAnsehen = faul(() => import("./TerminSheet").then((m) => ({ default: m.TerminAnsehen })));
 
 /** So viele Abstimmungen / Infos einzeln, der Rest als „Weitere …“ */
 const EINZELN = 2;
@@ -60,20 +68,34 @@ export function ZuErledigen({ className = "" }: { className?: string }) {
   // Blätter: Abstimmung bzw. Info direkt hier
   const [abstimmungId, setAbstimmungId] = useState<string | null>(null);
   const [infoId, setInfoId] = useState<string | null>(null);
+  // Die eigene nächste Schicht im Blatt (fürs Team dasselbe wie unter „Mitmachen“)
+  const [schichtOffen, setSchichtOffen] = useState<Termin | null>(null);
 
   if (isEltern) return null;
 
   const zeilen: ReactNode[] = [];
 
-  // 1. Wichtiges, das man noch nicht gesehen hat
+  // 1. Wichtiges, das man noch nicht gesehen hat. Die Zeile sagt, an wen es
+  //    geht – eine Info an alle („Beitrag bis Freitag überweisen“) wirkte unter
+  //    „Für dich offen“ wie eine persönliche Schuld, auch wenn man längst
+  //    bezahlt hatte.
   for (const e of ich.wichtig.slice(0, EINZELN))
-    zeilen.push(<Zeile key={`w-${e.id}`} symbol={sym("info", "bg-[#FF3B30]")} label={e.title} unter="Wichtig · neu" onClick={() => setInfoId(e.id)} />);
-  if (ich.wichtig.length > EINZELN)
+    zeilen.push(<Zeile key={`w-${e.id}`} symbol={sym("info", "bg-[#FF3B30]")} label={e.title} unter={`${anWen(e)} · neu`} onClick={() => setInfoId(e.id)} />);
+  if (ich.wichtig.length > EINZELN) {
+    const rest = ich.wichtig.slice(EINZELN);
     zeilen.push(
-      <Zeile key="w-mehr" symbol={sym("info", "bg-[#FF3B30]")} label="Weitere wichtige Infos" onClick={() => springe("events")}>
-        <Wert>{ich.wichtig.length - EINZELN}</Wert>
+      <Zeile
+        key="w-mehr"
+        symbol={sym("info", "bg-[#FF3B30]")}
+        label={rest.every((e) => e.audience === "all") ? "Weitere Infos an alle" : "Weitere wichtige Infos"}
+        // Schüler finden Wichtiges unter „Bitte ansehen“, das Team im Feed
+        // „Infos & Abstimmungen“ (EventsTab hebt es fürs Team nicht hoch)
+        onClick={() => springe("events", isStaff ? "infos" : "bitte")}
+      >
+        <Wert>{rest.length}</Wert>
       </Zeile>,
     );
+  }
 
   // 2. Abstimmungen ohne eigene Stimme
   for (const e of ich.abstimmungen.slice(0, EINZELN))
@@ -82,7 +104,7 @@ export function ZuErledigen({ className = "" }: { className?: string }) {
     );
   if (ich.abstimmungen.length > EINZELN)
     zeilen.push(
-      <Zeile key="a-mehr" symbol={sym("umfrage", "bg-[#0A84FF]")} label="Weitere Abstimmungen" onClick={() => springe("events")}>
+      <Zeile key="a-mehr" symbol={sym("umfrage", "bg-[#0A84FF]")} label="Weitere Abstimmungen" onClick={() => springe("events", "bitte")}>
         <Wert>{ich.abstimmungen.length - EINZELN}</Wert>
       </Zeile>,
     );
@@ -108,7 +130,9 @@ export function ZuErledigen({ className = "" }: { className?: string }) {
         symbol={sym("kalender", "bg-[#34C759]")}
         label="Deine nächste Schicht"
         unter={[tagLang(s.datum), zeitText(s), aktion?.titel || s.titel].filter(Boolean).join(" · ")}
-        onClick={() => springe("events")}
+        // Direkt im Blatt statt oben in Events (dort lag „Deine Schichten“ am
+        // iPhone SE unter „+ Neu“ und der Reiterleiste)
+        onClick={() => setSchichtOffen(s)}
       />,
     );
   }
@@ -122,8 +146,20 @@ export function ZuErledigen({ className = "" }: { className?: string }) {
       )}
       <AbstimmungBlatt id={abstimmungId} onClose={() => setAbstimmungId(null)} />
       <InfoBlatt id={infoId} onClose={() => setInfoId(null)} />
+      {schichtOffen && (
+        <FaulGrenze still>
+          <TerminAnsehen termin={schichtOffen} onSchliessen={() => setSchichtOffen(null)} />
+        </FaulGrenze>
+      )}
     </>
   );
+}
+
+/** An wen eine wichtige Info geht – kurz für die zweite Zeile. */
+function anWen(e: EventItem): string {
+  if (e.audience === "selected" && e.target_ids.length) return "Wichtig · an dich";
+  if (e.audience === "komitee") return "Wichtig · an dein Komitee";
+  return "Info an alle";
 }
 
 /** Abstimmen, ohne in Events suchen zu müssen. Ändern geht dort jederzeit. */
@@ -160,7 +196,7 @@ function AbstimmungBlatt({ id, onClose }: { id: string | null; onClose: () => vo
               label="In Events ansehen"
               onClick={() => {
                 onClose();
-                springe("events");
+                springe("events", e.id);
               }}
             />
           </Gruppe>
@@ -189,7 +225,7 @@ function InfoBlatt({ id, onClose }: { id: string | null; onClose: () => void }) 
     <Sheet open={Boolean(e)} onClose={zu}>
       {e && (
         <>
-          <SheetKopf titel={e.title} unter="Wichtig" onClose={zu} />
+          <SheetKopf titel={e.title} unter={anWen(e)} onClose={zu} />
           {e.body ? (
             <p className="whitespace-pre-wrap px-1 text-[15px] leading-relaxed text-tinte-matt dark:text-slate-300">{e.body}</p>
           ) : null}
@@ -198,7 +234,7 @@ function InfoBlatt({ id, onClose }: { id: string | null; onClose: () => void }) 
               label="In Events ansehen"
               onClick={() => {
                 zu();
-                springe("events");
+                springe("events", e.id);
               }}
             />
           </Gruppe>

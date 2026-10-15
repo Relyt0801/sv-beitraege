@@ -10,7 +10,7 @@ import { useRole } from "../auth/RoleProvider";
 import { hasSupabase, supabase } from "../lib/supabase";
 import { farbwert, lesbarerName, namensfarbe, speichereProfil, waehlbareFarben } from "../lib/profil";
 import { passwortProblem } from "../lib/passwort";
-import { SELECTABLE_COMMITTEES, committeeIcon, rolleUndKomitees } from "../lib/committees";
+import { SELECTABLE_COMMITTEES, rolleUndKomitees } from "../lib/committees";
 import { ladeKomiteeAntraege, stelleKomiteeAntrag } from "../lib/komitee-antrag";
 import { useTheme, type Modus } from "../lib/theme";
 import { fehlerText } from "../lib/netz";
@@ -21,7 +21,8 @@ import { FunktionenSheet } from "./FunktionenSheet";
 import { WortfilterSheet } from "./Melden";
 import { FreigabenSheet } from "./FreigabenSheet";
 import { Schalter } from "./Schalter";
-import { Gruppe, Symbol, Wert, Zeile, ZeileAuswahl, ZeileMitSchalter } from "./Liste";
+import { Gruppe, Symbol, Wert, Zeile, ZeileHaken, ZeileMitSchalter } from "./Liste";
+import { FussLeiste } from "./FussLeiste";
 import { Icon, type IconName } from "./Icon";
 import { darfSchalten } from "../lib/funktionen";
 import { hintergrundEntfernen, hintergrundSetzen, useHintergrund } from "../lib/hintergrund";
@@ -53,6 +54,7 @@ export function ProfilSheet({
   const [antragOffen, setAntragOffen] = useState(false);
   const [farbFehler, setFarbFehler] = useState("");
   const [hatAntrag, setHatAntrag] = useState(false);
+  const [antragBusy, setAntragBusy] = useState(false);
   // Passwort ändern direkt im Sheet – prompt() blockieren manche Browser
   const [pwOffen, setPwOffen] = useState(false);
   const [pw1, setPw1] = useState("");
@@ -120,7 +122,9 @@ export function ProfilSheet({
   const darfWortfilter = hasSupabase && can("wortfilter.verwalten");
   const verwaltung = darfFunktionen || darfFreigaben || darfWortfilter;
   const darfLoeschfristen = hasSupabase && (istAdmin || can("perms.manage"));
-  const daten = hasSupabase && (istAdmin || istKassenwart || can("perms.manage"));
+  // Demo (ohne Datenbank): nur das Protokoll mit erfundenen Einträgen zum Ansehen
+  // (lib/protokoll.ts) – Speicher, Löschfristen und Update brauchen die Datenbank.
+  const daten = hasSupabase ? istAdmin || istKassenwart || can("perms.manage") : istAdmin;
   const pushText = !pushConfigured() ? "Nicht eingerichtet" : perm === "granted" ? "An" : perm === "denied" ? "Blockiert" : "Aus";
 
   return (
@@ -313,49 +317,15 @@ export function ProfilSheet({
               <Zeile label={pwBusy ? "Wird gespeichert …" : "Passwort speichern"} blau disabled={pwBusy || !pw1} onClick={() => void passwortSpeichern()} />
             </>
           )}
+          {/* Komitee-Wunsch: Unterseite „‹ Mein Profil“ mit Häkchen-Liste (unten) */}
           {!isStaff && !istEltern && (
-            <AufZeile
+            <Zeile
               symbol={<Sym icon="rollen" farbe="bg-[#32ADE6]" />}
               label={meine.length ? "Komitee wechseln" : "Komitee wählen"}
-              auf={antragOffen}
-              onClick={() => !hatAntrag && setAntragOffen((o) => !o)}
-              wert={hatAntrag ? "Angefragt" : undefined}
-              ohnePfeil={hatAntrag}
-            />
-          )}
-          {!isStaff && !istEltern && antragOffen && !hatAntrag && (
-            <>
-              <Zeile label="Wunsch">
-                <ZeileAuswahl label="Wunsch-Komitee" value={wunsch} onChange={setWunsch}>
-                  <option value="">Auswählen</option>
-                  {SELECTABLE_COMMITTEES.filter((c) => !meine.includes(c.slug)).map((c) => (
-                    <option key={c.slug} value={c.slug}>
-                      {committeeIcon(c.slug)} {c.label}
-                    </option>
-                  ))}
-                </ZeileAuswahl>
-              </Zeile>
-              <textarea
-                rows={2}
-                maxLength={300}
-                className={`${EINGABE} resize-none py-3`}
-                placeholder="Warum? Ein Satz reicht"
-                value={grund}
-                onChange={(e) => setGrund(e.target.value)}
-              />
-              <Zeile
-                label="Antrag senden"
-                blau
-                disabled={!wunsch}
-                onClick={async () => {
-                  const r = await stelleKomiteeAntrag(wunsch, grund);
-                  if (r.ok) {
-                    setHatAntrag(true);
-                    setAntragOffen(false);
-                  } else meldeFehler(r.error || "Das hat nicht geklappt.");
-                }}
-              />
-            </>
+              onClick={hatAntrag ? undefined : () => setAntragOffen(true)}
+            >
+              {hatAntrag && <Wert>Angefragt</Wert>}
+            </Zeile>
           )}
         </Gruppe>
       )}
@@ -420,6 +390,49 @@ export function ProfilSheet({
         <RechtLinks />
       </div>
 
+      {!isStaff && !istEltern && (
+        <Sheet open={open && antragOffen && !hatAntrag} onClose={() => setAntragOffen(false)}>
+          <SheetKopf
+            titel={meine.length ? "Komitee wechseln" : "Komitee wählen"}
+            unter="Das Stufenteam entscheidet über deinen Wunsch."
+            onClose={() => setAntragOffen(false)}
+          />
+          <Gruppe titel="Wunsch-Komitee" className="mt-1">
+            {SELECTABLE_COMMITTEES.filter((c) => !meine.includes(c.slug)).map((c) => (
+              <ZeileHaken key={c.slug} label={c.label} gewaehlt={wunsch === c.slug} onClick={() => setWunsch(c.slug)} />
+            ))}
+          </Gruppe>
+          <Gruppe titel="Begründung" fuss="Optional – ein Satz reicht.">
+            <textarea
+              rows={2}
+              maxLength={300}
+              className={`${EINGABE} resize-none py-3`}
+              placeholder="Warum?"
+              value={grund}
+              onChange={(e) => setGrund(e.target.value)}
+            />
+          </Gruppe>
+          <FussLeiste>
+            <button
+              type="button"
+              className="btn-primary w-full disabled:opacity-40"
+              disabled={!wunsch || antragBusy}
+              onClick={async () => {
+                setAntragBusy(true);
+                const r = await stelleKomiteeAntrag(wunsch, grund);
+                setAntragBusy(false);
+                if (r.ok) {
+                  setHatAntrag(true);
+                  setAntragOffen(false);
+                  melde("Antrag gesendet – das Stufenteam entscheidet", "erfolg");
+                } else meldeFehler(r.error || "Das hat nicht geklappt.");
+              }}
+            >
+              {antragBusy ? "…" : "Antrag senden"}
+            </button>
+          </FussLeiste>
+        </Sheet>
+      )}
       <LoeschfristenSheet open={loeschOffen} onClose={() => setLoeschOffen(false)} />
       <FunktionenSheet open={funktionenOffen} onClose={() => setFunktionenOffen(false)} />
       <WortfilterSheet open={wortfilterOffen} onClose={() => setWortfilterOffen(false)} />

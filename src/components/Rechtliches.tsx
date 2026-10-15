@@ -327,9 +327,9 @@ export function RechtSheet({
     <Sheet open={seite !== null} onClose={onClose}>
       <SheetKopf titel={seite === "impressum" ? "Impressum" : "Datenschutz"} onClose={onClose} />
       {seite === "impressum" ? <Impressum /> : <Datenschutz />}
-      <button type="button" className="btn-primary mt-5" onClick={onClose}>
-        Schließen
-      </button>
+      {/* Kein eigener „Schließen“-Knopf unten: Der Kopf klebt oben und hat ✕
+          (im Profil zusätzlich „‹ Mein Profil“) – ein dritter Ausgang mit
+          anderer Wirkung verwirrte nur (Design-Regeln 3). */}
     </Sheet>
   );
 }
@@ -339,14 +339,15 @@ export function RechtLinks({ klein = false }: { klein?: boolean }) {
   const [seite, setSeite] = useState<"impressum" | "datenschutz" | null>(null);
   return (
     <>
-      <div className={`flex items-center justify-center gap-3 ${klein ? "text-[12px]" : "text-[12px]"} text-tinte-leise`}>
+      <div className={`auf-bild flex items-center justify-center gap-1 ${klein ? "text-[12px]" : "text-[12px]"} text-tinte-leise`}>
         {/* type="button" ist Pflicht: die Links stehen im Anmeldeformular, und
-            ein Knopf ohne type schickt das Formular ab. */}
-        <button type="button" className="font-semibold underline underline-offset-2" onClick={() => setSeite("impressum")}>
+            ein Knopf ohne type schickt das Formular ab. Tippfläche 44 px hoch
+            (Design-Regeln 5), die Schrift bleibt klein. */}
+        <button type="button" className="inline-flex min-h-[44px] items-center px-2 font-semibold underline underline-offset-2" onClick={() => setSeite("impressum")}>
           Impressum
         </button>
         <span aria-hidden>·</span>
-        <button type="button" className="font-semibold underline underline-offset-2" onClick={() => setSeite("datenschutz")}>
+        <button type="button" className="inline-flex min-h-[44px] items-center px-2 font-semibold underline underline-offset-2" onClick={() => setSeite("datenschutz")}>
           Datenschutz
         </button>
       </div>

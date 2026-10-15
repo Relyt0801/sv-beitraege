@@ -72,7 +72,7 @@ export const PATCH: PatchVersion = {
         },
         {
           titel: "Blätter wie in iOS",
-          text: "Öffnet sich etwas aus einem Blatt heraus, kommst du oben links mit „‹ Zurück“ wieder hin; das ✕ schließt alles.",
+          text: "Öffnet sich etwas aus einem Blatt heraus, kommst du oben links mit „‹ Zurück“ wieder hin; das ✕ schließt alles. Die Zurück-Taste am Handy schließt nur das Oberste – die App bleibt offen.",
           icon: "chevron",
           farbe: "bg-[#32ADE6]",
         },

@@ -29,7 +29,7 @@ const bilder = process.env.BILDER ? ordner('bilder') : null;
 const browser = await browserStarten();
 const ergebnis = [];
 for (const rolle of ROLLEN) for (const g of GROESSEN) for (const thema of ['light', 'dark']) {
-  const ctx = await browser.newContext({ viewport: { width: g.w, height: g.h }, isMobile: g.mobil, hasTouch: g.mobil, colorScheme: thema, locale: 'de-DE' });
+  const ctx = await browser.newContext({ viewport: { width: g.w, height: g.h }, isMobile: g.mobil, hasTouch: g.mobil, colorScheme: thema, locale: 'de-DE', serviceWorkers: 'block' });
   await ctx.addInitScript(TOUR_WEG);
   const page = await ctx.newPage();
   const fehler = [];

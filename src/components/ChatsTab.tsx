@@ -8,7 +8,7 @@ import { ElternGespraecheEbene, ElternInfosEbene, useElternZahlen } from "./Elte
 import { COMMITTEES, committeeIcon, committeeLabel } from "../lib/committees";
 import { KomiteePage } from "./KomiteePage";
 import { BannHinweis } from "./BannHinweis";
-import { ChatBlasen, ChatEbene, ChatEingabe, ChatKopf } from "./ChatBlasen";
+import { ChatBlasen, ChatEbene, ChatEingabe, ChatKopf, GespraechKnoepfe, GespraechMehrBlatt } from "./ChatBlasen";
 import { Avatar } from "./Avatar";
 import { useProfiles } from "../profiles-store";
 import { useStore } from "../store";
@@ -99,6 +99,8 @@ export function ChatsTab() {
   const [openId, setOpenId] = useState<string | null>(() => merker.openId);
   // Mit welchem Teil eine Komitee-Seite aufgeht (Vorschau-Zeilen: Pinnwand oder Chat)
   const [openTeil, setOpenTeil] = useState<Teil | undefined>(() => merker.teil);
+  // Eintrag der Pinnwand, zu dem die Seite beim Öffnen springt (nur einmal, nicht gemerkt)
+  const [openZiel, setOpenZiel] = useState<string | undefined>();
   const [teamOffen, setTeamOffen] = useState(() => merker.teamOffen);
   // Kam man über eine Benachrichtigung zu einer Anfrage, gleich die Anfragen
   // zeigen. Schon beim ersten Zeichnen prüfen: Die Anfrage-Komponenten
@@ -119,9 +121,10 @@ export function ChatsTab() {
     if (!openId) merker.teil = undefined;
   }, [openId, teamOffen, ansicht]);
 
-  /** Einen Komitee-Chat öffnen – optional gleich auf der Pinnwand */
-  const oeffne = useCallback((id: string, teil?: Teil) => {
+  /** Einen Komitee-Chat öffnen – optional gleich auf der Pinnwand, bei einem bestimmten Eintrag */
+  const oeffne = useCallback((id: string, teil?: Teil, ziel?: string) => {
     setOpenTeil(teil);
+    setOpenZiel(ziel);
     merker.teil = teil;
     setOpenId(id);
   }, []);
@@ -154,23 +157,35 @@ export function ChatsTab() {
     return () => window.removeEventListener("hashchange", pruefe);
   }, []);
 
-  // Aus einer Benachrichtigung (#chat-<id>): genau diesen Chat öffnen
+  // Aus einer Benachrichtigung (#chat-<id>): genau diesen Chat öffnen.
+  // Ebenso „#chats/<ziel>“ (Absprache R2: App.tsx öffnet nur den Reiter und
+  // lässt die Marke stehen): <chat-id>, <chat-id>/<eintrag-id> (Pinnwand bei
+  // diesem Eintrag) oder eine Unterseite (anfragen, schueler, eltern, elterninfos).
   useEffect(() => {
     if (!ready) return;
     const ausAdresse = () => {
-      const m = window.location.hash.match(/^#chat-([0-9a-f-]{36})$/i);
+      const unter = window.location.hash.match(/^#chats\/([^/]+)(?:\/(.+))?$/);
+      const m = unter ?? window.location.hash.match(/^#chat-([0-9a-f-]{36})$/i);
       if (!m) return;
       history.replaceState(null, "", window.location.pathname + window.location.search);
-      const t = topics.find((x) => x.id === m[1]);
+      const ziel = decodeURIComponent(m[1]);
+      if (unter && isStaff && (["anfragen", "schueler", "eltern", "elterninfos"] as const).includes(ziel as never)) {
+        setOpenId(null);
+        return setAnsicht(ziel as Ansicht);
+      }
+      const t = topics.find((x) => x.id === ziel);
       if (!t) return;
       // Schüler sehen ihre Gespräche mit dem Team als einen durchgehenden Chat
       if (t.kind === "ticket" && !isStaff) return setTeamOffen(true);
-      oeffne(t.id);
+      const eintrag = unter?.[2] ? items.find((i) => i.id === decodeURIComponent(unter[2]) && i.topic_id === t.id) : undefined;
+      const aufPinnwand = eintrag && (eintrag.type === "umfrage" || eintrag.type === "todo" || eintrag.pinned);
+      if (aufPinnwand) oeffne(t.id, "uebersicht", eintrag.id);
+      else oeffne(t.id, eintrag ? "chat" : undefined);
     };
     ausAdresse();
     window.addEventListener("hashchange", ausAdresse);
     return () => window.removeEventListener("hashchange", ausAdresse);
-  }, [ready, topics, isStaff, oeffne]);
+  }, [ready, topics, items, isStaff, oeffne]);
   const meineKoms = committeesOf(uid);
 
   // Fehlende Chats einmalig anlegen – nur wer Chats verwalten darf, kann das.
@@ -382,7 +397,7 @@ export function ChatsTab() {
       {vorschauZahl > 0 && (
         <div className={`grid gap-x-5 gap-y-6 lg:items-start ${vorschauZahl > 1 ? "lg:grid-cols-2" : ""}`}>
           {vorschauKomitees.map((t) => (
-            <KomiteeVorschau key={t.id} topic={t} onOeffnen={(teil) => oeffne(t.id, teil)} />
+            <KomiteeVorschau key={t.id} topic={t} onOeffnen={(teil, ziel) => oeffne(t.id, teil, ziel)} />
           ))}
           {teamLetzte && <TeamVorschau letzte={teamLetzte} uid={uid} onOeffnen={() => setTeamOffen(true)} />}
         </div>
@@ -470,6 +485,7 @@ export function ChatsTab() {
             key={offen.id}
             topic={offen}
             startTeil={openTeil}
+            startZiel={openZiel}
             onTeil={(t) => {
               merker.teil = t;
             }}
@@ -517,7 +533,7 @@ function standText(items: TopicItem[], topicId: string): string {
  * offene To-dos und die letzte Nachricht. Jede Zeile öffnet die passende
  * Stelle (Pinnwand oder Chat). Ist nichts da, fehlt die Gruppe ganz.
  */
-function KomiteeVorschau({ topic, onOeffnen }: { topic: Topic; onOeffnen: (teil: Teil) => void }) {
+function KomiteeVorschau({ topic, onOeffnen }: { topic: Topic; onOeffnen: (teil: Teil, ziel?: string) => void }) {
   const { items, myVotes, uid } = useTopics();
   // Gesperrte dürfen nicht abstimmen – dann auch kein „Abstimmen“ anbieten
   const { banned } = useRole();
@@ -543,9 +559,10 @@ function KomiteeVorschau({ topic, onOeffnen }: { topic: Topic; onOeffnen: (teil:
             <Icon name="pin" size={17} strich={2.2} />
           </Symbol>
         }
-        onClick={() => onOeffnen("uebersicht")}
+        onClick={() => onOeffnen("uebersicht", pin.id)}
       />,
     );
+  // Jede Zeile springt zu IHREM Eintrag auf der Pinnwand (mittig, kurz hervorgehoben)
   for (const u of umfragen)
     zeilen.push(
       <Zeile
@@ -557,7 +574,7 @@ function KomiteeVorschau({ topic, onOeffnen }: { topic: Topic; onOeffnen: (teil:
             <Icon name="umfrage" size={17} strich={2.2} />
           </Symbol>
         }
-        onClick={() => onOeffnen("uebersicht")}
+        onClick={() => onOeffnen("uebersicht", u.id)}
       >
         {banned ? null : ohneStimme(u) ? (
           <span className="text-[15px] font-medium text-brand-dark dark:text-brand">Abstimmen</span>
@@ -577,7 +594,7 @@ function KomiteeVorschau({ topic, onOeffnen }: { topic: Topic; onOeffnen: (teil:
             <Icon name="haken" size={17} strich={2.4} />
           </Symbol>
         }
-        onClick={() => onOeffnen("uebersicht")}
+        onClick={() => onOeffnen("uebersicht", todos[0].id)}
       >
         <Wert>{todos.length} offen</Wert>
       </Zeile>,
@@ -953,12 +970,13 @@ function TeamChatSchueler({ tickets, onBack }: { tickets: Topic[]; onBack: () =>
   );
 }
 
-/** Teamansicht: ein Ticket als Chat, mit Erledigt- und Löschen-Knopf. */
+/** Teamansicht: ein Ticket als Chat – im Kopf „Erledigt“ und „…“ (Löschen im Blatt). */
 function TicketChat({ topic, onBack }: { topic: Topic; onBack: () => void }) {
   const { items, postItem, deleteItem, deleteTopic, updateTopic, markRead, committeesOf, uid } = useTopics();
   const { role, can, isStaff, banned } = useRole();
   const { profile } = useProfiles();
   const [text, setText] = useState("");
+  const [mehr, setMehr] = useState(false);
 
   const liste = items
     .filter((i) => i.topic_id === topic.id)
@@ -978,6 +996,7 @@ function TicketChat({ topic, onBack }: { topic: Topic; onBack: () => void }) {
   const person = useTicketPerson(topic);
   const name = person ? profile[person]?.anzeigename : "";
   const erledigt = topic.status === "erledigt";
+  const umschalten = () => void updateTopic(topic.id, { status: erledigt ? "offen" : "erledigt" });
 
   return (
     <ChatEbene
@@ -989,44 +1008,34 @@ function TicketChat({ topic, onBack }: { topic: Topic; onBack: () => void }) {
           symbol={<Avatar userId={person} name={name} size={32} />}
           titel={name || "Frage"}
           unter={erledigt ? `Erledigt · ${topic.title}` : topic.title}
-          rechts={
-            isStaff && (
-              <>
-                <button
-                  className={`flex h-10 items-center gap-1 rounded-full px-3 text-[13px] font-semibold transition active:scale-95 ${
-                    erledigt
-                      ? "bg-[rgb(118_118_128/0.12)] text-brand-dark dark:bg-[rgb(118_118_128/0.24)] dark:text-brand"
-                      : "bg-[#248A3D] text-white dark:bg-[#30D158] dark:text-black"
-                  }`}
-                  onClick={() => updateTopic(topic.id, { status: erledigt ? "offen" : "erledigt" })}
-                  title={erledigt ? "Wieder öffnen" : "Als erledigt markieren"}
-                >
-                  {!erledigt && <Icon name="haken" size={15} strich={2.6} />}
-                  {erledigt ? "Öffnen" : "Erledigt"}
-                </button>
-                {can("chats.manage") && (
-                  <button
-                    className="iconbtn"
-                    title="Gespräch löschen"
-                    aria-label="Gespräch löschen"
-                    onClick={async () => {
-                      if (await frage("Diese Frage samt Verlauf löschen?", "Löschen", true)) {
-                        void deleteTopic(topic.id);
-                        onBack();
-                      }
-                    }}
-                  >
-                    <Icon name="muell" size={17} />
-                  </button>
-                )}
-              </>
-            )
-          }
+          rechts={isStaff && <GespraechKnoepfe erledigt={erledigt} onErledigt={umschalten} onMehr={() => setMehr(true)} />}
         />
       }
       fuss={banned ? undefined : <ChatEingabe wert={text} setWert={setText} onSenden={senden} platzhalter="Antworten" />}
     >
       <ChatBlasen liste={liste} uid={uid} darfLoeschen={can("chats.delete_messages")} onDelete={deleteItem} />
+      {isStaff && (
+        <GespraechMehrBlatt
+          open={mehr}
+          onClose={() => setMehr(false)}
+          titel={name || "Frage"}
+          unter={erledigt ? `Erledigt · ${topic.title}` : topic.title}
+          erledigt={erledigt}
+          onErledigt={umschalten}
+          loeschen={
+            can("chats.manage")
+              ? {
+                  frage: "Diese Frage samt Verlauf löschen?",
+                  fuss: "Alle Nachrichten darin verschwinden – auch für die Schülerin oder den Schüler.",
+                  onLoeschen: () => {
+                    void deleteTopic(topic.id);
+                    onBack();
+                  },
+                }
+              : undefined
+          }
+        />
+      )}
     </ChatEbene>
   );
 }

@@ -263,7 +263,11 @@ export function TerminSheet({
             aria-label="Bezeichnung"
             value={titel}
             onChange={(e) => setTitel(e.target.value)}
-            autoFocus
+            // Nur beim Neuanlegen: Beim Ändern (meist Uhrzeit oder Ort) ging
+            // sonst am Handy die Tastatur über dem Formular auf, und Esc/Zurück
+            // nahm erst nur den Fokus aus dem vollen Feld, statt zur Schicht
+            // zurückzugehen.
+            autoFocus={!termin}
           />
         </Zeile>
         <Zeile label="Ort">
@@ -626,8 +630,9 @@ export function TerminAnsehen({
   const st = useSchichtStatus();
   // „In meinen Kalender“ (.ics) – zurzeit aus: KALENDER_SYNC_AN in lib/kalender-sync.ts
   const kalenderDemo = useKalenderDemo();
-  // Immer den frischen Stand zeigen (z. B. nach dem Austragen einer Person)
-  const t = termin ? termine.find((x) => x.id === termin.id) ?? termin : null;
+  // Immer den frischen Stand zeigen (z. B. nach dem Austragen einer Person).
+  // Gelöscht (auch im Formular darüber, „Ändern“ → „Termin löschen“): Blatt zu.
+  const t = termin ? termine.find((x) => x.id === termin.id) ?? null : null;
 
   /** Die "Reihe": gleicher Titel, gleiche Uhrzeit, gleiche Aktion, ab heute. */
   const reihe = useMemo(() => {

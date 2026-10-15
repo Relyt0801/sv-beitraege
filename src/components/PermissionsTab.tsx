@@ -5,11 +5,10 @@ import { KomiteeZugriff } from "./KomiteeZugriff";
 import { SkelettKarten } from "./Skelett";
 import { Sheet, SheetKopf } from "./Sheet";
 import type { Profile } from "../auth/RoleProvider";
-import { Gruppe, Symbol, Zeile } from "./Liste";
+import { Gruppe, Symbol } from "./Liste";
 import { Icon, type IconName } from "./Icon";
-import { usePasswortNeu } from "./PasswortNeu";
 import { IN_KACHEL_EINSTELLBAR } from "./KachelVerwaltung";
-import { PERM_CATEGORIES, PERM_ROLES, ALL_PERMS, ROLE_DEFAULTS, ROLLE_KURZ, KOMITEE_PERMS, permsNachThema, rechteRolle, rollenDerZeile, type PermKey } from "../lib/permissions";
+import { PERM_CATEGORIES, PERM_ROLES, ALL_PERMS, ROLE_DEFAULTS, ROLLE_KURZ, KOMITEE_PERMS, permsNachThema, rechteRolle, rolleName, rollenDerZeile, type PermKey } from "../lib/permissions";
 import { COMMITTEES } from "../lib/committees";
 import { Schalter } from "./Schalter";
 
@@ -305,13 +304,12 @@ function UnterKopf({ text, erstes }: { text: string; erstes: boolean }) {
  * Je Recht drei Zustände als Segment: wie die Rolle (Standard), erlauben,
  * verbieten. Themen zugeklappt, damit es übersichtlich bleibt.
  *
- * Oben steht „Konto“ mit dem Passwort-Zurücksetzen (vorher nur im
- * Chat-Sperren-Menü der Personenliste zu finden). Rechte, die sonst in den
- * Kacheln eingestellt werden, stehen getrennt darunter, mit Hinweis.
+ * „Passwort zurücksetzen“ steht nur im Blatt der Person (Gruppe „Konto“) –
+ * hier stand es doppelt oben drüber. Rechte, die sonst in den Kacheln
+ * eingestellt werden, stehen getrennt darunter, mit Hinweis.
  */
 export function PersonRechteSheet({ profil, name, onClose }: { profil: Profile; name: string; onClose: () => void }) {
-  const { can, isAdmin, opUserId, uid } = useRole();
-  const pw = usePasswortNeu();
+  const { can, isAdmin, opUserId } = useRole();
   const [rolle, setRolle] = useState<Record<string, boolean>>({});
   const [ov, setOv] = useState<Record<string, boolean>>({});
   const [offen, setOffen] = useState<Set<string>>(() => new Set());
@@ -320,7 +318,12 @@ export function PersonRechteSheet({ profil, name, onClose }: { profil: Profile; 
   const zeile = rechteRolle(profil.role);
 
   useEffect(() => {
-    if (!hasSupabase) return;
+    // Demo: dieselben Startwerte wie die Matrix „Rechte je Rolle“ – vorher
+    // stand hier ohne Datenbank überall „Rolle: nein“, auch beim Admin
+    if (!hasSupabase) {
+      setRolle(Object.fromEntries(ALL_PERMS.map((pk) => [pk, zeile === "admin" || (ROLE_DEFAULTS[zeile] ?? []).includes(pk)])));
+      return;
+    }
     void (async () => {
       const [{ data: rp }, { data: up }] = await Promise.all([
         supabase!.from("role_permissions").select("perm, allowed").eq("role", profil.role),
@@ -439,30 +442,13 @@ export function PersonRechteSheet({ profil, name, onClose }: { profil: Profile; 
         titel={`Rechte von ${name}`}
         unter={
           <>
-            Ohne Ausnahme gilt, was die Rolle „{ROLLE_KURZ[zeile] ?? profil.role}“ erlaubt.
+            Ohne Ausnahme gilt, was die Rolle „{rolleName(profil.role)}“ erlaubt.
             {anzahl > 0 && ` ${anzahl} Ausnahme${anzahl > 1 ? "n" : ""} gesetzt.`}
             {geschuetzt && " Dieses Konto ist geschützt und lässt sich nicht ändern."}
           </>
         }
         onClose={onClose}
       />
-
-      {/* Konto: Passwort zurücksetzen – für den Admin, nie für das geschützte Konto */}
-      {pw.darf && !geschuetzt && profil.user_id !== uid && (
-        <Gruppe titel="Konto" className="mb-5" fuss="Erzeugt ein neues Startpasswort. Die Person muss es beim nächsten Anmelden ändern.">
-          <Zeile
-            label={pw.busy ? "Wird erzeugt …" : "Passwort zurücksetzen"}
-            blau
-            onClick={() => void pw.zuruecksetzen(profil.user_id, name)}
-            symbol={
-              <Symbol farbe="bg-[#8E8E93]">
-                <Icon name="schluessel" size={16} strich={2.2} />
-              </Symbol>
-            }
-          />
-        </Gruppe>
-      )}
-      {pw.anzeige}
 
       {!bereit ? (
         <div className="mt-4">

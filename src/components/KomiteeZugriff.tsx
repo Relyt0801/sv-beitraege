@@ -158,6 +158,8 @@ export function KomiteeZugriff() {
  * Neuer Zugriff: drei Angaben wie ein iOS-Formular – Komitee und Wer als
  * Zeilen, die eine Unterseite mit Häkchen-Liste öffnen (Wer mit Suche),
  * Lesen/Schreiben als Häkchen. „Zugriff geben“ unten in der Fußleiste.
+ * Wegen der Unterseiten am Handy gleich in voller Höhe (`hoch`): der Kopf
+ * bleibt beim Umblättern stehen, die Fußleiste unten.
  */
 function NeuerZugriffSheet({
   open, onClose, personen, nameVon, onGeben,
@@ -197,7 +199,7 @@ function NeuerZugriffSheet({
 
   if (seite === "komitee")
     return (
-      <Sheet open={open} onClose={onClose}>
+      <Sheet hoch open={open} onClose={onClose}>
         <SheetKopf titel="Komitee" unter="In welches Komitee darf jemand schauen?" zurueck={zurueck} onClose={onClose} />
         <Gruppe className="">
           {COMMITTEES.map((c) => (
@@ -226,7 +228,7 @@ function NeuerZugriffSheet({
       setSeite(null);
     };
     return (
-      <Sheet open={open} onClose={onClose}>
+      <Sheet hoch open={open} onClose={onClose}>
         <SheetKopf titel="Wer bekommt Zugriff?" zurueck={zurueck} onClose={onClose} />
         <Suchfeld wert={q} onChange={setQ} platzhalter="Komitee oder Person suchen …" />
         {komitees.length > 0 && (
@@ -247,7 +249,7 @@ function NeuerZugriffSheet({
   }
 
   return (
-    <Sheet open={open} onClose={onClose}>
+    <Sheet hoch open={open} onClose={onClose}>
       <SheetKopf titel="Neuer Zugriff" unter="Wer darf in ein fremdes Komitee schauen?" onClose={onClose} />
       <Gruppe className="">
         <Zeile label="Komitee" onClick={() => setSeite("komitee")}>

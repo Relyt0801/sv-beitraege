@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { committeeLabel } from "../lib/committees";
 import {
   KASSEN_FARBEN, centAus, euro, euroKurz, farbHex, postenFarbe, schuljahrVon, useGeplant,
@@ -51,12 +51,18 @@ export function mitVorzeichen(cent: number, kurz = false): string {
  * andere Reihenfolge) – PostenBereiche liefert sie ohne eigene Hülle.
  */
 export function PostenBereiche({
-  d, fin, listeKlasse = "", geplantKlasse = "",
+  d, fin, listeKlasse = "", geplantKlasse = "", onBuchung,
 }: {
   d: FinanzUebersicht;
   fin?: FinanzenValue | null;
   listeKlasse?: string;
   geplantKlasse?: string;
+  /**
+   * Eine einzelne Buchung eines Postens öffnen – dieselbe Detailseite wie
+   * in der Buchungsliste (FinanzenTab). Sie geht als Unterseite über dem
+   * Posten auf („‹ Waffelverkauf“), weil dessen Blatt offen bleibt.
+   */
+  onBuchung?: (b: Buchung) => void;
 }) {
   const dunkel = useDunkel();
   const [auswahl, setAuswahl] = useState<Auswahl>(null);
@@ -106,6 +112,7 @@ export function PostenBereiche({
           setAuswahl(null);
           setBuchung(start);
         }}
+        onBuchung={onBuchung}
       />
       {fin && (
         <>
@@ -204,6 +211,9 @@ function PostenZeile({
 function Kopf({ hex, titel, onClose, rechts }: { hex: string; titel: string; onClose: () => void; rechts?: ReactNode }) {
   return (
     <SheetKopf
+      // Der Titel ist kein reiner Text (Punkt + „Ändern“) – Kurzname für
+      // „‹ Waffelverkauf“ auf der Unterseite (vorher „‹ Zurück“)
+      name={titel}
       titel={
         <span className="flex items-center gap-2.5">
           <Punkt hex={hex} gross />
@@ -260,13 +270,14 @@ const tagKurz = (d: string) =>
   new Date(d + "T12:00:00").toLocaleDateString("de-DE", { weekday: "short", day: "2-digit", month: "2-digit", year: "2-digit" });
 
 function PostenDetail({
-  p, fin, onClose, onUmgezogen, onBuchen,
+  p, fin, onClose, onUmgezogen, onBuchen, onBuchung,
 }: {
   p: FinanzPosten | null;
   fin: FinanzenValue | null;
   onClose: () => void;
   onUmgezogen: (key: string) => void;
   onBuchen: (start: BuchungStart) => void;
+  onBuchung?: (b: Buchung) => void;
 }) {
   const dunkel = useDunkel();
   const [bearbeiten, setBearbeiten] = useState(false);
@@ -286,7 +297,11 @@ function PostenDetail({
   const start = (typ: "ein" | "aus") => onBuchen({ typ, ref: x.ref, name: anzeigeName(x), zurueck: postenKey(x) });
 
   return (
-    <Sheet open={p !== null} onClose={onClose}>
+    // Mit einzelnen Buchungen (Kassenwart) hat das Blatt Unterseiten – am
+    // Handy dann gleich volle Höhe, damit der Kopf beim Umblättern stehen
+    // bleibt. Auch ein noch leerer Posten: „Ändern“ klappt darin auf, und
+    // der Kopf soll dabei nicht nach oben springen.
+    <Sheet open={p !== null} onClose={onClose} hoch={Boolean(darf && onBuchung)}>
       <Kopf
         hex={hex}
         titel={anzeigeName(x)}
@@ -346,7 +361,7 @@ function PostenDetail({
         </div>
       )}
 
-      <Unterpunkte p={x} fin={darf ? fin : null} />
+      <Unterpunkte p={x} fin={darf ? fin : null} onBuchung={onBuchung} />
     </Sheet>
   );
 }
@@ -367,18 +382,13 @@ function Balken({ ein, aus, hex }: { ein: number; aus: number; hex: string }) {
 /**
  * Die Unterpunkte eines Postens (Bezeichnung, Tag, Betrag). Alle sehen die
  * Summen je Tag und Bezeichnung; der Kassenwart sieht jede Buchung einzeln.
- * Löschbare Einträge sind antippbar („›“) und öffnen ein kleines Blatt mit
- * „Buchung löschen“ ganz unten (Design-Regeln §2) – vorher stand in jeder
- * Zeile ein Mülleimer.
+ * Jede Buchung ist antippbar („›“) und öffnet DIESELBE Detailseite wie in
+ * der Buchungsliste (Status, Art, Erfasst von/am, Buchungs-Nr., Kategorie,
+ * Löschen ganz unten) – vorher ein abgespecktes Extra-Blatt nur mit Betrag
+ * und „Buchung löschen“.
  */
-function Unterpunkte({ p, fin }: { p: FinanzPosten; fin: FinanzenValue | null }) {
+function Unterpunkte({ p, fin, onBuchung }: { p: FinanzPosten; fin: FinanzenValue | null; onBuchung?: (b: Buchung) => void }) {
   const dunkel = useDunkel();
-  const [auf, setAuf] = useState<Buchung | null>(null);
-  // Beim Schließen bleibt der letzte Eintrag stehen, damit das Blatt mit Inhalt wegfährt
-  const letzter = useRef<Buchung | null>(null);
-  if (auf) letzter.current = auf;
-  const zeige = auf ?? letzter.current;
-  const [busy, setBusy] = useState(false);
   const einzeln = fin && p.buchungen
     ? [...p.buchungen]
         .sort((a, b) => (a.datum < b.datum ? 1 : a.datum > b.datum ? -1 : a.created_at < b.created_at ? 1 : -1))
@@ -392,7 +402,7 @@ function Unterpunkte({ p, fin }: { p: FinanzPosten; fin: FinanzenValue | null })
       </h3>
       <ul className="divide-y divide-papier-linie dark:divide-slate-800">
         {einzeln.map((e) => {
-          const loeschbar = Boolean(fin && e.buchung && !e.buchung.automatisch && e.buchung.quelle !== "abgleich");
+          const b = e.buchung;
           const inhalt = (
             <>
               {e.farbe && <Punkt hex={farbHex(e.farbe, dunkel)} />}
@@ -405,10 +415,10 @@ function Unterpunkte({ p, fin }: { p: FinanzPosten; fin: FinanzenValue | null })
           );
           return (
             <li key={e.key}>
-              {loeschbar ? (
+              {b && onBuchung ? (
                 <button
                   type="button"
-                  onClick={() => setAuf(e.buchung)}
+                  onClick={() => onBuchung(b)}
                   className="flex min-h-[44px] w-full items-center gap-2.5 py-2 text-left transition active:opacity-60"
                 >
                   {inhalt}
@@ -423,36 +433,6 @@ function Unterpunkte({ p, fin }: { p: FinanzPosten; fin: FinanzenValue | null })
           );
         })}
       </ul>
-
-      <Sheet open={auf !== null} onClose={() => setAuf(null)}>
-        {zeige && fin && (
-          <>
-            <SheetKopf
-              titel={zeige.titel}
-              unter={new Date(zeige.datum + "T12:00:00").toLocaleDateString("de-DE", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
-              onClose={() => setAuf(null)}
-            />
-            <div className="py-3 text-center">
-              <Betrag cent={zeige.cent} className="text-[2rem] font-bold tracking-tight" />
-            </div>
-            <Gruppe className="mt-6">
-              <Zeile
-                label="Buchung löschen"
-                rot
-                disabled={busy}
-                onClick={async () => {
-                  if (!(await frage(`„${zeige.titel}“ (${mitVorzeichen(zeige.cent)}) löschen?`, "Löschen", true))) return;
-                  setBusy(true);
-                  const f = await fin.loeschen(zeige.id);
-                  setBusy(false);
-                  if (f) meldeFehler("Löschen hat nicht geklappt: " + f);
-                  else setAuf(null);
-                }}
-              />
-            </Gruppe>
-          </>
-        )}
-      </Sheet>
     </>
   );
 }
@@ -594,8 +574,16 @@ export function BuchungSheet({ start, fin, onClose }: { start: BuchungStart | nu
   const [busy, setBusy] = useState(false);
   const [fehler, setFehler] = useState("");
 
-  useEffect(() => {
-    if (!start) return;
+  // Nur beim ÖFFNEN leeren – nicht bei jedem neuen Start-Objekt. Vorher
+  // leerte jedes Neuzeichnen der Seite (App-Timer, Realtime, Drehen über die
+  // lg-Grenze) Betrag und Bezeichnung, während man tippte. Layout-Effekt:
+  // das Blatt zeigt nie kurz die Eingaben vom letzten Mal.
+  const warOffen = useRef(false);
+  useLayoutEffect(() => {
+    const offen = start !== null;
+    const neu = offen && !warOffen.current;
+    warOffen.current = offen;
+    if (!neu || !start) return;
     setTyp(start.typ);
     setBetrag("");
     setTitel("");

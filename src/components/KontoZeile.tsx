@@ -96,9 +96,17 @@ export function Suchfeld({
         value={wert}
         onChange={(e) => onChange(e.target.value)}
       />
+      {/* Leeren wie in iOS: kleiner grauer Kreis, Tippfläche trotzdem 44 × 44 px */}
       {wert && (
-        <button onClick={() => onChange("")} aria-label="Suche leeren" className="px-1 text-tinte-leise">
-          ✕
+        <button
+          type="button"
+          onClick={() => onChange("")}
+          aria-label="Suche leeren"
+          className="-mr-3 flex h-11 w-11 shrink-0 items-center justify-center transition active:opacity-50"
+        >
+          <span className="flex h-[18px] w-[18px] items-center justify-center rounded-full bg-tinte-leise/70 text-white dark:text-slate-900">
+            <Icon name="x" size={11} strich={3} />
+          </span>
         </button>
       )}
     </div>

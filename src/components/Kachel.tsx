@@ -259,8 +259,17 @@ export function FarbKachel({
       } ${gedaempft ? "opacity-80 saturate-[.85]" : ""}`}
     >
       {/* Deko: das Symbol noch einmal groß und blass in der Ecke. Ein <Icon> hat eine
-          feste Pixelgröße – hier wird es auf Deko-Größe gezogen (Emoji: über die Schrift). */}
-      <span aria-hidden className="pointer-events-none absolute -bottom-4 -right-3 text-[4.75rem] leading-none opacity-[0.16] [filter:grayscale(1)_brightness(3)] [&_svg]:h-[4.75rem] [&_svg]:w-[4.75rem]">
+          feste Pixelgröße – hier wird es auf Deko-Größe gezogen (Emoji: über die Schrift).
+          Strich-Symbole sind ohnehin weiß (currentColor). Ein Komitee-Emoji ist
+          dagegen ein farbiges Bild: mit brightness(3) wurde z. B. 📰 zu einem
+          hellen Rechteck. Emojis darum nur grau und weich eingeblendet
+          (soft-light: hellt/dunkelt die Kachelfarbe ab, wie eine Prägung). */}
+      <span
+        aria-hidden
+        className={`pointer-events-none absolute -bottom-4 -right-3 text-[4.75rem] leading-none [&_svg]:h-[4.75rem] [&_svg]:w-[4.75rem] ${
+          typeof symbol === "string" ? "opacity-50 mix-blend-soft-light [filter:grayscale(1)]" : "opacity-[0.16]"
+        }`}
+      >
         {symbol}
       </span>
       <span className="relative flex items-start justify-between gap-2">

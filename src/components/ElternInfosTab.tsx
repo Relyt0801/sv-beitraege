@@ -8,7 +8,6 @@ import { Sheet, SheetKopf } from "./Sheet";
 import { Gruppe, Zeile, ZeileEingabe } from "./Liste";
 import { FussLeiste } from "./FussLeiste";
 import { useBreit } from "../lib/gescrollt";
-import { melde } from "../lib/melder";
 
 /**
  * Reiter "Infos": links das, was das Stufenteam für die Eltern angeheftet hat,
@@ -18,6 +17,12 @@ import { melde } from "../lib/melder";
  * mit einem breiten blauen Knopf mitten auf der Seite. Jetzt ist es wie in
  * iOS: eine Liste der Gespräche, als letzte Zeile „Neue Frage stellen“; die
  * Frage und jedes Gespräch öffnen sich in einem Blatt.
+ *
+ * Frage und Gespräch sind EIN Blatt in voller Höhe (wie „Neue Nachricht“ in
+ * iMessage): Nach „Absenden“ wird aus dem Formular an derselben Stelle das
+ * Gespräch. Vorher fuhr das Frage-Blatt zu, ein kleineres Gespräch-Blatt von
+ * unten herein, und jede Fehlerzeile oder Antwort schob den Kopf am Handy ein
+ * Stück weiter – dazu lag 3,5 s eine Meldung über der eigenen Nachricht.
  */
 export function ElternInfosTab({
   startGespraech = null,
@@ -34,7 +39,7 @@ export function ElternInfosTab({
   // trägt die Marke „Neu“. Der Merker selbst springt sofort auf „jetzt“
   // (ElternApp), die Marke bleibt aber stehen, solange man hier ist.
   const [gesehenBis] = useState(() => Date.parse(infosGesehen) || 0);
-  // Nach dem Absenden: das neue Gespräch öffnen
+  // Nach dem Absenden: im selben Blatt zum neuen Gespräch wechseln
   const [gesendet, setGesendet] = useState(false);
 
   const meine = istEltern ? tickets.filter((t) => t.user_id === uid) : tickets;
@@ -50,9 +55,15 @@ export function ElternInfosTab({
   const neuesteId = meine[0]?.id;
   useEffect(() => {
     if (!gesendet || !neuesteId) return;
+    // In EINEM Schritt: Gespräch auf, Formular zu – das Blatt bleibt offen
     setOffenesTicket(neuesteId);
+    setNeuOffen(false);
     setGesendet(false);
   }, [gesendet, neuesteId]);
+  const blattZu = () => {
+    setNeuOffen(false);
+    setOffenesTicket(null);
+  };
 
   const oeffnen = (id: string) => {
     setOffenesTicket(id);
@@ -146,28 +157,31 @@ export function ElternInfosTab({
         </div>
       </section>
 
-      <NeueFrageBlatt
-        open={neuOffen}
-        onClose={() => setNeuOffen(false)}
-        onSenden={async (betreff, text) => {
-          const problem = await neuesTicket(betreff, text);
-          if (problem) return problem;
-          setNeuOffen(false);
-          melde("Frage gesendet – die Antwort kommt hier in die App.", "erfolg");
-          setGesendet(true);
-          return null;
-        }}
-      />
-
-      {offen && (
-        <GespraechBlatt
-          ticket={offen}
-          verlauf={nachrichten.filter((n) => n.ticket_id === offen.id)}
-          ich={uid}
-          onAntworten={(txt) => void antworten(offen.id, txt)}
-          onClose={() => setOffenesTicket(null)}
-        />
-      )}
+      {/* Ein Blatt für Frage und Gespräch, am Handy in voller Höhe (hoch):
+          Kopf oben fest, „Absenden“ bzw. die Antwortzeile unten. Die
+          Bestätigung ist das Gespräch selbst – keine Meldung darüber. */}
+      <Sheet open={neuOffen || offen !== null} onClose={blattZu} hoch>
+        {offen ? (
+          <GespraechInhalt
+            key={offen.id}
+            ticket={offen}
+            verlauf={nachrichten.filter((n) => n.ticket_id === offen.id)}
+            ich={uid}
+            onAntworten={(txt) => void antworten(offen.id, txt)}
+            onClose={blattZu}
+          />
+        ) : (
+          <NeueFrageInhalt
+            onClose={blattZu}
+            onSenden={async (betreff, text) => {
+              const problem = await neuesTicket(betreff, text);
+              if (problem) return problem;
+              setGesendet(true);
+              return null;
+            }}
+          />
+        )}
+      </Sheet>
     </div>
   );
 }
@@ -184,13 +198,11 @@ function StatusKapsel({ erledigt }: { erledigt: boolean }) {
   );
 }
 
-/** Blatt „Frage ans Stufenteam“: Betreff, Frage, unten „Absenden“. */
-function NeueFrageBlatt({
-  open,
+/** Inhalt „Frage ans Stufenteam“: Betreff, Frage, unten „Absenden“. */
+function NeueFrageInhalt({
   onClose,
   onSenden,
 }: {
-  open: boolean;
   onClose: () => void;
   /** Gibt einen Fehlertext zurück oder null, wenn es geklappt hat. */
   onSenden: (betreff: string, text: string) => Promise<string | null>;
@@ -219,7 +231,7 @@ function NeueFrageBlatt({
   }
 
   return (
-    <Sheet open={open} onClose={onClose}>
+    <>
       <SheetKopf titel="Frage ans Stufenteam" unter="Die Antwort kommt hier in die App." onClose={onClose} />
       <Gruppe className="mt-2">
         {/* Am Handy nicht sofort die Tastatur aufklappen */}
@@ -244,12 +256,12 @@ function NeueFrageBlatt({
           {busy ? "Wird gesendet …" : "Absenden"}
         </button>
       </FussLeiste>
-    </Sheet>
+    </>
   );
 }
 
 /** Ein Gespräch mit dem Stufenteam: Verlauf wie in iMessage, unten antworten. */
-function GespraechBlatt({
+function GespraechInhalt({
   ticket,
   verlauf,
   ich,
@@ -268,7 +280,7 @@ function GespraechBlatt({
     ende.current?.scrollIntoView({ block: "nearest" });
   }, [verlauf.length]);
   return (
-    <Sheet open onClose={onClose}>
+    <>
       <SheetKopf
         titel={ticket.betreff}
         unter={`${ticket.erledigt ? "Erledigt" : "Offen"} · seit ${datumLang(ticket.created_at.slice(0, 10))}`}
@@ -298,7 +310,7 @@ function GespraechBlatt({
       <FussLeiste>
         <AntwortFeld onSenden={onAntworten} />
       </FussLeiste>
-    </Sheet>
+    </>
   );
 }
 

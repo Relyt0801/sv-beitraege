@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useStore } from "../store";
 import { beitraegeVon, staffelVon } from "../lib/logic";
 import { useEntwurf } from "../lib/entwurf";
@@ -11,6 +11,24 @@ import { FussLeiste } from "./Kachel";
 import { useBreit } from "../lib/gescrollt";
 
 import { frage } from "../lib/melder";
+
+/**
+ * iPad hoch und breiter (ab 768 px, Tailwind „md“)? Dort ist Platz für zwei
+ * Spalten. Eigener kleiner Hook wie useBreit (gescrollt.ts), nur für diese Seite.
+ */
+const MITTEL = "(min-width: 768px)";
+function useMittel(): boolean {
+  const [mittel, setMittel] = useState(() => typeof window !== "undefined" && !!window.matchMedia?.(MITTEL).matches);
+  useEffect(() => {
+    const mq = window.matchMedia?.(MITTEL);
+    if (!mq) return;
+    const neu = () => setMittel(mq.matches);
+    neu();
+    mq.addEventListener("change", neu);
+    return () => mq.removeEventListener("change", neu);
+  }, []);
+  return mittel;
+}
 
 /**
  * Zahl zum Ändern als kleine Kapsel: „+50 €“, „25 €“, „8 %“ – Zahl und Einheit
@@ -80,13 +98,15 @@ export function BeitraegeTab() {
   const preise = beitraegeVon(settings);
   const gesamt = HY.reduce((n, h) => n + (preise[h] || 0), 0);
 
-  // Drei Bereiche, einer zur Zeit – als Segment (vorher Kacheln, die wie
-  // reine Zahlen-Anzeigen aussahen und nicht wie Reiter).
+  // Drei Bereiche. Am Handy einer zur Zeit – als Segment (vorher Kacheln, die
+  // wie reine Zahlen-Anzeigen aussahen und nicht wie Reiter).
   const [bereich, setBereich] = useState<"prozente" | "halbjahre" | "ticket">("prozente");
-  // Am Rechner ist Platz für alle drei nebeneinander – kein Umschalten, kein
-  // leerer Bildschirm unter einer kurzen Liste.
+  // Am Rechner ist Platz für alle drei nebeneinander, am iPad hoch für zwei
+  // Spalten – kein Umschalten, kein leerer Bildschirm unter einer kurzen Liste
+  // (Rollen-Prüfung Okt. 2026: am iPad hoch war gut die Hälfte leer).
   const breit = useBreit();
-  const zeige = (b: typeof bereich) => breit || bereich === b;
+  const mittel = useMittel();
+  const spalten = breit ? 3 : mittel ? 2 : 1;
 
   const reiter: { key: typeof bereich; titel: string }[] = [
     { key: "prozente", titel: "Prozente" },
@@ -94,12 +114,158 @@ export function BeitraegeTab() {
     { key: "ticket", titel: "Ticket" },
   ];
 
+  /* ---------------- Möglichkeiten ---------------- */
+  const prozente = (
+    <>
+      <Gruppe
+        titel="Wofür gibt es Prozent?"
+        className=""
+        fuss="Diese Liste siehst du später, wenn du bei jemandem etwas einträgst. Antippen zum Ändern oder Löschen."
+      >
+        {sortiert.length === 0 && <div className="px-4 py-4 text-[14px] text-tinte-leise">Noch nichts angelegt.</div>}
+        {sortiert.map((t) => (
+          <Zeile
+            key={t.id}
+            label={t.titel}
+            unter={t.variabel ? "Wert beim Eintragen anpassbar" : undefined}
+            onClick={() => setOffen(t.id)}
+          >
+            <Wert>{t.punkte} %</Wert>
+          </Zeile>
+        ))}
+        <Zeile label="Neue Möglichkeit" blau onClick={() => setOffen("neu")} />
+      </Gruppe>
+
+      <VorlageNeu
+        open={offen === "neu"}
+        onClose={() => setOffen(null)}
+        onAnlegen={(t, p, v) => {
+          addTemplate(t, p, v);
+          setOffen(null);
+        }}
+      />
+      {(() => {
+        const v = offen && offen !== "neu" ? templates.find((x) => x.id === offen) : undefined;
+        return v ? (
+          <VorlageBlatt
+            key={v.id}
+            vorlage={v}
+            onClose={() => setOffen(null)}
+            onAendern={(patch) => updateTemplate(v.id, patch)}
+            onLoeschen={async () => {
+              if (!(await frage(`„${v.titel}“ wirklich löschen?`, "Löschen", true))) return;
+              setOffen(null);
+              void removeTemplate(v.id);
+            }}
+          />
+        ) : null;
+      })()}
+    </>
+  );
+
+  /* ---------------- Beitrag je Halbjahr ---------------- */
+  const halbjahre = (
+    <>
+      <Gruppe
+        titel="Was kostet ein Halbjahr?"
+        className=""
+        fuss="Der Betrag gilt für jede Person, die in dem Halbjahr dabei ist. Änderst du einen Wert, rechnen sich alle offenen Beträge sofort neu aus."
+      >
+        {HY.map((h) => (
+          <HalbjahrZeile
+            key={h}
+            halbjahr={h}
+            betrag={preise[h]}
+            aktuell={h === settings.aktuelles_halbjahr}
+            onBetrag={(wert) => setSettings({ beitraege: { ...preise, [h]: wert } })}
+          />
+        ))}
+      </Gruppe>
+      <Gruppe className="mt-5">
+        <Zeile label="Alle sechs Halbjahre zusammen">
+          <Wert stark>{gesamt} €</Wert>
+        </Zeile>
+      </Gruppe>
+    </>
+  );
+
+  /* ---------------- Abiballticket ---------------- */
+  const ticket = (
+    <>
+      <Gruppe
+        titel="Abiball-Ticket"
+        className=""
+        fuss={grund === 0 ? "0 = Preis noch offen. Eltern und Schüler sehen dann „Preis folgt“." : undefined}
+      >
+        <label className="flex min-h-[48px] items-center gap-3 px-4 py-2">
+          <span className="min-w-0 flex-1 text-[15px]">Grundpreis je Ticket</span>
+          <ZahlFeld wert={preis.wert} aendern={preis.aendern} speichern={preis.jetztSpeichern} einheit="€" label="Grundpreis je Ticket in Euro" />
+        </label>
+      </Gruppe>
+
+      <Gruppe
+        titel="Aufschlag fürs 1. Ticket, je Prozentstufe"
+        className="mt-5"
+        fuss="Wer wenig mithilft, zahlt auf das 1. Ticket einen Aufschlag. Je mehr Mithilfe, desto kleiner wird er. Es zählt die höchste erreichte Stufe; weitere Tickets kosten den Grundpreis."
+      >
+        {staffel.map((stufe, i) => (
+          <StufenZeile
+            key={stufe.ab}
+            stufe={stufe}
+            grund={grund}
+            onBetrag={(wert) => setSettings({ staffel: staffel.map((x, j) => (j === i ? { ...x, betrag: wert } : x)) })}
+          />
+        ))}
+      </Gruppe>
+    </>
+  );
+
+  // Laptop (3 Spalten): Prozente + Bonus | Halbjahre + Abiball | Ticket +
+  // Verkauf + Bestellungen – etwa gleich lang. iPad hoch (2 Spalten): links
+  // Prozente, Bonus und Halbjahre, rechts alles zum Ticket samt Abiball-Tag.
+  // Handy: ein Bereich, darunter (bei Ticket) alle Abiball-Gruppen.
+  if (spalten > 1) {
+    // Abiball-Gruppen bringen ihren Abstand (mt-4) selbst mit
+    const bonus = <AbiballEinstellungen nur={["bonus"]} />;
+    const abiball = <AbiballEinstellungen nur={["abiball"]} />;
+    const verkauf = <AbiballEinstellungen nur={["verkauf", "bestellungen"]} />;
+    return (
+      // Volle Breite der Seitenspalte (max-w-5xl in App.tsx) – KEIN eigenes
+      // max-w-*: sonst endet der Inhalt am Laptop mitten auf der Seite, während
+      // Titel, Reiterleiste und Knöpfe bis zum Rand der Spalte gehen.
+      <div className={`grid items-start gap-x-4 ${spalten === 3 ? "grid-cols-3" : "grid-cols-2"}`}>
+        {spalten === 3 ? (
+          <>
+            <div className="min-w-0">
+              {prozente}
+              {bonus}
+            </div>
+            <div className="min-w-0">
+              {halbjahre}
+              {abiball}
+            </div>
+          </>
+        ) : (
+          <div className="min-w-0">
+            {prozente}
+            {bonus}
+            <div className="mt-4">{halbjahre}</div>
+          </div>
+        )}
+        <div className="min-w-0">
+          {ticket}
+          {/* iPad hoch: Tag und Ort stehen auf dem Ticket – hier, dann sind
+              beide Spalten etwa gleich lang */}
+          {spalten === 2 && abiball}
+          {verkauf}
+        </div>
+      </div>
+    );
+  }
+
   return (
-    // Volle Breite der Seitenspalte (max-w-5xl in App.tsx) – KEIN eigenes
-    // max-w-*: sonst endet der Inhalt am Laptop mitten auf der Seite, während
-    // Titel, Reiterleiste und Knöpfe bis zum Rand der Spalte gehen.
-    <div className="grid gap-1 lg:grid-cols-3 lg:items-start lg:gap-x-4">
-      <div className="seg mb-3 lg:hidden" role="tablist" aria-label="Bereich">
+    <div>
+      <div className="seg mb-3" role="tablist" aria-label="Bereich">
         {reiter.map((r) => (
           <button
             key={r.key}
@@ -112,124 +278,13 @@ export function BeitraegeTab() {
           </button>
         ))}
       </div>
-
-      {/* ---------------- Möglichkeiten ---------------- */}
-      {zeige("prozente") && (
-        <div>
-          <Gruppe
-            titel="Wofür gibt es Prozent?"
-            className=""
-            fuss="Diese Liste siehst du später, wenn du bei jemandem etwas einträgst. Antippen zum Ändern oder Löschen."
-          >
-            {sortiert.length === 0 && <div className="px-4 py-4 text-[14px] text-tinte-leise">Noch nichts angelegt.</div>}
-            {sortiert.map((t) => (
-              <Zeile
-                key={t.id}
-                label={t.titel}
-                unter={t.variabel ? "Wert beim Eintragen anpassbar" : undefined}
-                onClick={() => setOffen(t.id)}
-              >
-                <Wert>{t.punkte} %</Wert>
-              </Zeile>
-            ))}
-            <Zeile label="Neue Möglichkeit" blau onClick={() => setOffen("neu")} />
-          </Gruppe>
-
-          <VorlageNeu
-            open={offen === "neu"}
-            onClose={() => setOffen(null)}
-            onAnlegen={(t, p, v) => {
-              addTemplate(t, p, v);
-              setOffen(null);
-            }}
-          />
-          {(() => {
-            const v = offen && offen !== "neu" ? templates.find((x) => x.id === offen) : undefined;
-            return v ? (
-              <VorlageBlatt
-                key={v.id}
-                vorlage={v}
-                onClose={() => setOffen(null)}
-                onAendern={(patch) => updateTemplate(v.id, patch)}
-                onLoeschen={async () => {
-                  if (!(await frage(`„${v.titel}“ wirklich löschen?`, "Löschen", true))) return;
-                  setOffen(null);
-                  void removeTemplate(v.id);
-                }}
-              />
-            ) : null;
-          })()}
-
-          {/* Am Laptop: Bonus über 100 % gehört zu den Prozenten (Spalte 1) */}
-          {breit && <AbiballEinstellungen nur={["bonus"]} />}
-        </div>
-      )}
-
-      {/* ---------------- Beitrag je Halbjahr ---------------- */}
-      {zeige("halbjahre") && (
-        <div>
-          <Gruppe
-            titel="Was kostet ein Halbjahr?"
-            className=""
-            fuss="Der Betrag gilt für jede Person, die in dem Halbjahr dabei ist. Änderst du einen Wert, rechnen sich alle offenen Beträge sofort neu aus."
-          >
-            {HY.map((h) => (
-              <HalbjahrZeile
-                key={h}
-                halbjahr={h}
-                betrag={preise[h]}
-                aktuell={h === settings.aktuelles_halbjahr}
-                onBetrag={(wert) => setSettings({ beitraege: { ...preise, [h]: wert } })}
-              />
-            ))}
-          </Gruppe>
-          <Gruppe className="mt-5">
-            <Zeile label="Alle sechs Halbjahre zusammen">
-              <Wert stark>{gesamt} €</Wert>
-            </Zeile>
-          </Gruppe>
-
-          {/* Am Laptop: Tag, Uhrzeit und Ort des Abiballs in Spalte 2 */}
-          {breit && <AbiballEinstellungen nur={["abiball"]} />}
-        </div>
-      )}
-
-      {/* ---------------- Abiballticket ---------------- */}
-      {zeige("ticket") && (
-        <div>
-          <Gruppe
-            titel="Abiball-Ticket"
-            className=""
-            fuss={grund === 0 ? "0 = Preis noch offen. Eltern und Schüler sehen dann „Preis folgt“." : undefined}
-          >
-            <label className="flex min-h-[48px] items-center gap-3 px-4 py-2">
-              <span className="min-w-0 flex-1 text-[15px]">Grundpreis je Ticket</span>
-              <ZahlFeld wert={preis.wert} aendern={preis.aendern} speichern={preis.jetztSpeichern} einheit="€" label="Grundpreis je Ticket in Euro" />
-            </label>
-          </Gruppe>
-
-          <Gruppe
-            titel="Aufschlag fürs 1. Ticket, je Prozentstufe"
-            className="mt-5"
-            fuss="Wer wenig mithilft, zahlt auf das 1. Ticket einen Aufschlag. Je mehr Mithilfe, desto kleiner wird er. Es zählt die höchste erreichte Stufe; weitere Tickets kosten den Grundpreis."
-          >
-            {staffel.map((stufe, i) => (
-              <StufenZeile
-                key={stufe.ab}
-                stufe={stufe}
-                grund={grund}
-                onBetrag={(wert) =>
-                  setSettings({ staffel: staffel.map((x, j) => (j === i ? { ...x, betrag: wert } : x)) })
-                }
-              />
-            ))}
-          </Gruppe>
-
-          {/* Handy/iPad: alles unter „Ticket“. Laptop: hier nur Verkauf und
-              Bestellungen – Bonus und Abiball stehen in Spalte 1 und 2, damit
-              die drei Spalten etwa gleich lang sind. */}
-          {breit ? <AbiballEinstellungen nur={["verkauf", "bestellungen"]} /> : <AbiballEinstellungen />}
-        </div>
+      {bereich === "prozente" && prozente}
+      {bereich === "halbjahre" && halbjahre}
+      {bereich === "ticket" && (
+        <>
+          {ticket}
+          <AbiballEinstellungen />
+        </>
       )}
     </div>
   );

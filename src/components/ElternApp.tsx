@@ -201,11 +201,14 @@ export function ElternApp() {
       {/* Das feststehende Abimotto sehen auch Eltern einmal groß */}
       <MottoEnthuellung />
       <header
-        className={`sticky top-0 z-20 px-4 pb-2 pt-[calc(env(safe-area-inset-top)+0.5rem)] transition-[background-color,box-shadow] duration-300 ${
+        className={`sticky top-0 z-20 pb-2 pt-[calc(env(safe-area-inset-top)+0.5rem)] transition-[background-color,box-shadow] duration-300 ${
           gescrollt ? "kopf-band" : "kopf-grund bg-papier dark:bg-slate-950"
         }`}
       >
-        <div className="mx-auto flex max-w-5xl items-center gap-2.5">
+        {/* Dieselbe Spalte wie <main> (max-w-3xl, ab lg 5xl ohne Rand
+            gerechnet): Am iPad hoch stand die Kopfzeile sonst je 26 px über
+            die Karten hinaus, der kleine Titel 30 px links vom großen. */}
+        <div className="mx-auto flex max-w-3xl items-center gap-2.5 px-4 lg:box-content lg:max-w-5xl">
           {/* Wie in der Schüler-App: am Rechner steht der Titel fest hier oben
               (vorher sprang der große Titel je Reiter zwischen zwei Breiten) */}
           {/* Am Rechner die einzige Seitenüberschrift (h1), am Handy nur die
@@ -258,7 +261,6 @@ export function ElternApp() {
           genau mit Titel und Knöpfen der Kopfzeile */}
       <main className="mx-auto max-w-3xl px-4 pt-2 lg:box-content lg:max-w-5xl lg:pt-3">
         <PushHinweis fuerEltern />
-        {reiter === "uebersicht" && <InstallKarte />}
         {reiter === "uebersicht" &&
           (laedt ? (
             <SkelettKarten n={2} gross />
@@ -333,6 +335,13 @@ export function ElternApp() {
                   </nav>
                 )}
               </div>
+
+              {/* „Als App installieren“ erst NACH dem Offenen und Neuen – vorher
+                  stand die Karte darüber (ohne Abstand an der Leitkarte) und
+                  schob am kleinen iPhone „Neu vom Stufenteam“ unter die
+                  Reiterleiste. Als eigenes Rasterkind: gleicher Abstand wie
+                  die anderen Karten, ohne Karte keine Lücke. */}
+              <InstallKarte className="" />
 
               {/* Jedes Kind einzeln. Ab dem iPad stehen Geschwister nebeneinander
                   (vorher kam das zweite Kind erst nach 1,5 Bildschirmen); im

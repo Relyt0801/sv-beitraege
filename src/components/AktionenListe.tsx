@@ -212,8 +212,10 @@ export function AktionenListe({ onAendern }: { onAendern?: (t: Termin) => void }
     return liste;
   }, [offen, nachId]);
 
-  // Damit das aufgeklappte Blatt immer die frischen Bewerbungen zeigt
-  const aktuelleSchicht = schicht ? termine.find((t) => t.id === schicht.id) ?? schicht : null;
+  // Damit das aufgeklappte Blatt immer die frischen Bewerbungen zeigt. Ist die
+  // Schicht gelöscht (z. B. im Formular darüber), geht auch ihr Blatt zu –
+  // sonst stünde darunter noch das Blatt eines Termins, den es nicht mehr gibt.
+  const aktuelleSchicht = schicht ? termine.find((t) => t.id === schicht.id) ?? null : null;
 
   // Die Erklärung braucht nur, wer sich noch nie eingetragen hat – sonst kostet
   // sie bei jedem Öffnen drei Zeilen vor der ersten Aktion. Sie steht jetzt
@@ -276,14 +278,9 @@ export function AktionenListe({ onAendern }: { onAendern?: (t: Termin) => void }
           schicht={aktuelleSchicht}
           aktion={aktionen.find((a) => a.id === aktuelleSchicht.aktion_id) || null}
           onSchliessen={() => setSchicht(null)}
-          onAendern={
-            onAendern
-              ? () => {
-                  setSchicht(null);
-                  onAendern(aktuelleSchicht);
-                }
-              : undefined
-          }
+          // Das Schicht-Blatt bleibt offen: „Termin ändern“ geht als Unterseite
+          // darüber auf („‹ Waffelteig backen“) – Esc/Speichern führen zurück
+          onAendern={onAendern ? () => onAendern(aktuelleSchicht) : undefined}
         />
       )}
     </>
@@ -735,6 +732,8 @@ export function SchichtSheet({
             {schicht.titel}
           </>
         }
+        // Kurzname für „‹ …“ der Unterseite (ohne das Zeichen davor)
+        name={schicht.titel}
         unter={`${tagLang(schicht.datum)} · ${zeitText(schicht)}${schicht.ort ? ` · ${schicht.ort}` : ""}`}
         onClose={onSchliessen}
         extra={

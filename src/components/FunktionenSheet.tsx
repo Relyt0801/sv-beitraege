@@ -19,7 +19,7 @@ const SYMBOL: Record<FunktionKey, { icon: IconName; farbe: string }> = {
 };
 /** Welche Wortfilter-Bereiche gehören zur Funktion? */
 const WF: Record<FunktionKey, WfBereich[]> = {
-  album: ["steckbrief", "kommentare"],
+  album: ["steckbrief", "kommentare", "kommentare_inoffiziell"],
   spotify: [],
   zitate: ["zitate"],
   rankings: ["rankings"],
@@ -198,7 +198,8 @@ export function FunktionenSheet({ open, onClose }: { open: boolean; onClose: () 
           Ausgeschaltetes sehen nur, wer es schalten darf (mit Hinweis). Einzelne Bereiche lassen sich auch Komitees geben: Rollen → „Rechte je Rolle“ → Komitee-Rechte.
         </p>
 
-        {album && <KategorienSheet open={open && fenster === "steckbrief"} album={album} onClose={() => setFenster(null)} />}
+        {/* Wortfilter für Steckbrief und Kommentare stehen hier schon unter „Abi-Album“ */}
+        {album && <KategorienSheet open={open && fenster === "steckbrief"} album={album} onClose={() => setFenster(null)} mitWortfilter={false} />}
         <Sheet open={open && fenster === "lehrer"} onClose={() => setFenster(null)}>
           <SheetKopf titel="Lehrkräfte" unter="Zum Auswählen bei Zitaten und im Lehrer-Ranking." onClose={() => setFenster(null)} />
           <LehrerListe aktiv={open && fenster === "lehrer"} />

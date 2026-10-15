@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { createContext, createElement, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useEvents } from "../events-store";
 import { useSchichtStatus, useTermine } from "../termine-store";
 import { useRole } from "../auth/RoleProvider";
@@ -29,9 +29,16 @@ import { useOffeneAbschluesse } from "../components/SchichtAbschluss";
  * öffnet Events, „#anfrage-…“ den Reiter der Anfrage (lib/sprung.ts), wo die
  * Anfrage-Komponente selbst hinscrollt; „#zitate“ öffnet das Prüfen-Blatt
  * der Zitat-Karte.
+ *
+ * Mit `eintrag` (nur Events): „#events/<eintrag>“ – App.tsx öffnet den Reiter
+ * und lässt die Marke stehen; EventsTab öffnet den Eintrag selbst (eine
+ * Abstimmung/Info im Blatt, „termin-<id>“ einen Termin, „bitte“ scrollt zu
+ * „Bitte ansehen“, „infos“ zu „Infos & Abstimmungen“) und räumt die Marke weg. Vorher landete jeder Sprung oben
+ * in Events, die Info lag am iPhone zwei Bildschirme tiefer.
  */
-export function springe(ziel: "events" | "zitate" | Sprungziel) {
-  const hash = ziel === "events" || ziel === "zitate" ? ziel : `anfrage-${ziel}`;
+export function springe(ziel: "events" | "zitate" | Sprungziel, eintrag?: string) {
+  const hash =
+    ziel === "events" && eintrag ? `events/${eintrag}` : ziel === "events" || ziel === "zitate" ? ziel : `anfrage-${ziel}`;
   // Steht dieselbe Marke noch da (noch nicht abgeholt), feuert kein
   // hashchange – also erst wegräumen.
   if (window.location.hash === `#${hash}`) history.replaceState(null, "", window.location.pathname + window.location.search);
@@ -124,20 +131,40 @@ type ServerArt = Exclude<TeamArt, "schichten" | "termin">;
  * GEZÄHLT (head-Abfragen, keine Live-Verbindung): beim Öffnen, wenn die App
  * wieder in den Vordergrund kommt und alle zwei Minuten.
  */
+/*
+ * Die Zahlen werden EINMAL gezählt (TeamAufgabenQuelle in App.tsx) und von
+ * der Reiterleiste (Zahl an „Übersicht“) und „Zu erledigen“ geteilt – sonst
+ * liefen die Zählungen mit Datenbank doppelt (alle 2 min, beim Zurückkommen).
+ * Ohne Quelle (z. B. in einem Test) zählt der Hook selbst.
+ */
+const GeteilteAufgaben = createContext<TeamAufgaben | null>(null);
+
+export function TeamAufgabenQuelle({ children }: { children: ReactNode }) {
+  const wert = useTeamAufgabenZaehlen(true);
+  return createElement(GeteilteAufgaben.Provider, { value: wert }, children);
+}
+
 export function useTeamAufgaben(): TeamAufgaben {
+  const geteilt = useContext(GeteilteAufgaben);
+  // Immer aufrufen (Hook-Regeln); mit Quelle ohne eigene Abfragen
+  const eigen = useTeamAufgabenZaehlen(!geteilt);
+  return geteilt ?? eigen;
+}
+
+function useTeamAufgabenZaehlen(aktiv: boolean): TeamAufgaben {
   const { isStaff, isAdmin, isEltern, can, uid } = useRole();
   const { sichtbar } = useFunktionen();
   const { anfragen } = useTermine();
   const abschluesse = useOffeneAbschluesse();
 
-  const darfZitate = !isEltern && sichtbar("zitate") && can("zitate.pruefen");
+  const darfZitate = aktiv && !isEltern && sichtbar("zitate") && can("zitate.pruefen");
   const rechte: Record<ServerArt, boolean> = {
-    kosten: can("finanzen.manage"),
-    nachtrag: isStaff || can("hilfen.edit"),
-    komitee: can("komitees.assign"),
-    entsperren: can("mod.timeout"),
-    meldung: can("meldungen.bearbeiten"),
-    foto: isStaff,
+    kosten: aktiv && can("finanzen.manage"),
+    nachtrag: aktiv && (isStaff || can("hilfen.edit")),
+    komitee: aktiv && can("komitees.assign"),
+    entsperren: aktiv && can("mod.timeout"),
+    meldung: aktiv && can("meldungen.bearbeiten"),
+    foto: aktiv && isStaff,
     zitate: darfZitate,
   };
   const server = useServerZahlen(rechte, isAdmin, uid);

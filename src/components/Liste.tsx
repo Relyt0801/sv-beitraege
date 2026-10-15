@@ -78,9 +78,11 @@ export function Zeile({
           <span className="mt-0.5 block text-[12.5px] leading-snug text-tinte-leise">{unter}</span>
         </span>
       ) : (
-        <span className={`shrink-0 text-[15px] ${rot ? "font-semibold" : blau ? "font-medium" : ""} ${farbe}`}>{label}</span>
+        // Lange Bezeichnung bricht um, statt „›“ aus der Zeile zu schieben;
+        // der Wert rechts behält seine Breite
+        <span className={`min-w-0 shrink text-[15px] leading-snug ${rot ? "font-semibold" : blau ? "font-medium" : ""} ${farbe}`}>{label}</span>
       )}
-      <span className={`flex min-w-0 items-center justify-end gap-1.5 ${unter ? "shrink-0" : "flex-1"}`}>{children}</span>
+      <span className={`flex items-center justify-end gap-1.5 ${unter ? "min-w-0 shrink-0" : "min-w-fit flex-1"}`}>{children}</span>
       {onClick && !rot && !blau && !ohnePfeil && <span aria-hidden className="shrink-0 text-[17px] leading-none text-tinte-leise">›</span>}
     </>
   );
@@ -193,30 +195,6 @@ export function ZeileHaken({
 export function Wert({ children, stark }: { children: ReactNode; stark?: boolean }) {
   return (
     <span className={`zahl truncate text-[15px] ${stark ? "font-bold" : "text-tinte-matt dark:text-slate-300"}`}>{children}</span>
-  );
-}
-
-/** Auswahlfeld in einer Zeile – sieht aus wie ein Wert, öffnet die native Auswahl. */
-export function ZeileAuswahl({
-  value,
-  onChange,
-  children,
-  label,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  children: ReactNode;
-  label: string;
-}) {
-  return (
-    <select
-      aria-label={label}
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className="max-w-[60%] cursor-pointer appearance-none truncate bg-transparent text-right text-[15px] text-tinte-matt outline-none dark:text-slate-300"
-    >
-      {children}
-    </select>
   );
 }
 

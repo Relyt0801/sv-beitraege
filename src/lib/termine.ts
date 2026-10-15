@@ -460,7 +460,9 @@ export function demoTermine(
   andere: string[],
   meineUid: string,
 ): { termine: Termin[]; aktionen: Aktion[]; bewerbungen: Record<string, string[]> } {
-  const jetzt = new Date().toISOString();
+  // Fest in der Vergangenheit (nicht „jetzt“): sonst gelten nach jedem
+  // Neuladen alle Demo-Termine wieder als neu (Zähler an „Events“).
+  const jetzt = plusTage(heute, -3) + "T08:00:00.000Z";
   const aktion = (id: string, titel: string, icon: string, prozent: number): Aktion => ({
     id, titel, icon, beschreibung: "", prozent, geschlossen: false, created_at: jetzt,
   });

@@ -11,6 +11,65 @@ ausführlich (auf Deutsch); hier steht der Überblick dazu.
 
 ---
 
+## Gesamtprüfung nach Rollen: 44 Funde (15.10.2026, spät)
+
+Nach dem Zusammenführen hat je ein Agent pro Rolle (Schüler, Stufenteam,
+Kassenwart, Admin, Eltern) die App auf allen Geräten durchgespielt; jeder Fund
+wurde von einem zweiten nachgestellt (48 gemeldet, 44 bestätigt).
+
+**Leisten und Rahmen**
+- **Obere Reiterleiste steht still** (`GlasLeiste.tsx`): Die rote Zahl sitzt
+  absolut an der Ecke des Reiters, statt im Text zu stehen – vorher rutschten
+  alle Reiter um 11 px zur Seite, sobald eine Zahl kam oder ging (App und
+  Eltern-App). Die Leiste scrollt beim Mausrad nicht mehr in sich.
+- „Übersicht“ (Team) zeigt die Zahl für „Zu erledigen“; gezählt wird einmal
+  (`TeamAufgabenQuelle` in `lib/offen.ts`) und geteilt. Die Demo startet das
+  Team ohne Aufblitzen der Kasse direkt in der Übersicht.
+- **Zurück-Taste** (Android/Browser) schliesst die oberste Ebene (Chat,
+  Kalender, Blatt) statt die App zu verlassen; **Esc** auf einer Unterseite im
+  selben Blatt geht eine Seite zurück; Text im Feld schützt vor Esc
+  (`Sheet.tsx`).
+- „Chat | Pinnwand“ steht in der Kopfzeile immer direkt vor den App-Knöpfen,
+  „+ Neu“ links davon (vorher sprang der Umschalter um 89 px).
+- Adressen `#events/<ziel>` und `#chats/<ziel>` öffnen den Reiter und den
+  Eintrag (Sprünge aus „Für dich offen“/„Zu erledigen“ landen beim Eintrag).
+
+**Chats / Events / Kalender**
+- Kalender: links „‹ Events“, die Monatspfeile blau ohne Kreis – keine zwei
+  gleichen „‹“ mehr. Am Laptop Tag-Ansicht über die volle Breite, Tipp auf
+  einen Eintrag im Monat öffnet ihn.
+- Events am Handy: „Mitmachen“ wieder im ersten Bildschirm, „Bitte ansehen“
+  danach. „Ändern“ im Schicht-Blatt ist eine Unterseite (‹ zurück zur Schicht).
+- Tipp auf eine Abstimmung in der Chats-Liste springt zu genau dieser.
+- Gesprächsköpfe am iPhone: „Erledigt“ und „…“ (Löschen im Blatt).
+
+**Kasse / Finanzen / Rollen**
+- Einnahme-/Ausgabe-Blatt behält Betrag, Bezeichnung und Datum (vorher beim
+  Neuzeichnen geleert). Posten → Eintrag öffnet die volle Buchungsseite
+  („‹ Waffelverkauf“); Monatskopf der Buchungen klebt am Laptop.
+- Auswahl-Leiste kompakt (SE), Namens-Chips 44 px antippbar.
+- Beiträge & Abiball am iPad hoch zweispaltig; Bestellungen ohne zwei Knöpfe
+  je Zeile.
+- Personenblatt und „Neuer Zugriff“ am Handy in voller Höhe; „Chat sperren“
+  als Unterseite; Suche blendet „Person hinzufügen“ aus; Rechte-Blatt mit
+  vollem Rollennamen, Passwort nur noch im Personenblatt.
+
+**Blätter**
+- Steckbrief- und Ranking-Kategorien als iOS-Listen mit Bearbeiten-Blatt
+  (keine Pfeile/Schalter/Mülleimer je Zeile), „Umfragen verwalten“ ohne
+  Kachelraster, Komitee-Wunsch, „Für wen“ und Fragetyp als Häkchen-Unterseiten
+  (keine nativen Auswahlfelder mehr; `ZeileAuswahl` entfernt), Kinder
+  verknüpfen ohne rotes „Entfernen“, Album ohne Emoji-Symbole.
+- Impressum/Datenschutz ohne dritten „Schließen“; Rechtslinks und
+  „Suche leeren“ 44 px; Protokoll in der Demo mit erfundenen Einträgen
+  (echtes Protokoll unverändert, nicht löschbar).
+- Lange Zeilentitel brechen um, statt „›“ aus der Zeile zu schieben.
+
+**Eltern**
+- Frage ans Stufenteam und Gespräch als Blatt in voller Höhe (Kopf wandert
+  nicht), keine Meldung über der eigenen Nachricht; Install-Karte mit Abstand
+  nach „Neu“; Kopfzeile am iPad hoch fluchtet mit der Spalte.
+
 ## Rollen-Prüfung: 121 Funde umgesetzt (15.10.2026, nachts)
 
 Alle Rollen (Schüler, Stufenteam, Kassenwart, Admin, Eltern) auf iPhone, SE,

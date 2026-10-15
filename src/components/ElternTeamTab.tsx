@@ -8,7 +8,7 @@ import { normalize } from "../lib/logic";
 import { datumLang } from "./BeitragsListe";
 
 import { frage } from "../lib/melder";
-import { ChatEbene, ChatEingabe, ChatKopf, useChatEndeIn } from "./ChatBlasen";
+import { ChatEbene, ChatEingabe, ChatKopf, GespraechKnoepfe, GespraechMehrBlatt, useChatEndeIn } from "./ChatBlasen";
 import { Avatar } from "./Avatar";
 import { Icon, type IconName } from "./Icon";
 import { Schalter } from "./Schalter";
@@ -363,13 +363,15 @@ function GespraechZeile({
 
 /**
  * Ein Gespräch mit einem Elternhaus als Chat (wie die Gespräche mit Schülern):
- * oben Betreff und Familie, rechts „Erledigt“ und Löschen, unten die Eingabe.
+ * oben Betreff und Familie, rechts „Erledigt“ und „…“ (Löschen im Blatt),
+ * unten die Eingabe.
  */
 function ElternGespraech({ ticket, wer, onBack }: { ticket: ElternTicket; wer: string; onBack: () => void }) {
   const { nachrichten, antworten, ticketSchliessen, ticketLoeschen, alsGelesen } = useEltern();
   const { uid } = useRole();
   const { profile } = useProfiles();
   const [text, setText] = useState("");
+  const [mehr, setMehr] = useState(false);
   const verlauf = useMemo(
     () => nachrichten.filter((n) => n.ticket_id === ticket.id).sort((a, b) => (a.created_at < b.created_at ? -1 : 1)),
     [nachrichten, ticket.id],
@@ -408,41 +410,11 @@ function ElternGespraech({ ticket, wer, onBack }: { ticket: ElternTicket; wer: s
           titel={ticket.betreff}
           unter={ticket.erledigt ? `Erledigt · ${wer}` : wer}
           rechts={
-            <>
-              <button
-                type="button"
-                className={`flex h-10 items-center gap-1 rounded-full px-3 text-[13px] font-semibold transition active:scale-95 ${
-                  ticket.erledigt
-                    ? "bg-[rgb(118_118_128/0.12)] text-brand-dark dark:bg-[rgb(118_118_128/0.24)] dark:text-brand"
-                    : "bg-[#248A3D] text-white dark:bg-[#30D158] dark:text-black"
-                }`}
-                onClick={() => void ticketSchliessen(ticket.id, !ticket.erledigt)}
-                title={ticket.erledigt ? "Wieder öffnen" : "Als erledigt markieren"}
-              >
-                {!ticket.erledigt && <Icon name="haken" size={15} strich={2.6} />}
-                {ticket.erledigt ? "Öffnen" : "Erledigt"}
-              </button>
-              <button
-                type="button"
-                className="iconbtn"
-                title="Gespräch löschen"
-                aria-label="Gespräch löschen"
-                onClick={async () => {
-                  if (
-                    await frage(
-                      `Das Gespräch „${ticket.betreff}" endgültig löschen?\n\nAlle Nachrichten darin verschwinden – auch für die Eltern.`,
-                      "Löschen",
-                      true,
-                    )
-                  ) {
-                    void ticketLoeschen(ticket.id);
-                    onBack();
-                  }
-                }}
-              >
-                <Icon name="muell" size={17} />
-              </button>
-            </>
+            <GespraechKnoepfe
+              erledigt={ticket.erledigt}
+              onErledigt={() => void ticketSchliessen(ticket.id, !ticket.erledigt)}
+              onMehr={() => setMehr(true)}
+            />
           }
         />
       }
@@ -468,6 +440,22 @@ function ElternGespraech({ ticket, wer, onBack }: { ticket: ElternTicket; wer: s
         })}
         <div ref={ende} />
       </div>
+      <GespraechMehrBlatt
+        open={mehr}
+        onClose={() => setMehr(false)}
+        titel={ticket.betreff}
+        unter={ticket.erledigt ? `Erledigt · ${wer}` : wer}
+        erledigt={ticket.erledigt}
+        onErledigt={() => void ticketSchliessen(ticket.id, !ticket.erledigt)}
+        loeschen={{
+          frage: `Das Gespräch „${ticket.betreff}" endgültig löschen?\n\nAlle Nachrichten darin verschwinden – auch für die Eltern.`,
+          fuss: "Alle Nachrichten darin verschwinden – auch für die Eltern.",
+          onLoeschen: () => {
+            void ticketLoeschen(ticket.id);
+            onBack();
+          },
+        }}
+      />
     </ChatEbene>
   );
 }

@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { SchliessenKnopf, Sheet, SheetKopf, ZurueckKnopf, useBlattKopf } from "./Sheet";
-import { Gruppe, Zeile } from "./Liste";
+import { Gruppe, Wert, Zeile, ZeileEingabe, ZeileMitSchalter } from "./Liste";
+import { Icon } from "./Icon";
 import { Schalter } from "./Schalter";
 import { useRole } from "../auth/RoleProvider";
 import {
@@ -9,6 +10,7 @@ import {
   personVerlauf,
   useAlbum,
   type Album,
+  type AlbumKategorie,
   type AlbumKommentar,
   type AlbumPerson,
   type Freigabe,
@@ -20,7 +22,8 @@ import { LiedSuche, SpotifyKarte, ohneLink, spotifyAus } from "./Spotify";
 import { FarbKarte, FussLeiste, KleinerRing, KnopfGlas, KnopfHell } from "./Kachel";
 import { FussLeiste as FussLeisteBlatt } from "./FussLeiste";
 import { WortfilterSchalter } from "./AutorInfo";
-import { TeilMarke, TeilUmschalter, useVerschiebenRueckfrage } from "./TeilUmschalter";
+import { useWfRecht } from "../lib/wortfilter-bereiche";
+import { TeilUmschalter, useVerschiebenRueckfrage } from "./TeilUmschalter";
 import { TEIL_NAME, useTeil, useVerschiebungen, type Teil } from "../lib/teile";
 import { AusHinweis } from "./Funktionen";
 import { GesperrtZeile, GESPERRT_TEXT } from "./Gesperrt";
@@ -208,7 +211,10 @@ export function AlbumKarte({ className = "" }: { className?: string }) {
             <KnopfGlas onClick={() => oeffne(null)}>Alle ansehen</KnopfGlas>
             {offeneFreigaben > 0 && (
               <KnopfGlas dunkel onClick={() => oeffne(offeneFreigaben === 1 ? `__schreiben__:${wartend[0].student_id}` : "__fuer_mich__")}>
-                ✍️ {offeneFreigaben} {offeneFreigaben === 1 ? "Text wartet" : "Texte warten"} ›
+                <span className="mr-1.5 inline-flex" aria-hidden>
+                  <Icon name="zitat" size={15} strich={2.2} />
+                </span>
+                {offeneFreigaben} {offeneFreigaben === 1 ? "Text wartet" : "Texte warten"} ›
               </KnopfGlas>
             )}
           </>
@@ -221,8 +227,14 @@ export function AlbumKarte({ className = "" }: { className?: string }) {
           <span className="zahl text-[13px] font-bold">{prozent} %</span>
         </div>
         <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-white/90">
-          <span>❤ {meineLikes}</span>
-          <span>💬 {meineKommentare}</span>
+          <span className="inline-flex items-center gap-1" aria-label={`${meineLikes} „Gefällt mir“`}>
+            <Icon name="herz" size={14} strich={2.2} />
+            {meineLikes}
+          </span>
+          <span className="inline-flex items-center gap-1" aria-label={`${meineKommentare} Kommentare`}>
+            <Icon name="chats" size={14} strich={2.2} />
+            {meineKommentare}
+          </span>
           <span className="flex items-center">
             {vorschau.length > 0 && (
               <span className="mr-1.5 flex -space-x-2">
@@ -326,9 +338,9 @@ export function AlbumSheet({ open, start, album, onClose }: { open: boolean; sta
               <AlleSteckbriefe album={album} oeffnen={(id) => setAnsicht({ art: "person", id })} nurFuerMich={nurFuerMich} setNurFuerMich={setNurFuerMich} />
             ) : null}
             {!nutzen && can("album.kategorien") && (
-              <button className="btn-primary w-full" onClick={() => setKategorienOffen(true)}>
-                Kategorien bearbeiten
-              </button>
+              <Gruppe className="mt-1">
+                <Zeile label="Steckbrief-Kategorien" onClick={() => setKategorienOffen(true)} />
+              </Gruppe>
             )}
           </>
         )}
@@ -395,7 +407,10 @@ function AlleSteckbriefe({
           onClick={() => setNurFuerMich(false)}
           className="mb-3 flex w-full items-center justify-between rounded-2xl bg-[#FF375F]/10 px-4 py-2.5 text-left text-[14px] font-semibold text-[#D70040] dark:text-[#FF6482]"
         >
-          ✍️ Nur Steckbriefe, die auf deinen Text warten
+          <span className="flex items-center gap-2">
+            <Icon name="zitat" size={16} strich={2.2} />
+            Nur Steckbriefe, die auf deinen Text warten
+          </span>
           <span className="text-[13px] font-semibold opacity-80">Alle zeigen ✕</span>
         </button>
       )}
@@ -436,7 +451,10 @@ function AlleSteckbriefe({
                 <PolaroidBild p={p} />
                 {pr === 0 && <span className="absolute inset-0 bg-white/45 dark:bg-slate-900/50" />}
                 {fuerMich && (
-                  <span className="absolute left-1.5 top-1.5 rounded-full bg-white/95 px-2 py-0.5 text-[12px] font-bold text-[#D70040] shadow-sm">✍️ für dich</span>
+                  <span className="absolute left-1.5 top-1.5 inline-flex items-center gap-1 rounded-full bg-white/95 px-2 py-0.5 text-[12px] font-bold text-[#D70040] shadow-sm">
+                    <Icon name="zitat" size={12} strich={2.4} />
+                    für dich
+                  </span>
                 )}
               </span>
               <span className="mt-2 block truncate font-buch text-[15px] font-semibold italic leading-tight">
@@ -456,8 +474,14 @@ function AlleSteckbriefe({
                       : "noch leer"}
               </span>
               <span className="mt-1 flex gap-3 text-[12px] font-semibold text-tinte-leise">
-                <span className={likes ? "text-[#FF2D55]" : ""}>❤ {likes}</span>
-                <span>💬 {komm}</span>
+                <span className={`inline-flex items-center gap-1 ${likes ? "text-[#FF2D55]" : ""}`} aria-label={`${likes} „Gefällt mir“`}>
+                  <Icon name="herz" size={13} strich={2.3} />
+                  {likes}
+                </span>
+                <span className="inline-flex items-center gap-1" aria-label={`${komm} Kommentare`}>
+                  <Icon name="chats" size={13} strich={2.3} />
+                  {komm}
+                </span>
               </span>
             </button>
           );
@@ -541,7 +565,10 @@ function SteckbriefAnsicht({
         </h2>
         <div className="mt-2 flex items-center gap-4">
           <Herz an={gelikt} n={likes} onClick={() => void album.liken(id)} />
-          <span className="text-[14px] font-semibold text-tinte-leise">💬 {alleKommentare.length}</span>
+          <span className="inline-flex items-center gap-1 text-[14px] font-semibold text-tinte-leise" aria-label={`${alleKommentare.length} Kommentare`}>
+            <Icon name="chats" size={20} />
+            {alleKommentare.length}
+          </span>
           {ich && (
             <button onClick={bearbeiten} className="rounded-full bg-brand/10 px-3 py-1 text-[13px] font-semibold text-brand-dark dark:text-brand">
               Bearbeiten
@@ -552,7 +579,7 @@ function SteckbriefAnsicht({
           {ich && s && <BearbeitetInfo s={s} className="text-tinte-matt dark:text-slate-300" />}
           {!ich && can("album.redigieren") && (
             <button onClick={korrigieren} className="rounded-full bg-brand/10 px-3 py-1 text-[13px] font-semibold text-brand-dark dark:text-brand">
-              ✏️ Korrigieren
+              Korrigieren
             </button>
           )}
         </div>
@@ -612,7 +639,7 @@ function SteckbriefAnsicht({
       )}
       {darfSchreiben && (
         <button onClick={schreiben} className="btn-primary mt-3 w-full">
-          ✍️ {s?.text.trim() ? "Text überarbeiten" : "Text schreiben"}
+          {s?.text.trim() ? "Text überarbeiten" : "Text schreiben"}
         </button>
       )}
 
@@ -889,7 +916,9 @@ function MeinFoto({ studentId }: { studentId: string }) {
       {zeigen ? (
         <img src={zeigen} alt="Dein Foto" className="h-14 w-14 shrink-0 rounded-xl object-cover" />
       ) : (
-        <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-black/[0.06] text-[22px] dark:bg-white/10">📷</span>
+        <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-black/[0.06] text-tinte-leise dark:bg-white/10">
+          <Icon name="bild" size={24} />
+        </span>
       )}
       <span className="min-w-0 flex-1">
         <span className="block text-[15px] font-semibold">Foto</span>
@@ -1036,7 +1065,7 @@ function MeinSteckbrief({ album, vorschau }: { album: Album; vorschau: () => voi
         </div>
       )}
 
-      <Gruppe titel="Wer darf den Text schreiben?" fuss={freigabe === "niemand" ? "Nur du." : freigabe === "alle" ? "Alle im Album können den Text schreiben oder überarbeiten." : `${an.length} ausgewählt – sie sehen bei dir „✍️ für dich“.`}>
+      <Gruppe titel="Wer darf den Text schreiben?" fuss={freigabe === "niemand" ? "Nur du." : freigabe === "alle" ? "Alle im Album können den Text schreiben oder überarbeiten." : `${an.length} ausgewählt – sie sehen bei dir „für dich“.`}>
         <div className="px-3 py-2.5">
           <div className="seg">
             {(
@@ -1106,114 +1135,137 @@ function MeinSteckbrief({ album, vorschau }: { album: Album; vorschau: () => voi
 /* ====================================================================== */
 /* Kategorien (Team)                                                      */
 /* ====================================================================== */
-export function KategorienSheet({ open, album, onClose }: { open: boolean; album: Album; onClose: () => void }) {
-  const [neu, setNeu] = useState("");
+export function KategorienSheet({
+  open,
+  album,
+  onClose,
+  mitWortfilter = true,
+}: {
+  open: boolean;
+  album: Album;
+  onClose: () => void;
+  /**
+   * Wortfilter für Steckbrief und Kommentare hier mit anzeigen. Aus
+   * Profil → Funktionen nicht nötig – dort stehen sie schon unter „Abi-Album“.
+   */
+  mitWortfilter?: boolean;
+}) {
+  // null = Liste, "neu" = anlegen, sonst die id der Kategorie (Unterseite im selben Blatt)
   const [bearbeite, setBearbeite] = useState<string | null>(null);
   const [titel, setTitel] = useState("");
   const [platz, setPlatz] = useState("");
+  const [aktiv, setAktiv] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const wfRecht = useWfRecht();
+  const zeigeWf = mitWortfilter && (["steckbrief", "kommentare", "kommentare_inoffiziell"] as const).some((b) => wfRecht(b));
 
-  async function anlegen() {
-    if (!neu.trim()) return;
-    const f = await album.kategorieSpeichern({ titel: neu.trim(), sort: (album.kategorien.at(-1)?.sort ?? 0) + 1 });
-    if (f) return meldeFehler(f);
-    setNeu("");
+  // Beim nächsten Öffnen wieder auf der Liste starten
+  useEffect(() => {
+    if (!open) setBearbeite(null);
+  }, [open]);
+
+  const liste = album.kategorien;
+  const k = bearbeite && bearbeite !== "neu" ? liste.find((x) => x.id === bearbeite) : undefined;
+  const i = k ? liste.indexOf(k) : -1;
+  // Woanders gelöscht, während die Unterseite offen war: zurück zur Liste
+  const seite = bearbeite === "neu" || k ? bearbeite : null;
+  const zurListe = () => setBearbeite(null);
+
+  function oeffnen(x: AlbumKategorie | null) {
+    setTitel(x?.titel ?? "");
+    setPlatz(x?.platzhalter ?? "");
+    setAktiv(x?.aktiv ?? true);
+    setBusy(false);
+    setBearbeite(x ? x.id : "neu");
+  }
+
+  async function sichern() {
+    if (!titel.trim() || busy) return;
+    setBusy(true);
+    const f = k
+      ? await album.kategorieSpeichern({ ...k, titel: titel.trim(), platzhalter: platz.trim(), aktiv })
+      : await album.kategorieSpeichern({ titel: titel.trim(), platzhalter: platz.trim(), sort: (liste.at(-1)?.sort ?? 0) + 1 });
+    setBusy(false);
+    if (f) return meldeFehler("Ging nicht: " + f);
+    melde(k ? "Gespeichert" : "Kategorie hinzugefügt", "erfolg");
+    zurListe();
   }
 
   return (
-    <Sheet open={open} onClose={onClose}>
-      <SheetKopf titel="Steckbrief-Kategorien" unter="Die Stammdaten-Felder, die alle ausfüllen. Antippen zum Ändern, Schalter blendet aus, 🗑 löscht." onClose={onClose} />
-      <div className="mb-4 space-y-2">
-        <WortfilterSchalter bereich="steckbrief" />
-        <WortfilterSchalter bereich="kommentare" />
-        <WortfilterSchalter bereich="kommentare_inoffiziell" />
-      </div>
-      <Gruppe>
-        {album.kategorien.map((k, i) =>
-          bearbeite === k.id ? (
-            <div key={k.id} className="space-y-2 px-4 py-3">
-              <input className="field" value={titel} maxLength={60} onChange={(e) => setTitel(e.target.value)} placeholder="Titel" />
-              <input className="field" value={platz} maxLength={80} onChange={(e) => setPlatz(e.target.value)} placeholder="Hinweis im Feld (optional)" />
-              <div className="flex gap-2">
-                <button className="btn-grau flex-1 !min-h-[40px] !text-[15px]" onClick={() => setBearbeite(null)}>
-                  Abbrechen
-                </button>
-                <button
-                  className="btn-primary flex-1 !min-h-[40px] !text-[15px]"
-                  onClick={async () => {
-                    if (!titel.trim()) return;
-                    const f = await album.kategorieSpeichern({ ...k, titel, platzhalter: platz });
-                    if (f) return meldeFehler(f);
-                    setBearbeite(null);
-                  }}
-                >
-                  Sichern
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div key={k.id} className={`flex min-h-[52px] items-center gap-2 px-3 ${k.aktiv ? "" : "opacity-50"}`}>
-              <div className="flex flex-col">
-                <button aria-label="Nach oben" disabled={i === 0} onClick={() => void album.kategorieVerschieben(k.id, -1)} className="px-1 text-[12px] text-tinte-leise disabled:opacity-25">
-                  ▲
-                </button>
-                <button
-                  aria-label="Nach unten"
-                  disabled={i === album.kategorien.length - 1}
-                  onClick={() => void album.kategorieVerschieben(k.id, 1)}
-                  className="px-1 text-[12px] text-tinte-leise disabled:opacity-25"
-                >
-                  ▼
-                </button>
-              </div>
-              <button
-                className="min-w-0 flex-1 text-left"
-                onClick={() => {
-                  setBearbeite(k.id);
-                  setTitel(k.titel);
-                  setPlatz(k.platzhalter);
-                }}
-              >
-                <span className="block truncate text-[15px] font-medium">{k.titel}</span>
-                {k.platzhalter && <span className="block truncate text-[12px] text-tinte-leise">{k.platzhalter}</span>}
-              </button>
-              <Schalter an={k.aktiv} label={`${k.titel} anzeigen`} onChange={(v) => void album.kategorieSpeichern({ ...k, aktiv: v })} />
-              <button
-                aria-label={`${k.titel} löschen`}
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[16px] transition active:scale-90 active:bg-red-500/10"
+    <Sheet hoch open={open} onClose={onClose}>
+      {seite ? (
+        // Eine Kategorie: Unterseite im selben Blatt („‹ Steckbrief-Kategorien“,
+        // Esc und die Zurück-Taste gehen eine Seite zurück)
+        <div key={seite} className="animate-vonRechts">
+          <SheetKopf titel={k ? k.titel : "Neue Kategorie"} zurueck={{ text: "Steckbrief-Kategorien", onClick: zurListe }} onClose={onClose} />
+          <Gruppe className="mt-1" fuss="Der Hinweis steht grau im leeren Feld – z. B. „Wie nennen dich alle?“.">
+            <ZeileEingabe label="Titel" value={titel} onChange={setTitel} placeholder="z. B. Spitzname" maxLength={60} autoFocus={!k} onEnter={() => void sichern()} />
+            <ZeileEingabe label="Hinweis" value={platz} onChange={setPlatz} placeholder="optional" maxLength={80} onEnter={() => void sichern()} />
+          </Gruppe>
+          {k && (
+            <Gruppe fuss="Aus: Das Feld ist im Steckbrief ausgeblendet. Was schon eingetragen ist, bleibt gespeichert.">
+              <ZeileMitSchalter label="Im Steckbrief zeigen">
+                <Schalter an={aktiv} onChange={setAktiv} label="Im Steckbrief zeigen" />
+              </ZeileMitSchalter>
+            </Gruppe>
+          )}
+          {k && liste.length > 1 && (
+            <Gruppe titel="Reihenfolge" fuss={`Platz ${i + 1} von ${liste.length} – so steht es im Steckbrief.`}>
+              <Zeile label="Nach oben" blau disabled={i === 0} onClick={() => void album.kategorieVerschieben(k.id, -1)} />
+              <Zeile label="Nach unten" blau disabled={i === liste.length - 1} onClick={() => void album.kategorieVerschieben(k.id, 1)} />
+            </Gruppe>
+          )}
+          {k && (
+            <Gruppe>
+              <Zeile
+                label="Kategorie löschen"
+                rot
                 onClick={() =>
                   void frage(
-                    `„${k.titel}“ löschen?\n\nWas schon eingetragen wurde, wird bei niemandem mehr angezeigt. Nur ausblenden geht mit dem Schalter.`,
+                    `„${k.titel}“ löschen?\n\nWas schon eingetragen wurde, wird bei niemandem mehr angezeigt. Nur ausblenden geht mit „Im Steckbrief zeigen“.`,
                     "Löschen",
                     true,
                   ).then(async (ok) => {
                     if (!ok) return;
                     const f = await album.kategorieLoeschen(k.id);
-                    if (f) meldeFehler("Ging nicht: " + f);
+                    if (f) return meldeFehler("Ging nicht: " + f);
+                    zurListe();
                   })
                 }
-              >
-                🗑
-              </button>
-            </div>
-          ),
-        )}
-      </Gruppe>
-      <div className="mt-3 flex gap-2">
-        <input
-          className="field flex-1"
-          value={neu}
-          maxLength={60}
-          placeholder="Neue Kategorie, z. B. Bester Lehrerspruch"
-          onChange={(e) => setNeu(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && void anlegen()}
-        />
-        <button className="btn-primary !min-h-[44px] !w-auto shrink-0 px-4 !text-[15px]" disabled={!neu.trim()} onClick={() => void anlegen()}>
-          Hinzufügen
-        </button>
-      </div>
-      <p className="mt-3 px-1 text-[12px] leading-snug text-tinte-leise">
-        Tipp: Welche Kategorien rein sollen, könnt ihr vorher per Pop-up-Umfrage abstimmen lassen.
-      </p>
+              />
+            </Gruppe>
+          )}
+          <FussLeisteBlatt>
+            <button type="button" className="btn-primary w-full disabled:opacity-40" disabled={!titel.trim() || busy} onClick={() => void sichern()}>
+              {busy ? "…" : k ? "Sichern" : "Hinzufügen"}
+            </button>
+          </FussLeisteBlatt>
+        </div>
+      ) : (
+        <>
+          <SheetKopf titel="Steckbrief-Kategorien" unter="Die Felder, die alle im Steckbrief ausfüllen. Antippen zum Ändern." onClose={onClose} />
+          <Gruppe
+            titel={`Kategorien · ${liste.length}`}
+            className="mt-1"
+            fuss="Tipp: Welche Kategorien rein sollen, könnt ihr vorher per Umfrage abstimmen lassen."
+          >
+            {liste.map((x) => (
+              // Zweite Zeile immer (Hinweis im Feld): so darf auch ein langer Titel umbrechen
+              <Zeile key={x.id} label={x.titel} unter={x.platzhalter || "Ohne Hinweis im Feld"} onClick={() => oeffnen(x)}>
+                {!x.aktiv && <Wert>Aus</Wert>}
+              </Zeile>
+            ))}
+            <Zeile label="Neue Kategorie" blau onClick={() => oeffnen(null)} />
+          </Gruppe>
+          {zeigeWf && (
+            <Gruppe titel="Wortfilter">
+              <WortfilterSchalter zeile bereich="steckbrief" titel="Steckbriefe" />
+              <WortfilterSchalter zeile bereich="kommentare" titel="Kommentare · Offiziell" />
+              <WortfilterSchalter zeile bereich="kommentare_inoffiziell" titel="Kommentare · Inoffiziell" />
+            </Gruppe>
+          )}
+        </>
+      )}
     </Sheet>
   );
 }
