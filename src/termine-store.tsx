@@ -159,7 +159,34 @@ export function TermineProvider({ children }: { children: ReactNode }) {
     setAktionen(d.aktionen);
     setBewerbungen(d.bewerbungen);
     // ?rolle=vorsitz: leitet das Komitee Abizeitung (dort ist man Mitglied)
+    // und hat eine beantwortete Terminanfrage – so sieht man den Stand
     setVorsitz(rolle === "vorsitz" ? { abizeitung: [uid] } : {});
+    if (rolle === "vorsitz") {
+      const tag = (n: number) => {
+        const x = new Date();
+        x.setDate(x.getDate() + n);
+        return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}-${String(x.getDate()).padStart(2, "0")}`;
+      };
+      setAnfragen([
+        {
+          id: "demo-anfrage-1",
+          tag: "abizeitung",
+          titel: "Redaktionssitzung",
+          ort: "Raum 204",
+          nachricht: "",
+          datum: tag(5),
+          bis_datum: null,
+          von: "13:30",
+          bis: "14:30",
+          status: "angenommen",
+          antwort: "",
+          created_by: uid,
+          created_at: `${tag(-2)}T10:00:00.000Z`,
+          decided_by: "demo-team",
+          decided_at: `${tag(-1)}T10:00:00.000Z`,
+        },
+      ]);
+    }
   }, [demoIch, demoPersonen]);
 
   const lokalSpeichern = useCallback((next: Termin[]) => {
@@ -647,7 +674,29 @@ export function TermineProvider({ children }: { children: ReactNode }) {
   // ---------------------------------------------------------- Anfragen
   const anfrageStellen = useCallback<TermineValue["anfrageStellen"]>(
     async (a) => {
-      if (!hasSupabase) return "Ohne Datenbank geht das nicht.";
+      if (!hasSupabase) {
+        // Demo/lokal: nur im Browser, ohne Benachrichtigung – sonst konnten
+        // Vorsitzende die Anfrage in der Demo gar nicht ausprobieren
+        const neu: TerminAnfrage = {
+          id: `lokal-${Date.now()}`,
+          tag: a.tag,
+          titel: a.titel.trim(),
+          ort: a.ort.trim(),
+          nachricht: a.nachricht.trim().slice(0, 500),
+          datum: a.datum,
+          bis_datum: a.bis_datum || null,
+          von: a.von || null,
+          bis: a.bis || null,
+          status: "offen",
+          antwort: "",
+          created_by: uidRef.current,
+          created_at: new Date().toISOString(),
+          decided_by: null,
+          decided_at: null,
+        };
+        setAnfragen((p) => [neu, ...p]);
+        return null;
+      }
       const { error } = await supabase!.from("termin_requests").insert({
         tag: a.tag,
         titel: a.titel.trim(),
@@ -674,7 +723,13 @@ export function TermineProvider({ children }: { children: ReactNode }) {
 
   const anfrageEntscheiden = useCallback<TermineValue["anfrageEntscheiden"]>(
     async (id, status, antwort = "") => {
-      if (!hasSupabase) return "Ohne Datenbank geht das nicht.";
+      if (!hasSupabase) {
+        // Demo/lokal: nur den Status setzen
+        setAnfragen((p) =>
+          p.map((x) => (x.id === id ? { ...x, status, antwort: antwort.trim().slice(0, 500), decided_by: uidRef.current, decided_at: new Date().toISOString() } : x)),
+        );
+        return null;
+      }
       const { error } = await supabase!
         .from("termin_requests")
         .update({
@@ -705,8 +760,8 @@ export function TermineProvider({ children }: { children: ReactNode }) {
 
   const anfrageLoeschen = useCallback<TermineValue["anfrageLoeschen"]>(
     async (id) => {
-      if (!hasSupabase) return;
       setAnfragen((prev) => prev.filter((a) => a.id !== id));
+      if (!hasSupabase) return;
       const { error } = await supabase!.from("termin_requests").delete().eq("id", id);
       if (error) {
         void laden();

@@ -11,6 +11,30 @@ ausführlich (auf Deutsch); hier steht der Überblick dazu.
 
 ---
 
+## Nachtrag: Vorsitz-Funktionen in der Demo, Terminanfragen nicht abgeschnitten (16.10.2026)
+
+Eine unabhängige Prüfung des Diffs von #19 fand Folgendes (alles nur Demo bzw.
+Doku, in der echten App unverändert):
+
+- **Kosten- und Terminanfragen ließen sich in der Demo gar nicht stellen**
+  („Ohne Datenbank geht das nicht.“), die nach oben gezogene Karte zeigte
+  immer „Keine Anfragen“. Jetzt leben sie ohne Datenbank im Browser:
+  - stellen, zurückziehen und entscheiden gehen (`src/lib/kosten.ts`,
+    `src/termine-store.tsx`, nur im Zweig `!hasSupabase`);
+  - `?rolle=vorsitz` startet mit einer offenen und einer genehmigten
+    Kostenanfrage und einer angenommenen Terminanfrage.
+- **Eigene Terminanfragen** (Events, Karte „Vorsitz …“) standen in einer
+  Zeile; am iPhone war vom Datum nur „Mo, 19…“ zu sehen. Jetzt zwei Zeilen:
+  Titel, darunter Stand und Termin, eine Antwort des Teams darunter
+  (`TerminAnfragen.tsx`).
+- Doku: die Rolle `vorsitz` steht jetzt in `README.md` und
+  `docs/DESIGN-REGELN.md` (§6, Rollen für Fotos); `tests/README.md` nennt
+  7 Rollen für `leisten-check`.
+
+Klicktest (Demo, iPhone-Größe): Kostenanfrage stellen → erscheint mit
+„wartet“, Kopf „2 offen“ → zurückziehen → weg; Terminanfrage stellen →
+erscheint unter „Vorsitz Abizeitung“; keine Seitenfehler.
+
 ## Vorher/Nachher der Kopfleiste, Sicht der Komitee-Vorsitzenden (16.10.2026)
 
 **Vorher/Nachher am Bildschirm.** Der Stand vor der Korrektur (`3989f39^`)

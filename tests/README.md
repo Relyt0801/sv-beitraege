@@ -12,7 +12,7 @@ Test-Konten gibst du nur beim Aufruf als Umgebungsvariable mit.
 | `last-test.mjs` | bis zu 260 Personen öffnen gleichzeitig die App | PowerShell | nein (nur lesend) |
 | `ui-check.mjs` | alle Rollen × 4 Größen × hell/dunkel × jeder Reiter, Barrierefreiheit | PowerShell | nein (Demo-Modus) |
 | `masse-check.mjs` | 400 Personen, 1.500 Nachrichten, Klicksturm, Doppeltipp | PowerShell | nein (Demo-Modus) |
-| `leisten-check.mjs` | Kopf- und Reiterleiste an fester Stelle: 7 Größen × 6 Rollen, jeder Reiter oben/unten, Reiterwechsel, Chat/Kalender offen, nach Blatt | PowerShell | nein (Demo-Modus) |
+| `leisten-check.mjs` | Kopf- und Reiterleiste an fester Stelle: 7 Größen × 7 Rollen (mit Vorsitz), jeder Reiter oben/unten, Reiterwechsel, Chat/Kalender offen, nach Blatt | PowerShell | nein (Demo-Modus) |
 
 ## Einmal einrichten (PowerShell, im Projektordner)
 

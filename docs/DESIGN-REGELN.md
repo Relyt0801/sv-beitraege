@@ -149,6 +149,7 @@ DARK=1 BILD=1 node geraet.mjs laptop admin beitraege 'css:[role=tab][aria-label=
 ```
 
 Rollen: `schueler`, `stufenteam`, `kassenwart`, `admin`, `eltern`,
-`eltern-leer`. Bilder landen in `tests/ergebnisse/` (nicht im Git).
+`eltern-leer`, `vorsitz` (Komitee-Vorsitz: Kostenanfragen, Vorsitz-Zeilen).
+Bilder landen in `tests/ergebnisse/` (nicht im Git).
 Auf jedem Bild fragen: Fluchtet alles an der Spalte? Ist jede Schrift
 lesbar? Scheint irgendwo etwas durch? Steht ein Bedienelement links vom Text?

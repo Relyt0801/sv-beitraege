@@ -5,6 +5,7 @@ import { abonniere } from "./realtime";
 import { pushToUsers } from "./push";
 import { committeeLabel } from "./committees";
 import { euro } from "./finanzen";
+import { demoRolle, demoUid } from "./demo";
 
 /**
  * Kostenanfragen: Komitee-Vorsitzende fragen eine Ausgabe an, Kassenwart oder
@@ -48,8 +49,30 @@ export interface KostenValue {
   entscheiden: (a: KostenAnfrage, genehmigt: boolean, antwort: string, datum: string) => Promise<string | null>;
 }
 
+/** Datum in n Tagen als „JJJJ-MM-TT“ (Ortszeit) – nur für die Demo-Beispiele. */
+function tagIn(n: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() + n);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+/**
+ * Ohne Datenbank (Demo/lokal) leben Anfragen nur im Browser. Die Demo-Rolle
+ * „vorsitz“ startet mit einer offenen und einer genehmigten Anfrage – sonst
+ * stand dort immer nur „Keine Anfragen“, und den Stand der eigenen Anfragen
+ * konnte man in der Demo gar nicht ansehen (Prüfung Okt. 2026).
+ */
+function demoAnfragen(): KostenAnfrage[] {
+  if (hasSupabase || demoRolle() !== "vorsitz") return [];
+  const basis = { tag: "abizeitung", antwort: "", buchung_id: null, created_by: demoUid("vorsitz") ?? "local-user", decided_by: null, decided_at: null };
+  return [
+    { ...basis, id: "demo-kosten-1", titel: "Probedruck Abizeitung", nachricht: "Zwei Probeexemplare zum Korrekturlesen.", cent: 4500, benoetigt_am: tagIn(10), status: "offen", created_at: `${tagIn(-1)}T16:00:00.000Z` },
+    { ...basis, id: "demo-kosten-2", titel: "Speicherkarte für Fotos", nachricht: "", cent: 1999, benoetigt_am: null, status: "genehmigt", antwort: "Passt – Beleg bitte abgeben.", decided_by: "demo-kasse", decided_at: `${tagIn(-3)}T12:00:00.000Z`, created_at: `${tagIn(-5)}T12:00:00.000Z` },
+  ];
+}
+
 export function useKostenAnfragen(aktiv: boolean): KostenValue {
-  const [anfragen, setAnfragen] = useState<KostenAnfrage[]>([]);
+  const [anfragen, setAnfragen] = useState<KostenAnfrage[]>(demoAnfragen);
   const [aufsichtsrat, setAufsichtsrat] = useState(false);
   const [bereit, setBereit] = useState(!hasSupabase);
 
@@ -79,7 +102,26 @@ export function useKostenAnfragen(aktiv: boolean): KostenValue {
 
   const stellen = useCallback<KostenValue["stellen"]>(
     async (a) => {
-      if (!hasSupabase) return "Ohne Datenbank geht das nicht.";
+      if (!hasSupabase) {
+        // Demo/lokal: nur im Browser, ohne Benachrichtigung
+        const neu: KostenAnfrage = {
+          id: `lokal-${Date.now()}`,
+          tag: a.tag,
+          titel: a.titel.trim(),
+          nachricht: a.nachricht.trim(),
+          cent: a.cent,
+          benoetigt_am: a.benoetigt_am || null,
+          status: "offen",
+          antwort: "",
+          buchung_id: null,
+          created_by: demoUid(demoRolle()) ?? "local-user",
+          created_at: new Date().toISOString(),
+          decided_by: null,
+          decided_at: null,
+        };
+        setAnfragen((p) => [neu, ...p]);
+        return null;
+      }
       const { data: s } = await supabase!.auth.getSession();
       const uid = s.session?.user.id;
       if (!uid) return "Bitte neu anmelden.";
@@ -110,8 +152,8 @@ export function useKostenAnfragen(aktiv: boolean): KostenValue {
 
   const zurueckziehen = useCallback<KostenValue["zurueckziehen"]>(
     async (id) => {
-      if (!hasSupabase) return null;
       setAnfragen((p) => p.filter((x) => x.id !== id));
+      if (!hasSupabase) return null;
       const { error } = await supabase!.from("kosten_anfragen").delete().eq("id", id);
       if (error) {
         void laden();
@@ -124,7 +166,12 @@ export function useKostenAnfragen(aktiv: boolean): KostenValue {
 
   const entscheiden = useCallback<KostenValue["entscheiden"]>(
     async (a, genehmigt, antwort, datum) => {
-      if (!hasSupabase) return null;
+      if (!hasSupabase) {
+        // Demo/lokal: nur den Status setzen (keine Buchung im Kassenbuch)
+        const status: KostenAnfrage["status"] = genehmigt ? "genehmigt" : "abgelehnt";
+        setAnfragen((p) => p.map((x) => (x.id === a.id ? { ...x, status, antwort: antwort.trim(), decided_at: new Date().toISOString() } : x)));
+        return null;
+      }
       // Genehmigen braucht ggf. mehrere Zustimmungen (Profil → Freigaben)
       if (genehmigt) {
         const z = await zustimmen("kosten", a.id);
