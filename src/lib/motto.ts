@@ -31,6 +31,32 @@ import type { Teil } from "./teile";
  */
 export type MottoArt = "like" | "feuer";
 
+/**
+ * Alle Motto-Stimmen seitenweise: Wer das Motto verwaltet, darf alle lesen –
+ * die Datenbank liefert aber höchstens 1000 Zeilen je Abfrage. Ohne Seiten
+ * fehlten ab der 1001. Stimme still Zeilen – dann auch eigene Stimmen (nicht
+ * zurücknehmbar) und die Zahlen, bis stimmen_zahlen() geantwortet hat.
+ * Sortiert nach dem Primärschlüssel, damit sich die Seiten nicht überlappen.
+ */
+async function alleStimmen(): Promise<{ data: unknown[] | null; error: unknown }> {
+  const SEITE = 1000;
+  const alle: unknown[] = [];
+  for (let von = 0; von < 20 * SEITE; von += SEITE) {
+    const r = await supabase!
+      .from("motto_stimmen")
+      .select("vorschlag_id, user_id, art")
+      .eq("an", true)
+      .order("vorschlag_id")
+      .order("user_id")
+      .order("art")
+      .range(von, von + SEITE - 1);
+    if (r.error) return { data: null, error: r.error };
+    alle.push(...(r.data || []));
+    if ((r.data || []).length < SEITE) break;
+  }
+  return { data: alle, error: null };
+}
+
 export interface Motto {
   id: string;
   text: string;
@@ -158,7 +184,7 @@ export function useMotto(aktiv: boolean, uid: string | null) {
     // Vorschläge meine sind, sagt meine_eintraege().
     const [m, s, a, mi] = await Promise.all([
       supabase!.from("motto_vorschlaege").select("id, text, erklaerung, created_at, ausgeblendet, gewaehlt, bereich, gewaehlt_at").order("created_at", { ascending: false }).limit(500),
-      supabase!.from("motto_stimmen").select("vorschlag_id, user_id, art").eq("an", true),
+      alleStimmen(),
       supabase!.from("app_settings").select("motto_abstimmung").eq("id", 1).maybeSingle(),
       supabase!.rpc("meine_eintraege"),
     ]);

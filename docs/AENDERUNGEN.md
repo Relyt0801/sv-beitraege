@@ -11,6 +11,33 @@ ausführlich (auf Deutsch); hier steht der Überblick dazu.
 
 ---
 
+## Abfragen gegen die echte Datenbank geprüft (16.10.2026)
+
+Alle Supabase-Abfragen der in dieser Runde geänderten Bereiche (Zu erledigen,
+Finanzen, Verwaltung, Eltern/Mitmachen) wurden **nur lesend** gegen die echte
+Datenbank geprüft: Tabellen, Spalten, Status-Werte (CHECK-Constraints) und
+die Lese-/Schreib-Policies – ohne Personendaten, nur Schema und Anzahlen.
+169 Abfragen, 164 in Ordnung. Wichtig, weil Fehler in der App oft still zu 0
+werden (`offen.ts`: `x.error ? 0`). Drei echte Fehler, behoben:
+
+- **„Aus deinen Komitees“** zählte Freitext-Abstimmungen dauerhaft als offen
+  (die Antwort liegt in `topic_antworten`, nicht in `topic_votes`) – jetzt
+  wie KomiteePage ohne `antwort_art` (`ZuErledigen`, ebenso der Untertitel
+  der Komitee-Zeile in `ChatsTab`).
+- **Eltern-Fragen erreichten das Team nie:** Eltern dürfen die Team-Profile
+  nicht lesen, die Empfängerliste war leer, `pushToUsers([])` schickte nichts;
+  eine neue Frage schickte gar keine Mitteilung. Jetzt `pushAnTeam(…, { art:
+  "eltern" })` in beiden Fällen (`eltern-store`), und die Edge-Function
+  beachtet im Team-Zweig den Mitteilungs-Schalter „Eltern“
+  (`supabase/functions/send-push`). **Die Edge-Function muss nach der Freigabe
+  neu bereitgestellt werden** (`supabase functions deploy send-push`) – bis
+  dahin bekommen auch Teammitglieder mit abgeschaltetem Schalter die Mitteilung.
+- **Zitat-Stimmen:** Das Prüf-Komitee darf alle Stimmen lesen (1105) – die
+  Datenbank liefert höchstens 1000 Zeilen, eigene Stimmen fehlten dann und
+  ließen sich nicht zurücknehmen. Jetzt nur die eigenen (`zitate.ts`; Zahlen
+  kommen ohnehin aus `useStimmenZahlen`). Motto (585 Stimmen) lädt
+  vorsorglich seitenweise (`motto.ts`).
+
 ## Letzte Reste: Protokoll, Umfrage-Editor, Kontrast, Regal (16.10.2026)
 
 Nachmessung über alle Rollen × 5 Geräte × Reiter (Seitenhöhe, größte Lücke,

@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState, ty
 import { hasSupabase, supabase } from "./lib/supabase";
 import { abonniere } from "./lib/realtime";
 import type { BankKonto } from "./lib/types";
-import { pushToUsers, sendePush } from "./lib/push";
+import { pushAnTeam, pushToUsers, sendePush } from "./lib/push";
 import { DEMO_KONTO, demoRolle, demoUid, demoZuordnung } from "./lib/demo";
 import { useStore } from "./store";
 
@@ -150,8 +150,6 @@ export function ElternProvider({ children }: { children: ReactNode }) {
   const [zuordnungFehlt, setZuordnungFehlt] = useState(false);
   const [infosGesehen, setInfosGesehen] = useState(infosGesehenStart);
   const istTeam = useRef(false);
-  /** Kennungen des Stufenteams – damit Antworten der Eltern dort ankommen. */
-  const teamIds = useRef<string[]>([]);
   const uid = useRef<string | null>(null);
 
   // Ohne Datenbank (Demo): erfundene Zuordnung, Kontodaten und eine Info.
@@ -215,13 +213,6 @@ export function ElternProvider({ children }: { children: ReactNode }) {
       .from("profiles").select("role").eq("user_id", uid.current).maybeSingle();
     istTeam.current = ["stufenteam", "kassenwart", "admin", "sprecher", "stv_sprecher"]
       .includes(((meins as { role?: string } | null)?.role) || "");
-
-    // Wer gehoert zum Stufenteam? Eltern duerfen das nicht sehen, deshalb
-    // bleibt die Liste bei ihnen leer und der Server verteilt selbst.
-    const { data: team } = await supabase!
-      .from("profiles").select("user_id")
-      .in("role", ["stufenteam", "kassenwart", "admin", "sprecher", "stv_sprecher"]);
-    teamIds.current = ((team as { user_id: string }[]) || []).map((r) => r.user_id);
 
     if (istTeam.current) {
       const { data: alle } = await supabase!
@@ -303,6 +294,9 @@ export function ElternProvider({ children }: { children: ReactNode }) {
       .from("eltern_ticket_nachrichten")
       .insert({ ticket_id: ticket.id, user_id: uid.current, text: text.trim() });
     if (e2) return "Die Nachricht konnte nicht gespeichert werden. Bitte später noch einmal versuchen.";
+    // Neue Elternfrage: das Stufenteam benachrichtigen (vorher kam bei einer
+    // neuen Frage gar keine Mitteilung)
+    void pushAnTeam(`Eltern: ${betreff.trim()}`, text.trim().slice(0, 110), "./#chats", { art: "eltern" });
     void laden();
     return null;
   }, [laden]);
@@ -340,20 +334,17 @@ export function ElternProvider({ children }: { children: ReactNode }) {
     }
     supabase!.from("eltern_tickets").update({ updated_at: new Date().toISOString() }).eq("id", ticketId).then(({ error }) => { if (error) console.warn("[speichern]", error.message); }); // then() nötig, sonst wird nie gesendet
 
-    // Die Gegenseite benachrichtigen.
+    // Die Gegenseite benachrichtigen. Titel = Betreff des Gesprächs, damit man
+    // in der Mitteilung sofort sieht, worum es geht.
     const t = tickets.find((x) => x.id === ticketId);
     if (t) {
-      const anTeam = t.user_id === uid.current;
-      const ziel = anTeam ? teamIds.current : [t.user_id];
-      // Titel = Betreff des Gesprächs, damit man in der Mitteilung sofort sieht,
-      // worum es geht.
-      void pushToUsers(
-        ziel.filter((z) => z !== uid.current),
-        anTeam ? `Eltern: ${t.betreff}` : t.betreff,
-        anTeam ? text.trim().slice(0, 110) : `Antwort vom Stufenteam: ${text.trim().slice(0, 90)}`,
-        anTeam ? "./#chats" : "./#infos",
-        anTeam ? { art: "eltern" } : undefined,
-      );
+      if (t.user_id === uid.current)
+        // Eltern -> Team: Eltern dürfen die Team-Profile nicht lesen (Policy
+        // „profiles read“), eine Empfängerliste wäre leer und pushToUsers([])
+        // schickte nichts. Der Server sucht das Team selbst (an_team) und
+        // beachtet den Mitteilungs-Schalter „Eltern“.
+        void pushAnTeam(`Eltern: ${t.betreff}`, text.trim().slice(0, 110), "./#chats", { art: "eltern" });
+      else void pushToUsers([t.user_id], t.betreff, `Antwort vom Stufenteam: ${text.trim().slice(0, 90)}`, "./#infos");
     }
   }, [tickets]);
 

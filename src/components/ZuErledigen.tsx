@@ -87,7 +87,11 @@ export function ZuErledigen({ className = "" }: { className?: string }) {
     .flatMap((t) => {
       const eig = items.filter((i) => i.topic_id === t.id);
       const abst = eig.filter(
-        (i) => i.type === "umfrage" && !(i.poll_deadline && Date.parse(i.poll_deadline) < jetzt) && !(myVotes[i.id] || []).length,
+        // Freitext-Abstimmungen (antwort_art) speichern die Antwort in
+        // topic_antworten, nicht in topic_votes – myVotes bliebe für immer leer
+        // und die Abstimmung stünde hier dauerhaft als offen. Wie ChatsTab und
+        // KomiteePage: nur Auswahl-Abstimmungen zählen.
+        (i) => i.type === "umfrage" && !i.antwort_art && !(i.poll_deadline && Date.parse(i.poll_deadline) < jetzt) && !(myVotes[i.id] || []).length,
       );
       const todos = eig.filter((i) => i.type === "todo" && !i.done);
       const erstes = abst[0] ?? todos[0];

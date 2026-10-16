@@ -522,7 +522,9 @@ const zeitKurz = (iso: string) => {
 function standText(items: TopicItem[], topicId: string, myVotes: Record<string, unknown[]>): string {
   const eig = items.filter((i) => i.topic_id === topicId);
   // Nur Abstimmungen, bei denen man selbst noch nicht abgestimmt hat
-  const umfragen = eig.filter((i) => i.type === "umfrage" && !abgelaufen(i) && !(myVotes[i.id] || []).length).length;
+  // Freitext-Abstimmungen (antwort_art) nicht: ihre Antwort liegt in
+  // topic_antworten, myVotes bliebe leer (wie KomiteeVorschau/ZuErledigen)
+  const umfragen = eig.filter((i) => i.type === "umfrage" && !i.antwort_art && !abgelaufen(i) && !(myVotes[i.id] || []).length).length;
   const todos = eig.filter((i) => i.type === "todo" && !i.done).length;
   const teile: string[] = [];
   if (umfragen) teile.push(`${umfragen} ${umfragen === 1 ? "Abstimmung" : "Abstimmungen"} offen`);
