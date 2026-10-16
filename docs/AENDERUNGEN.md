@@ -130,7 +130,9 @@ gegengeprüft, hat 14 Funde bestätigt (11 verschiedene). Alle sind behoben:
 - Zitate-Runden ohne Aufteilung 5/5.
 - Offiziell/inoffiziell 15/15, Vorsitz-Anfragen 9/9.
 - Fotos bei 320 px (hell, dunkel, Bild): nichts gekürzt, keine Seitenfehler.
-- `ui-check` und `leisten-check` auf r40: Ergebnis folgt.
+- `ui-check` 280 Ansichten ohne Fund (axe ohne Befund, keine Konsolenfehler);
+  `leisten-check` 777 Zustände, 0 Abweichungen.
+- Typecheck und Build ohne Fehler.
 
 ## Runde 8a: Offiziell/Inoffiziell schaltbar, Info-Symbol, Mottos löschen (16.10.2026)
 
