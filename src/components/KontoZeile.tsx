@@ -45,7 +45,9 @@ export function KontoZeile({
         <span
           title={punkt ? "hat ein eigenes Passwort gesetzt" : "nutzt noch das Startpasswort"}
           className={`h-2.5 w-2.5 shrink-0 rounded-full ${
-            punkt ? "bg-emerald-500" : "bg-slate-300 dark:bg-slate-600"
+            // Startpasswort als hohler Ring: unterscheidbar ohne Farbe und
+            // auch im Dunkeln sichtbar (grauer Punkt verschwand fast)
+            punkt ? "bg-emerald-500" : "border-[1.5px] border-slate-500 dark:border-slate-400"
           }`}
         />
       )}

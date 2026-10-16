@@ -168,7 +168,7 @@ export function RolesTab() {
                 eigenes Passwort
               </span>
               <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
-                <span aria-hidden className="h-2 w-2 rounded-full bg-slate-300 dark:bg-slate-600" />
+                <span aria-hidden className="h-2 w-2 rounded-full border-[1.5px] border-slate-500 dark:border-slate-400" />
                 noch Startpasswort
               </span>
             </span>
