@@ -201,20 +201,20 @@ export function MyKasse({
       </Sheet>
 
       {/* ------------------------------------------ Abi-Album (nur mit Recht) */}
-      {/* Mitmachen (Album, Motto, Zitate, Rankings): am Handy ein Regal zum
-          Wischen wie in Apple Music – die nächste Karte schaut rechts herein.
-          Vorher fünf hohe Karten untereinander (gut 800 px, die Übersicht war
-          fast drei Bildschirme lang). Ab 640 px zwei nebeneinander im Raster.
-          pb-7/-mb-7: Platz für die farbigen Schatten (overflow schneidet sonst ab). */}
+      {/* Mitmachen (Album, Motto, Zitate, Rankings): am Handy ein Raster aus
+          zwei Spalten kleiner Kacheln (FarbKachel, wie im Chats-Reiter) – ein
+          Tipp öffnet das Blatt. Vorher fünf hohe Karten untereinander (gut
+          800 px), danach ein seitlich wischbares Regal („man muss seitlich
+          scrollen, das ist unschön“, Runde 8). Album, Motto und Zitate je eine
+          Kachel, die Rankings eine ganze Reihe (Schüler | Lehrer); bei
+          ungerader Zahl geht die letzte einzelne Kachel über beide Spalten
+          (.regal in index.css). Ab 640 px die großen Karten, zwei nebeneinander. */}
       {/* data-tour: Einführung zeigt hier auf die Kacheln (Tour.tsx) */}
       <div
         data-tour="kacheln"
         role="region"
         aria-label="Mitmachen"
-        // Tastatur: die Karte mit dem Fokus ganz ins Bild holen (sonst blieb ein
-        // Knopf zu 80 % rechts außerhalb stehen)
-        onFocus={(e) => (e.target as HTMLElement).closest('[data-tour="kacheln"] > *')?.scrollIntoView({ inline: "start", block: "nearest" })}
-        className="no-scrollbar order-3 gap-3 max-sm:-mx-3 max-sm:-mb-7 max-sm:-mt-2 max-sm:flex max-sm:snap-x max-sm:snap-mandatory max-sm:scroll-px-3 max-sm:overflow-x-auto max-sm:px-3 max-sm:pb-7 max-sm:pt-2 max-sm:[&>*:only-child]:w-full max-sm:[&>*]:w-[86%] max-[359px]:[&>*]:w-[92%] max-sm:[&>*]:shrink-0 max-sm:[&>*]:snap-start sm:grid sm:grid-cols-2 md:order-4 md:col-span-2 [&:empty]:hidden"
+        className="regal order-3 grid grid-cols-2 gap-3 md:order-4 md:col-span-2 [&:empty]:hidden"
       >
         <AlbumKarte />
         <MottoKarte />

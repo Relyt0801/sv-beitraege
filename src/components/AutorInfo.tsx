@@ -102,6 +102,7 @@ export function WortfilterSchalter({
   kompakt,
   zeile,
   titel,
+  einzeilig,
 }: {
   bereich: WfBereich;
   className?: string;
@@ -111,6 +112,8 @@ export function WortfilterSchalter({
   zeile?: boolean;
   /** Eigene Bezeichnung statt „Wortfilter · …“ (z. B. „Offiziell“) */
   titel?: string;
+  /** Nur die Bezeichnung, ohne Zustand in Worten darunter (der Schalter zeigt ihn) */
+  einzeilig?: boolean;
 }) {
   const darf = useWfRecht()(bereich);
   const { an, setzen } = useWortfilterBereiche(darf);
@@ -120,16 +123,18 @@ export function WortfilterSchalter({
     const f = await setzen(bereich, v);
     if (f) meldeFehler("Ging nicht: " + f);
   };
-  // In einer Gruppe (`zeile`, Einstellungs-Blätter) EINE Zeile – den Zustand
-  // zeigt der Schalter; der Satz darunter machte die Blätter nur lang
-  // (Rückmeldung Okt. 2026: „Settings nehmen zu viel Platz“). Mit eigener
-  // grauer Fläche (Standard, allein stehend) weiter mit dem Zustand in Worten.
+  // In einer Gruppe (`zeile`, Einstellungs-Blätter) und mit `einzeilig`
+  // (Profil → Funktionen) EINE Zeile – den Zustand zeigt der Schalter; der
+  // Satz darunter machte die Blätter nur lang (Rückmeldung Okt. 2026:
+  // „Settings nehmen zu viel Platz“). Mit eigener grauer Fläche (Standard,
+  // allein stehend) weiter mit dem Zustand in Worten.
   const ohneFlaeche = zeile || kompakt;
+  const eineZeile = ohneFlaeche || einzeilig;
   return (
-    <label className={`flex items-center gap-3 px-4 py-2 ${ohneFlaeche ? "min-h-[48px]" : "feld-grau min-h-[52px]"} ${className}`}>
+    <label className={`flex items-center gap-3 px-4 py-2 ${eineZeile ? "min-h-[48px]" : "min-h-[52px]"} ${ohneFlaeche ? "" : "feld-grau"} ${className}`}>
       <span className="min-w-0 flex-1">
-        <span className="block text-[15px] leading-snug">{titel ?? `Wortfilter · ${info?.titel}`}</span>
-        {!ohneFlaeche && (
+        <span className={`block text-[15px] leading-snug ${einzeilig ? "truncate" : ""}`}>{titel ?? `Wortfilter · ${info?.titel}`}</span>
+        {!eineZeile && (
           <span className="block text-[12.5px] leading-snug text-tinte-leise">
             {an[bereich] ? "An – beleidigende Wörter werden blockiert" : "Aus – Einträge werden nicht geprüft"}
           </span>

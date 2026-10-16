@@ -11,6 +11,85 @@ ausführlich (auf Deutsch); hier steht der Überblick dazu.
 
 ---
 
+## Runde 8a: Offiziell/Inoffiziell schaltbar, Info-Symbol, Mottos löschen (16.10.2026)
+
+Rückmeldung: „Gewinner der Herzen macht keinen Sinn mehr mit offiziell /
+inoffiziell. Man soll überall einstellen können, ob es diese Aufteilung
+geben soll … Wenn es beides gibt, ein kleines Info-Symbol … Mit 1 Stimme
+inoffiziell, umgekehrt die festgelegte Anzahl … Settings an einem klaren
+Ort … Mottos, die nicht in der Abstimmung sind (und die Herzens-Kandidaten),
+in inoffiziell, Komitee und Admins dürfen löschen – ohne Benachrichtigungen.“
+
+- **Aufteilung je Bereich schaltbar** (Motto, Zitate, Rankings,
+  Album-Kommentare): Schalter „Offiziell & Inoffiziell trennen“ steht im
+  Zahnrad-Blatt des Bereichs **ganz oben** (beim Album: Einstellungen →
+  „Kommentare · Offiziell & Inoffiziell“). Aus: kein Umschalter, alles in
+  einem Bereich, nirgends das Wort „offiziell“ (Titel ohne „· Offiziell“).
+  Neues landet intern im Teil „offiziell“, nichts wird verschoben oder
+  gelöscht – wieder an, liegt alles im alten Teil.
+  Datenbank: `app_settings.teile`, `teile_setzen()` (Recht wie Verschieben
+  im Bereich, Admin immer), Schutz-Trigger, Protokolleintrag
+  (`supabase/teile-schaltbar.sql`, angewendet). App: `useAufgeteilt`,
+  `imTeil`, `mitTeil` in `lib/teile.ts`.
+- **Info-Symbol (i)** neben dem Umschalter statt des Erklärsatzes: je
+  Bereich, was in Abizeitung, Pullis, Banner … kommen kann und was in der
+  Stufe bleibt, dazu die Regel fürs Verschieben (`TeilInfo`, `TEIL_INFO`).
+- **Verschieben:** nach inoffiziell reicht **eine** Stimme (sofort), nach
+  offiziell die eingestellte Zahl (Profil → Freigaben → „Nach offiziell
+  verschieben“). Datenbank `verschieben_noetig()`. Die Rückfrage sagt nur
+  noch dem Owner „deine Zustimmung reicht“ – vorher stand das für jeden
+  Admin, die Datenbank sah das anders.
+- **Gewinner der Herzen** nur noch in Bereichen ohne Aufteilung – mit
+  Aufteilung übernimmt der inoffizielle Teil diese Rolle (Küren-Blatt,
+  Runden-Start, Einstellungen, Bühne).
+- **Mottos löschen** (Komitee = „Motto verwalten“, Admin): „Vorschlag
+  löschen“ unten im Verwalten-Blatt (···), mit Rückfrage, ohne
+  Benachrichtigung. `motto_loeschen()` leert den Vorschlag und markiert ihn
+  (`geloescht_at`); der Text steht nur im Protokoll. Nicht für Kandidaten
+  einer laufenden Runde oder gekürte Gewinner.
+- **Daten (live, nur UPDATE):** Die 10 Kandidaten der laufenden
+  Motto-Abstimmung liegen jetzt im Teil offiziell, alle übrigen 56 Vorschläge
+  und die Herzens-Kandidaten bleiben inoffiziell; das Herzens-Voting der
+  laufenden Runde ist aus. Ein Protokolleintrag, keine Benachrichtigung.
+- **Einstellungen kompakter:** lange Fußtexte gekürzt, Wortfilter-Zeilen
+  einzeilig (der Schalter zeigt den Zustand).
+
+## Runde 8b: Finanzen – Einnahme/Ausgabe am Kontostand, Buchungen rechts oben (16.10.2026)
+
+- **Knöpfe in der Kontostand-Karte** (`FinanzenTab.tsx`, `UebersichtKarte`,
+  `onBuchen`, `hinweis`): „+ Einnahme“ / „− Ausgabe“ direkt unter dem Betrag,
+  voll grün/rot, 44 px – nur mit Recht „Kassenbuch führen“. Die eigene
+  Knopf-Zeile über der Seite ist weg (und mit ihr das leere Rasterfeld am
+  Handy). Wer nur liest, sieht dort „Nur lesen …“ statt eines Balkens.
+- **Laptop/iPad quer, rechts:** oben „Buchungen“ als eine Karte (Filter und
+  Suche bleiben stehen, Monate zuerst zugeklappt, Monatskopf klebt),
+  mindestens die obere Hälfte bzw. 16 rem; darunter die Kostenanfragen,
+  höchstens die Hälfte, scrollen in sich. Links: Kontostand,
+  Aktionen/Beiträge/Sonstiges, Geplante Aktionen.
+- Handy/iPad hoch unverändert; Design-Regeln Abschnitt 3 angepasst.
+
+## Runde 8c: Handy ohne seitliches Scrollen, Profil einzeilig, Glas-Leiste (16.10.2026)
+
+- **Mitmachen auf der Startseite (< 640 px):** statt eines seitlich
+  wischbaren Regals ein Raster aus zwei Spalten kleiner Kacheln
+  (`FarbKachel`): Album, Motto, Zitate je eine Kachel, die Rankings eine Reihe;
+  ungerade Zahl → letzte Kachel über beide Spalten. Ab 640 px unverändert.
+- **Auswahl-Leiste der Kasse:** Namen in EINER Zeile „Anna, Ben +3 ›“, alle im
+  Blatt (`MassBar.tsx`). **Protokoll:** am Handy „Bereich ›“ mit Häkchen-Liste
+  statt 11 wischbarer Chips. **Kontodaten:** IBAN/Verwendungszweck brechen um.
+- **Profil:** keine Untertexte/Fußnoten mehr, jede Einstellung eine Zeile;
+  Kopf kompakt; Erscheinungsbild als aufklappbare Zeile mit Wert; die
+  Push-Prüfung klappt „Auf diesem Gerät“ auf (`ProfilSheet.tsx`).
+- **Funktionen:** einzeilig, Erklärungen hinter dem „i“ im Kopf, mehrere
+  Wortfilter einer Funktion auf einer Unterseite (`FunktionenSheet.tsx`).
+- **Glas-Leiste:** Die Linse federte mit `cubic-bezier(.34,1.32,.5,1)` über
+  ihr Ziel – gemessen bis 12,5 px über die Kapsel (Laptop, erster → letzter
+  Reiter), am iPhone 5–6,5 px; „eckig“ war der Weichzeichner an der Linse in
+  Bewegung bzw. das gerade Abschneiden am Leistenrand. Jetzt
+  `cubic-bezier(.32,.72,0,1)` für Lage und Breite, kein `backdrop-filter` an
+  der Linse, am Rand wächst sie beim Drücken nur nach innen. Nachgemessen
+  0–700 ms bei 320, 390 und 1440 px: bleibt in der Kapsel.
+
 ## Nachtrag: Vorsitz-Funktionen in der Demo, Terminanfragen nicht abgeschnitten (16.10.2026)
 
 Eine unabhängige Prüfung des Diffs von #19 fand Folgendes. Anfragen-Speicher,

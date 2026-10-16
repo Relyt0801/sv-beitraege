@@ -61,7 +61,7 @@ export const PATCH: PatchVersion = {
         },
         {
           titel: "Übersicht mit weniger Scrollen",
-          text: "„Für dich offen“ steht ganz oben. Album, Motto, Zitate und Rankings wischst du am Handy seitlich durch.",
+          text: "„Für dich offen“ steht ganz oben. Album, Motto, Zitate und Rankings stehen am Handy als Kacheln nebeneinander – ohne seitliches Wischen.",
           icon: "haken",
           farbe: "bg-[#FF9500]",
         },
