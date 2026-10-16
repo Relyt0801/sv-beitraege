@@ -268,7 +268,10 @@ export function Tour({
         <h3 className={`text-[17px] font-semibold leading-snug tracking-[-0.01em] ${letzter ? "" : rect ? "pr-28" : step.zeichen ? "px-6" : "pt-9"}`}>{step.title}</h3>
         <p className="mt-1.5 text-[15px] leading-relaxed text-tinte-matt dark:text-slate-300">{step.text}</p>
 
-        <div className={`mt-4 flex items-center gap-3 ${rect ? "" : "justify-center"}`}>
+        {/* flex-wrap: bei 320 px passen 10 Punkte, „Zurück“ und „Weiter“ nicht in
+            eine Reihe – dann rutschen die Knöpfe rechtsbündig darunter, statt über
+            den Rand zu ragen (Prüfung Okt. 2026) */}
+        <div className={`mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 ${rect ? "" : "justify-center"}`}>
           {/* Seitenpunkte wie auf dem iPhone-Homescreen */}
           <div className={`flex items-center gap-1.5 ${rect ? "mr-auto" : "absolute bottom-[1.6rem] left-5"}`} aria-label={`Schritt ${i + 1} von ${steps.length}`}>
             {steps.map((_, k) => (
@@ -280,7 +283,7 @@ export function Tour({
               />
             ))}
           </div>
-          <div className={`flex items-center gap-1 ${rect ? "" : "ml-auto"}`}>
+          <div className="ml-auto flex items-center gap-1">
             {i > 0 && (
               <button onClick={zurueck} className="min-h-[44px] rounded-full px-4 text-[15px] font-semibold text-brand transition active:scale-95">
                 Zurück

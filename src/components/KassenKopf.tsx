@@ -78,8 +78,10 @@ function KassenKopfRoh({
   });
   // Für die Handy-Zeile: Quote des laufenden Halbjahrs und bei wie vielen
   // PERSONEN aus früheren Halbjahren noch etwas fehlt – damit man sieht, ob
-  // sich das Blatt lohnt. Je Person einmal gezählt, wie „offen bei 5“ darüber
-  // (vorher Personen × Halbjahre: „früher 13 offen“ bei 8 Personen).
+  // sich das Blatt lohnt. Je Person einmal gezählt, wie „5 offen“ in den
+  // Kacheln (vorher Personen × Halbjahre: „früher 13 offen“ bei 8 Personen).
+  // Die Zahl steht vor „offen“, nicht am Zeilenende – am iPhone mini/SE
+  // schnitte das Abschneiden sonst genau sie ab („früher offen b…“).
   const quoteJetzt = halbjahre.find((h) => h.laeuft)?.quote ?? 100;
   const frueherOffen = students.filter((s) => HY.some((h, i) => i < bis && isActive(s, i) && s.terms[h].status === "offen")).length;
 
@@ -203,7 +205,7 @@ function KassenKopfRoh({
         >
           <span className="min-w-0 flex-1 truncate">
             <b className="font-semibold">{settings.aktuelles_halbjahr} läuft</b> · <span className="zahl">{quoteJetzt}{" "}%</span> bezahlt
-            {frueherOffen > 0 && <span className="text-offen dark:text-amber-300"> · früher offen bei {frueherOffen}</span>}
+            {frueherOffen > 0 && <span className="text-offen dark:text-amber-300"> · früher {frueherOffen} offen</span>}
           </span>
           <span className="flex shrink-0 items-center gap-1 text-tinte-leise">
             {/* Unter 360 px braucht die Zeile den Platz für „früher … offen“ */}

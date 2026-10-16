@@ -291,10 +291,14 @@ export function ChatsTab() {
   const kuerzlich = new Set(
     isStaff ? items.filter((i) => i.type !== "system" && new Date(i.created_at).getTime() > grenze).map((i) => i.topic_id) : [],
   );
+  // Ungelesenes und eben Bedientes (gehalten) stehen immer da – auch über die
+  // 3 hinaus; sonst spränge eine Zeile, deren Glocke man gerade ausschaltet,
+  // unter dem Finger weg (und der nächste Tipp träfe die Zeile darunter).
   const ungelesen = (t: Topic) => zaehlt(t) && unreadCount(t.id) > 0;
-  const aktiv = (t: Topic) => komiteeAn(mitteilungen, t.tag, false) || kuerzlich.has(t.id) || gehalten.has(t.id);
-  let freiePlaetze = Math.max(0, 3 - andereChats.filter(ungelesen).length);
-  const aktiveKomitees = andereChats.filter((t) => ungelesen(t) || (aktiv(t) && freiePlaetze-- > 0));
+  const fest = (t: Topic) => ungelesen(t) || gehalten.has(t.id);
+  const aktiv = (t: Topic) => komiteeAn(mitteilungen, t.tag, false) || kuerzlich.has(t.id);
+  let freiePlaetze = Math.max(0, 3 - andereChats.filter(fest).length);
+  const aktiveKomitees = andereChats.filter((t) => fest(t) || (aktiv(t) && freiePlaetze-- > 0));
   // Bliebe nur EIN Komitee übrig, steht es direkt da – „Alle 1 Komitees ›“
   // wäre eine Zeile, die nur auf eine andere Zeile zeigt.
   const handyKomitees = andereChats.length - aktiveKomitees.length <= 1 ? andereChats : aktiveKomitees;
@@ -324,9 +328,11 @@ export function ChatsTab() {
     />
   );
   /** Ein Komitee, in dem man nicht ist, als Listenzeile mit Glocke (Team).
-   *  Im Blatt (imBlatt) schließt ein Tipp erst das Blatt, dann geht das
-   *  Komitee auf – sonst ginge die Ebene unter dem Blatt auf. */
-  const komiteeZeile = (t: Topic, imBlatt = false) => (
+   *  ort: „kurz“ = gekürzte Handy-Liste (nur dort hält „Glocke aus“ die Zeile
+   *  fest), „liste“ = ganze Liste ab iPad, „blatt“ = Blatt „Alle N Komitees“
+   *  (ein Tipp schließt erst das Blatt, dann geht das Komitee auf – sonst
+   *  ginge die Ebene unter dem Blatt auf). */
+  const komiteeZeile = (t: Topic, ort: "kurz" | "liste" | "blatt") => (
     <ChatZeile
       key={t.id}
       titel={committeeLabel(t.tag)}
@@ -334,13 +340,13 @@ export function ChatsTab() {
       unter={komiteeUnter(t, "Noch keine Nachricht")}
       unread={zaehlt(t) ? unreadCount(t.id) : 0}
       onOpen={() => {
-        if (imBlatt) setAlleKomitees(false);
+        if (ort === "blatt") setAlleKomitees(false);
         oeffne(t.id);
       }}
       glocke={{
         an: komiteeAn(mitteilungen, t.tag, false),
         setAn: (x) => {
-          if (!x && !imBlatt) setGehalten((g) => new Set(g).add(t.id));
+          if (!x && ort === "kurz") setGehalten((g) => new Set(g).add(t.id));
           void setKomitee(t.tag, x);
         },
         name: committeeLabel(t.tag),
@@ -481,7 +487,7 @@ export function ChatsTab() {
         (isStaff ? (
           <>
             <Gruppe className="md:hidden" titel={komiteeTitel}>
-              {handyKomitees.map((t) => komiteeZeile(t))}
+              {handyKomitees.map((t) => komiteeZeile(t, "kurz"))}
               {andereChats.length > handyKomitees.length && (
                 <Zeile label={`Alle ${andereChats.length} Komitees`} onClick={() => setAlleKomitees(true)} />
               )}
@@ -489,7 +495,7 @@ export function ChatsTab() {
             {/* ab Laptop zwei Spalten (Gruppe spalten): 7 Komitees sind dann
                 4 Zeilen statt 7 über die ganze Breite (DESIGN-REGELN 2) */}
             <Gruppe className="max-md:hidden" titel={komiteeTitel} fuss={GLOCKE_FUSS} spalten>
-              {andereChats.map((t) => komiteeZeile(t))}
+              {andereChats.map((t) => komiteeZeile(t, "liste"))}
             </Gruppe>
           </>
         ) : (
@@ -569,7 +575,7 @@ export function ChatsTab() {
         <Sheet open={alleKomitees} onClose={() => setAlleKomitees(false)}>
           <SheetKopf titel={komiteeTitel} onClose={() => setAlleKomitees(false)} />
           <Gruppe className="" fuss={GLOCKE_FUSS}>
-            {andereChats.map((t) => komiteeZeile(t, true))}
+            {andereChats.map((t) => komiteeZeile(t, "blatt"))}
           </Gruppe>
         </Sheet>
       )}

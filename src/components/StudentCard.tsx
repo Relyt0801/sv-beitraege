@@ -83,6 +83,9 @@ function StudentCardRoh({
   const fruehereOffen = HY.filter(
     (h, i) => i < aktIdx && student.terms[h].status === "offen" && !isPreJoin(student, i) && !isDead(student, i),
   );
+  // Drei und mehr aufeinanderfolgende als Spanne („EF.1–Q1.2“): Bei 320 px
+  // passten „EF.1, EF.2, Q1.1, Q1.2, Q2.1“ nicht einmal in zwei Zeilen.
+  const offenText = spannen(fruehereOffen.map((h) => idx(h)));
   // „auch“ nur, wenn das laufende Halbjahr selbst offen ist – sonst stünde
   // neben „EF.2 ✓“ ein „auch EF.1 offen“, das nicht stimmt (Prüfung Okt. 2026)
   const aktOffen =
@@ -149,12 +152,14 @@ function StudentCardRoh({
               <>
                 <span className="text-offen dark:text-amber-300">
                   {aktOffen ? "auch " : ""}
-                  {fruehereOffen.join(", ")} offen
+                  {/* bricht nur nach einem Komma um; „offen“ bleibt am letzten Halbjahr */}
+                  {offenText}{"\u00a0"}offen
                 </span>
                 {" · "}
               </>
             )}
-            {prozent} % Mithilfe
+            {/* festes Leerzeichen: „0“ und „% Mithilfe“ nie auf zwei Zeilen */}
+            <span className="whitespace-nowrap">{prozent}{"\u00a0"}% Mithilfe</span>
             {unter && ` · ${unter}`}
           </span>
         </span>
@@ -228,4 +233,19 @@ export const StudentCard = memo(StudentCardRoh);
 export function nextStatus(cur: string) {
   const i = STATI.indexOf(cur as any);
   return STATI[(i + 1) % STATI.length];
+}
+
+/** Halbjahre als kurze Liste: drei und mehr aufeinanderfolgende als Spanne
+ *  („EF.1–Q1.2“), sonst mit Komma („EF.1, Q1.1“). Erwartet aufsteigende Indizes. */
+function spannen(indizes: number[]): string {
+  const teile: string[] = [];
+  for (let a = 0; a < indizes.length; ) {
+    let b = a;
+    while (b + 1 < indizes.length && indizes[b + 1] === indizes[b] + 1) b++;
+    // U+2060 (Wortverbinder): kein Zeilenumbruch am Strich
+    if (b - a >= 2) teile.push(`${HY[indizes[a]]}\u2060–\u2060${HY[indizes[b]]}`);
+    else for (let k = a; k <= b; k++) teile.push(HY[indizes[k]]);
+    a = b + 1;
+  }
+  return teile.join(", ");
 }

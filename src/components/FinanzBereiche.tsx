@@ -840,14 +840,19 @@ export function GeplantKarte({ darf, fin, className = "", alsZeile = false }: { 
     />
   );
 
-  if (alsZeile) {
-    // Rechts nur die Anzahl, Datum und „vorbei“ in der zweiten Zeile – rechts
-    // daneben war am Handy kein Platz („1 · ab 3. Nov. · 2 v…“, Prüfung Okt. 2026)
-    const kommend = anstehend.filter((g) => g.datum);
-    const ab = kommend[0]?.datum ? new Date(kommend[0].datum + "T12:00:00").toLocaleDateString("de-DE", { day: "numeric", month: "short" }) : null;
-    const unter = [ab ? `nächste am ${ab}` : null, anzahlVorbei ? `${anzahlVorbei} vorbei` : null].filter(Boolean).join(" · ");
-    return (
-      <>
+  // Rechts nur die Anzahl, Datum und „vorbei“ in der zweiten Zeile – rechts
+  // daneben war am Handy kein Platz („1 · ab 3. Nov. · 2 v…“, Prüfung Okt. 2026)
+  const kommend = anstehend.filter((g) => g.datum);
+  const ab = kommend[0]?.datum ? new Date(kommend[0].datum + "T12:00:00").toLocaleDateString("de-DE", { day: "numeric", month: "short" }) : null;
+  const unter = [ab ? `nächste am ${ab}` : null, anzahlVorbei ? `${anzahlVorbei} vorbei` : null].filter(Boolean).join(" · ");
+
+  // EINE Form für Zeile und Karte: Inhalt, Listenblatt und Detailblatt stehen
+  // immer an denselben Plätzen. FinanzStandard schaltet alsZeile beim Drehen
+  // um – so hängt dabei kein Blatt neu ein: Ein offenes Blatt bleibt offen und
+  // geht beim Zurückdrehen nicht von selbst wieder auf (Prüfung Okt. 2026).
+  return (
+    <>
+      {alsZeile ? (
         <Zeile
           label="Geplante Aktionen"
           unter={unter || undefined}
@@ -860,20 +865,15 @@ export function GeplantKarte({ darf, fin, className = "", alsZeile = false }: { 
         >
           <span className="zahl whitespace-nowrap text-[15px] text-tinte-leise">{anstehend.length || "keine"}</span>
         </Zeile>
-        <Sheet open={listeAuf} onClose={() => setListeAuf(false)}>
-          <SheetKopf titel="Geplante Aktionen" onClose={() => setListeAuf(false)} />
-          {geplantListe(true)}
-        </Sheet>
-        {blatt}
-      </>
-    );
-  }
-
-  return (
-    <section className={`card min-w-0 p-4 sm:p-5 ${className}`}>
-      {geplantListe(false)}
+      ) : (
+        <section className={`card min-w-0 p-4 sm:p-5 ${className}`}>{geplantListe(false)}</section>
+      )}
+      <Sheet open={listeAuf} onClose={() => setListeAuf(false)}>
+        <SheetKopf titel="Geplante Aktionen" onClose={() => setListeAuf(false)} />
+        {geplantListe(true)}
+      </Sheet>
       {blatt}
-    </section>
+    </>
   );
 
   // Kopf und Liste – in der Karte oder im Blatt (dort selbst als Karte).
