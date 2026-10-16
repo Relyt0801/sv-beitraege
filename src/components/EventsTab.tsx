@@ -367,7 +367,10 @@ export function EventsTab() {
         <>
           {/* Offene Schichten zum Bestätigen – bleibt, auch wenn das Pop-up weggewischt wurde */}
           <AbschlussHinweis />
-          <MeineSchichten ausserTag={streifenTag} />
+          {/* Team: Aktions-Schichten stehen gleich darunter in „Mitmachen“ mit
+              „Eingeteilt“ – hier nur die ohne Aktion (Okt. 2026). Die rechte
+              Spalte am Laptop zeigt weiter alle Tickets. */}
+          <MeineSchichten ausserTag={streifenTag} nurOhneAktion={darfTermine} />
         </>
       )}
 

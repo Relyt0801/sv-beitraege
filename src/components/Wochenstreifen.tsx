@@ -99,6 +99,12 @@ export function Wochenstreifen({
       : `${kurz(a).slice(0, 3)}–${kurz(b).slice(0, 3)} ${b.getFullYear()}`;
   };
   const dieseWoche = woStart === montagVon(heute);
+  // Heute ohne Eintrag und ohne „+ Termin“ (Schüler, Vorsitz): der Tagesblock
+  // fällt ganz weg. „HEUTE · nichts eingetragen“ sagte nur, was der blaue
+  // Kreis ohne Punkt schon zeigt – und schob am Handy das erste „Eintragen“
+  // um 65 px nach unten (Prüfung Okt. 2026: am iPhone SE unter dem Rand).
+  // Andere Tage, Tage mit Einträgen und das Team („+ Termin“) behalten ihn.
+  const ohneTagesblock = ready && !onNeu && gewaehlt === heute && desTages.length === 0;
 
   return (
     <section className="card mb-5 overflow-hidden p-3 sm:p-4" data-tour="wochenstreifen">
@@ -239,63 +245,67 @@ export function Wochenstreifen({
       </div>
 
       {/* ------------------------------------------------ der gewählte Tag */}
-      <div className="mt-2.5 border-t border-black/[0.08] pt-2.5 dark:border-white/[0.1]">
-        <div className="mb-1 flex min-h-[44px] items-center justify-between gap-2 px-1">
-          <span className="min-w-0 truncate text-[13px] font-semibold uppercase tracking-[0.02em] text-tinte-leise">
-            {gewaehlt === heute ? "Heute" : tagLang(gewaehlt)}
-            {/* Leerer Tag heute: in derselben Zeile statt einer eigenen darunter.
-                Andere Tage („DI, 21. OKTOBER“ + „Heute“-Knopf) hätten dafür
-                keinen Platz – dort bleibt die eigene Zeile. Mit „+ Termin“
-                (Team) reicht der Platz erst ab 360 px. */}
-            {ready && desTages.length === 0 && gewaehlt === heute && (
-              <span className={`font-normal normal-case tracking-normal ${onNeu ? "max-[359px]:hidden" : ""}`}> · nichts eingetragen</span>
-            )}
-          </span>
-          <span className="flex shrink-0 items-center gap-2">
-            {gewaehlt !== heute && (
-              <button
-                onClick={() => {
-                  setWoStart(montagVon(heute));
-                  setGewaehlt(heute);
-                }}
-                className="btn-klein-grau"
-              >
-                Heute
-              </button>
-            )}
-            {/* Team: Termin am gewählten Tag – beschriftet, damit klar ist, was das „＋“ tut */}
-            {onNeu && (
-              <button
-                onClick={() => onNeu(gewaehlt)}
-                className="btn-klein"
-                aria-label="Termin am gewählten Tag eintragen"
-                title="Termin am gewählten Tag eintragen"
-              >
-                <Icon name="plus" size={14} strich={2.6} />
-                Termin
-              </button>
-            )}
-          </span>
-        </div>
-
-        {!ready ? (
-          <div className="py-2">
-            <SkelettText zeilen={2} />
+      {!ohneTagesblock && (
+        <div className="mt-2.5 border-t border-black/[0.08] pt-2.5 dark:border-white/[0.1]">
+          <div className="mb-1 flex min-h-[44px] items-center justify-between gap-2 px-1">
+            <span className="min-w-0 truncate text-[13px] font-semibold uppercase tracking-[0.02em] text-tinte-leise">
+              {gewaehlt === heute ? "Heute" : tagLang(gewaehlt)}
+              {/* Leerer Tag heute (gibt es hier nur noch fürs Team, siehe
+                  ohneTagesblock): in derselben Zeile statt einer eigenen darunter.
+                  Andere Tage („DI, 21. OKTOBER“ + „Heute“-Knopf) hätten dafür
+                  keinen Platz – dort bleibt die eigene Zeile. Neben „+ Termin“
+                  reicht der Platz erst ab 360 px. */}
+              {ready && desTages.length === 0 && gewaehlt === heute && (
+                <span className="font-normal normal-case tracking-normal max-[359px]:hidden"> · nichts eingetragen</span>
+              )}
+            </span>
+            <span className="flex shrink-0 items-center gap-2">
+              {gewaehlt !== heute && (
+                <button
+                  onClick={() => {
+                    setWoStart(montagVon(heute));
+                    setGewaehlt(heute);
+                  }}
+                  className="btn-klein-grau"
+                >
+                  Heute
+                </button>
+              )}
+              {/* Team: Termin am gewählten Tag – beschriftet, damit klar ist, was das „＋“ tut */}
+              {onNeu && (
+                <button
+                  onClick={() => onNeu(gewaehlt)}
+                  className="btn-klein"
+                  aria-label="Termin am gewählten Tag eintragen"
+                  title="Termin am gewählten Tag eintragen"
+                >
+                  <Icon name="plus" size={14} strich={2.6} />
+                  Termin
+                </button>
+              )}
+            </span>
           </div>
-        ) : desTages.length === 0 ? (
-          gewaehlt !== heute ? (
-            <div className="px-1 py-2.5 text-[14px] text-tinte-leise">Nichts eingetragen.</div>
-          ) : onNeu ? (
-            <div className="px-1 py-2.5 text-[14px] text-tinte-leise min-[360px]:hidden">Nichts eingetragen.</div>
-          ) : null
-        ) : (
-          <ul className="grid">
-            {desTages.map((t) => (
-              <TerminZeile key={t.id} t={t} meins={meins(t)} status={st(t)} onClick={onOeffnen ? () => onOeffnen(t) : undefined} />
-            ))}
-          </ul>
-        )}
-      </div>
+
+          {!ready ? (
+            <div className="py-2">
+              <SkelettText zeilen={2} />
+            </div>
+          ) : desTages.length === 0 ? (
+            gewaehlt !== heute ? (
+              <div className="px-1 py-2.5 text-[14px] text-tinte-leise">Nichts eingetragen.</div>
+            ) : (
+              // heute leer, Team: unter 360 px passt der Hinweis nicht neben „+ Termin“
+              <div className="px-1 py-2.5 text-[14px] text-tinte-leise min-[360px]:hidden">Nichts eingetragen.</div>
+            )
+          ) : (
+            <ul className="grid">
+              {desTages.map((t) => (
+                <TerminZeile key={t.id} t={t} meins={meins(t)} status={st(t)} onClick={onOeffnen ? () => onOeffnen(t) : undefined} />
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
     </section>
   );
 }
