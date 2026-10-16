@@ -64,7 +64,18 @@ gegengeprüft): 2 bestätigte kleine Funde, beide behoben.
   - Finanzen iPad hoch: Löcher 25–27 % → 9–12 %.
   - Mittel Tablet: 10,5 % → 9,1 % Löcher (höchster Wert 27 % → 14 %).
   - Mittel Handy unverändert: 2,09 Bildschirme, 10 % Löcher.
-- `ui-check`, `leisten-check` und Klicktests auf r45: Ergebnis folgt.
+- `ui-check` 280 Ansichten ohne Fund (axe ohne Befund, keine
+  Konsolenfehler).
+- `leisten-check` 777 Zustände, 0 Abweichungen.
+- Klicktests:
+  - offiziell/inoffiziell 15/15
+  - Anfragen 9/9
+  - Herzen 9/9
+  - Rankings-Herzen 7/7
+  - Zitate-Runden 5/5
+- Fokus-Test (Blatt offen, Breite wechselt über 1024 px) in beiden Richtungen
+  in Ordnung.
+- Typecheck und Build ohne Fehler.
 
 ## Runde 8d: Korrekturen aus der Prüfung von Runde 8 (16.10.2026)
 
