@@ -14,7 +14,7 @@ import { Gruppe, Zeile } from "./Liste";
  * Finanzen unter dem Kontostand:
  *  1. „Aktionen, Beiträge und Sonstiges“ – alles, was Geld bewegt: Elternbeiträge
  *     (blau), jede Aktion/Kategorie in ihrer Farbe mit ihren Ausgaben verrechnet,
- *     Komitees, Spenden, Sonstiges (grau). Jede Zeile antippbar (ⓘ).
+ *     Komitees, Spenden, Sonstiges (grau). Jede Zeile antippbar („›“, vorher ⓘ).
  *  2. „Geplante Aktionen“ – was noch ansteht, mit Tag, Infos und Erwartung.
  *
  * Mit `fin` (Kassenwart/Admin, „Kassenbuch führen“) wird gebucht, gelöscht,
@@ -191,12 +191,13 @@ function PostenZeile({
       >
         <Punkt hex={hex} />
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-[14px] font-semibold">{name}</span>
+          {/* Höchstens zwei Zeilen statt abgeschnitten („Waffelstand Elternspr…“ am schmalen Handy) */}
+          <span className="line-clamp-2 block text-[14px] font-semibold leading-snug [overflow-wrap:anywhere]">{name}</span>
           {unter && <span className="zahl block truncate text-[12px] text-tinte-leise">{unter}</span>}
         </span>
         <Betrag cent={betrag} className="shrink-0 text-[15px] font-bold" />
         <span className="shrink-0 text-tinte-leise" aria-hidden>
-          <Icon name="info" size={17} />
+          <Icon name="chevron" size={14} strich={2.4} />
         </span>
       </button>
     </li>
@@ -404,7 +405,7 @@ function Unterpunkte({ p, fin, onBuchung }: { p: FinanzPosten; fin: FinanzenValu
             <>
               {e.farbe && <Punkt hex={farbHex(e.farbe, dunkel)} />}
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-[14px] font-semibold">{e.titel}</span>
+                <span className="line-clamp-2 block text-[14px] font-semibold leading-snug [overflow-wrap:anywhere]">{e.titel}</span>
                 <span className="block text-[12px] text-tinte-leise">{tagKurz(e.datum)}</span>
               </span>
               <Betrag cent={e.cent} className="shrink-0 text-[14px] font-bold" />
@@ -808,9 +809,9 @@ function GeplantKarte({ darf, fin, className = "" }: { darf: boolean; fin: Finan
                     <span className="zahl mt-0.5 text-[17px] font-bold">{d ? d.getDate() : "?"}</span>
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="flex items-center gap-1.5">
+                    <span className="flex items-baseline gap-1.5">
                       {f && <Punkt hex={farbHex(f, dunkel)} />}
-                      <span className="truncate text-[14px] font-semibold">{g.titel}</span>
+                      <span className="line-clamp-2 min-w-0 text-[14px] font-semibold leading-snug [overflow-wrap:anywhere]">{g.titel}</span>
                     </span>
                     <span className="block truncate text-[12px] text-tinte-leise">
                       {[
@@ -821,7 +822,7 @@ function GeplantKarte({ darf, fin, className = "" }: { darf: boolean; fin: Finan
                     </span>
                   </span>
                   <span className="shrink-0 text-tinte-leise" aria-hidden>
-                    <Icon name="info" size={17} />
+                    <Icon name="chevron" size={14} strich={2.4} />
                   </span>
                 </button>
               </li>

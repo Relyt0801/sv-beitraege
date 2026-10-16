@@ -212,6 +212,12 @@ export function Tour({
       : { top: rect.top + rect.height + PAD + 12, left: links, width: w };
   }
 
+  // Das Loch nie über den oberen Rand: Der Profil-Knopf (44 px bei y = 8)
+  // ergab top = 0 – Ring und obere Rundung lagen außerhalb des Bildes.
+  // 4 px lassen Platz für den 2,5-px-Ring.
+  const lochOben = rect ? Math.max(4, rect.top - PAD) : 0;
+  const lochHoehe = rect ? rect.top + rect.height + PAD - lochOben : 0;
+
   return (
     <div className="fixed inset-0 z-[100]" role="dialog" aria-modal="true" aria-label="Einführung">
       {/* Abdunkeln mit Loch um das Element */}
@@ -220,16 +226,16 @@ export function Tour({
           <div
             className="pointer-events-none absolute rounded-[1.25rem] transition-all duration-300 ease-ios"
             style={{
-              top: rect.top - PAD,
+              top: lochOben,
               left: rect.left - PAD,
               width: rect.width + PAD * 2,
-              height: rect.height + PAD * 2,
+              height: lochHoehe,
               boxShadow: "0 0 0 9999px rgba(0,0,0,.66)",
             }}
           />
           <div
             className="pointer-events-none absolute animate-puls rounded-[1.25rem] ring-[2.5px] ring-brand transition-all duration-300 ease-ios"
-            style={{ top: rect.top - PAD, left: rect.left - PAD, width: rect.width + PAD * 2, height: rect.height + PAD * 2 }}
+            style={{ top: lochOben, left: rect.left - PAD, width: rect.width + PAD * 2, height: lochHoehe }}
           />
         </>
       ) : (

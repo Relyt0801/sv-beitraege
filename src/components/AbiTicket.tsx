@@ -14,8 +14,9 @@ import {
 } from "../lib/tickets";
 import { KontoTab, jahrgangKurz } from "./KontoTab";
 import { Sheet, SheetKopf } from "./Sheet";
-import { Gruppe, Zeile } from "./Liste";
+import { Gruppe, Symbol, Zeile } from "./Liste";
 import { Icon } from "./Icon";
+import { StaffelKacheln } from "./Staffel";
 
 /**
  * Das Abiball-Ticket – personalisiert, so wie es später auch aussehen soll.
@@ -495,6 +496,153 @@ function TicketAnsicht({
   );
 }
 
+// ================================================================ Eltern
+
+/** Kleines Ticket-Symbol für Zeilen: Nachtblau mit goldenem Funken wie das Ticket selbst */
+function TicketSymbol() {
+  return (
+    <Symbol farbe="bg-gradient-to-br from-[#23467F] to-[#0A1730] !text-[#E9C460] ring-1 ring-inset ring-[#E2B744]/45">
+      <Icon name="funke" size={16} strich={2.2} />
+    </Symbol>
+  );
+}
+
+/**
+ * Eltern-Übersicht: das Ticket EINES Kindes als Zeile in dessen Karte (eine
+ * `gruppe-zellen`) – „Abiball-Ticket · Preis“, darunter der Stand. Ein Tipp
+ * öffnet die Ticket-Ansicht mit dem großen Ticket. Offene Bestellungen stehen
+ * als eigene Zeile mit „Überweisen“ darunter – das ist das, was Eltern tun.
+ *
+ * Prüfung Okt. 2026: Vorher stand bei jedem Kind eine eigene Ticket-Karte mit
+ * großer Grafik „Preis folgt“ und beim ersten Kind zusätzlich das Gäste-
+ * Ticket – zusammen über einen Bildschirm, das zweite Kind kam erst nach 1,5
+ * Bildschirmen. Was für alle gilt (Gäste-Ticket, Countdown, Staffel), steht
+ * jetzt EINMAL in `TicketFamilie`.
+ */
+export function TicketZeilen({ student, settings, prozent }: { student: Student; settings: Settings; prozent: number }) {
+  const { sichtbar } = useFunktionen();
+  const zeigen = sichtbar("abiball");
+  const [auf, setAuf] = useState(false);
+  const [zahlen, setZahlen] = useState<TicketBestellung | null>(null);
+  const a = abiballVon(settings);
+  const abMs = a.verkaufAb ? Date.parse(a.verkaufAb) : NaN;
+  // Kein Countdown in der Zeile – nur der Wechsel „bald“ → „läuft“ zählt
+  const jetzt = useJetzt(Number.isFinite(abMs) && abMs > Date.now(), 30_000);
+  const status = verkaufStatus(a, jetzt);
+  const { liste } = useTicketBestellungen(zeigen);
+  if (!zeigen) return null;
+
+  const p = ticketPreise(prozent, settings);
+  const aktiv = liste.filter((b) => b.student_id === student.id && b.status !== "storniert");
+  const offene = aktiv.filter((b) => b.status === "offen");
+  const anzahl = aktiv.reduce((n, b) => n + b.anzahl, 0);
+  const stand =
+    anzahl > 0
+      ? `${anzahl} ${anzahl === 1 ? "Ticket" : "Tickets"} bestellt · ${offene.length ? "Überweisung offen" : "bezahlt"}`
+      : status === "laeuft"
+        ? `Verkauf läuft – ${student.vorname} bestellt selbst`
+        : status === "bald"
+          ? `Verkauf ab ${zeitpunktSchoen(a.verkaufAb!)}`
+          : "Verkauf noch nicht gestartet";
+
+  return (
+    <>
+      <Zeile symbol={<TicketSymbol />} label="Abiball-Ticket" unter={stand} onClick={() => setAuf(true)}>
+        <span className="zahl text-[15px] font-semibold text-tinte-matt dark:text-slate-300">{p.preisSteht ? `${p.erstes} €` : "Preis folgt"}</span>
+      </Zeile>
+      {offene.map((b) => (
+        // Eingerückt bis zum Text der Ticket-Zeile darüber (16 + 30 + 12 px) –
+        // so gehört die Bestellung sichtbar zum Ticket
+        <div key={b.id} className="flex min-h-[52px] items-center gap-3 py-2 pl-[58px] pr-4 before:!left-[58px]">
+          <span className="min-w-0 flex-1">
+            <span className="block text-[15px] leading-snug">
+              {b.anzahl} {b.anzahl === 1 ? "Ticket" : "Tickets"} · {euroAusCent(b.betrag_cent)}
+            </span>
+            <span className="mt-0.5 block text-[12.5px] font-semibold leading-snug text-offen">Überweisung offen · {bestellNummer(b)}</span>
+          </span>
+          <button
+            onClick={() => setZahlen(b)}
+            className="btn-klein min-h-[44px] shrink-0"
+            aria-label={`${b.anzahl} ${b.anzahl === 1 ? "Ticket" : "Tickets"} für ${student.vorname} überweisen`}
+          >
+            Überweisen
+          </button>
+        </div>
+      ))}
+      {auf && <TicketAnsicht student={student} settings={settings} prozent={prozent} fuerEltern onClose={() => setAuf(false)} />}
+      {zahlen && <TicketUeberweisen bestellung={zahlen} student={student} settings={settings} du={false} onClose={() => setZahlen(null)} />}
+    </>
+  );
+}
+
+/**
+ * Eltern-Übersicht: was für die ganze Familie gilt, EINMAL – das Ticket für
+ * Eltern & Gäste, der Verkaufsstand (mit Countdown) und die Staffel, in der
+ * bei Geschwistern jedes Kind mit Vornamen an seiner Stufe steht.
+ *
+ * Vorher stand das Gäste-Ticket nur in der Karte des ersten Kindes (wirkte
+ * wie dessen Ticket, die Spalten waren ungleich hoch) und die Staffel bei
+ * jedem Kind einzeln.
+ *
+ * `breit`: Die Karte geht über die volle Breite (Geschwister) – ab 700 px dann
+ * Ticket links, Staffel rechts. Bei einem Kind steht sie neben dessen Karte.
+ */
+export function TicketFamilie({
+  settings,
+  kinder,
+  breit,
+}: {
+  settings: Settings;
+  kinder: { student: Student; prozent: number }[];
+  breit?: boolean;
+}) {
+  const { sichtbar } = useFunktionen();
+  const zeigen = sichtbar("abiball");
+  const { a, abMs, jetzt, status } = useVerkauf(settings);
+  const erstes = kinder[0];
+  if (!erstes) return null;
+  const mehrere = kinder.length > 1;
+
+  return (
+    <section className="card p-4 sm:p-5" aria-label="Abiball-Tickets">
+      <AusHinweis funktion="abiball" className="mb-2" />
+      <h2 className="text-[15px] font-semibold">{zeigen ? "Abiball-Tickets" : "Mithilfe senkt den Ticketpreis"}</h2>
+      {/* Am Laptop behält das Ticket Ticket-Maße (vorher ~780 px breit gezogen) */}
+      <div
+        className={`grid ${zeigen && breit ? "min-[700px]:grid-cols-2 min-[700px]:items-start min-[700px]:gap-x-6 lg:grid-cols-[minmax(0,24rem)_minmax(0,1fr)] lg:gap-x-10" : ""}`}
+      >
+        {zeigen && (
+          <div className="mt-3 grid content-start gap-2.5">
+            {/* Das Ticket der Eltern selbst: hängt von keinem Kind ab */}
+            <AbiTicket art="weiteres" student={erstes.student} settings={settings} prozent={erstes.prozent} klein />
+            <Info>
+              {status === "bald" ? (
+                <span>
+                  Verkauf startet in <b className="zahl font-bold text-tinte dark:text-slate-100">{countdown(abMs - jetzt)}</b> ·{" "}
+                  {zeitpunktSchoen(a.verkaufAb!)}
+                </span>
+              ) : status === "laeuft" ? (
+                <span>
+                  Verkauf läuft – {mehrere ? "jedes Kind bestellt" : `${erstes.student.vorname} bestellt`} über den eigenen Zugang, auch die
+                  Karten für Eltern & Gäste.
+                </span>
+              ) : (
+                <span>Der Verkauf ist noch nicht gestartet.</span>
+              )}
+            </Info>
+          </div>
+        )}
+        <StaffelKacheln
+          pct={erstes.prozent}
+          settings={settings}
+          kinder={mehrere ? kinder.map((k) => ({ name: k.student.vorname, pct: k.prozent })) : undefined}
+          className={zeigen && breit ? "mt-4 min-[700px]:mt-3" : zeigen ? "mt-4" : "mt-2"}
+        />
+      </div>
+    </section>
+  );
+}
+
 // ================================================================ Bereich
 
 /**
@@ -513,6 +661,8 @@ function TicketAnsicht({
  *     einmal (es hängt nicht vom Kind ab).
  *   • `eineSpalte`: Steht der Bereich in einer halben Spalte (Geschwister
  *     nebeneinander), kommen Tickets und Kasse untereinander statt gequetscht.
+ *   • Die Eltern-Übersicht nutzt seit der Prüfung Okt. 2026 `TicketZeilen` (je
+ *     Kind eine Zeile) und `TicketFamilie` (Gäste-Ticket und Staffel einmal).
  */
 export function TicketBereich({
   student,

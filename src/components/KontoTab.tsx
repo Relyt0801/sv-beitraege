@@ -108,15 +108,19 @@ export function KontoTab({
   // laengster Inhalt. Sonst schiebt die IBAN auf kleinen iPhones die ganze
   // Seite breiter als den Bildschirm.
   // Kleine Überschrift über einer Gruppe – wie in den iOS-Einstellungen
-  const kopf = (text: string) => <h3 className="mb-1.5 px-4 text-[13px] uppercase tracking-[0.02em] text-tinte-leise">{text}</h3>;
+  // Steht direkt auf dem Hintergrund (auch dem eigenen Bild): auf-bild
+  const kopf = (text: string) => <h3 className="auf-bild mb-1.5 px-4 text-[13px] uppercase tracking-[0.02em] text-tinte-leise">{text}</h3>;
 
   return (
     <div className="grid grid-cols-1 gap-3">
-      <section className={seite ? "card p-5" : ""}>
+      {/* Auf der eigenen Seite KEINE Karte um die Gruppen: Sie stehen direkt
+          auf dem Grund wie in den iOS-Einstellungen und fluchten an der Spalte
+          (vorher Karte + Gruppen = doppelter Einzug, zwei Ebenen Kästen). */}
+      <section>
         {/* Keine eigene Überschrift („So überweisen Sie“): Auf der eigenen
             Seite steht oben schon „Kontodaten“, im Blatt (personen) der Titel
             des Blatts („Überweisen“, „Tickets überweisen“) – sie wäre doppelt */}
-        <p className={`text-[13px] leading-relaxed text-tinte-matt dark:text-slate-400 ${seite ? "px-4" : ""}`}>
+        <p className={`text-[13px] leading-relaxed text-tinte-matt dark:text-slate-400 ${seite ? "auf-bild px-4" : ""}`}>
           {hinweis
             ? hinweis
             : du
@@ -150,7 +154,7 @@ export function KontoTab({
             </div>
             {/* Hinweis der Kasse direkt unter den Kontodaten (vorher ganz unten
                 über die volle Breite) */}
-            {seite && kassenHinweis && <p className="mt-1.5 px-4 text-[13px] leading-snug text-tinte-matt dark:text-slate-300">{kassenHinweis}</p>}
+            {seite && kassenHinweis && <p className="auf-bild mt-1.5 px-4 text-[13px] leading-snug text-tinte-matt dark:text-slate-300">{kassenHinweis}</p>}
           </div>
 
           {/* Was überwiesen wird: je Kind Betrag und Verwendungszweck zum Kopieren */}
@@ -251,7 +255,8 @@ function KontoWert({
     <button
       type="button"
       onClick={onKopieren}
-      className={`${kopiert ? "btn-klein !bg-[#1E7B34]" : "btn-klein-grau"} shrink-0`}
+      // 44 px hoch wie jede Tippfläche (btn-klein allein hat 40 px)
+      className={`${kopiert ? "btn-klein !bg-[#1E7B34]" : "btn-klein-grau"} min-h-[44px] shrink-0`}
       aria-label={`${name ?? label} kopieren`}
     >
       {kopiert ? (
@@ -272,10 +277,12 @@ function KontoWert({
       // Handy: oben Beschriftung | Knopf, darunter der Wert über die volle
       // Breite. Rechner: Knopf rechts über beide Zeilen, Wert unter der
       // Beschriftung – eine normale Zeile.
-      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 px-4 py-2.5 lg:min-h-[56px]">
+      // Ab iPad hoch (md) schon wie eine normale Zeile – vorher erst ab lg,
+      // am iPad hoch standen IBAN/Zweck anders als Empfänger/BIC/Betrag.
+      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 px-4 py-2.5 md:min-h-[56px]">
         <div className="col-start-1 row-start-1 min-w-0 text-[12px] font-medium leading-tight text-tinte-leise">{label}</div>
-        <div className="col-start-2 row-start-1 lg:row-span-2">{knopf}</div>
-        <div className="no-scrollbar col-span-2 row-start-2 mt-1 select-all overflow-x-auto whitespace-nowrap text-[clamp(12px,3.75vw,18px)] font-semibold tabular-nums tracking-[0.03em] text-tinte dark:text-slate-100 lg:col-span-1 lg:mt-0.5 lg:whitespace-normal lg:text-[17px] lg:leading-snug">
+        <div className="col-start-2 row-start-1 md:row-span-2">{knopf}</div>
+        <div className="no-scrollbar col-span-2 row-start-2 mt-1 select-all overflow-x-auto whitespace-nowrap text-[clamp(12px,3.75vw,18px)] font-semibold tabular-nums tracking-[0.03em] text-tinte dark:text-slate-100 md:col-span-1 md:mt-0.5 md:whitespace-normal md:text-[17px] md:leading-snug">
           {wert}
         </div>
       </div>

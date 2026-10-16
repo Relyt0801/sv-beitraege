@@ -10,6 +10,31 @@ import { FussLeiste } from "./FussLeiste";
 import { useBreit } from "../lib/gescrollt";
 
 /**
+ * Entwurf der Frage ans Stufenteam. Vorher lag er im Blatt selbst – ✕, ein
+ * Tipp daneben, Wischen oder zweimal Zurück/Esc warfen Betreff und Text ohne
+ * Rückfrage weg (Prüfung Okt. 2026). Jetzt hält ihn der Reiter, und damit er
+ * auch einen Reiterwechsel übersteht, zusätzlich sessionStorage (nur dieses
+ * Fenster, weg nach dem Schließen). Geleert wird er erst nach dem Absenden.
+ */
+type Entwurf = { betreff: string; text: string };
+const LEER: Entwurf = { betreff: "", text: "" };
+const ENTWURF_MERKER = "sv:eltern:frage-entwurf";
+function entwurfLesen(): Entwurf {
+  try {
+    const roh = JSON.parse(sessionStorage.getItem(ENTWURF_MERKER) || "null") as Partial<Entwurf> | null;
+    if (roh && typeof roh.betreff === "string" && typeof roh.text === "string") return { betreff: roh.betreff, text: roh.text };
+  } catch {
+    /* privates Fenster, gesperrter Speicher */
+  }
+  return LEER;
+}
+/** Für die Zeile: höchstens ~50 Zeichen, eine Zeile */
+const kurz = (t: string) => {
+  const z = t.replace(/\s+/g, " ");
+  return z.length > 50 ? `${z.slice(0, 49)}…` : z;
+};
+
+/**
  * Reiter "Infos": links das, was das Stufenteam für die Eltern angeheftet hat,
  * rechts (am Handy darunter) die eigenen Fragen ans Stufenteam.
  *
@@ -41,6 +66,16 @@ export function ElternInfosTab({
   const [gesehenBis] = useState(() => Date.parse(infosGesehen) || 0);
   // Nach dem Absenden: im selben Blatt zum neuen Gespräch wechseln
   const [gesendet, setGesendet] = useState(false);
+  const [entwurf, setEntwurf] = useState<Entwurf>(entwurfLesen);
+  const hatEntwurf = Boolean(entwurf.betreff.trim() || entwurf.text.trim());
+  useEffect(() => {
+    try {
+      if (entwurf.betreff || entwurf.text) sessionStorage.setItem(ENTWURF_MERKER, JSON.stringify(entwurf));
+      else sessionStorage.removeItem(ENTWURF_MERKER);
+    } catch {
+      /* egal – dann hält ihn nur der Reiter */
+    }
+  }, [entwurf]);
 
   const meine = istEltern ? tickets.filter((t) => t.user_id === uid) : tickets;
 
@@ -153,7 +188,13 @@ export function ElternInfosTab({
               </Zeile>
             );
           })}
-          <Zeile label="Neue Frage stellen" blau onClick={() => setNeuOffen(true)} />
+          <Zeile
+            label="Neue Frage stellen"
+            blau
+            // Wie in Mail: ein angefangener Entwurf bleibt und ist zu sehen
+            unter={hatEntwurf ? `Entwurf: ${kurz(entwurf.betreff.trim() || entwurf.text.trim())}` : undefined}
+            onClick={() => setNeuOffen(true)}
+          />
         </div>
       </section>
 
@@ -172,10 +213,13 @@ export function ElternInfosTab({
           />
         ) : (
           <NeueFrageInhalt
+            entwurf={entwurf}
+            setEntwurf={setEntwurf}
             onClose={blattZu}
             onSenden={async (betreff, text) => {
               const problem = await neuesTicket(betreff, text);
               if (problem) return problem;
+              setEntwurf(LEER);
               setGesendet(true);
               return null;
             }}
@@ -200,16 +244,22 @@ function StatusKapsel({ erledigt }: { erledigt: boolean }) {
 
 /** Inhalt „Frage ans Stufenteam“: Betreff, Frage, unten „Absenden“. */
 function NeueFrageInhalt({
+  entwurf,
+  setEntwurf,
   onClose,
   onSenden,
 }: {
+  /** Betreff und Text liegen im Reiter – sie überstehen das Schließen des Blatts */
+  entwurf: Entwurf;
+  setEntwurf: React.Dispatch<React.SetStateAction<Entwurf>>;
   onClose: () => void;
   /** Gibt einen Fehlertext zurück oder null, wenn es geklappt hat. */
   onSenden: (betreff: string, text: string) => Promise<string | null>;
 }) {
   const breit = useBreit();
-  const [betreff, setBetreff] = useState("");
-  const [text, setText] = useState("");
+  const { betreff, text } = entwurf;
+  const setBetreff = (v: string) => setEntwurf((e) => ({ ...e, betreff: v }));
+  const setText = (v: string) => setEntwurf((e) => ({ ...e, text: v }));
   const [fehler, setFehler] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -225,14 +275,17 @@ function NeueFrageInhalt({
       setFehler(problem);
       return;
     }
-    setBetreff("");
-    setText("");
+    // Den Entwurf leert der Reiter (onSenden), das Blatt wird zum Gespräch
     setFehler("");
   }
 
   return (
     <>
-      <SheetKopf titel="Frage ans Stufenteam" unter="Die Antwort kommt hier in die App." onClose={onClose} />
+      <SheetKopf
+        titel="Frage ans Stufenteam"
+        unter={betreff || text ? "Entwurf bleibt erhalten, bis Sie absenden." : "Die Antwort kommt hier in die App."}
+        onClose={onClose}
+      />
       <Gruppe className="mt-2">
         {/* Am Handy nicht sofort die Tastatur aufklappen */}
         <ZeileEingabe label="Betreff" value={betreff} onChange={setBetreff} placeholder="z. B. Überweisung" autoFocus={breit} maxLength={120} />
