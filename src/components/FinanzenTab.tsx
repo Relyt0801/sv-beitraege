@@ -1081,7 +1081,8 @@ function AnfrageDetailSheet({
 
       {a.status !== "offen" && (
         <div className="mt-3 text-[14px] text-tinte-matt dark:text-slate-300">
-          {a.status === "genehmigt" ? "Genehmigt und als Ausgabe gebucht" : "Abgelehnt"}
+          {/* „gebucht“ nur, wenn es die Buchung wirklich gibt (Demo, gelöschte Buchung) */}
+          {a.status === "genehmigt" ? (a.buchung_id ? "Genehmigt und als Ausgabe gebucht" : "Genehmigt") : "Abgelehnt"}
           {a.decided_at ? ` am ${new Date(a.decided_at).toLocaleDateString("de-DE")}` : ""}
           {a.antwort ? <span className="mt-1 block">„{a.antwort}“</span> : null}
         </div>

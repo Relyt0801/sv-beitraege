@@ -159,7 +159,8 @@ export function TermineProvider({ children }: { children: ReactNode }) {
     setAktionen(d.aktionen);
     setBewerbungen(d.bewerbungen);
     // ?rolle=vorsitz: leitet das Komitee Abizeitung (dort ist man Mitglied)
-    // und hat eine beantwortete Terminanfrage – so sieht man den Stand
+    // und hat eine beantwortete Terminanfrage – so sieht man Stand und
+    // Antwort des Teams (abgelehnt: dann fehlt auch kein Termin im Kalender)
     setVorsitz(rolle === "vorsitz" ? { abizeitung: [uid] } : {});
     if (rolle === "vorsitz") {
       const tag = (n: number) => {
@@ -178,8 +179,8 @@ export function TermineProvider({ children }: { children: ReactNode }) {
           bis_datum: null,
           von: "13:30",
           bis: "14:30",
-          status: "angenommen",
-          antwort: "",
+          status: "abgelehnt",
+          antwort: "An dem Tag ist schon Stufenversammlung – bitte einen anderen Tag anfragen.",
           created_by: uid,
           created_at: `${tag(-2)}T10:00:00.000Z`,
           decided_by: "demo-team",

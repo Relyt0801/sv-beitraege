@@ -183,7 +183,8 @@ export function MeineAnfragen() {
             {meine.map((a) => (
               <div key={a.id} className="flex min-h-[44px] items-center gap-2 py-1">
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[15px] font-semibold">{a.titel}</span>
+                  {/* umbrechen statt kürzen: die Zeile öffnet kein Blatt, sonst wäre ein langer Titel nirgends ganz lesbar */}
+                  <span className="block text-[15px] font-semibold leading-snug [overflow-wrap:anywhere]">{a.titel}</span>
                   <span className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[13px] text-tinte-leise">
                     <span
                       className={`shrink-0 rounded-full px-2 py-px text-[12px] font-bold ${
@@ -198,7 +199,7 @@ export function MeineAnfragen() {
                     </span>
                     <span>{wann(a)}</span>
                   </span>
-                  {a.antwort && <span className="mt-0.5 line-clamp-2 block text-[13px] text-tinte-leise">„{a.antwort}“</span>}
+                  {a.antwort && <span className="mt-0.5 block text-[13px] text-tinte-leise [overflow-wrap:anywhere]">„{a.antwort}“</span>}
                 </span>
                 {a.status === "offen" && (
                   <button
