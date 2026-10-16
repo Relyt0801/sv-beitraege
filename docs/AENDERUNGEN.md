@@ -44,23 +44,27 @@ es dafür nur Fotos und keine Zahl.
   Dort heißt es „Nicht bereit“, die Prüfung sagt warum. So lassen sich Zeile
   und Aufklappen ohne Datenbank testen und fotografieren.
 
-**Prüfung (Demo r44 = Endstand, Chromium):**
-- `platz-check` 165 Ansichten, 0 über den Grenzen. Gegenüber dem
-  Live-Stand ist keine Ansicht schlechter geworden.
-  - Übersicht iPad quer/Laptop: 1,47–1,75 → 1,41–1,68 Bildschirme,
-    Löcher 15–21 % → 8–13 %.
-  - Finanzen iPad hoch: Löcher 25–30 % → 9–14 %.
-  - Mittel Handy: 2,09 Bildschirme und 11 % Löcher, unverändert.
-- `ui-check` 280 Ansichten ohne Fund (axe ohne Befund, keine
-  Konsolenfehler).
-- `leisten-check` 777 Zustände, 0 Abweichungen.
-- Klicktests:
-  - offiziell/inoffiziell 15/15
-  - Anfragen 9/9
-  - Herzen 9/9
-  - Rankings-Herzen 7/7
-  - Zitate-Runden 5/5
-- Typecheck und Build ohne Fehler.
+**Gegenprüfung des Diffs von Runde 9** (zwei Blickwinkel, jeder Fund
+gegengeprüft): 2 bestätigte kleine Funde, beide behoben.
+- **Fokus beim Drehen:** War ein Blatt aus „Zu erledigen“ offen und wechselte
+  die Breite über 1024 px (iPad drehen), baute React die Zeilen neu auf.
+  Nach dem Schließen landete der Fokus auf der Seite statt auf der Zeile.
+  Jetzt bleiben diese Zeilen bei jeder Breite an derselben Stelle im Baum.
+  Nachgeprüft in beiden Richtungen: Der Fokus kehrt zurück, Tab geht weiter.
+- **Messung:** `platz-check` zählte den Innenrand von `<main>` in der
+  ElternApp als Loch, in der App nicht. Jetzt wird die Inhaltsfläche ohne
+  Innenabstand gemessen. Die Zahlen unten stammen aus beiden Läufen mit der
+  korrigierten Messung.
+
+**Prüfung (Demo r45 = Endstand, Chromium):**
+- `platz-check` 165 Ansichten, 0 über den Grenzen. Gegenüber dem Live-Stand
+  (gleiche Messung) ist keine Ansicht schlechter geworden.
+  - Übersicht iPad quer/Laptop: 1,47–1,75 → 1,41–1,68 Bildschirme, Löcher
+    11–18 % → 4–9 %.
+  - Finanzen iPad hoch: Löcher 25–27 % → 9–12 %.
+  - Mittel Tablet: 10,5 % → 9,1 % Löcher (höchster Wert 27 % → 14 %).
+  - Mittel Handy unverändert: 2,09 Bildschirme, 10 % Löcher.
+- `ui-check`, `leisten-check` und Klicktests auf r45: Ergebnis folgt.
 
 ## Runde 8d: Korrekturen aus der Prüfung von Runde 8 (16.10.2026)
 
