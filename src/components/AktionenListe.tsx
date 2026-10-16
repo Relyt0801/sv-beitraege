@@ -133,9 +133,11 @@ interface Block {
   schluessel: string;
   titel: string;
   schichten: Termin[];
-  /** Ab GRUPPE_AB Schichten: eingeklappt mit „Alle n Termine“ */
+  /** Ab GRUPPE_AB Schichten: eingeklappt, der Kopf zeigt „n Termine · k weitere“ */
   aufklappbar: boolean;
 }
+
+const SCHICHT_MERKER = "sv:hinweis:schicht-antippen";
 
 /**
  * Die ausgeschriebenen Aktionen im Events-Reiter („Mitmachen“).
@@ -156,6 +158,25 @@ export function AktionenListe({ onAendern }: { onAendern?: (t: Termin) => void }
   const { isStaff, can } = useRole();
   const darfVerteilen = isStaff || can("termine.manage");
   const [schicht, setSchicht] = useState<Termin | null>(null);
+  // Team: Die Erklärung „Schicht antippen …“ braucht man nur, bis man einmal
+  // eine Schicht geöffnet hat – danach kostet sie bei jedem Öffnen drei Zeilen.
+  const [teamKenntEs, setTeamKenntEs] = useState(() => {
+    try {
+      return localStorage.getItem(SCHICHT_MERKER) === "1";
+    } catch {
+      return false;
+    }
+  });
+  const oeffnen = (t: Termin) => {
+    setSchicht(t);
+    if (teamKenntEs) return;
+    setTeamKenntEs(true);
+    try {
+      localStorage.setItem(SCHICHT_MERKER, "1");
+    } catch {
+      /* dann eben beim nächsten Mal wieder */
+    }
+  };
   // „eintragen“: Bestätigung wie beim Bezahlen, mit Hinweis aufs Einteilen
   const [meldung, setMeldung] = useState<{ auftrag: Promise<unknown>; titel: string; unter: string } | null>(null);
   const eintragen = (id: string, an: boolean) => {
@@ -253,11 +274,11 @@ export function AktionenListe({ onAendern }: { onAendern?: (t: Termin) => void }
               darfVerteilen={darfVerteilen}
               st={st}
               onEintragen={eintragen}
-              onOeffnen={setSchicht}
+              onOeffnen={oeffnen}
             />
           )}
         </ZweiSpalten>
-        {(darfVerteilen || !kenntEs) && (
+        {(darfVerteilen ? !teamKenntEs : !kenntEs) && (
           <p className="auf-bild mt-2 px-4 text-[13px] leading-snug text-tinte-leise">
             {darfVerteilen
               ? "Schicht antippen: sehen, wer sich angemeldet hat, und einteilen. Das Prozent zeigt, wie viel Mithilfe eine Schicht zählt."
@@ -389,7 +410,8 @@ function AktionGruppe({
         <span className="block truncate text-[16px] font-semibold leading-tight">{block.titel}</span>
         <span className="mt-0.5 block truncate text-[13px] text-tinte-leise">
           {schichten.length === 1 ? "1 Termin" : `${schichten.length} Termine`}
-          {kommend.length > 0 && ` · nächster ${kurzTag(kommend[0].datum)}`}
+          {/* eingeklappt: wie viele noch dahinter stehen */}
+          {block.aufklappbar && !auf && versteckt > 0 ? ` · ${versteckt} weitere` : kommend.length > 0 ? ` · nächster ${kurzTag(kommend[0].datum)}` : ""}
         </span>
       </span>
     </>
@@ -446,12 +468,15 @@ function AktionGruppe({
         />
       ))}
 
-      {block.aufklappbar && (versteckt > 0 || auf) && (
+      {/* Eingeklappt reicht der Kopf („5 Termine“ mit ⌄, ganze Zeile tippbar) –
+          vorher stand darunter noch „Alle 5 Termine anzeigen“ (44 px je
+          Aktion). Aufgeklappt bleibt „Weniger anzeigen“ am Ende der Liste. */}
+      {block.aufklappbar && auf && (
         <button
           onClick={() => setAuf(!auf)}
           className="flex w-full items-center gap-1.5 px-4 py-2.5 text-left text-[15px] font-medium text-brand transition active:bg-black/[0.04] dark:active:bg-white/[0.06]"
         >
-          <span className="flex-1">{auf ? "Weniger anzeigen" : `Alle ${schichten.length} Termine anzeigen`}</span>
+          <span className="flex-1">Weniger anzeigen</span>
           <Winkel auf={auf} />
         </button>
       )}

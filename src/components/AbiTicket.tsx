@@ -1,6 +1,6 @@
 import { useFunktionen } from "../lib/funktionen";
 import { AusHinweis } from "./Funktionen";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import type { Abiball, Settings, Student } from "../lib/types";
 import { abiballVon, bestellBetrag, ticketPreise } from "../lib/logic";
 import {
@@ -606,13 +606,22 @@ export function TicketFamilie({
   return (
     <section className="card p-4 sm:p-5" aria-label="Abiball-Tickets">
       <AusHinweis funktion="abiball" className="mb-2" />
-      <h2 className="text-[15px] font-semibold">{zeigen ? "Abiball-Tickets" : "Mithilfe senkt den Ticketpreis"}</h2>
+      <h2 className="text-[15px] font-semibold">
+        {zeigen ? "Abiball-Tickets" : "Mithilfe senkt den Ticketpreis"}
+        {/* Vor dem Verkauf am Handy: eine Zeile statt Ticket mit „Preis folgt“
+            und Hinweiskasten darunter (~130 px ohne neue Information) */}
+        {zeigen && status === "aus" && (
+          <span className="block text-[12.5px] font-normal text-tinte-leise md:hidden">
+            Eltern &amp; Gäste: Preis folgt · Verkauf noch nicht gestartet
+          </span>
+        )}
+      </h2>
       {/* Am Laptop behält das Ticket Ticket-Maße (vorher ~780 px breit gezogen) */}
       <div
         className={`grid ${zeigen && breit ? "min-[700px]:grid-cols-2 min-[700px]:items-start min-[700px]:gap-x-6 lg:grid-cols-[minmax(0,24rem)_minmax(0,1fr)] lg:gap-x-10" : ""}`}
       >
         {zeigen && (
-          <div className="mt-3 grid content-start gap-2.5">
+          <div className={`mt-3 grid content-start gap-2.5 ${status === "aus" ? "max-md:hidden" : ""}`}>
             {/* Das Ticket der Eltern selbst: hängt von keinem Kind ab */}
             <AbiTicket art="weiteres" student={erstes.student} settings={settings} prozent={erstes.prozent} klein />
             <Info>
@@ -636,7 +645,7 @@ export function TicketFamilie({
           pct={erstes.prozent}
           settings={settings}
           kinder={mehrere ? kinder.map((k) => ({ name: k.student.vorname, pct: k.prozent })) : undefined}
-          className={zeigen && breit ? "mt-4 min-[700px]:mt-3" : zeigen ? "mt-4" : "mt-2"}
+          className={zeigen && breit ? `mt-4 min-[700px]:mt-3 ${status === "aus" ? "max-md:mt-3" : ""}` : zeigen ? `mt-4 ${status === "aus" ? "max-md:mt-3" : ""}` : "mt-2"}
         />
       </div>
     </section>
@@ -672,12 +681,15 @@ export function TicketBereich({
   ohneGaeste,
   eineSpalte,
   onMitKasse,
+  unten,
   className = "",
 }: {
   student: Student;
   settings: Settings;
   prozent: number;
   fuerEltern?: boolean;
+  /** Nur am Handy unten in der Karte, z. B. die Mithilfe-Zeile der Übersicht (davon hängt der Preis ab) */
+  unten?: ReactNode;
   /** Gäste-Ticket ausblenden (z. B. beim zweiten Kind) */
   ohneGaeste?: boolean;
   /** Tickets und Kasse immer untereinander (schmale Spalte) */
@@ -748,6 +760,7 @@ export function TicketBereich({
         </div>
         {mitKasse && <TicketKasse student={student} settings={settings} prozent={prozent} fuerEltern={fuerEltern} />}
       </div>
+      {unten && <div className="mt-3 border-t border-black/[0.06] pt-1 dark:border-white/10 md:hidden">{unten}</div>}
 
       {auf && <TicketAnsicht student={student} settings={settings} prozent={prozent} fuerEltern={fuerEltern} onClose={() => setAuf(false)} />}
     </section>

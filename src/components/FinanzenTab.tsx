@@ -7,7 +7,7 @@ import { useTermine } from "../termine-store";
 import { useProfiles } from "../profiles-store";
 import { basisOffen } from "../lib/logic";
 import { FinanzStandard } from "./FinanzStandard";
-import { BuchungSheet, FarbWahl, Kennzahlen, PostenBereiche, type BuchungStart } from "./FinanzBereiche";
+import { BuchungSheet, FarbWahl, GeplantKarte, Kennzahlen, PostenBereiche, type BuchungStart } from "./FinanzBereiche";
 import { committeeLabel } from "../lib/committees";
 import {
   EINNAHME_QUELLEN, KASSEN_FARBEN, QUELLE_NAME, STANDARD_FARBE, buchungFarbe, centAus, euro, euroKurz, farbHex,
@@ -18,11 +18,12 @@ import type { KostenAnfrage, KostenValue } from "../lib/kosten";
 import { Sheet, SheetKopf } from "./Sheet";
 import { InKopf } from "./InKopf";
 import { Icon, type IconName } from "./Icon";
-import { Gruppe, Wert, Zeile, ZeileEingabe, ZeileHaken } from "./Liste";
+import { Gruppe, Symbol, Wert, Zeile, ZeileEingabe, ZeileHaken } from "./Liste";
 import { FussLeiste } from "./FussLeiste";
 
 import { frage, meldeFehler } from "../lib/melder";
 import { useDunkel } from "../lib/dunkel";
+import { useBreit } from "../lib/gescrollt";
 
 const heute = () => new Date().toISOString().slice(0, 10);
 const kurzTag = (d: string) =>
@@ -141,6 +142,8 @@ export function FinanzenTab({ kosten }: { kosten: KostenValue }) {
   // Scrollen links rutschte die rechte Spalte mit, bis sie klebte.
   // Gemessen wird der Abstand vom Seitenanfang bis zu den Spalten (Kopfzeile,
   // Reiter und die Zeile mit Einnahme/Ausgabe sind unterschiedlich hoch).
+  // Handy/iPad hoch (unter 1024 px): Geplantes und Kostenanfragen als Zeilen
+  const breit = useBreit();
   const spalten = useRef<HTMLDivElement>(null);
   const [spaltenOben, setSpaltenOben] = useState<number | null>(null);
   useLayoutEffect(() => {
@@ -237,14 +240,14 @@ export function FinanzenTab({ kosten }: { kosten: KostenValue }) {
           <div className="grid grid-cols-2 gap-2 lg:flex">
             <button
               onClick={() => setBuchen({ typ: "ein" })}
-              className="flex min-h-[3rem] items-center justify-center gap-1.5 rounded-full bg-[#1E7B34] text-[16px] font-semibold text-white transition duration-200 ease-ios active:scale-[.97] lg:min-h-[2.5rem] lg:px-4 lg:text-[15px]"
+              className="flex min-h-[2.75rem] items-center justify-center gap-1.5 rounded-full bg-[#1E7B34] text-[16px] font-semibold text-white transition duration-200 ease-ios active:scale-[.97] lg:min-h-[2.5rem] lg:px-4 lg:text-[15px]"
             >
               <Icon name="plus" size={17} strich={2.4} />
               Einnahme
             </button>
             <button
               onClick={() => setBuchen({ typ: "aus" })}
-              className="flex min-h-[3rem] items-center justify-center gap-1.5 rounded-full bg-red-600 text-[16px] font-semibold text-white transition duration-200 ease-ios active:scale-[.97] lg:min-h-[2.5rem] lg:px-4 lg:text-[15px]"
+              className="flex min-h-[2.75rem] items-center justify-center gap-1.5 rounded-full bg-red-600 text-[16px] font-semibold text-white transition duration-200 ease-ios active:scale-[.97] lg:min-h-[2.5rem] lg:px-4 lg:text-[15px]"
             >
               <span className="text-[20px] leading-none">−</span>
               Ausgabe
@@ -290,11 +293,24 @@ export function FinanzenTab({ kosten }: { kosten: KostenValue }) {
           fin={darfBuchen ? fin : null}
           listeKlasse="max-lg:order-3"
           geplantKlasse="max-lg:order-3"
+          ohneGeplant={!breit}
           onBuchung={darfBuchen ? setBuchungAuf : undefined}
         />
 
-        {/* ================================================ Kostenanfragen (sonst hier) */}
-        {zeigeAnfragen && !kostenOben && <div className="min-w-0 max-lg:order-3">{kostenKarte}</div>}
+        {/* ================================================ Geplantes + Kostenanfragen */}
+        {/* Am Handy/iPad hoch: EINE Gruppe mit zwei Zeilen (wie die iOS-
+            Einstellungen), die Listen im Blatt – vorher zwei Karten, ~300 px.
+            Am Laptop (linke Spalte) bleiben es Karten. */}
+        {!breit ? (
+          <div className="gruppe-zellen min-w-0 max-lg:order-3">
+            <GeplantKarte alsZeile darf={darfBuchen} fin={darfBuchen ? fin : null} />
+            {zeigeAnfragen && !kostenOben && (
+              <KostenKarte alsZeile kosten={kosten} darfEntscheiden={darfBuchen} vorsitze={meineVorsitze} onEntschieden={fin.neuLaden} />
+            )}
+          </div>
+        ) : (
+          zeigeAnfragen && !kostenOben && <div className="min-w-0">{kostenKarte}</div>
+        )}
       </div>
 
       {/* ================================================ Verlauf */}
@@ -339,8 +355,9 @@ export function FinanzenTab({ kosten }: { kosten: KostenValue }) {
  * sieht. Vorher „Standard – wie alle“ / „Erweitert“: unverständlich.
  */
 const ANSICHT_TEXT = {
-  standard: "So sehen es Schüler und Eltern: nur Summen, keine Namen.",
-  erweitert: "Das ganze Kassenbuch mit jeder Buchung – nur für dich und die Kasse.",
+  // kurz: am Handy eine Zeile unter dem Umschalter
+  standard: "So sehen es Schüler und Eltern: nur Summen.",
+  erweitert: "Jede Buchung mit Namen – nur für dich und die Kasse.",
 } as const;
 
 function AnsichtWahl({ ansicht, setAnsicht }: { ansicht: "standard" | "erweitert"; setAnsicht: (a: "standard" | "erweitert") => void }) {
@@ -434,7 +451,7 @@ function UebersichtKarte({
   );
 
   return (
-    <section className="card p-5">
+    <section className="card p-4 sm:p-5">
       <div className="flex items-start gap-3">
         <div className="min-w-0 flex-1">
           <div className="text-[14px] font-medium text-tinte-leise">Kontostand</div>
@@ -446,9 +463,17 @@ function UebersichtKarte({
             {euro(zahlen.stand)}
           </div>
           <div className="mt-1.5 text-[12px] text-tinte-leise">
-            {zahlen.letzterAbgleich
-              ? `Einnahmen − Ausgaben · Bankabgleich (unter Sonstiges) zuletzt ${new Date(zahlen.letzterAbgleich).toLocaleDateString("de-DE")}`
-              : "noch nicht mit der Bank abgeglichen"}
+            {zahlen.letzterAbgleich ? (
+              <>
+                {/* am Handy eine Zeile – die Erklärung steht im Blatt hinter dem Regler */}
+                <span className="sm:hidden">Mit der Bank abgeglichen am {new Date(zahlen.letzterAbgleich).toLocaleDateString("de-DE")}</span>
+                <span className="max-sm:hidden">
+                  Einnahmen − Ausgaben · Bankabgleich (unter Sonstiges) zuletzt {new Date(zahlen.letzterAbgleich).toLocaleDateString("de-DE")}
+                </span>
+              </>
+            ) : (
+              "noch nicht mit der Bank abgeglichen"
+            )}
           </div>
         </div>
         {darf && (
@@ -743,18 +768,25 @@ const STATUS: Record<KostenAnfrage["status"], { text: string; klasse: string }> 
   abgelehnt: { text: "abgelehnt", klasse: "bg-red-500/10 text-red-600 dark:text-red-400" },
 };
 
+/**
+ * `alsZeile` (Kassenbuch am Handy, nichts offen): nur EINE Zeile
+ * „Kostenanfragen · keine“ in einer Gruppe, die Liste im Blatt. Steht etwas
+ * zur Entscheidung an, zeigt FinanzenTab die ganze Karte oben.
+ */
 function KostenKarte({
-  kosten, darfEntscheiden, vorsitze, onEntschieden,
+  kosten, darfEntscheiden, vorsitze, onEntschieden, alsZeile = false,
 }: {
   kosten: KostenValue;
   darfEntscheiden: boolean;
   vorsitze: string[];
   onEntschieden?: () => void;
+  alsZeile?: boolean;
 }) {
   const { profile } = useProfiles();
   const [neu, setNeu] = useState(false);
   const [auswahl, setAuswahl] = useState<KostenAnfrage | null>(null);
   const [alle, setAlle] = useState(false);
+  const [listeAuf, setListeAuf] = useState(false);
 
   const offene = kosten.anfragen.filter((a) => a.status === "offen");
   const erledigte = kosten.anfragen.filter((a) => a.status !== "offen");
@@ -765,20 +797,21 @@ function KostenKarte({
     else hinScrollen("sprung-kosten");
   });
 
-  return (
-    <section id="sprung-kosten" className="min-w-0">
-      <div className="mb-1.5 flex items-center gap-3 px-4">
-        <h2 className="auf-bild min-w-0 flex-1 text-[13px] font-semibold uppercase tracking-[0.02em] text-tinte-leise">
-          Kostenanfragen{offene.length > 0 ? ` · ${offene.length} offen` : ""}
-        </h2>
-        {vorsitze.length > 0 && (
-          <button onClick={() => setNeu(true)} className="btn-klein shrink-0 gap-1">
-            <Icon name="plus" size={14} strich={2.6} />
-            Anfragen
-          </button>
-        )}
-      </div>
-
+  const kopf = (imBlatt: boolean) => (
+    <div className="mb-1.5 flex items-center gap-3 px-4">
+      <h2 className={`auf-bild min-w-0 flex-1 text-[13px] font-semibold uppercase tracking-[0.02em] text-tinte-leise ${imBlatt ? "sr-only" : ""}`}>
+        Kostenanfragen{offene.length > 0 ? ` · ${offene.length} offen` : ""}
+      </h2>
+      {vorsitze.length > 0 && (
+        <button onClick={() => setNeu(true)} className="btn-klein shrink-0 gap-1">
+          <Icon name="plus" size={14} strich={2.6} />
+          Anfragen
+        </button>
+      )}
+    </div>
+  );
+  const liste = (imBlatt: boolean) => (
+    <>
       {!kosten.bereit ? (
         <div className="gruppe-zellen px-4 py-5 text-center text-[14px] text-tinte-leise">Lädt …</div>
       ) : kosten.anfragen.length === 0 ? (
@@ -811,7 +844,13 @@ function KostenKarte({
           ))}
         </div>
       )}
-      <p className="auf-bild mt-1.5 px-4 text-[13px] leading-snug text-tinte-leise">
+      {/* Ohne Anfragen am Handy ohne Erklärzeile – „Keine Anfragen“ reicht
+          (im Blatt steht sie immer: dort fragt man sich, wozu das da ist) */}
+      <p
+        className={`auf-bild mt-1.5 px-4 text-[13px] leading-snug text-tinte-leise ${
+          !imBlatt && kosten.anfragen.length === 0 && vorsitze.length === 0 ? "max-lg:hidden" : ""
+        }`}
+      >
         {vorsitze.length > 0
           ? "Du brauchst Geld fürs Komitee? Hier anfragen – der Kassenwart entscheidet."
           : darfEntscheiden
@@ -823,7 +862,10 @@ function KostenKarte({
           {alle ? "Weniger anzeigen" : `Alle ${erledigte.length} erledigten anzeigen`}
         </button>
       )}
-
+    </>
+  );
+  const blaetter = (
+    <>
       <KostenAnfrageSheet open={neu} onClose={() => setNeu(false)} vorsitze={vorsitze} onStellen={kosten.stellen} />
       <AnfrageDetailSheet
         anfrage={auswahl}
@@ -833,6 +875,39 @@ function KostenKarte({
         onEntschieden={onEntschieden}
         name={auswahl ? profile[auswahl.created_by]?.anzeigename || "Vorsitz" : ""}
       />
+    </>
+  );
+
+  if (alsZeile)
+    return (
+      <>
+        <Zeile
+          label="Kostenanfragen"
+          symbol={
+            <Symbol farbe="bg-[#5856D6]">
+              <Icon name="finanzen" size={16} strich={2.2} />
+            </Symbol>
+          }
+          onClick={() => setListeAuf(true)}
+        >
+          <span className="zahl truncate text-[15px] text-tinte-leise">
+            {!kosten.bereit ? "…" : offene.length > 0 ? `${offene.length} offen` : erledigte.length > 0 ? `keine offen · ${erledigte.length} erledigt` : "keine"}
+          </span>
+        </Zeile>
+        <Sheet open={listeAuf} onClose={() => setListeAuf(false)}>
+          <SheetKopf titel="Kostenanfragen" onClose={() => setListeAuf(false)} />
+          {kopf(true)}
+          {liste(true)}
+        </Sheet>
+        {blaetter}
+      </>
+    );
+
+  return (
+    <section id="sprung-kosten" className="min-w-0">
+      {kopf(false)}
+      {liste(false)}
+      {blaetter}
     </section>
   );
 }
@@ -1067,7 +1142,7 @@ const monatName = (m: string) =>
   new Date(m + "-01T12:00:00").toLocaleDateString("de-DE", { month: "long", year: "numeric" });
 
 /** So viele neueste Buchungen zeigt die Vorschau am Handy/iPad hoch */
-const VORSCHAU = 4;
+const VORSCHAU = 3;
 
 function VerlaufKarte({
   buchungen, kategorien, darf, onLoeschen, onKategorie, aktionName,

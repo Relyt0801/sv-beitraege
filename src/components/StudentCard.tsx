@@ -61,11 +61,15 @@ function StudentCardRoh({
   const joiningLate = student.beigetreten_ab !== "EF.1";
   const betrag = offenGesamt(student, settings);
   const prozent = prozentVon(punkte, settings);
+  // „dabei seit EF.1“ gilt für fast alle und sagt nichts – die zweite Zeile
+  // steht nur noch, wenn etwas besonders ist (später dazu, verlässt die Stufe).
+  // Am Handy spart das je Person ~14 px (bei 100 Personen 1400 px Scrollen).
+  const unter = leaving ? `verlässt ${student.verlaesst_ab}` : joiningLate ? `dabei ab ${student.beigetreten_ab}` : null;
 
   return (
     <div
       data-tour={anchor}
-      className={`flex flex-wrap items-center gap-x-3 gap-y-2 px-3.5 py-3 transition sm:px-4 ${
+      className={`flex flex-wrap items-center gap-x-3 gap-y-1.5 px-3.5 py-2.5 transition sm:px-4 md:py-3 ${
         selected ? "bg-brand/5 ring-2 ring-inset ring-brand" : ""
       } ${leaving ? "bg-red-50/60 dark:bg-red-500/5" : ""}`}
     >
@@ -95,7 +99,7 @@ function StudentCardRoh({
         {/* Derselbe Namenskreis wie im Rollen-Reiter: Farbe der Person, nicht
             Farbe des Zahlungsstands. Der Betrag rechts sagt das ohnehin. */}
         <span className="relative shrink-0">
-          <Avatar userId={userId} name={`${student.nachname}, ${student.vorname}`} size={36} />
+          <Avatar userId={userId} name={`${student.nachname}, ${student.vorname}`} size={unter ? 36 : 30} />
           {loginState != null && (
             <span
               title={loginState ? "hat ein eigenes Passwort gesetzt" : "nutzt noch das Startpasswort"}
@@ -109,13 +113,7 @@ function StudentCardRoh({
           <span className="block truncate text-[14px] font-semibold">
             {student.nachname}, {student.vorname}
           </span>
-          <span className="block truncate text-[12px] text-tinte-leise">
-            {leaving
-              ? `verlässt ${student.verlaesst_ab}`
-              : joiningLate
-                ? `dabei ab ${student.beigetreten_ab}`
-                : "dabei seit EF.1"}
-          </span>
+          {unter && <span className="block truncate text-[12px] text-tinte-leise">{unter}</span>}
         </span>
       </button>
 

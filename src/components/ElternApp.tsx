@@ -12,6 +12,7 @@ import { TicketFamilie, TicketZeilen } from "./AbiTicket";
 import { PunkteSheet } from "./PunkteSheet";
 import { Icon, type IconName } from "./Icon";
 import { Symbol, Zeile } from "./Liste";
+import { Sheet, SheetKopf } from "./Sheet";
 import { ElternInfosTab } from "./ElternInfosTab";
 import { FinanzStandard } from "./FinanzStandard";
 import { KontoTab } from "./KontoTab";
@@ -36,6 +37,35 @@ const TOUR_MERKER = "sv:tour:v3:eltern";
 /** Die Begriffe der Halbjahre – steht einmal auf der Übersicht. */
 const HALBJAHRE_ERKLAERT =
   "„erlassen“ heißt: muss nicht gezahlt werden. „später“: kommt erst in einem späteren Halbjahr dran. EF ist die Einführungsphase (Klasse 11), Q1 und Q2 sind die beiden Qualifikationsjahre (Klasse 12 und 13) – die Zahl dahinter (.1 / .2) ist das Halbjahr.";
+
+/**
+ * Die Begriffe (EF, Q1, „erlassen“, „später“). Ab iPad als Absatz unter der
+ * Legende; am Handy eine Zeile, die sie im Blatt erklärt – der Absatz war dort
+ * sechs Zeilen lang und stand bei jedem Öffnen zwischen Kindern und Tickets.
+ */
+function Begriffe({ className = "" }: { className?: string }) {
+  const [auf, setAuf] = useState(false);
+  return (
+    <>
+      <p className={`text-[12px] leading-relaxed text-tinte-leise max-md:hidden ${className}`}>{HALBJAHRE_ERKLAERT}</p>
+      <button
+        type="button"
+        onClick={() => setAuf(true)}
+        className="-mb-2 mt-0.5 flex min-h-[44px] items-center gap-1 text-[13px] font-medium text-brand-dark transition active:opacity-60 dark:text-brand md:hidden"
+      >
+        Was heißen EF, Q1 und „erlassen“?
+        <Icon name="chevron" size={13} strich={2.4} />
+      </button>
+      <Sheet open={auf} onClose={() => setAuf(false)}>
+        <SheetKopf titel="Begriffe" onClose={() => setAuf(false)} />
+        <div className="card p-4">
+          <HalbjahrLegende />
+          <p className="mt-3 text-[14px] leading-relaxed text-tinte-matt dark:text-slate-300">{HALBJAHRE_ERKLAERT}</p>
+        </div>
+      </Sheet>
+    </>
+  );
+}
 
 /**
  * Die ganze App, wie Eltern sie sehen.
@@ -413,7 +443,7 @@ export function ElternApp() {
                 // Breite verteilt (HalbjahrLegende verteilt erst ab lg nicht mehr)
                 <div className="auf-bild -mt-2 px-1 min-[700px]:[&_ul]:justify-start min-[700px]:[&_ul]:gap-x-6">
                   <HalbjahrLegende />
-                  <p className="mt-2 text-[12px] leading-relaxed text-tinte-leise">{HALBJAHRE_ERKLAERT}</p>
+                  <Begriffe className="mt-2" />
                 </div>
               )}
 
@@ -571,7 +601,7 @@ function KindKarte({
           {einzeln && (
             <>
               <HalbjahrLegende />
-              <p className="mt-3 text-[12px] leading-relaxed text-tinte-leise">{HALBJAHRE_ERKLAERT}</p>
+              <Begriffe className="mt-3" />
             </>
           )}
         </div>

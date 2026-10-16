@@ -1,4 +1,4 @@
-# Änderungen – Stand 15.10.2026
+# Änderungen – Stand 16.10.2026
 
 Diese Datei erklärt, was sich in den letzten Runden geändert hat, **wo** es im
 Code steht und **warum** es so gebaut ist. Die Kommentare im Code selbst sind
@@ -10,6 +10,47 @@ ausführlich (auf Deutsch); hier steht der Überblick dazu.
 > ausgeschlossen. Bitte so beibehalten.
 
 ---
+
+## Weniger Scrollen am Handy, Test in WebKit (16.10.2026)
+
+Gemessen mit Demo-Daten (Seitenhöhe in Bildschirmen, iPhone 390 × 844, alle
+Rollen): im Mittel 1,77 → 1,58, die längste Seite 2,37 → 2,05 (iPhone SE:
+2,23 → 1,99). Nichts ist weggefallen – Selteneres steht eine Ebene tiefer
+im Blatt, wie in den iOS-Einstellungen.
+
+- **Übersicht** (1,85 → 1,50): Die sechs Halbjahre stehen am Handy als
+  schmaler Streifen in der dunklen Karte „Deine Stufenkasse“ (`TermChip.tsx`
+  → `HalbjahrStreifen`); Antippen zeigt Preise und Legende im Blatt. Die
+  Mithilfe steht als Zeile in der Abiball-Ticket-Karte (`AbiTicket.tsx`
+  → `unten`) – die Prozente bestimmen ja den Preis; Staffel und Hinweis im
+  Blatt. Ab iPad unverändert. Ab Laptop stehen „Für dich offen“ und „Aus
+  deinen Komitees“ nebeneinander (`ZuErledigen.tsx`).
+- **Finanzen, Kassenbuch** (2,37 → 1,83): „Geplante Aktionen“ und
+  „Kostenanfragen“ unter 1024 px als zwei Zeilen in einer Gruppe, die Listen
+  im Blatt (`GeplantKarte alsZeile`, `KostenKarte alsZeile`). Steht eine
+  Anfrage offen oder ist man Vorsitz, bleibt die Karte groß oben. Drei statt
+  vier neueste Buchungen, Elternbeiträge + zwei Posten statt vier,
+  kürzere Erklärzeilen. Am Laptop (zwei Spalten) unverändert.
+- **Events** (Team 2,10 → 1,87): Eingeklappte Aktionsgruppen ohne die Zeile
+  „Alle 5 Termine anzeigen“ – der Kopf sagt „5 Termine · 3 weitere ⌄“ und ist
+  ganz tippbar. „Heute · nichts eingetragen“ in einer Zeile. Die Erklärung
+  „Schicht antippen …“ sieht das Team nur, bis es einmal eine Schicht
+  geöffnet hat (`sv:hinweis:schicht-antippen`).
+- **Kasse**: Personen ohne Besonderheit einzeilig („dabei seit EF.1“ entfällt,
+  nur „dabei ab Q1.1“/„verlässt …“ bleibt) – je Person ~14 px, bei 100
+  Personen 1400 px weniger. Tippflächen der Halbjahre bleiben 44 px.
+- **Eltern** (1,79 → 1,55): Der Absatz zu EF/Q1/„erlassen“ steht am Handy
+  hinter „Was heißen EF, Q1 und „erlassen“?“ im Blatt; vor dem Ticketverkauf
+  ersetzt eine Zeile das große Eltern-&-Gäste-Ticket mit „Preis folgt“.
+- **Test in WebKit** (die Engine von Safari): WebKitGTK 2.52 mit
+  `WebKitWebDriver` unter Xvfb, App in einem Rahmen mit exakt 390 × 844,
+  375 × 667, 820 × 1180 und 1440 × 900 – 120 Ansichten, 6 Rollen: nichts
+  steht seitlich über, Kopfzeile und Reiterleiste stehen je Gerät überall an
+  derselben Stelle und bleiben beim Scrollen stehen. Ohne Grafikkarte muss
+  `WEBKIT_DISABLE_COMPOSITING_MODE=1` gesetzt sein (sonst ist der Kopf im
+  Bildschirmfoto schwarz – ein Fehler der Testumgebung, nicht der App). Ein
+  echtes iPhone ersetzt das nicht (Safe Area, Gummiband-Scrollen).
+- `tests/geraet.mjs` nimmt wie `_umgebung.mjs` `CHROMIUM_PATH` an.
 
 ## Update 1.4 live (16.10.2026)
 

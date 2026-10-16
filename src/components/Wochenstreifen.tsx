@@ -240,6 +240,8 @@ export function Wochenstreifen({
         <div className="mb-1 flex min-h-[44px] items-center justify-between gap-2 px-1">
           <span className="min-w-0 truncate text-[13px] font-semibold uppercase tracking-[0.02em] text-tinte-leise">
             {gewaehlt === heute ? "Heute" : tagLang(gewaehlt)}
+            {/* Leerer Tag: in derselben Zeile statt einer eigenen darunter */}
+            {ready && desTages.length === 0 && <span className="font-normal normal-case tracking-normal"> · nichts eingetragen</span>}
           </span>
           <span className="flex shrink-0 items-center gap-2">
             {gewaehlt !== heute && (
@@ -272,9 +274,7 @@ export function Wochenstreifen({
           <div className="py-2">
             <SkelettText zeilen={2} />
           </div>
-        ) : desTages.length === 0 ? (
-          <div className="px-1 py-2.5 text-[14px] text-tinte-leise">Nichts eingetragen.</div>
-        ) : (
+        ) : desTages.length === 0 ? null : (
           <ul className="grid">
             {desTages.map((t) => (
               <TerminZeile key={t.id} t={t} meins={meins(t)} status={st(t)} onClick={onOeffnen ? () => onOeffnen(t) : undefined} />
