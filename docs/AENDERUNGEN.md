@@ -11,6 +11,42 @@ ausführlich (auf Deutsch); hier steht der Überblick dazu.
 
 ---
 
+## Runde 9: Platz und Scrollen gemessen, Löcher geschlossen (16.10.2026)
+
+Anlass: „kaum leere Freiräume … so dass man kaum scrollen muss“. Bisher gab
+es dafür nur Fotos und keine Zahl.
+
+- **Neuer Test `tests/platz-check.mjs`** (5 Größen × 7 Rollen × jeder
+  Reiter). Er misst:
+  - wie viele Bildschirme man bis zum Ende scrollt,
+  - wie viel vom ersten Bildschirm zwischen den Inhalten leer bleibt,
+  - die größte Lücke.
+  Erster Lauf auf dem Live-Stand: Eine Lücke von 96 px in der
+  Eltern-Übersicht war ein Messfehler (eine Karte ist ein `<nav>`), behoben.
+- **Übersicht ab Laptop/iPad quer:** „Zu erledigen“ und „Aus deinen
+  Komitees“ standen als zwei Gruppen nebeneinander. Bei 3 bis 4 Aufgaben und
+  1 Komitee blieben rechts 2 bis 3 Zeilen leer. Jetzt gilt:
+  - Ab 1024 px steht alles in EINER Karte mit zwei Spalten (`Gruppe
+    spalten`, `.gruppe-zwei`).
+  - Die Komitee-Zeilen hängen hinten dran und sind an Sprechblase und
+    Komitee-Name erkennbar.
+  - Eine ungerade letzte Zeile geht über beide Spalten.
+  - Das ist immer die niedrigste Höhe und lässt kein Loch.
+  - Am Handy bleiben zwei Gruppen untereinander.
+  - Ein Zwischenschritt mit zwei Gruppen untereinander kostete durch die
+    zweite Überschrift Höhe und wurde verworfen.
+- **Finanzen (Standard-Ansicht) ab iPad hoch:** „Aktionen, Beiträge und
+  Sonstiges“ steht in einer eigenen Spalte. Bisher war die Liste dort trotzdem
+  auf 3 Posten gekürzt („Alle 8 anzeigen“), darunter blieb ein halber
+  Bildschirm leer. Jetzt steht die Liste ganz da (`PostenBereiche vollAb`),
+  ohne Extra-Tipp.
+- **Profil → Mitteilungen → „Dieses Gerät“** steht jetzt auch in der Demo.
+  Dort heißt es „Nicht bereit“, die Prüfung sagt warum. So lassen sich Zeile
+  und Aufklappen ohne Datenbank testen und fotografieren.
+
+**Prüfung (Demo r43, Chromium):**
+- PRUEFUNG_R9
+
 ## Runde 8d: Korrekturen aus der Prüfung von Runde 8 (16.10.2026)
 
 Eine Prüfung aus drei Blickwinkeln (Offiziell/Inoffiziell, Finanzen,

@@ -15,6 +15,7 @@ import { FaulGrenze, faul } from "./FaulLaden";
 import type { EventItem } from "../lib/events";
 import type { Termin } from "../lib/termine";
 import { Icon, type IconName } from "./Icon";
+import { useBreit } from "../lib/gescrollt";
 
 /**
  * „Für dich offen“ (Schüler) bzw. „Zu erledigen“ (Team) – ganz oben in der
@@ -73,6 +74,7 @@ export function ZuErledigen({ className = "" }: { className?: string }) {
   // Die eigene nächste Schicht im Blatt (fürs Team dasselbe wie unter „Mitmachen“)
   const [schichtOffen, setSchichtOffen] = useState<Termin | null>(null);
   const { topics, items, myVotes, committeesOf, uid } = useTopics();
+  const breit = useBreit();
 
   if (isEltern) return null;
 
@@ -179,25 +181,37 @@ export function ZuErledigen({ className = "" }: { className?: string }) {
     );
   }
 
+  // Ab Laptop/iPad quer EINE Karte mit zwei Spalten, die Komitee-Zeilen
+  // hinten dran (Sprechblase + Komitee-Name zeigen, woher sie kommen).
+  // Vorher zwei Gruppen nebeneinander: bei 3–4 Aufgaben und 1 Komitee blieben
+  // rechts 2–3 Zeilen leer (platz-check Okt. 2026); untereinander kostete die
+  // zweite Überschrift Höhe. So ist es immer die niedrigste Höhe ohne Loch.
+  // Am Handy weiter zwei Gruppen untereinander.
+  const titel = isStaff ? "Zu erledigen" : "Für dich offen";
   return (
     <>
-      {(zeilen.length > 0 || komitee.length > 0) && (
-        // Ab Laptop/iPad quer stehen beide Listen nebeneinander – vorher stand
-        // „Aus deinen Komitees“ (meist 1–2 Zeilen) über die volle Breite darunter.
-        // Halb/halb wie die Karten darunter, damit die Kanten fluchten.
-        <div className={`${className} ${zeilen.length > 0 && komitee.length > 0 ? "lg:grid lg:grid-cols-2 lg:items-start lg:gap-3" : ""}`}>
-          {zeilen.length > 0 && (
-            <Gruppe titel={isStaff ? "Zu erledigen" : "Für dich offen"} className="">
+      {(zeilen.length > 0 || komitee.length > 0) &&
+        (breit ? (
+          <div className={className}>
+            <Gruppe titel={zeilen.length ? titel : "Aus deinen Komitees"} className="" spalten>
               {zeilen}
-            </Gruppe>
-          )}
-          {komitee.length > 0 && (
-            <Gruppe titel="Aus deinen Komitees" className={zeilen.length ? "mt-4 lg:mt-0" : ""}>
               {komitee}
             </Gruppe>
-          )}
-        </div>
-      )}
+          </div>
+        ) : (
+          <div className={className}>
+            {zeilen.length > 0 && (
+              <Gruppe titel={titel} className="">
+                {zeilen}
+              </Gruppe>
+            )}
+            {komitee.length > 0 && (
+              <Gruppe titel="Aus deinen Komitees" className={zeilen.length ? "mt-4" : ""}>
+                {komitee}
+              </Gruppe>
+            )}
+          </div>
+        ))}
       <AbstimmungBlatt id={abstimmungId} onClose={() => setAbstimmungId(null)} />
       <InfoBlatt id={infoId} onClose={() => setInfoId(null)} />
       {schichtOffen && (

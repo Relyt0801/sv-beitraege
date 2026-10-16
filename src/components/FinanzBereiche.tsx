@@ -51,7 +51,7 @@ export function mitVorzeichen(cent: number, kurz = false): string {
  * andere Reihenfolge) – PostenBereiche liefert sie ohne eigene Hülle.
  */
 export function PostenBereiche({
-  d, fin, listeKlasse = "", geplantKlasse = "", ohneGeplant = false, onBuchung,
+  d, fin, listeKlasse = "", geplantKlasse = "", ohneGeplant = false, onBuchung, vollAb = "lg",
 }: {
   d: FinanzUebersicht;
   fin?: FinanzenValue | null;
@@ -65,6 +65,13 @@ export function PostenBereiche({
    * Posten auf („‹ Waffelverkauf“), weil dessen Blatt offen bleibt.
    */
   onBuchung?: (b: Buchung) => void;
+  /**
+   * Ab welcher Breite die Liste ganz dasteht: „lg“ (Kassenbuch – darunter eine
+   * Spalte) oder „md“ (Standard-Ansicht – ab dem iPad hoch steht die Liste in
+   * einer eigenen rechten Spalte; gekürzt blieb darunter der halbe Bildschirm
+   * leer, platz-check Okt. 2026).
+   */
+  vollAb?: "md" | "lg";
 }) {
   const dunkel = useDunkel();
   const [auswahl, setAuswahl] = useState<Auswahl>(null);
@@ -76,9 +83,9 @@ export function PostenBereiche({
     (a, b) => REIHENFOLGE[a.art] - REIHENFOLGE[b.art] || Math.abs(b.ein_cent - b.aus_cent) - Math.abs(a.ein_cent - a.aus_cent),
   );
   const gewaehlt = auswahl?.typ === "posten" ? d.posten.find((p) => postenKey(p) === auswahl.key) ?? null : null;
-  // Am Handy/iPad zuerst die Elternbeiträge und die KURZ_POSTEN größten Posten
+  // Schmal zuerst die Elternbeiträge und die KURZ_POSTEN größten Posten
   // (dieselben Kategorien stehen schon in der Legende am Kreis darüber); der
-  // Rest hinter „Alle … anzeigen“. Am Laptop alles (nur CSS, wie die Buchungen).
+  // Rest hinter „Alle … anzeigen“. Ab `vollAb` alles (nur CSS, wie die Buchungen).
   const [alle, setAlle] = useState(false);
   const kuerzen = !alle && liste.length > KURZ_POSTEN + 1;
 
@@ -102,11 +109,11 @@ export function PostenBereiche({
               unter={unterzeile(p)}
               betrag={p.ein_cent - p.aus_cent}
               onClick={() => setAuswahl({ typ: "posten", key: postenKey(p) })}
-              klasse={kuerzen && i >= KURZ_POSTEN ? "max-lg:hidden" : undefined}
+              klasse={kuerzen && i >= KURZ_POSTEN ? (vollAb === "md" ? "max-md:hidden" : "max-lg:hidden") : undefined}
             />
           ))}
           {kuerzen && (
-            <li className="lg:hidden">
+            <li className={vollAb === "md" ? "md:hidden" : "lg:hidden"}>
               <button
                 type="button"
                 onClick={(e) => {

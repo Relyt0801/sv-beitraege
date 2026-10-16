@@ -278,6 +278,29 @@ button:not(:disabled) {
   .card .gruppe-zellen {
     @apply bg-[rgb(118_118_128/0.08)] dark:bg-[rgb(118_118_128/0.18)];
   }
+  /* Ab Laptop/iPad quer: Zeilen einer Gruppe in ZWEI Spalten (Gruppe spalten,
+     z. B. „Zu erledigen“) – eine 1000 px breite Zeile mit kurzem Text war fast
+     leer, und neben einer kurzen Gruppe blieb ein Loch (platz-check Okt. 2026).
+     Trennlinien: oben erst ab der zweiten Reihe, zwischen den Spalten eine
+     senkrechte; eine ungerade letzte Zeile geht über beide Spalten. */
+  @media (min-width: 1024px) {
+    .gruppe-zwei {
+      @apply grid grid-cols-2;
+    }
+    .gruppe-zwei > * {
+      @apply relative;
+    }
+    .gruppe-zwei > *:nth-child(2)::before {
+      content: none;
+    }
+    .gruppe-zwei > *:nth-child(odd):not(:last-child)::after {
+      content: "";
+      @apply pointer-events-none absolute bottom-2 right-0 top-2 w-px scale-x-50 bg-black/[0.18] dark:bg-white/[0.16];
+    }
+    .gruppe-zwei > *:last-child:nth-child(odd) {
+      grid-column: span 2;
+    }
+  }
   /* Segmentierte Auswahl (Alle / Rein / Raus …) */
   .seg {
     @apply flex rounded-[0.6rem] bg-[rgb(118_118_128/0.12)] p-[2px] dark:bg-[rgb(118_118_128/0.24)];

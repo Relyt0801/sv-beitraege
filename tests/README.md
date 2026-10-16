@@ -13,6 +13,7 @@ Test-Konten gibst du nur beim Aufruf als Umgebungsvariable mit.
 | `ui-check.mjs` | alle Rollen × 4 Größen × hell/dunkel × jeder Reiter, Barrierefreiheit | PowerShell | nein (Demo-Modus) |
 | `masse-check.mjs` | 400 Personen, 1.500 Nachrichten, Klicksturm, Doppeltipp | PowerShell | nein (Demo-Modus) |
 | `leisten-check.mjs` | Kopf- und Reiterleiste an fester Stelle: 7 Größen × 7 Rollen (mit Vorsitz), jeder Reiter oben/unten, Reiterwechsel, Chat/Kalender offen, nach Blatt | PowerShell | nein (Demo-Modus) |
+| `platz-check.mjs` | Platz und Scrollen: 5 Größen × 7 Rollen × jeder Reiter – Bildschirme bis zum Ende, Löcher zwischen Inhalten, größte Lücke | PowerShell | nein (Demo-Modus) |
 
 ## Einmal einrichten (PowerShell, im Projektordner)
 
@@ -47,7 +48,14 @@ Fenster 2 (PowerShell, Projektordner):
 node tests/ui-check.mjs
 node tests/masse-check.mjs
 node tests/leisten-check.mjs
+node tests/platz-check.mjs
 ```
+
+`platz-check` misst, wie viel man scrollen muss (Seitenhöhe ÷ Bildschirm) und
+wie viel vom ersten Bildschirm zwischen den Inhalten leer bleibt (Raster aus
+Messpunkten in der Inhaltsspalte, ohne Kopf- und Reiterleiste). Rangliste in
+der Konsole, alle Werte in `tests/ergebnisse/platz.json`; Exit-Code 1 über
+den Grenzen (Handy 4 Bildschirme, iPad 3, Laptop 2,5; Löcher 30 %; Lücke 72 px).
 
 `leisten-check` meldet jede Ansicht, in der Kopf- oder Reiterleiste woanders
 steht als sonst auf diesem Gerät – und am Laptop jedes zweite Band unter der

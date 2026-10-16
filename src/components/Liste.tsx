@@ -17,18 +17,21 @@ export function Gruppe({
   fuss,
   children,
   className = "mt-4",
+  spalten = false,
 }: {
   titel?: string;
   fuss?: ReactNode;
   children: ReactNode;
   className?: string;
+  /** ab Laptop/iPad quer die Zeilen in zwei Spalten (index.css → .gruppe-zwei) */
+  spalten?: boolean;
 }) {
   return (
     <section className={className}>
       {titel && (
         <h3 className="auf-bild mb-1.5 px-4 text-[13px] font-normal uppercase tracking-[0.02em] text-tinte-leise">{titel}</h3>
       )}
-      <div className="gruppe-zellen">
+      <div className={`gruppe-zellen ${spalten ? "gruppe-zwei" : ""}`}>
         {children}
       </div>
       {fuss && <p className="auf-bild mt-1.5 px-4 text-[13px] leading-snug text-tinte-leise">{fuss}</p>}

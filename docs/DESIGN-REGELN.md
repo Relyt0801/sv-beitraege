@@ -48,6 +48,13 @@ wieder passieren.**
 - Auswahl aus mehreren Möglichkeiten (Rolle, Komitees): Liste im Blatt mit
   Häkchen rechts – keine nativen `<select>`, keine Aufklapp-Menüs in Karten.
 - Schalter immer über `Schalter` in `ZeileMitSchalter` (ganze Zeile tippbar).
+- **Ab Laptop/iPad quer keine halb leeren Spalten:** Keine zwei ungleich
+  langen Gruppen nebeneinander – stattdessen eine Gruppe in voller Breite mit
+  `Gruppe spalten` (Zeilen in zwei Spalten, `.gruppe-zwei`; ungerade letzte
+  Zeile über beide). Beispiel Übersicht: „Zu erledigen“ und die
+  Komitee-Zeilen stehen am Laptop in EINER Karte (`ZuErledigen`). Listen, die
+  am Handy gekürzt sind („Alle 8 anzeigen“), stehen ganz da, sobald sie eine
+  eigene Spalte haben. Nachmessen mit `tests/platz-check.mjs`.
 
 ## 3. Kopfleisten und Ebenen
 

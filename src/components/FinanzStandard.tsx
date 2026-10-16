@@ -133,6 +133,7 @@ export function FinanzStandardInhalt({ d }: { d: FinanzUebersicht }) {
         d={d}
         listeKlasse="md:col-start-2 md:row-start-1 md:row-span-2"
         geplantKlasse="md:col-start-1 md:row-start-2"
+        vollAb="md"
       />
     </div>
   );
