@@ -78,6 +78,9 @@ export function Tour({
   const [hoehe, setHoehe] = useState(() => window.innerHeight);
   const ziel = useRef<HTMLElement | null>(null);
   const karte = useRef<HTMLDivElement | null>(null);
+  // Höhe der Karte – damit sie am iPad/Laptop nie über den oberen oder unteren
+  // Rand ragt (Prüfung Okt. 2026: am iPad quer lag „Weiter“ unter dem Rand)
+  const [kartenHoehe, setKartenHoehe] = useState(0);
 
   const step = steps[i];
   const letzter = i >= steps.length - 1;
@@ -190,6 +193,13 @@ export function Tour({
     return () => window.removeEventListener("keydown", taste, true);
   }, [open, weiter, zurueck, onClose]);
 
+  // Nach jedem Zeichnen nachmessen; ändert sich die Höhe kaum, bleibt der Wert
+  // (sonst zeichnete jede Messung neu).
+  useLayoutEffect(() => {
+    const h = karte.current?.offsetHeight ?? 0;
+    setKartenHoehe((v) => (Math.abs(v - h) > 1 ? h : v));
+  });
+
   if (!open || !step) return null;
 
   // ------------------------------------------------ Wo steht die Karte?
@@ -205,14 +215,24 @@ export function Tour({
       : { bottom: "calc(env(safe-area-inset-bottom) + 12px)", left: 12, right: 12 };
   } else {
     // Rechner/Tablet: direkt über oder unter dem Element, mittig ausgerichtet
-    // 384 px wie die mittige Karte (24rem): elf bis zwölf Punkte, „Zurück“ und
-    // „Weiter“ passen in eine Reihe – bei 360 brach sie am iPad um, und „Weiter“
-    // rutschte unten aus dem Bild (Prüfung Okt. 2026)
+    // 384 px wie die mittige Karte (24rem): mit den engeren Punkten passen bis
+    // zu zwölf Schritte (Admin), „Zurück“ und „Weiter“ in eine Reihe – bei 360
+    // brach sie am iPad um (Prüfung Okt. 2026)
     const w = Math.min(384, window.innerWidth - 32);
     const links = Math.min(Math.max(16, rect.left + rect.width / 2 - w / 2), window.innerWidth - w - 16);
-    kartenStil = unten
-      ? { bottom: hoehe - rect.top + PAD + 12, left: links, width: w }
-      : { top: rect.top + rect.height + PAD + 12, left: links, width: w };
+    // Senkrecht immer ganz im Bild: Reicht der Platz neben dem Element nicht,
+    // rückt die Karte an den Rand und darf das Element teilweise verdecken –
+    // besser als ein „Weiter“, das man nicht erreicht.
+    const RAND = 12;
+    if (unten) {
+      let unterkante = rect.top - PAD - 12;
+      if (unterkante - kartenHoehe < RAND) unterkante = Math.min(hoehe - RAND, kartenHoehe + RAND);
+      kartenStil = { bottom: hoehe - unterkante, left: links, width: w };
+    } else {
+      let oben = rect.top + rect.height + PAD + 12;
+      if (oben + kartenHoehe > hoehe - RAND) oben = Math.max(RAND, hoehe - RAND - kartenHoehe);
+      kartenStil = { top: oben, left: links, width: w };
+    }
   }
 
   // Das Loch nie über den oberen Rand: Der Profil-Knopf (44 px bei y = 8)
@@ -274,9 +294,10 @@ export function Tour({
         {/* flex-wrap: bei 320 px passen 10 Punkte, „Zurück“ und „Weiter“ nicht in
             eine Reihe – dann rutschen die Knöpfe rechtsbündig darunter, statt über
             den Rand zu ragen (Prüfung Okt. 2026) */}
-        <div className={`mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 ${rect ? "" : "justify-center"}`}>
-          {/* Seitenpunkte wie auf dem iPhone-Homescreen */}
-          <div className={`flex items-center gap-1.5 ${rect ? "mr-auto" : "absolute bottom-[1.6rem] left-5"}`} aria-label={`Schritt ${i + 1} von ${steps.length}`}>
+        <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2">
+          {/* Seitenpunkte wie auf dem iPhone-Homescreen – im Fluss, nicht mehr
+              absolut: bei 320/375 px lagen sie sonst unter „Zurück“/„Los geht’s“ */}
+          <div className="mr-auto flex items-center gap-1" aria-label={`Schritt ${i + 1} von ${steps.length}`}>
             {steps.map((_, k) => (
               <span
                 key={k}

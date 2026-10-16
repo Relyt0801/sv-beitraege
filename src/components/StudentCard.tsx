@@ -157,9 +157,10 @@ function StudentCardRoh({
                 {" · "}
               </>
             )}
-            {/* festes Leerzeichen nur zwischen Zahl und „%“ – mehr zusammenzuhalten
-                schob die Mithilfe bei 320 px in eine abgeschnittene dritte Zeile */}
-            {prozent}{"\u00a0"}% Mithilfe
+            {/* feste Leerzeichen in „0 % Mithilfe“ (bricht als Ganzes um, nie „0 %“
+                ohne „Mithilfe“) – aber nichts weiter zusammenhalten: das schob die
+                Mithilfe bei 320 px in eine abgeschnittene dritte Zeile */}
+            {prozent}{"\u00a0"}%{"\u00a0"}Mithilfe
             {unter && ` · ${unter}`}
           </span>
         </span>
