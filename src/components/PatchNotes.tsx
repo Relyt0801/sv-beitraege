@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { PATCH, patchFuer } from "../lib/patchnotes";
+import { PATCH, patchFuer, type PatchGruppe } from "../lib/patchnotes";
 import { Icon, type IconName } from "./Icon";
 import { useEscapeSchliesst } from "./Sheet";
 import { scrollSperren } from "../lib/scrollsperre";
@@ -18,8 +18,9 @@ import { scrollSperren } from "../lib/scrollsperre";
  * das merkt, läuft die Liste unten milchig aus und ein Pfeil zeigt „es geht
  * weiter“; am Ende der Liste verschwinden beide (Update 1.4, U3).
  */
-export function PatchNotes({ team, onFertig }: { team: boolean; onFertig: () => void }) {
-  const bereiche = patchFuer(team);
+export function PatchNotes({ gruppen, onFertig }: { gruppen: PatchGruppe[]; onFertig: () => void }) {
+  // Nach Rollen: Komitees, Team, Kasse, Admin und Eltern sehen je ihre Einträge
+  const bereiche = patchFuer(gruppen);
   const liste = useRef<HTMLDivElement>(null);
   // Gibt es unter dem sichtbaren Teil noch mehr?
   const [mehr, setMehr] = useState(false);

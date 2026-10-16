@@ -55,7 +55,13 @@ export const KARTE_KLICK_KLASSE =
 export function FussLeiste({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
     <div
-      className={`sticky bottom-0 z-10 -mx-5 -mb-[calc(env(safe-area-inset-bottom)+1.5rem)] mt-4 bg-papier/95 px-5 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-3 shadow-[0_-10px_14px_-12px_rgba(0,0,0,.18)] backdrop-blur dark:bg-slate-900/95 ${className}`}
+      // Wie FussLeiste.tsx: Chrome und Safari messen „sticky“ vom Inhaltsrand,
+      // nicht vom Blattrand. Mit bottom-0 rutschte die Leiste um das Polster
+      // (1,5 rem + Home-Indikator) nach oben, sobald der Inhalt das Blatt fast
+      // füllte – dann lag sie dauerhaft über der letzten Zeile („Noch kein
+      // offizieller Kommentar …“ halb verdeckt) und scrollen ging nicht mehr.
+      style={{ bottom: "calc(-1 * (env(safe-area-inset-bottom) + 1.5rem))" }}
+      className={`sticky z-10 -mx-5 -mb-[calc(env(safe-area-inset-bottom)+1.5rem)] mt-4 bg-papier/95 px-5 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-3 shadow-[0_-10px_14px_-12px_rgba(0,0,0,.18)] backdrop-blur dark:bg-slate-900/95 ${className}`}
     >
       {children}
     </div>

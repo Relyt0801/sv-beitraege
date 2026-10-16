@@ -2,14 +2,26 @@
  * Patch Notes – erscheinen einmal pro Version nach dem nächsten Öffnen
  * (App.tsx vergleicht PATCH.version mit dem Merker im Gerät; wer die
  * Einführung gerade gesehen hat, bekommt sie nicht zusätzlich).
- * Eltern sehen keine. Einträge mit nur: "team" sehen nur Stufenteam, Admin,
- * Kassenwart und Sprecher.
+ * Nach Rollen (seit 1.4): jeder Eintrag kann mit `fuer` auf Gruppen begrenzt
+ * werden (Komitee, Team, Kasse, Admin, Eltern – siehe PatchGruppe). Eltern
+ * sehen in ihrer eigenen App nur die Einträge für Eltern (ElternApp.tsx).
  *
  * Seit 1.4 im Stil von Apples „Neu in …“-Bildschirm: je Eintrag ein farbiges
  * Symbol, ein fetter Titel und ein kurzer Satz. `icon` ist ein Name aus
  * components/Icon.tsx (IconName), `farbe` eine Tailwind-Hintergrundklasse.
  * Ältere Einträge ohne Titel (nur `text`) werden weiter einfach angezeigt.
  */
+/**
+ * Für wen ein Eintrag ist (Update 1.4, nach Rollen):
+ *   komitee  Mitglied in mindestens einem Komitee (und das Team)
+ *   team     Stufenteam, Kassenwart, Admin, Sprecher
+ *   kasse    darf das Kassenbuch führen (finanzen.manage)
+ *   admin    Admin
+ *   eltern   Elternkonten (eigene App, sehen nur ihre Einträge)
+ * Ohne `fuer` sehen den Eintrag alle außer Eltern.
+ */
+export type PatchGruppe = "komitee" | "team" | "kasse" | "admin" | "eltern";
+
 export interface PatchEintrag {
   /** Kurzer Titel, fett (seit 1.4) */
   titel?: string;
@@ -19,7 +31,8 @@ export interface PatchEintrag {
   icon?: string;
   /** Hintergrund des Symbol-Kästchens, z. B. "bg-[#34C759]" */
   farbe?: string;
-  nur?: "team";
+  /** Nur für diese Gruppen (eine reicht); ohne: alle außer Eltern */
+  fuer?: PatchGruppe[];
 }
 export interface PatchBereich {
   bereich: string;
@@ -37,74 +50,44 @@ export const PATCH: PatchVersion = {
   datum: "Oktober 2026",
   bereiche: [
     {
-      bereich: "Neu",
+      bereich: "Für alle",
       icon: "✨",
       eintraege: [
         {
-          titel: "Neue Reiterleiste",
-          text: "Aus Glas – am Handy unten, am Laptop und iPad quer oben. Ein geöffneter Chat steht am Laptop in derselben Kopfzeile wie jede Seite.",
+          titel: "Leisten an fester Stelle",
+          text: "Kopfzeile und Reiter stehen auf jedem Gerät immer am selben Platz. Die Zurück-Taste schließt nur das Oberste – die App bleibt offen.",
           icon: "haus",
           farbe: "bg-brand",
         },
         {
-          titel: "Übersicht",
-          text: "Deine Startseite mit Betrag, Abizeitung und Ticket heißt jetzt für alle „Übersicht“. Die App öffnet den Reiter, den du zuletzt benutzt hast.",
-          icon: "haus",
-          farbe: "bg-[#34C759]",
-        },
-        {
-          titel: "Für dich offen",
-          text: "Ganz oben in der Übersicht: offene Abstimmungen, wichtige Infos und deine nächste Schicht – ein Tipp, und du bist da.",
+          titel: "Übersicht mit weniger Scrollen",
+          text: "„Für dich offen“ steht ganz oben. Album, Motto, Zitate und Rankings wischst du am Handy seitlich durch.",
           icon: "haken",
           farbe: "bg-[#FF9500]",
         },
         {
-          titel: "Komitee-Pinnwand",
-          text: "Im Komitee heißt es jetzt „Chat | Pinnwand“: erst Angepinntes und To-dos, dann offene Abstimmungen. Die Kachel sagt, was neu ist.",
-          icon: "pin",
-          farbe: "bg-[#5856D6]",
-        },
-        {
-          titel: "Kalender wie auf dem iPhone",
-          text: "Monat mit Punkten, darunter die Termine des Tages. Der Kalender öffnet wie ein Chat – Kopf und Reiter bleiben, wo sie sind.",
-          icon: "kalender",
-          farbe: "bg-[#FF3B30]",
-        },
-        {
           titel: "Blätter wie in iOS",
-          text: "Öffnet sich etwas aus einem Blatt heraus, kommst du oben links mit „‹ Zurück“ wieder hin; das ✕ schließt alles. Die Zurück-Taste am Handy schließt nur das Oberste – die App bleibt offen.",
+          text: "Öffnet sich etwas aus einem Blatt, kommst du oben links mit „‹ Zurück“ wieder hin; das ✕ schließt alles.",
           icon: "chevron",
           farbe: "bg-[#32ADE6]",
         },
         {
           titel: "Offiziell & Inoffiziell",
-          text: "Rankings, Zitate, Mottos und Kommentare gibt es zweimal: offiziell fürs Abibuch, inoffiziell nur für die Stufe.",
+          text: "Kommentare, Zitate, Mottos und Rankings gibt es zweimal: offiziell fürs Abibuch, inoffiziell nur für die Stufe.",
           icon: "schild",
           farbe: "bg-[#5856D6]",
         },
         {
-          titel: "Gewinner",
-          text: "Das Team kürt Gewinner – sie stehen ganz oben, und Ergebnisse siehst du direkt ohne Suchen.",
-          icon: "pokal",
-          farbe: "bg-[#FF9500]",
+          titel: "Kalender wie auf dem iPhone",
+          text: "Monat mit Punkten, darunter die Termine des Tages.",
+          icon: "kalender",
+          farbe: "bg-[#FF3B30]",
         },
         {
           titel: "Eigene Antwort",
-          text: "Bei Abstimmungen kannst du jetzt auch selbst etwas eintragen.",
+          text: "Bei Abstimmungen kannst du auch selbst etwas eintragen.",
           icon: "stimme",
           farbe: "bg-[#34C759]",
-        },
-        {
-          titel: "Events gebündelt",
-          text: "Zusammengehöriges steht beisammen – weniger Scrollen.",
-          icon: "events",
-          farbe: "bg-[#FF2D55]",
-        },
-        {
-          titel: "Klarere Meldungen",
-          text: "Ohne Internet sagt dir die App genau, was gerade nicht geht – unten, ohne etwas zu verdecken.",
-          icon: "info",
-          farbe: "bg-[#32ADE6]",
         },
         {
           titel: "Hell, Dunkel oder Automatisch",
@@ -112,11 +95,32 @@ export const PATCH: PatchVersion = {
           icon: "mond",
           farbe: "bg-[#5856D6]",
         },
+      ],
+    },
+    {
+      bereich: "Für Komitees",
+      icon: "🗂️",
+      eintraege: [
         {
-          titel: "Kalender kurz pausiert",
-          text: "Termine ins Handy übernehmen ist vorübergehend aus und kommt bald zurück.",
-          icon: "kalender",
-          farbe: "bg-[#8E8E93]",
+          titel: "Offiziell oder inoffiziell?",
+          text: "Offiziell kommt ins Abibuch – später lesen es auch Eltern und Lehrkräfte, also bitte ohne Beleidigungen. Inoffiziell bleibt in der Stufe: wird nicht gedruckt, Eltern sehen es nie. Verschieben geht nur mit Zustimmung.",
+          icon: "schild",
+          farbe: "bg-[#5856D6]",
+          fuer: ["komitee"],
+        },
+        {
+          titel: "Komitee-Pinnwand",
+          text: "„Chat | Pinnwand“: erst Angepinntes und To-dos, dann offene Abstimmungen.",
+          icon: "pin",
+          farbe: "bg-[#5856D6]",
+          fuer: ["komitee"],
+        },
+        {
+          titel: "Aus deinen Komitees",
+          text: "Offene Abstimmungen und To-dos deiner Komitees stehen jetzt auch in der Übersicht.",
+          icon: "haken",
+          farbe: "bg-[#FF9500]",
+          fuer: ["komitee"],
         },
       ],
     },
@@ -125,49 +129,110 @@ export const PATCH: PatchVersion = {
       icon: "🔑",
       eintraege: [
         {
-          titel: "Einstellungen aufgeräumt",
-          text: "Ein Zahnrad je Bereich, Profil und Rechte im Stil der iPhone-Einstellungen.",
-          icon: "regler",
-          farbe: "bg-[#8E8E93]",
-          nur: "team",
-        },
-        {
-          titel: "Beiträge in der Kasse",
-          text: "„Beiträge & Abiball“ ist kein eigener Reiter mehr: oben in der Kasse umschalten. Einnahme und Ausgabe stehen in Finanzen ganz oben.",
-          icon: "kasse",
-          farbe: "bg-brand",
-          nur: "team",
-        },
-        {
           titel: "Zu erledigen",
-          text: "Die Übersicht zählt, was auf dich wartet: Schichten bestätigen, Anfragen, Zitate prüfen – mit Sprung an die richtige Stelle. „Neu“ legt jetzt auch Termine an.",
+          text: "Die Übersicht zählt, was auf dich wartet: Schichten bestätigen, Anfragen, Zitate prüfen – ein Tipp springt an die richtige Stelle.",
           icon: "haken",
           farbe: "bg-[#FF9500]",
-          nur: "team",
+          fuer: ["team"],
         },
         {
-          titel: "Kasse & Finanzen schneller",
-          text: "Suche zeigt Treffer direkt unter dem Feld, ein Tipp aufs Halbjahr schaltet nur offen ↔ bezahlt (erlassen im Blatt der Person). Finanzen am Laptop zweispaltig mit Buchungen rechts.",
+          titel: "Fragen von Eltern",
+          text: "Neue Elternfragen und Antworten kommen jetzt zuverlässig als Mitteilung an.",
+          icon: "chats",
+          farbe: "bg-[#34C759]",
+          fuer: ["team"],
+        },
+        {
+          titel: "Einstellungen aufgeräumt",
+          text: "Profil, Rechte und Funktionen im Stil der iPhone-Einstellungen – Bearbeiten und Löschen auf einer Unterseite, Löschen rot unten mit Rückfrage.",
+          icon: "regler",
+          farbe: "bg-[#8E8E93]",
+          fuer: ["team"],
+        },
+      ],
+    },
+    {
+      bereich: "Kasse & Finanzen",
+      icon: "💶",
+      eintraege: [
+        {
+          titel: "Kasse zuerst",
+          text: "Die Kasse ist dein erster Reiter. „Beiträge & Abiball“ schaltest du oben um, abgehakte Personen bleiben sichtbar.",
           icon: "kasse",
           farbe: "bg-brand",
-          nur: "team",
+          fuer: ["kasse"],
         },
         {
-          titel: "Verschieben mit Zustimmung",
-          text: "Offiziell ↔ inoffiziell braucht Zustimmungen – wie viele, steht unter Profil → Freigaben.",
-          icon: "pfeile",
+          titel: "Finanzen wie in Wallet",
+          text: "Am Handy die neuesten Buchungen, „Alle Buchungen“ mit Suche und Filter. Am Laptop scrollen beide Spalten getrennt.",
+          icon: "finanzen",
+          farbe: "bg-[#34C759]",
+          fuer: ["kasse"],
+        },
+        {
+          titel: "Sicherheitskopie",
+          text: "Ältere Speicherstände lädst du mit einem Tipp herunter.",
+          icon: "beitraege",
+          farbe: "bg-[#8E8E93]",
+          fuer: ["kasse"],
+        },
+      ],
+    },
+    {
+      bereich: "Verwaltung",
+      icon: "🛠️",
+      eintraege: [
+        {
+          titel: "Personen & Rechte",
+          text: "Rolle, Komitees und Passwort-Stand je Person als Zeilen; beim Fremdzugriff lässt sich „Darf“ jetzt ändern.",
+          icon: "rollen",
           farbe: "bg-[#5856D6]",
-          nur: "team",
+          fuer: ["admin"],
+        },
+        {
+          titel: "Protokoll & Umfragen",
+          text: "Speicherstände und Fragen einer Umfrage bearbeitest du auf einer Unterseite – Übernehmen und Entfernen mit Rückfrage.",
+          icon: "umfrage",
+          farbe: "bg-[#FF9500]",
+          fuer: ["admin"],
+        },
+      ],
+    },
+    {
+      bereich: "Für Eltern",
+      icon: "👪",
+      eintraege: [
+        {
+          titel: "Übersicht kompakter",
+          text: "Je Kind eine Karte mit Mithilfe und Abiball-Ticket; Geschwister stehen nebeneinander.",
+          icon: "kind",
+          farbe: "bg-brand",
+          fuer: ["eltern"],
+        },
+        {
+          titel: "Fragen ans Stufenteam",
+          text: "Ihre Frage erreicht das Stufenteam jetzt sicher als Mitteilung. Ein angefangener Text bleibt erhalten.",
+          icon: "chats",
+          farbe: "bg-[#34C759]",
+          fuer: ["eltern"],
+        },
+        {
+          titel: "Infos und Konto",
+          text: "Neues vom Stufenteam als übersichtliche Liste, Kontodaten mit großem Kopieren-Knopf.",
+          icon: "bank",
+          farbe: "bg-[#FF9500]",
+          fuer: ["eltern"],
         },
       ],
     },
   ],
 };
 
-/** Die Bereiche, die diese Person sieht – ohne leere. */
-export function patchFuer(team: boolean): PatchBereich[] {
+/** Die Bereiche, die diese Person sieht – ohne leere. Eltern sehen nur Einträge für Eltern. */
+export function patchFuer(gruppen: PatchGruppe[]): PatchBereich[] {
+  const eltern = gruppen.includes("eltern");
   return PATCH.bereiche
-    .map((b) => ({ ...b, eintraege: b.eintraege.filter((e) => team || e.nur !== "team") }))
+    .map((b) => ({ ...b, eintraege: b.eintraege.filter((e) => (e.fuer ? e.fuer.some((g) => gruppen.includes(g)) : !eltern)) }))
     .filter((b) => b.eintraege.length > 0);
 }
 

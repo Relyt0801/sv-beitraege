@@ -39,7 +39,7 @@ export function ProfilSheet({
   onClose: () => void;
   /** Fehlt in der Elternansicht – dort gibt es keine Einführung. */
   onTutorial?: () => void;
-  /** „Was ist neu“ – öffnet die Patch-Notes wieder (fehlt bei Eltern). */
+  /** „Was ist neu“ – öffnet die Patch-Notes wieder (Eltern sehen nur ihre Einträge). */
   onNeu?: () => void;
 }) {
   const { mein, uid, aktualisiere, neuLaden } = useProfiles();

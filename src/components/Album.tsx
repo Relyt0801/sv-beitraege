@@ -648,7 +648,8 @@ function SteckbriefAnsicht({
       <TeilUmschalter teil={teil} setTeil={setTeil} zahlen={{ offiziell: zahlTeil("offiziell"), inoffiziell: zahlTeil("inoffiziell") }} className="mb-4" />
       {kommentare.length === 0 && (
         <p className="px-1 text-[13.5px] text-tinte-leise">
-          {teil === "offiziell" ? "Noch kein offizieller Kommentar – der kommt später ins Abibuch." : "Sei die erste Person, die etwas schreibt."}
+          {/* „ins Abibuch“ steht schon in der Zeile über dem Umschalter */}
+          {teil === "offiziell" ? "Noch kein offizieller Kommentar – schreib den ersten." : "Noch kein Kommentar – schreib den ersten."}
         </p>
       )}
       <ul className="space-y-3.5">

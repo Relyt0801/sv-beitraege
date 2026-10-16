@@ -11,6 +11,28 @@ ausführlich (auf Deutsch); hier steht der Überblick dazu.
 
 ---
 
+## Abgeschnittener Text, Finanzen am Laptop, „Was ist neu“ nach Rollen (16.10.2026)
+
+- **Abgeschnittener Text über der Eingabe:** Die klebende Fußleiste in
+  Kacheln (`Kachel.tsx` → `FussLeiste`: Album-Kommentare, Abiball,
+  Gewinner, Beiträge, Runden) stand mit `bottom-0` 24 px zu hoch, weil
+  Chrome/Safari „sticky“ vom Inhaltsrand messen – der letzte Text lag halb
+  darunter und ließ sich nicht freiscrollen. Jetzt wie
+  `components/FussLeiste.tsx` mit negativem `bottom` (Abstand + Safe Area).
+  Leerer Kommentar-Hinweis kürzer: „Noch kein offizieller Kommentar – schreib
+  den ersten.“
+- **Finanzen am Laptop:** Links (Ziel, Kassen, Anfragen) und rechts (Verlauf)
+  scrollen jetzt wirklich getrennt. Vorher scrollte die Seite mit, sobald
+  eine Spalte am Ende war. Beide Spalten bekommen die Resthöhe des Fensters
+  (`--finanz-oben`, gemessen), `overscroll-contain`, die Seite selbst scrollt
+  nicht mehr (`FinanzenTab.tsx`).
+- **„Was ist neu“ nach Rollen** (`lib/patchnotes.ts`): Einträge tragen
+  `fuer` (komitee, team, kasse, admin, eltern); `patchFuer()` filtert.
+  Komitee-Mitglieder bekommen eine kurze Erklärung „Offiziell oder
+  inoffiziell?“. Eltern sehen nur ihren eigenen Abschnitt – auch über
+  „Was ist neu“ im Profil (`ElternApp.tsx`, einmal je Version nach der
+  Einführung).
+
 ## Abfragen gegen die echte Datenbank geprüft (16.10.2026)
 
 Alle Supabase-Abfragen der in dieser Runde geänderten Bereiche (Zu erledigen,

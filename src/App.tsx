@@ -18,7 +18,7 @@ import { RoleProvider, useRole } from "./auth/RoleProvider";
 import { ProfilesProvider, useProfiles } from "./profiles-store";
 import { EventsProvider, useEvents } from "./events-store";
 import { TermineProvider, useTermine } from "./termine-store";
-import { TopicsProvider } from "./topics-store";
+import { TopicsProvider, useTopics } from "./topics-store";
 import { SPALTE_HALBJAHRE, SPALTE_MITHILFE, SPALTE_OFFEN, SPALTE_PERSON, StudentCard } from "./components/StudentCard";
 import { Gruppe, Zeile } from "./components/Liste";
 import { useKostenAnfragen } from "./lib/kosten";
@@ -28,7 +28,7 @@ import { KassenKopf } from "./components/KassenKopf";
 import { SchichtAbschluss } from "./components/SchichtAbschluss";
 import { useChatZaehler } from "./lib/chat-zaehler";
 import { PatchNotes } from "./components/PatchNotes";
-import { PATCH, PATCH_MERKER } from "./lib/patchnotes";
+import { PATCH, PATCH_MERKER, type PatchGruppe } from "./lib/patchnotes";
 import { ElternProvider, useEltern } from "./eltern-store";
 import { Icon, type IconName } from "./components/Icon";
 import { HintergrundEbene } from "./components/HintergrundEbene";
@@ -235,6 +235,17 @@ function Main() {
   // Kennung fürs eigene Namensbild aus dem Profil-Speicher – im Themen-Speicher
   // liegt sie in einer Referenz und ist beim ersten Zeichnen noch leer.
   const { uid } = useProfiles();
+  // „Was ist neu“ nach Rollen: Komitee-Mitglieder bekommen die Erklärung zu
+  // offiziell/inoffiziell, die Kasse ihre Finanz-Neuerungen, Admins die Verwaltung
+  const { committeesOf } = useTopics();
+  const patchGruppen = useMemo<PatchGruppe[]>(() => {
+    const g: PatchGruppe[] = [];
+    if (isStaff) g.push("team", "komitee");
+    else if (uid && committeesOf(uid).length) g.push("komitee");
+    if (can("finanzen.manage")) g.push("kasse");
+    if (role === "admin") g.push("admin");
+    return g;
+  }, [isStaff, uid, committeesOf, can, role]);
   const { theme, toggle } = useTheme();
 
   const showTopicsTab = true;
@@ -1327,7 +1338,7 @@ function Main() {
       />
       {showPatch && !showTour && (
         <PatchNotes
-          team={isStaff}
+          gruppen={patchGruppen}
           onFertig={() => {
             setShowPatch(false);
             try {

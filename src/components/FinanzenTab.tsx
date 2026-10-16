@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { hinScrollen, useSprungziel } from "../lib/sprung";
 import { SkelettKarten } from "./Skelett";
 import { useStore } from "../store";
@@ -134,6 +134,34 @@ export function FinanzenTab({ kosten }: { kosten: KostenValue }) {
     [fin.buchungen, fin.ziel, fin.kategorien, offen, settings.aktuelles_halbjahr, aktionen], // eslint-disable-line react-hooks/exhaustive-deps
   );
 
+  // Laptop: geteilte Ansicht wie in Mail – beide Spalten genau so hoch wie der
+  // Platz unter Kopfzeile und Knöpfen, jede scrollt nur in sich, die Seite
+  // selbst gar nicht. Vorher scrollte die Seite und die rechte Spalte klebte:
+  // am Ende der Buchungen lief das Scrollen an die Seite weiter, und beim
+  // Scrollen links rutschte die rechte Spalte mit, bis sie klebte.
+  // Gemessen wird der Abstand vom Seitenanfang bis zu den Spalten (Kopfzeile,
+  // Reiter und die Zeile mit Einnahme/Ausgabe sind unterschiedlich hoch).
+  const spalten = useRef<HTMLDivElement>(null);
+  const [spaltenOben, setSpaltenOben] = useState<number | null>(null);
+  useLayoutEffect(() => {
+    const el = spalten.current;
+    if (!el) return;
+    const messen = () => {
+      const r = el.getBoundingClientRect();
+      // Am Handy ist die linke Spalte „contents“ (keine eigene Box) – nichts zu tun
+      if (!r.width && !r.height) return;
+      setSpaltenOben(Math.round(r.top + window.scrollY));
+    };
+    messen();
+    const ro = new ResizeObserver(messen);
+    ro.observe(document.body);
+    window.addEventListener("resize", messen);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", messen);
+    };
+  }, [fin.bereit, ansicht]);
+
   // Standard-Ansicht: Summen ohne Namen (Schüler, Eltern – oder zur Kontrolle)
   if ((!darfSehen && darfStandard) || (darfSehen && ansicht === "standard")) {
     return (
@@ -184,7 +212,13 @@ export function FinanzenTab({ kosten }: { kosten: KostenValue }) {
   );
 
   return (
-    <div className="grid grid-cols-[minmax(0,1fr)] gap-3 pb-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-start">
+    // lg:pb-0/-mb-20: am Laptop hebt das die Seitenränder darunter auf (pb-4
+    // an <main>, lg:pb-16 in App.tsx) – sonst ließe sich die Seite um diesen
+    // Rand scrollen und beide Spalten wanderten mit.
+    <div
+      style={spaltenOben ? ({ "--finanz-oben": `${spaltenOben}px` } as CSSProperties) : undefined}
+      className="grid grid-cols-[minmax(0,1fr)] gap-3 pb-6 lg:-mb-20 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-start lg:pb-0"
+    >
       {/* Oben, was der Kassenwart am häufigsten tut: Einnahme / Ausgabe buchen.
           Vorher standen die Knöpfe unter Kontostand und Kreis – am Handy erst
           nach gut einer Bildschirmhöhe. Die Ansicht-Wahl steht am Rechner in
@@ -231,7 +265,10 @@ export function FinanzenTab({ kosten }: { kosten: KostenValue }) {
           Liste in Mail). Vorher standen sie über die volle Breite erst unter
           dem Falz. Am Handy (die linke Spalte ist dann „contents“) folgen
           auf den Kontostand direkt die Buchungen, danach der Rest. */}
-      <div className="contents lg:flex lg:min-w-0 lg:flex-col lg:gap-3">
+      <div
+        ref={spalten}
+        className="contents lg:-mx-2 lg:flex lg:h-[calc(100dvh-var(--finanz-oben,14rem)-1rem)] lg:min-w-0 lg:flex-col lg:gap-3 lg:overflow-y-auto lg:overscroll-contain lg:px-2 lg:pb-3"
+      >
         {/* ================================================ Übersicht */}
         <div className="min-w-0 max-lg:order-1">
           <UebersichtKarte
@@ -1122,7 +1159,7 @@ function VerlaufKarte({
       ) : (
         // Eigene Scroll-Fläche nur am Laptop; das Raster darin behält seine
         // volle Höhe (in einem Raster mit fester Höhe würden die Monate gestaucht)
-        <div className="lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:rounded-[1.25rem]">
+        <div className="lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:overscroll-contain lg:rounded-[1.25rem]">
         <div className="grid grid-cols-[minmax(0,1fr)] gap-2.5">
           {gruppen.map(([monat, zeilen]) => {
             const summe = zeilen.reduce((n, b) => n + (b.quelle === "abgleich" ? 0 : b.cent), 0);
@@ -1171,14 +1208,11 @@ function VerlaufKarte({
   );
 
   return (
-    // Am Laptop die rechte Spalte: klebt unter der Kopfzeile, Filter und Suche
-    // bleiben stehen, nur die Monate scrollen (eigene Höhe = Fensterhöhe).
-    // lg:-mb-[6.5rem]: Ein klebendes Element bleibt mit seinem Außenrand im
-    // Rasterfeld. Unter dem Raster liegen am Laptop noch 6,5 rem Seitenrand
-    // (pb-6 hier, pb-4 an <main>, lg:pb-16 in App.tsx) – ohne den negativen
-    // Rand schob das Rasterende den Block am Seitenende nach oben, und
-    // „Buchungen“, Filter und Suche verschwanden unter der Kopfzeile.
-    <section className="min-w-0 max-lg:order-2 lg:sticky lg:top-[calc(var(--kopf)+0.75rem)] lg:-mb-[6.5rem] lg:flex lg:max-h-[calc(100dvh-var(--kopf)-1.5rem)] lg:flex-col">
+    // Am Laptop die rechte Spalte der geteilten Ansicht: so hoch wie der Platz
+    // (siehe spaltenOben in FinanzenTab), Filter und Suche bleiben stehen, nur
+    // die Monate scrollen – overscroll-contain: am Listenende läuft das
+    // Scrollen nicht an die linke Spalte oder die Seite weiter.
+    <section className="min-w-0 max-lg:order-2 lg:flex lg:h-[calc(100dvh-var(--finanz-oben,14rem)-1rem)] lg:flex-col">
       {/* Handy/iPad hoch: wie „Letzte Transaktionen“ in Wallet – die neuesten
           Buchungen und „Alle Buchungen ›“; Filter, Suche und Monate im Blatt.
           Vorher standen Filter, Suche und alle Monate auf der Seite (gut ein

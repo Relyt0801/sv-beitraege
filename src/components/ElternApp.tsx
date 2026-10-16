@@ -25,6 +25,8 @@ import { InstallKarte } from "./InstallHinweis";
 import { abmelden, appZaehler } from "../lib/push";
 
 import { frage } from "../lib/melder";
+import { PatchNotes } from "./PatchNotes";
+import { PATCH, PATCH_MERKER } from "../lib/patchnotes";
 type Reiter = "uebersicht" | "infos" | "finanzen" | "konto";
 
 // Titel = Name des Reiters (wie in der Schüler-App; vorher hieß „Übersicht“ oben „Stufenkasse“)
@@ -53,6 +55,8 @@ export function ElternApp() {
   }, []);
   const [profilOffen, setProfilOffen] = useState(false);
   const [tour, setTour] = useState(false);
+  // „Neu in Version …“ – für Eltern nur ihre Einträge (lib/patchnotes.ts)
+  const [patch, setPatch] = useState(false);
   const { theme, toggle } = useTheme();
   const gescrollt = useGescrollt(4);
   const titelWeg = useGescrollt(44);
@@ -78,6 +82,20 @@ export function ElternApp() {
   );
   const ohneKind = bereit && kinderIds.length === 0;
   const laedt = !ready || !bereit;
+  // Einmal pro Version, aber nicht direkt nach der Einführung (wie in App.tsx)
+  useEffect(() => {
+    if (laedt || tour) return;
+    let gesehen: string | null = null;
+    try {
+      if (!localStorage.getItem(TOUR_MERKER)) return;
+      gesehen = localStorage.getItem(PATCH_MERKER);
+    } catch {
+      return;
+    }
+    if (gesehen && Number(gesehen) >= Number(PATCH.version)) return;
+    const t = setTimeout(() => setPatch(true), 1200);
+    return () => clearTimeout(t);
+  }, [laedt, tour]);
 
   // Zahl am App-Symbol und am Reiter „Infos“: neue Antworten UND neue Infos
   // vom Stufenteam (vorher zählten nur Antworten – eine neue Info sah niemand)
@@ -446,6 +464,10 @@ export function ElternApp() {
       <ProfilSheet
         open={profilOffen}
         onClose={() => setProfilOffen(false)}
+        onNeu={() => {
+          setProfilOffen(false);
+          setPatch(true);
+        }}
         onTutorial={() => {
           setProfilOffen(false);
           setReiter("uebersicht");
@@ -462,11 +484,26 @@ export function ElternApp() {
           window.scrollTo({ top: 0, behavior: "smooth" });
           try {
             localStorage.setItem(TOUR_MERKER, new Date().toISOString());
+            // Wer die Einführung gerade gesehen hat, braucht „Was ist neu“ nicht
+            localStorage.setItem(PATCH_MERKER, PATCH.version);
           } catch {
             /* privates Fenster */
           }
         }}
       />
+      {patch && !tour && (
+        <PatchNotes
+          gruppen={["eltern"]}
+          onFertig={() => {
+            setPatch(false);
+            try {
+              localStorage.setItem(PATCH_MERKER, PATCH.version);
+            } catch {
+              /* privates Fenster */
+            }
+          }}
+        />
+      )}
     </div>
   );
 }
