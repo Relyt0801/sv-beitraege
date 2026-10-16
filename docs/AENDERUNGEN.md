@@ -11,6 +11,44 @@ ausführlich (auf Deutsch); hier steht der Überblick dazu.
 
 ---
 
+## Nachtrag: Vorsitz-Funktionen in der Demo, Terminanfragen nicht abgeschnitten (16.10.2026)
+
+Eine unabhängige Prüfung des Diffs von #19 fand Folgendes. Anfragen-Speicher,
+Beispieldaten und Test betreffen nur Demo bzw. Doku; die neue Liste der
+eigenen Terminanfragen und der Text „Genehmigt“ gelten auch in der echten App.
+
+- **Kosten- und Terminanfragen ließen sich in der Demo gar nicht stellen**
+  („Ohne Datenbank geht das nicht.“), die nach oben gezogene Karte zeigte
+  immer „Keine Anfragen“. Jetzt leben sie ohne Datenbank im Browser:
+  - stellen, zurückziehen und entscheiden gehen (`src/lib/kosten.ts`,
+    `src/termine-store.tsx`, nur im Zweig `!hasSupabase`);
+  - `?rolle=vorsitz` startet mit einer offenen und einer genehmigten
+    Kostenanfrage und einer angenommenen Terminanfrage.
+- **Eigene Terminanfragen** (Events, Karte „Vorsitz …“, auch echte App)
+  standen in einer Zeile; am iPhone war vom Datum nur „Mo, 19…“ zu sehen.
+  Jetzt: Titel (bricht um statt abgeschnitten), darunter Stand und Termin,
+  darunter die ganze Antwort des Teams (`TerminAnfragen.tsx`). Die Zeile
+  öffnet kein Blatt – darum wird nichts gekürzt.
+- Kostenanfrage-Blatt: „Genehmigt und als Ausgabe gebucht“ nur, wenn es die
+  Buchung gibt, sonst „Genehmigt“.
+- Ergebnis mit korrigiertem Blatt-Schritt: `leisten-check` 777 Zustände,
+  0 Abweichungen (das Profil-Blatt geht jetzt auf allen Größen auf und zu);
+  `ui-check` 280 Ansichten ohne Fund.
+- Doku: die Rolle `vorsitz` steht jetzt in `README.md` und
+  `docs/DESIGN-REGELN.md` (§6, Rollen für Fotos); `tests/README.md` nennt
+  7 Rollen für `leisten-check`.
+- **Fehler im Test selbst:** Der Schritt „nach Blatt (gescrollt)“ in
+  `leisten-check.mjs` klickte den letzten Knopf in `<header>`. Am Laptop und
+  iPad quer steckt dort die Reiterleiste – es wurde ein Reiter gewechselt,
+  aber nie ein Blatt geöffnet. Die früheren Angaben „nach Blatt“ galten
+  dort also nicht. Jetzt wird der Profilknopf über seinen Namen getroffen
+  („Mein Profil“ bzw. „Ihr Zugang“), und der Test meldet eine Abweichung,
+  wenn das Blatt nicht auf- oder nicht wieder zugeht.
+
+Klicktest (Demo, iPhone-Größe): Kostenanfrage stellen → erscheint mit
+„wartet“, Kopf „2 offen“ → zurückziehen → weg; Terminanfrage stellen →
+erscheint unter „Vorsitz Abizeitung“; keine Seitenfehler.
+
 ## Vorher/Nachher der Kopfleiste, Sicht der Komitee-Vorsitzenden (16.10.2026)
 
 **Vorher/Nachher am Bildschirm.** Der Stand vor der Korrektur (`3989f39^`)

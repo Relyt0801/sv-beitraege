@@ -31,7 +31,8 @@ gut zum Ausprobieren.
 npm run demo
 ```
 Dann z. B. `http://localhost:5173/?rolle=eltern` öffnen. Rollen: `schueler`, `stufenteam`,
-`kassenwart`, `admin`, `eltern`, `eltern-leer` (Elternzugang ohne Kind). Alles sind erfundene Daten.
+`kassenwart`, `admin`, `eltern`, `eltern-leer` (Elternzugang ohne Kind), `vorsitz` (Schüler, der ein
+Komitee leitet). Alles sind erfundene Daten.
 
 ## Supabase einrichten (für Sync + Login)
 1. Auf https://supabase.com ein kostenloses Projekt anlegen – **Region: Europe (Frankfurt)**.

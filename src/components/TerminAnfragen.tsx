@@ -177,22 +177,29 @@ export function MeineAnfragen() {
 
         {meine.length > 0 && (
           <div className="mt-3 grid gap-1 border-t border-black/[0.08] pt-2 dark:border-white/[0.1]">
+            {/* Zwei Zeilen: Titel oben, Stand und Termin darunter. Vorher stand
+                alles in einer Zeile – am iPhone war vom Datum nur „Mo, 19…“
+                zu sehen (Prüfung aus Sicht der Vorsitzenden, Okt. 2026). */}
             {meine.map((a) => (
-              <div key={a.id} className="flex min-h-[44px] flex-wrap items-center gap-2 text-[14px]">
-                <span
-                  className={`shrink-0 rounded-full px-2.5 py-0.5 text-[12px] font-bold ${
-                    a.status === "offen"
-                      ? "bg-[rgb(118_118_128/0.12)] text-tinte-matt dark:bg-[rgb(118_118_128/0.24)] dark:text-slate-300"
-                      : a.status === "angenommen"
-                        ? "bg-bezahlt-grund text-bezahlt"
-                        : "bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-400"
-                  }`}
-                >
-                  {a.status === "offen" ? "wartet" : a.status === "angenommen" ? "im Kalender" : "abgelehnt"}
-                </span>
-                <span className="min-w-0 flex-1 truncate">
-                  <b>{a.titel}</b> · {wann(a)}
-                  {a.antwort ? ` – „${a.antwort}"` : ""}
+              <div key={a.id} className="flex min-h-[44px] items-center gap-2 py-1">
+                <span className="min-w-0 flex-1">
+                  {/* umbrechen statt kürzen: die Zeile öffnet kein Blatt, sonst wäre ein langer Titel nirgends ganz lesbar */}
+                  <span className="block text-[15px] font-semibold leading-snug [overflow-wrap:anywhere]">{a.titel}</span>
+                  <span className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[13px] text-tinte-leise">
+                    <span
+                      className={`shrink-0 rounded-full px-2 py-px text-[12px] font-bold ${
+                        a.status === "offen"
+                          ? "bg-[rgb(118_118_128/0.12)] text-tinte-matt dark:bg-[rgb(118_118_128/0.24)] dark:text-slate-300"
+                          : a.status === "angenommen"
+                            ? "bg-bezahlt-grund text-bezahlt"
+                            : "bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-400"
+                      }`}
+                    >
+                      {a.status === "offen" ? "wartet" : a.status === "angenommen" ? "im Kalender" : "abgelehnt"}
+                    </span>
+                    <span>{wann(a)}</span>
+                  </span>
+                  {a.antwort && <span className="mt-0.5 block text-[13px] text-tinte-leise [overflow-wrap:anywhere]">„{a.antwort}“</span>}
                 </span>
                 {a.status === "offen" && (
                   <button
