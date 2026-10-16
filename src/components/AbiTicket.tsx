@@ -517,7 +517,8 @@ function TicketSymbol() {
  * großer Grafik „Preis folgt“ und beim ersten Kind zusätzlich das Gäste-
  * Ticket – zusammen über einen Bildschirm, das zweite Kind kam erst nach 1,5
  * Bildschirmen. Was für alle gilt (Gäste-Ticket, Countdown, Staffel), steht
- * jetzt EINMAL in `TicketFamilie`.
+ * jetzt EINMAL in `TicketFamilie`. Vor dem Verkauf ohne Preis und ohne
+ * Bestellung fällt die Zeile ganz weg (Runde 10, Okt. 2026).
  */
 export function TicketZeilen({ student, settings, prozent }: { student: Student; settings: Settings; prozent: number }) {
   const { sichtbar } = useFunktionen();
@@ -534,6 +535,12 @@ export function TicketZeilen({ student, settings, prozent }: { student: Student;
 
   const p = ticketPreise(prozent, settings);
   const aktiv = liste.filter((b) => b.student_id === student.id && b.status !== "storniert");
+  // Vor dem Verkauf ohne Preis und ohne Bestellung sagt die Zeile nichts, was
+  // `TicketFamilie` darunter nicht schon sagt – bei zwei Kindern standen zwei
+  // gleiche Zeilen „Abiball-Ticket · Preis folgt“ da (Runde 10, Okt. 2026).
+  // Erst nach allen Hooks; „bald“ und jede nicht stornierte Bestellung (dann
+  // mit „Überweisen“) holen die Zeile zurück.
+  if (status === "aus" && !p.preisSteht && aktiv.length === 0) return null;
   const offene = aktiv.filter((b) => b.status === "offen");
   const anzahl = aktiv.reduce((n, b) => n + b.anzahl, 0);
   const stand =
@@ -669,7 +676,8 @@ export function TicketFamilie({
  *   • Vor dem Verkauf standen auf der Übersicht zwei große Tickets mit „Preis
  *     folgt“ über die volle Breite (~300 px ohne Information). Jetzt: nur
  *     das eigene Ticket in klein und eine Zeile – die Karte passt neben
- *     „Mithilfe bei Aktionen“ (davon hängt der Preis ja ab).
+ *     „Mithilfe bei Aktionen“ (davon hängt der Preis ja ab). Am Handy ist
+ *     es seit Runde 10 nur noch EINE Zeile, das Ticket steht im Blatt.
  *   • `onMitKasse` sagt der Übersicht, ob rechts eine Kasse steht (dann
  *     braucht der Bereich die volle Breite).
  *   • `ohneGaeste`: Bei mehreren Kindern zeigen Eltern das Gäste-Ticket nur
@@ -718,6 +726,7 @@ export function TicketBereich({
   if (!zeigen) return null;
   // Vor dem Verkauf (nicht bei Eltern): klein und knapp
   const knapp = !mitKasse && !fuerEltern;
+  const p = ticketPreise(prozent, settings);
 
   const eigenes = (
     <AbiTicket art="erstes" student={student} settings={settings} prozent={prozent} fuerEltern={fuerEltern} onClick={() => setAuf(true)} klein={knapp} />
@@ -727,29 +736,48 @@ export function TicketBereich({
   return (
     <section className={`card p-4 sm:p-5 ${className}`} data-tour="abiball-ticket">
       <AusHinweis funktion="abiball" className="mb-2" />
-      <div className="flex items-baseline justify-between gap-2">
-        <h2 className="text-[15px] font-semibold">
-          Abiball-Ticket
-          {/* Vor dem Verkauf am Handy als Unterzeile statt eigenem Kasten */}
-          {knapp && <span className="block text-[12.5px] font-normal text-tinte-leise md:hidden">Verkauf noch nicht gestartet</span>}
-        </h2>
+      {/* Vor dem Verkauf am Handy EINE Zeile wie bei den Eltern (TicketZeilen):
+          Titel, Stand, Preis, „›“. Vorher standen Kopf mit „Details“ und das
+          kleine Ticket „Preis folgt“ da – ~140 px ohne neue Information
+          (Runde 10, Okt. 2026). Das Ticket steht weiter im Blatt und ab iPad.
+          Per CSS statt JS-Weiche: beim Drehen wird nichts neu aufgebaut, der
+          Fokus findet nach dem Blatt seinen Auslöser (Sheet.tsx). */}
+      {knapp && (
+        <button
+          type="button"
+          onClick={() => setAuf(true)}
+          className="flex min-h-[48px] w-full items-center gap-3 text-left transition active:opacity-60 md:hidden"
+        >
+          <TicketSymbol />
+          <span className="min-w-0 flex-1">
+            <span className="block text-[15px] font-semibold leading-snug">Abiball-Ticket</span>
+            <span className="mt-0.5 block text-[12.5px] leading-snug text-tinte-leise">Verkauf noch nicht gestartet</span>
+          </span>
+          <span className="zahl shrink-0 text-[15px] font-semibold text-tinte-matt dark:text-slate-300">
+            {p.preisSteht ? `${p.erstes} €` : "Preis folgt"}
+          </span>
+          <span aria-hidden className="shrink-0 text-tinte-leise">
+            <Icon name="chevron" size={14} strich={2.4} />
+          </span>
+        </button>
+      )}
+      <div className={`flex items-baseline justify-between gap-2 ${knapp ? "max-md:hidden" : ""}`}>
+        <h2 className="text-[15px] font-semibold">Abiball-Ticket</h2>
         <button onClick={() => setAuf(true)} className="-my-3 -mr-3 flex min-h-[44px] items-center gap-0.5 px-3 text-[14px] font-semibold text-brand-dark dark:text-brand">
           Details <Icon name="chevron" size={14} strich={2.4} />
         </button>
       </div>
-      <div className={`mt-3 grid gap-4 ${mitKasse && !eineSpalte ? "md:grid-cols-[minmax(0,1.4fr)_minmax(260px,1fr)]" : ""}`}>
+      <div
+        className={`mt-3 grid gap-4 ${knapp ? "max-md:hidden" : ""} ${mitKasse && !eineSpalte ? "md:grid-cols-[minmax(0,1.4fr)_minmax(260px,1fr)]" : ""}`}
+      >
         <div className="grid content-start gap-2.5">
           {knapp ? (
             <>
+              {/* Nur ab iPad zu sehen (am Handy steht oben die Zeile): die
+                  Karte steht dort neben „Mithilfe“, Platz für das Gäste-Ticket */}
               {eigenes}
-              {/* Ab iPad steht die Karte neben „Mithilfe“ – dort ist Platz für
-                  das Gäste-Ticket, am Handy reicht eine Zeile */}
-              {!ohneGaeste && <div className="hidden md:block">{gaeste}</div>}
-              {/* Ab iPad als Kasten; am Handy steht der Satz im Kopf der Karte,
-                  die weiteren Tickets stehen in „Details“ */}
-              <div className="max-md:hidden">
-                <Info>Verkauf noch nicht gestartet</Info>
-              </div>
+              {!ohneGaeste && gaeste}
+              <Info>Verkauf noch nicht gestartet</Info>
             </>
           ) : fuerEltern ? (
             <>

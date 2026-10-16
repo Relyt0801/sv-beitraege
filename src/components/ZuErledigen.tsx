@@ -80,8 +80,9 @@ export function ZuErledigen({ className = "" }: { className?: string }) {
 
   // Was in den eigenen Komitees offen ist (Abstimmung ohne eigene Stimme,
   // offene To-dos) – vorher sah man das nur, wenn man in Chats nachschaute.
-  // Eigene Gruppe: Komitee-Aufgaben gehören allen Mitgliedern, die Zahl am
-  // Reiter zählt nur, was oben unter „Zu erledigen“ steht.
+  // Stehen hinten in derselben Gruppe. Die Zahl am Reiter (App.tsx →
+  // aufgabenZahl) zählt sie bewusst nicht: Komitee-Aufgaben gehören allen
+  // Mitgliedern, nicht einem selbst.
   const meineKoms = uid ? committeesOf(uid) : [];
   const jetzt = Date.now();
   const komitee: ReactNode[] = topics
@@ -181,32 +182,24 @@ export function ZuErledigen({ className = "" }: { className?: string }) {
     );
   }
 
-  // Ab Laptop/iPad quer EINE Karte mit zwei Spalten, die Komitee-Zeilen
-  // hinten dran (Sprechblase + Komitee-Name zeigen, woher sie kommen).
-  // Vorher zwei Gruppen nebeneinander: bei 3–4 Aufgaben und 1 Komitee blieben
-  // rechts 2–3 Zeilen leer (platz-check Okt. 2026); untereinander kostete die
-  // zweite Überschrift Höhe. So ist es immer die niedrigste Höhe ohne Loch.
-  // Am Handy weiter zwei Gruppen untereinander.
-  // Die Zeilen in `zeilen` (sie öffnen Blätter) stehen bei JEDER Breite an
-  // derselben Stelle im Baum – nur die Komitee-Zeilen wandern. Sonst baute
-  // React sie beim Drehen des iPads neu auf, und nach dem Schließen eines
-  // Blatts fand der Fokus seinen Auslöser nicht mehr (Sheet.tsx).
+  // EINE Gruppe bei jeder Breite, die Komitee-Zeilen hinten dran (Sprechblase
+  // + Komitee-Name zeigen, woher sie kommen); ab Laptop/iPad quer in zwei
+  // Spalten. Vorher zwei Gruppen nebeneinander: bei 3–4 Aufgaben und
+  // 1 Komitee blieben rechts 2–3 Zeilen leer (platz-check Okt. 2026). Am
+  // Handy stand „Aus deinen Komitees“ als zweite Gruppe darunter – die zweite
+  // Überschrift kostete Höhe für meist eine Zeile (Runde 10, Okt. 2026).
+  // Alle Zeilen stehen so bei JEDER Breite an derselben Stelle im Baum. Sonst
+  // baute React sie beim Drehen des iPads neu auf, und nach dem Schließen
+  // eines Blatts fand der Fokus seinen Auslöser nicht mehr (Sheet.tsx).
   const titel = isStaff ? "Zu erledigen" : "Für dich offen";
   return (
     <>
       {(zeilen.length > 0 || komitee.length > 0) && (
         <div className={className}>
-          {(zeilen.length > 0 || breit) && (
-            <Gruppe titel={zeilen.length ? titel : "Aus deinen Komitees"} className="" spalten={breit}>
-              {zeilen}
-              {breit ? komitee : null}
-            </Gruppe>
-          )}
-          {!breit && komitee.length > 0 && (
-            <Gruppe titel="Aus deinen Komitees" className={zeilen.length ? "mt-4" : ""}>
-              {komitee}
-            </Gruppe>
-          )}
+          <Gruppe titel={zeilen.length ? titel : "Aus deinen Komitees"} className="" spalten={breit}>
+            {zeilen}
+            {komitee}
+          </Gruppe>
         </div>
       )}
       <AbstimmungBlatt id={abstimmungId} onClose={() => setAbstimmungId(null)} />
