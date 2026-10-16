@@ -91,6 +91,66 @@ export function TermChip({
 }
 
 /**
+ * Die sechs Halbjahre als schmaler Streifen auf der dunklen Leitkarte
+ * („Deine Stufenkasse“, nur am Handy). Gleiche Zeichen wie die Kacheln
+ * (✓ bezahlt, € offen, / erlassen, grau = später, blau umrandet = läuft),
+ * nur in Farben für dunklen Grund. Reine Anzeige – der Streifen steckt in
+ * einem Knopf, der die ausführliche Ansicht mit Legende öffnet (44 px hoch:
+ * Mindestmaß für Tippflächen; Kürzel 12 px wie in den Kacheln).
+ */
+export function HalbjahrStreifen({ student, current, hy }: { student: Student; current: Halbjahr; hy: readonly Halbjahr[] }) {
+  return (
+    <span className="flex w-full gap-1">
+      {hy.map((h, i) => {
+        const t = student.terms[h];
+        const pre = isPreJoin(student, i);
+        const dead = isDead(student, i);
+        let cls: string, glyph: string, wort: string;
+        if (pre) {
+          cls = "border border-dashed border-white/30 text-white/60";
+          glyph = "–";
+          wort = "noch nicht dabei";
+        } else if (dead) {
+          cls = "bg-[#FF453A]/20 text-[#FF8A80]";
+          glyph = "×";
+          wort = "nicht mehr dabei";
+        } else if (t.status === "offen" && i > idx(current)) {
+          cls = "bg-white/[0.08] text-white/60";
+          glyph = GLYPH.offen;
+          wort = "später";
+        } else if (t.status === "bezahlt") {
+          cls = "bg-[#30D158]/20 text-[#30D158]";
+          glyph = GLYPH.bezahlt;
+          wort = "bezahlt";
+        } else if (t.status === "erlassen") {
+          cls = "bg-white/15 text-white/85";
+          glyph = GLYPH.erlassen;
+          wort = "erlassen";
+        } else {
+          cls = "bg-[#FF9F0A]/25 text-[#FFB340]";
+          glyph = GLYPH.offen;
+          wort = "offen";
+        }
+        return (
+          <span
+            key={h}
+            className={`flex h-11 flex-1 basis-0 flex-col items-center justify-center gap-0.5 rounded-lg font-semibold leading-none ${cls} ${
+              h === current ? "ring-2 ring-[#0A84FF]" : ""
+            }`}
+          >
+            <span className="text-[12px]">{h}</span>
+            <span aria-hidden className={`text-[12px] ${t.status === "erlassen" && !pre && !dead ? "font-black" : "font-bold"}`}>
+              {glyph}
+            </span>
+            <span className="sr-only">{wort}, </span>
+          </span>
+        );
+      })}
+    </span>
+  );
+}
+
+/**
  * Legende unter den Halbjahren – mit genau den Kästchen, die auch oben
  * stehen (Farbe, Rand und Zeichen), damit man sie sofort wiedererkennt.
  * Die vier Einträge stehen immer in einer Zeile (auch auf 320 px);

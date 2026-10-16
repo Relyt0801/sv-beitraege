@@ -2,7 +2,7 @@ import { HY, type Settings, type Student } from "../lib/types";
 import { SkelettKarten } from "./Skelett";
 import { useStore } from "../store";
 import { abiballVon, basisOffen, beitragFuer, isPreJoin, naechsteStufe, prozentVon, ticketPreise } from "../lib/logic";
-import { HalbjahrLegende, TermChip } from "./TermChip";
+import { HalbjahrLegende, HalbjahrStreifen, TermChip } from "./TermChip";
 import { StaffelKacheln, StaffelRing } from "./Staffel";
 import { BeitragsListe } from "./BeitragsListe";
 import { KontoTab } from "./KontoTab";
@@ -56,6 +56,7 @@ export function MyKasse({
   const { sichtbar } = useFunktionen();
   const [ueberweisen, setUeberweisen] = useState(false);
   const [staffelOffen, setStaffelOffen] = useState(false);
+  const [halbjahreOffen, setHalbjahreOffen] = useState(false);
   // Läuft der Ticketverkauf (rechts die Kasse)? Dann braucht das Ticket die
   // volle Breite – sonst steht es neben „Mithilfe bei Aktionen“.
   const [ticketBreit, setTicketBreit] = useState(false);
@@ -84,9 +85,36 @@ export function MyKasse({
   const bonus = abiballVon(settings);
   const preise = ticketPreise(pct, settings);
   const gesamt = HY.reduce((n, h) => n + beitragFuer(h, settings), 0);
+  const preisSatz = `EF je ${beitragFuer("EF.1", settings)} €, Q1/Q2 je ${beitragFuer("Q1.1", settings)} €`;
+  const halbjahre = (tour: boolean) => (
+    <>
+      <div className="mt-3 flex gap-1.5" data-tour={tour ? "meine-halbjahre" : undefined}>
+        {HY.map((h, i) => (
+          <TermChip key={h} student={student} h={h} i={i} current={settings.aktuelles_halbjahr} />
+        ))}
+      </div>
+      <div className="mt-1.5 flex gap-1.5">
+        {HY.map((h) => (
+          <div key={h} className="zahl flex-1 basis-0 text-center text-[12px] font-semibold text-tinte-leise">
+            {beitragFuer(h, settings)} €
+          </div>
+        ))}
+      </div>
+      <HalbjahrLegende nichtDabei={HY.some((_, i) => isPreJoin(student, i))} />
+    </>
+  );
   const meine = contributions
     .filter((c) => c.student_id === student.id)
     .sort((a, b) => (a.datum < b.datum ? 1 : -1));
+
+  const mithilfeKopf =
+    pct > 100 && bonus.ueber100
+      ? `Stark! ${preise.rabatt} € Bonus aufs erste Ticket.`
+      : pct >= 100
+        ? bonus.ueber100
+          ? `Kein Zuschlag mehr. Alle ${bonus.bonusSchritt} % mehr: −${bonus.bonusProSchritt} €.`
+          : "Geschafft – kein Zuschlag mehr aufs erste Ticket."
+        : "Mehr Prozent = günstigeres Abiball-Ticket.";
 
   // Spalten ab iPad (Prüfung Okt. 2026: Ticket ohne Verkauf über die volle
   // Breite, „Mithilfe“ erst unter dem Rand, leere Liste in halber Breite):
@@ -113,7 +141,7 @@ export function MyKasse({
           vorher eine 170 px hohe Karte ohne Aufgabe. Ist etwas offen, bleibt
           die große Zahl: dann ist sie das Wichtigste auf der Seite. */}
       <section
-        className={`leitkarte order-2 flex flex-col ${offen > 0 ? "" : "max-md:flex-row max-md:items-center max-md:gap-3 max-md:!py-3"}`}
+        className={`leitkarte order-2 flex flex-col ${offen > 0 ? "" : "max-md:flex-row max-md:flex-wrap max-md:items-center max-md:gap-3 max-md:!py-3"}`}
         data-tour="meine-karte"
       >
         <div className={offen > 0 ? "" : "max-md:min-w-0 max-md:flex-1"}>
@@ -137,6 +165,18 @@ export function MyKasse({
             {student.vorname} {student.nachname} · {gesamt} € über alle sechs Halbjahre
           </div>
         </div>
+        {/* Halbjahre am Handy als Streifen IN der Karte – beides ist „meine
+            Kasse“. Vorher eine eigene Karte (~190 px) darunter. Antippen
+            öffnet die ausführliche Ansicht mit Preisen und Legende. */}
+        <button
+          type="button"
+          onClick={() => setHalbjahreOffen(true)}
+          data-tour="meine-halbjahre"
+          className={`mt-3 w-full rounded-lg transition active:opacity-70 md:hidden ${offen > 0 ? "" : "max-md:order-last max-md:mt-0"}`}
+        >
+          <span className="sr-only">Deine Halbjahre: </span>
+          <HalbjahrStreifen student={student} current={settings.aktuelles_halbjahr} hy={HY} />
+        </button>
         {/* Überweisen – falls Schüler selbst zahlen (sonst die Eltern) */}
         <button
           onClick={() => setUeberweisen(true)}
@@ -187,29 +227,22 @@ export function MyKasse({
       <UmfrageStichwahlen className="order-3 md:order-4 md:col-span-2" />
 
       {/* ------------------------------------------ Halbjahre mit Preis */}
-      <section className="card order-4 p-4 sm:p-5 md:order-3">
+      {/* Ab iPad als Karte neben der Zahl; am Handy steckt der Streifen in der
+          Leitkarte und das hier steht im Blatt */}
+      <section className="card order-4 p-4 max-md:hidden sm:p-5 md:order-3">
         <div className="flex items-center justify-between gap-2">
           <Titel icon="kalender" farbe="bg-[#0A84FF]">Deine Halbjahre</Titel>
-          <span className="text-[12px] text-tinte-leise">
-            EF je {beitragFuer("EF.1", settings)} €, Q1/Q2 je {beitragFuer("Q1.1", settings)} €
-          </span>
+          <span className="text-[12px] text-tinte-leise">{preisSatz}</span>
         </div>
-
-        <div className="mt-3 flex gap-1.5" data-tour="meine-halbjahre">
-          {HY.map((h, i) => (
-            <TermChip key={h} student={student} h={h} i={i} current={settings.aktuelles_halbjahr} />
-          ))}
-        </div>
-        <div className="mt-1.5 flex gap-1.5">
-          {HY.map((h) => (
-            <div key={h} className="zahl flex-1 basis-0 text-center text-[12px] font-semibold text-tinte-leise">
-              {beitragFuer(h, settings)} €
-            </div>
-          ))}
-        </div>
-
-        <HalbjahrLegende nichtDabei={HY.some((_, i) => isPreJoin(student, i))} />
+        {halbjahre(true)}
       </section>
+      <Sheet open={halbjahreOffen} onClose={() => setHalbjahreOffen(false)}>
+        <SheetKopf titel="Deine Halbjahre" onClose={() => setHalbjahreOffen(false)} />
+        <div className="card p-4">
+          <div className="text-[13px] text-tinte-matt">{preisSatz}</div>
+          {halbjahre(false)}
+        </div>
+      </Sheet>
 
       {/* ------------------------------------------ Abiballticket */}
       {/* Verkauf läuft: links die Tickets, rechts bestellen und überweisen */}
@@ -219,24 +252,44 @@ export function MyKasse({
         prozent={pct}
         onMitKasse={setTicketBreit}
         className={`order-5 ${ticketBreit ? "md:col-span-2" : ""}`}
+        unten={
+          // Am Handy: Mithilfe als eine Zeile im Ticket statt eigener Karte
+          // (~230 px) – die Prozente bestimmen den Ticketpreis
+          <button
+            type="button"
+            onClick={() => setStaffelOffen(true)}
+            data-tour="meine-punkte"
+            className="flex min-h-[44px] w-full items-center gap-3 py-2 text-left transition active:opacity-60"
+          >
+            <StaffelRing pct={pct} settings={settings} klein />
+            <span className="min-w-0 flex-1">
+              <span className="block text-[14px] font-semibold leading-snug">Mithilfe bei Aktionen</span>
+              <span className="mt-0.5 block text-[13px] leading-snug text-tinte-matt">
+                {next ? (
+                  <>
+                    Noch <b className="text-brand-dark dark:text-brand">{next.fehlt} %</b> bis zur nächsten Stufe, das spart dir{" "}
+                    <b className="text-brand-dark dark:text-brand">{next.spart} €</b>.
+                  </>
+                ) : (
+                  mithilfeKopf
+                )}
+              </span>
+            </span>
+            <span aria-hidden className="shrink-0 text-tinte-leise">
+              <Icon name="chevron" size={14} strich={2.4} />
+            </span>
+          </button>
+        }
       />
 
       {/* ------------------------------------------ Prozentstand */}
-      <section className={`card order-6 p-4 sm:p-5 ${mithilfeBreit ? "md:col-span-2" : ""}`} data-tour="meine-punkte">
+      <section className={`card order-6 p-4 sm:p-5 ${mithilfeBreit ? "md:col-span-2" : ""} ${ticketDa ? "max-md:hidden" : ""}`} data-tour="meine-punkte">
         <Titel icon="herz" farbe="bg-[#34C759]">Mithilfe bei Aktionen</Titel>
 
         <div className="mt-3 flex items-center gap-4">
           <StaffelRing pct={pct} settings={settings} />
           <div className="min-w-0 flex-1">
-            <div className="text-[14px] font-semibold leading-snug">
-              {pct > 100 && bonus.ueber100
-                ? `Stark! ${preise.rabatt} € Bonus aufs erste Ticket.`
-                : pct >= 100
-                  ? bonus.ueber100
-                    ? `Kein Zuschlag mehr. Alle ${bonus.bonusSchritt} % mehr: −${bonus.bonusProSchritt} €.`
-                    : "Geschafft – kein Zuschlag mehr aufs erste Ticket."
-                  : "Mehr Prozent = günstigeres Abiball-Ticket."}
-            </div>
+            <div className="text-[14px] font-semibold leading-snug">{mithilfeKopf}</div>
             {next && (
               <div className="mt-1.5 text-[13px] leading-relaxed text-tinte-matt">
                 Noch <b className="text-brand-dark dark:text-brand">{next.fehlt} %</b> bis zur nächsten Stufe, das spart dir{" "}
@@ -269,7 +322,16 @@ export function MyKasse({
       <Sheet open={staffelOffen} onClose={() => setStaffelOffen(false)}>
         <SheetKopf titel="Mithilfe und Ticketpreis" onClose={() => setStaffelOffen(false)} />
         <div className="card p-4">
-          <StaffelKacheln pct={pct} settings={settings} className="" />
+          <div className="flex items-center gap-3">
+            <StaffelRing pct={pct} settings={settings} klein />
+            <p className="min-w-0 flex-1 text-[14px] font-semibold leading-snug">{mithilfeKopf}</p>
+          </div>
+          <StaffelKacheln pct={pct} settings={settings} className="mt-4" />
+          {!hatBeitraege && (
+            <p className="mt-3 text-[13px] leading-snug text-tinte-leise">
+              Noch keine Mithilfe eingetragen. Wenn du bei einer Aktion hilfst, trägt das Stufenteam sie ein.
+            </p>
+          )}
         </div>
       </Sheet>
 

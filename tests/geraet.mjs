@@ -1,7 +1,7 @@
 // Prüf-Helfer (Bildschirmfotos im Demo-Modus): node geraet.mjs <geraet> <rolle> <ausgabe> [schritt ...]
 // geraet: iphone (390x844) | se (375x667) | android (360x800) | pixel (412x915) | ipad (820x1180) | ipadquer (1180x820) | laptop (1440x900)
 // Schritte: Text (Teilstring, klickt erstes Treffer) | css:<sel> | scroll:<px> | warte:<ms> | tippe:<text> | shot:<name> | offline | online | dunkel | zurueck (Escape)
-// Umgebung: DARK=1 (Dunkel), BILD=1 (eigenes Hintergrundbild simulieren), TOUR=1 (Einführung nicht wegklicken), BASIS=<url>
+// Umgebung: DARK=1 (Dunkel), BILD=1 (eigenes Hintergrundbild simulieren), TOUR=1 (Einführung nicht wegklicken), BASIS=<url>, CHROMIUM_PATH=<browser>
 // Ausgabe: PNG je shot unter tests/ergebnisse/<ausgabe>-<name>.png und am Ende <ausgabe>.png; Konsolenfehler + Zeitmessungen auf stdout
 import { chromium } from 'playwright';
 import { mkdirSync } from 'node:fs';
@@ -13,7 +13,8 @@ const G = { iphone: [390, 844, true], se: [375, 667, true], android: [360, 800, 
 (async () => {
   const [geraet, rolle, aus, ...schritte] = process.argv.slice(2);
   const [w, h, mobil] = G[geraet] || G.iphone;
-  const b = await chromium.launch();
+  // wie _umgebung.mjs: CHROMIUM_PATH nur nötig, wenn Playwright seinen eigenen Browser nicht findet
+  const b = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {});
   const ctx = await b.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: 2, isMobile: mobil, hasTouch: mobil, colorScheme: process.env.DARK === '1' ? 'dark' : 'light', serviceWorkers: 'block' });
   const p = await ctx.newPage();
   const log = []; p.on('pageerror', e => log.push('pageerror: ' + e.message)); p.on('console', m => { if (m.type() === 'error') log.push('console: ' + m.text().slice(0, 200)); });

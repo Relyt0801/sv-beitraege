@@ -1,4 +1,4 @@
-# Änderungen – Stand 15.10.2026
+# Änderungen – Stand 16.10.2026
 
 Diese Datei erklärt, was sich in den letzten Runden geändert hat, **wo** es im
 Code steht und **warum** es so gebaut ist. Die Kommentare im Code selbst sind
@@ -10,6 +10,71 @@ ausführlich (auf Deutsch); hier steht der Überblick dazu.
 > ausgeschlossen. Bitte so beibehalten.
 
 ---
+
+## Weniger Scrollen am Handy, Test in WebKit (16.10.2026)
+
+Gemessen mit Demo-Daten (Seitenhöhe in Bildschirmen, iPhone 390 × 844, alle
+Rollen): im Mittel 1,77 → 1,58, die längste Seite 2,37 → 2,05 (iPhone SE:
+2,23 → 1,99). Nichts ist weggefallen – Selteneres steht eine Ebene tiefer
+im Blatt, wie in den iOS-Einstellungen.
+
+- **Übersicht** (1,85 → 1,50): Die sechs Halbjahre stehen am Handy als
+  schmaler Streifen in der dunklen Karte „Deine Stufenkasse“ (`TermChip.tsx`
+  → `HalbjahrStreifen`); Antippen zeigt Preise und Legende im Blatt. Die
+  Mithilfe steht als Zeile in der Abiball-Ticket-Karte (`AbiTicket.tsx`
+  → `unten`) – die Prozente bestimmen ja den Preis; Staffel und Hinweis im
+  Blatt. Ab iPad unverändert. Ab Laptop stehen „Für dich offen“ und „Aus
+  deinen Komitees“ nebeneinander (`ZuErledigen.tsx`).
+- **Finanzen, Kassenbuch** (2,37 → 1,83): „Geplante Aktionen“ und
+  „Kostenanfragen“ unter 1024 px als zwei Zeilen in einer Gruppe, die Listen
+  im Blatt (`GeplantKarte alsZeile`, `KostenKarte alsZeile`). Die Zeile zählt
+  nur, was noch ansteht; Vergangenes (sieht nur der Kassenwart, zum
+  Aufräumen) steht dahinter: „1 · ab 3. Nov. · 2 vorbei“. Steht eine
+  Anfrage offen oder ist man Vorsitz, bleibt die Karte groß oben. Drei statt
+  vier neueste Buchungen, Elternbeiträge + zwei Posten statt vier,
+  kürzere Erklärzeilen. Am Laptop (zwei Spalten) unverändert.
+- **Events** (Team 2,10 → 1,87): Eingeklappte Aktionsgruppen ohne die Zeile
+  „Alle 5 Termine anzeigen“ – der Kopf sagt „5 Termine · 3 weitere ⌄“ und ist
+  ganz tippbar. „Heute · nichts eingetragen“ in einer Zeile. Die Erklärung
+  „Schicht antippen …“ sieht das Team nur, bis es einmal eine Schicht
+  geöffnet hat (`sv:hinweis:schicht-antippen`).
+- **Kasse**: Personen ohne Besonderheit einzeilig („dabei seit EF.1“ entfällt,
+  nur „dabei ab Q1.1“/„verlässt …“ bleibt) – je Person ~12 px, bei 100
+  Personen 1200 px weniger. Namenskreis überall 32 px (die Namen fluchten),
+  der Personen-Knopf bleibt 44 px hoch antippbar, die Halbjahre auch.
+- **Eltern** (1,79 → 1,55): Der Absatz zu EF/Q1/„erlassen“ steht am Handy
+  hinter „Was heißen EF, Q1 und „erlassen“?“ im Blatt; vor dem Ticketverkauf
+  ersetzt eine Zeile das große Eltern-&-Gäste-Ticket („Eltern & Gäste: Preis
+  folgt“ bzw. der Preis, sobald er feststeht). Mit Geschwistern gilt die
+  Grenze 700 px wie beim Raster daneben, sonst 768 px.
+- **Gegenprüfung** (drei unabhängige Prüfer, jeder Fund einzeln gegengeprüft):
+  Streifen 44 px hoch und 12 px Schrift, gleich große Namenskreise in der
+  Kasse, „nichts eingetragen“ an anderen Tagen wieder als eigene Zeile, keine
+  doppelte Überschrift im Blatt „Kostenanfragen“, Höhenschätzung der
+  Laptop-Spalten in Events ohne die entfernte Fußzeile.
+- **Test in WebKit** (die Engine von Safari): WebKitGTK 2.52 mit
+  `WebKitWebDriver` unter Xvfb, App in einem Rahmen mit exakt 390 × 844,
+  375 × 667, 820 × 1180 und 1440 × 900 – 120 Ansichten, 6 Rollen: nichts
+  steht seitlich über, Kopfzeile und Reiterleiste stehen je Gerät überall an
+  derselben Stelle und bleiben beim Scrollen stehen. Ohne Grafikkarte muss
+  `WEBKIT_DISABLE_COMPOSITING_MODE=1` gesetzt sein (sonst ist der Kopf im
+  Bildschirmfoto schwarz – ein Fehler der Testumgebung, nicht der App). Ein
+  echtes iPhone ersetzt das nicht (Safe Area, Gummiband-Scrollen).
+- `tests/geraet.mjs` nimmt wie `_umgebung.mjs` `CHROMIUM_PATH` an.
+
+## Update 1.4 live (16.10.2026)
+
+- `update-1-4` ist in `main` (Relyt0801/sv-beitraege#15 → #16), Vercel-Produktion
+  auf remi-abi28.de liefert 1.4 aus.
+- Datenbank vorher nur lesend geprüft: alle sechs neuen SQL-Dateien waren schon
+  eingespielt (`offiziell-inoffiziell`, `zitate-bereich-lesen`,
+  `motto-spalten-lesen`, `umfrage-eigene-antwort`, `abstimmung-sonstiges`,
+  `speicherwaechter`).
+- Edge-Function `send-push` neu bereitgestellt; Selbsttest aus der Datenbank
+  antwortet mit HTTP 200.
+- Update bei allen erzwungen: `app_settings.neu_laden_ab` auf den Zeitpunkt
+  nach dem Deploy gesetzt (wie der Knopf „Update bei allen erzwingen“ im
+  Profil). Offene Apps laden einmal neu, nie mitten beim Tippen.
 
 ## Abgeschnittener Text, Finanzen am Laptop, „Was ist neu“ nach Rollen (16.10.2026)
 
@@ -51,9 +116,8 @@ werden (`offen.ts`: `x.error ? 0`). Drei echte Fehler, behoben:
   eine neue Frage schickte gar keine Mitteilung. Jetzt `pushAnTeam(…, { art:
   "eltern" })` in beiden Fällen (`eltern-store`), und die Edge-Function
   beachtet im Team-Zweig den Mitteilungs-Schalter „Eltern“
-  (`supabase/functions/send-push`). **Die Edge-Function muss nach der Freigabe
-  neu bereitgestellt werden** (`supabase functions deploy send-push`) – bis
-  dahin bekommen auch Teammitglieder mit abgeschaltetem Schalter die Mitteilung.
+  (`supabase/functions/send-push`). Am 16.10.2026 bereitgestellt (Version 29,
+  JWT-Prüfung an).
 - **Zitat-Stimmen:** Das Prüf-Komitee darf alle Stimmen lesen (1105) – die
   Datenbank liefert höchstens 1000 Zeilen, eigene Stimmen fehlten dann und
   ließen sich nicht zurücknehmen. Jetzt nur die eigenen (`zitate.ts`; Zahlen

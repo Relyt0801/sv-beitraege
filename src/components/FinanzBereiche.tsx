@@ -8,7 +8,7 @@ import { useDunkel } from "../lib/dunkel";
 import { frage, melde, meldeFehler } from "../lib/melder";
 import { Sheet, SheetKopf } from "./Sheet";
 import { Icon } from "./Icon";
-import { Gruppe, Zeile } from "./Liste";
+import { Gruppe, Symbol, Zeile } from "./Liste";
 
 /**
  * Finanzen unter dem Kontostand:
@@ -51,12 +51,14 @@ export function mitVorzeichen(cent: number, kurz = false): string {
  * andere Reihenfolge) – PostenBereiche liefert sie ohne eigene Hülle.
  */
 export function PostenBereiche({
-  d, fin, listeKlasse = "", geplantKlasse = "", onBuchung,
+  d, fin, listeKlasse = "", geplantKlasse = "", ohneGeplant = false, onBuchung,
 }: {
   d: FinanzUebersicht;
   fin?: FinanzenValue | null;
   listeKlasse?: string;
   geplantKlasse?: string;
+  /** „Geplante Aktionen“ stellt der Aufrufer selbst dar (Kassenbuch am Handy: als Zeile) */
+  ohneGeplant?: boolean;
   /**
    * Eine einzelne Buchung eines Postens öffnen – dieselbe Detailseite wie
    * in der Buchungsliste (FinanzenTab). Sie geht als Unterseite über dem
@@ -82,7 +84,7 @@ export function PostenBereiche({
 
   return (
     <>
-      <section className={`card min-w-0 p-5 ${listeKlasse}`}>
+      <section className={`card min-w-0 p-4 sm:p-5 ${listeKlasse}`}>
         <BereichKopf titel="Aktionen, Beiträge und Sonstiges" onNeu={fin ? () => setNeu(true) : undefined} neuText="Kategorie" />
         <ul className="divide-y divide-papier-linie dark:divide-slate-800">
           <PostenZeile
@@ -122,7 +124,7 @@ export function PostenBereiche({
         </ul>
       </section>
 
-      <GeplantKarte darf={Boolean(fin)} fin={fin ?? null} className={geplantKlasse} />
+      {!ohneGeplant && <GeplantKarte darf={Boolean(fin)} fin={fin ?? null} className={geplantKlasse} />}
 
       <BeitraegeDetail open={auswahl?.typ === "beitraege"} d={d} onClose={() => setAuswahl(null)} />
       <PostenDetail
@@ -195,7 +197,8 @@ function Betrag({ cent, className = "", warnen }: { cent: number; className?: st
   return <span className={`zahl ${warnen && cent < 0 ? "text-red-600 dark:text-red-400" : ""} ${className}`}>{mitVorzeichen(cent)}</span>;
 }
 
-const KURZ_POSTEN = 4;
+// Am Handy: Elternbeiträge + 2 größte Posten, der Rest hinter „Alle … anzeigen“
+const KURZ_POSTEN = 2;
 
 function PostenZeile({
   hex, name, unter, betrag, onClick, klasse,
@@ -800,71 +803,126 @@ export function FarbWahl({ wert, setzen }: { wert: string; setzen: (f: string) =
 
 const heuteKey = () => new Date().toISOString().slice(0, 10);
 
-function GeplantKarte({ darf, fin, className = "" }: { darf: boolean; fin: FinanzenValue | null; className?: string }) {
+/**
+ * Geplante Aktionen. `alsZeile` (Kassenbuch am Handy): nur EINE Zeile
+ * „Geplante Aktionen · 2 · ab 3. Nov.“ in einer Gruppe – die Liste öffnet
+ * sich als Blatt (vorher eine eigene Karte, ~200 px). Der Aufrufer legt die
+ * Zeile in eine `gruppe-zellen`; die Blätter hängen am Ende von <body>.
+ */
+export function GeplantKarte({ darf, fin, className = "", alsZeile = false }: { darf: boolean; fin: FinanzenValue | null; className?: string; alsZeile?: boolean }) {
   const dunkel = useDunkel();
   const { liste, speichern, loeschen } = useGeplant(true);
   const [offen, setOffen] = useState<KassenGeplant | "neu" | null>(null);
+  const [listeAuf, setListeAuf] = useState(false);
   const h = heuteKey();
   // Vorbei ist vorbei – nur der Kassenwart sieht sie noch (zum Aufräumen)
   const sichtbar = liste.filter((g) => darf || !g.datum || g.datum >= h);
   const katFarbe = (id: string | null) => fin?.kategorien.find((k) => k.id === id)?.farbe ?? null;
+  const blatt = (
+    <GeplantSheet
+      g={offen}
+      darf={darf}
+      fin={fin}
+      onClose={() => setOffen(null)}
+      onSpeichern={speichern}
+      onLoeschen={loeschen}
+    />
+  );
+
+  if (alsZeile) {
+    // Gezählt wird, was noch ansteht; Vergangenes (sieht nur der Kassenwart,
+    // zum Aufräumen) steht getrennt dahinter: „1 · ab 3. Nov. · 2 vorbei“
+    const anstehend = sichtbar.filter((g) => !g.datum || g.datum >= h);
+    const vorbei = sichtbar.length - anstehend.length;
+    const kommend = anstehend.filter((g) => g.datum);
+    const ab = kommend[0]?.datum ? new Date(kommend[0].datum + "T12:00:00").toLocaleDateString("de-DE", { day: "numeric", month: "short" }) : null;
+    const wert = [anstehend.length === 0 ? "keine" : ab ? `${anstehend.length} · ab ${ab}` : String(anstehend.length), vorbei ? `${vorbei} vorbei` : null]
+      .filter(Boolean)
+      .join(" · ");
+    return (
+      <>
+        <Zeile
+          label="Geplante Aktionen"
+          symbol={
+            <Symbol farbe="bg-[#FF9500]">
+              <Icon name="kalender" size={16} strich={2.2} />
+            </Symbol>
+          }
+          onClick={() => setListeAuf(true)}
+        >
+          <span className="zahl truncate text-[15px] text-tinte-leise">
+            {wert}
+          </span>
+        </Zeile>
+        <Sheet open={listeAuf} onClose={() => setListeAuf(false)}>
+          <SheetKopf titel="Geplante Aktionen" onClose={() => setListeAuf(false)} />
+          {geplantListe(true)}
+        </Sheet>
+        {blatt}
+      </>
+    );
+  }
 
   return (
-    <section className={`card min-w-0 p-5 ${className}`}>
-      <BereichKopf titel="Geplante Aktionen" onNeu={darf ? () => setOffen("neu") : undefined} />
-      {sichtbar.length === 0 ? (
-        <p className="text-[13px] text-tinte-leise">Gerade ist nichts geplant.</p>
-      ) : (
-        <ul className="divide-y divide-papier-linie dark:divide-slate-800">
-          {sichtbar.map((g) => {
-            const vorbei = Boolean(g.datum && g.datum < h);
-            const d = g.datum ? new Date(g.datum + "T12:00:00") : null;
-            const f = katFarbe(g.kategorie_id);
-            return (
-              <li key={g.id}>
-                <button
-                  type="button"
-                  onClick={() => setOffen(g)}
-                  className={`flex min-h-[52px] w-full items-center gap-3 py-2 text-left transition active:opacity-60 ${vorbei ? "opacity-60" : ""}`}
-                >
-                  <span className="flex w-11 shrink-0 flex-col items-center rounded-lg border border-papier-linie py-1 leading-none dark:border-slate-700">
-                    <span className="text-[12px] font-bold uppercase text-red-600 dark:text-red-400">
-                      {d ? d.toLocaleDateString("de-DE", { month: "short" }).replace(".", "") : "–"}
-                    </span>
-                    <span className="zahl mt-0.5 text-[17px] font-bold">{d ? d.getDate() : "?"}</span>
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="flex items-baseline gap-1.5">
-                      {f && <Punkt hex={farbHex(f, dunkel)} />}
-                      <span className="line-clamp-2 min-w-0 text-[14px] font-semibold leading-snug [overflow-wrap:anywhere]">{g.titel}</span>
-                    </span>
-                    <span className="block truncate text-[12px] text-tinte-leise">
-                      {[
-                        vorbei ? "vorbei" : null,
-                        g.erwartet_cent ? `ca. ${mitVorzeichen(g.erwartet_cent, true)}` : null,
-                        g.info || (!vorbei && d ? d.toLocaleDateString("de-DE", { weekday: "long" }) : null),
-                      ].filter(Boolean).join(" · ") || "Tag noch offen"}
-                    </span>
-                  </span>
-                  <span className="shrink-0 text-tinte-leise" aria-hidden>
-                    <Icon name="chevron" size={14} strich={2.4} />
-                  </span>
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-      )}
-      <GeplantSheet
-        g={offen}
-        darf={darf}
-        fin={fin}
-        onClose={() => setOffen(null)}
-        onSpeichern={speichern}
-        onLoeschen={loeschen}
-      />
+    <section className={`card min-w-0 p-4 sm:p-5 ${className}`}>
+      {geplantListe(false)}
+      {blatt}
     </section>
   );
+
+  // Kopf und Liste – in der Karte oder im Blatt (dort selbst als Karte).
+  // Als Funktion aufgerufen, nicht als <Komponente/>: sonst baute React die
+  // Liste bei jedem Neuzeichnen neu auf.
+  function geplantListe(karte: boolean) {
+    return (
+      <div className={karte ? "card p-4" : ""}>
+        <BereichKopf titel={karte ? (sichtbar.length ? `${sichtbar.length} geplant` : "Nichts geplant") : "Geplante Aktionen"} onNeu={darf ? () => setOffen("neu") : undefined} />
+        {sichtbar.length === 0 ? (
+          <p className="text-[13px] text-tinte-leise">Gerade ist nichts geplant.</p>
+        ) : (
+          <ul className="divide-y divide-papier-linie dark:divide-slate-800">
+            {sichtbar.map((g) => {
+              const vorbei = Boolean(g.datum && g.datum < h);
+              const d = g.datum ? new Date(g.datum + "T12:00:00") : null;
+              const f = katFarbe(g.kategorie_id);
+              return (
+                <li key={g.id}>
+                  <button
+                    type="button"
+                    onClick={() => setOffen(g)}
+                    className={`flex min-h-[52px] w-full items-center gap-3 py-2 text-left transition active:opacity-60 ${vorbei ? "opacity-60" : ""}`}
+                  >
+                    <span className="flex w-11 shrink-0 flex-col items-center rounded-lg border border-papier-linie py-1 leading-none dark:border-slate-700">
+                      <span className="text-[12px] font-bold uppercase text-red-600 dark:text-red-400">
+                        {d ? d.toLocaleDateString("de-DE", { month: "short" }).replace(".", "") : "–"}
+                      </span>
+                      <span className="zahl mt-0.5 text-[17px] font-bold">{d ? d.getDate() : "?"}</span>
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="flex items-baseline gap-1.5">
+                        {f && <Punkt hex={farbHex(f, dunkel)} />}
+                        <span className="line-clamp-2 min-w-0 text-[14px] font-semibold leading-snug [overflow-wrap:anywhere]">{g.titel}</span>
+                      </span>
+                      <span className="block truncate text-[12px] text-tinte-leise">
+                        {[
+                          vorbei ? "vorbei" : null,
+                          g.erwartet_cent ? `ca. ${mitVorzeichen(g.erwartet_cent, true)}` : null,
+                          g.info || (!vorbei && d ? d.toLocaleDateString("de-DE", { weekday: "long" }) : null),
+                        ].filter(Boolean).join(" · ") || "Tag noch offen"}
+                      </span>
+                    </span>
+                    <span className="shrink-0 text-tinte-leise" aria-hidden>
+                      <Icon name="chevron" size={14} strich={2.4} />
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
+    );
+  }
 }
 
 function GeplantSheet({

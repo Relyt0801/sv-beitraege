@@ -181,14 +181,17 @@ export function ZuErledigen({ className = "" }: { className?: string }) {
   return (
     <>
       {(zeilen.length > 0 || komitee.length > 0) && (
-        <div className={className}>
+        // Ab Laptop/iPad quer stehen beide Listen nebeneinander – vorher stand
+        // „Aus deinen Komitees“ (meist 1–2 Zeilen) über die volle Breite darunter.
+        // Halb/halb wie die Karten darunter, damit die Kanten fluchten.
+        <div className={`${className} ${zeilen.length > 0 && komitee.length > 0 ? "lg:grid lg:grid-cols-2 lg:items-start lg:gap-3" : ""}`}>
           {zeilen.length > 0 && (
             <Gruppe titel={isStaff ? "Zu erledigen" : "Für dich offen"} className="">
               {zeilen}
             </Gruppe>
           )}
           {komitee.length > 0 && (
-            <Gruppe titel="Aus deinen Komitees" className={zeilen.length ? "mt-4" : ""}>
+            <Gruppe titel="Aus deinen Komitees" className={zeilen.length ? "mt-4 lg:mt-0" : ""}>
               {komitee}
             </Gruppe>
           )}

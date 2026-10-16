@@ -11,10 +11,11 @@ export function aktuelleStufe(pct: number, settings: Settings): number | null {
  * Ring mit Strichen an den Stellen, an denen der Aufschlag sinkt. Über 100 %
  * (nur wenn eingeschaltet) läuft eine goldene Bonus-Runde darüber.
  */
-export function StaffelRing({ pct, settings }: { pct: number; settings: Settings }) {
+export function StaffelRing({ pct, settings, klein }: { pct: number; settings: Settings; klein?: boolean }) {
   return (
     <Ring
       pct={pct}
+      klein={klein}
       stufen={staffelVon(settings).map((s) => s.ab)}
       aktuellAb={aktuelleStufe(pct, settings)}
       bonus={bonusAnteil(pct, settings)}
