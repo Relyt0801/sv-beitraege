@@ -100,7 +100,55 @@ links, Chat rechts, wie Nachrichten am Mac) wäre der richtige nächste
 Schritt. Sie ändert aber die Ebenen-Regel (DESIGN-REGELN 3) und ist hier
 nicht gebaut.
 
-**Prüfung (Demo r47 = Endstand, Chromium):** siehe unten, Nachtrag.
+**Zweite und dritte Nachprüfung:** Jede Korrektur wurde in der Demo neu
+nachgestellt, und ein eigener Prüfer hat den Diff der Korrekturen gelesen.
+Dabei kamen noch einmal 9 kleine Funde heraus; alle sind behoben:
+- Schaltet man die Glocke bei einem Komitee mit Ungelesenem aus, sprang die
+  Zeile trotzdem weg. Jetzt bleibt sie über die 3 hinaus stehen.
+- Festgehalten wird nur in der kurzen Handy-Liste.
+- „Geplante Aktionen“ ist jetzt auch im Kassenbuch eine Instanz an fester
+  Stelle (Hülle `contents` ab 1024 px). Blätter und Entwurf überstehen das
+  Drehen, und nichts geht von selbst wieder auf. `PostenBereiche` zeichnet
+  Geplantes nicht mehr selbst.
+- Kassenkopf: „früher N offen“. Die Zahl steht vorn, damit sie beim
+  Abschneiden nicht verloren geht.
+- Kasse am Handy:
+  - Drei und mehr aufeinanderfolgende offene Halbjahre stehen als Spanne da
+    („EF.1–Q1.2“).
+  - Zahl und „%“ bleiben zusammen.
+  - Bei 320 px steht die Mithilfe wieder in der Zeile.
+- Einführung:
+  - Am Handy rutschen die Knöpfe bei 320 px unter die Punkte.
+  - Am iPad/Laptop ist die Karte 384 px breit, die Reihe bricht dort nicht
+    um. Das Überstehen bei 320 px gab es schon vor Runde 10.
+- Team-Chats am Laptop: „Weitere Komitees“ in zwei Spalten, aus 7 Zeilen
+  werden 4. Am iPad quer passt die Seite jetzt ohne Scrollen (1,15 → 1,00).
+
+**Bekannter Rest:** Dreht man das Gerät, während das Blatt „Geplante
+Aktionen“ offen ist, bleibt das Blatt offen. Nach dem Schließen landet der
+Fokus aber auf der Seite statt auf der Zeile, denn die Zeile ist inzwischen
+eine Karte. Vorher ging dabei das ganze Blatt verloren.
+
+**Prüfung (Demo r49/r50 = Endstand, Chromium):**
+- `platz-check`: 165 Ansichten, 0 über den Grenzen. Keine Ansicht ist länger
+  als vor Runde 10. Handy 2,09 → 1,84 Bildschirme.
+- `ui-check`: 280 Ansichten ohne Fund (axe ohne Befund, keine
+  Konsolenfehler, nichts seitlich überstehend).
+- `leisten-check`: 777 Zustände, 0 Abweichungen.
+- Klicktests:
+  - offiziell/inoffiziell 15/15
+  - Anfragen 9/9
+  - Herzen 9/9
+  - Rankings-Herzen 7/7
+  - Zitate-Runden 5/5
+- Fokus-Test (Breitenwechsel über 1024 px) in beiden Richtungen in Ordnung.
+- Fotos nach Regel 8: iPhone (9 Ansichten) und Laptop (5 Ansichten), je hell,
+  dunkel und dunkel mit Bild, angesehen.
+- Typecheck und Build ohne Fehler.
+
+**Nicht geprüft:** Ein echtes iPhone und eine Anmeldung gegen die echte
+Datenbank gehen von hier aus nicht (`*.supabase.co` ist gesperrt, kein Gerät).
+Das bitte in der Vercel-Vorschau am eigenen iPhone nachsehen.
 
 ## Runde 9: Platz und Scrollen gemessen, Löcher geschlossen (16.10.2026)
 
