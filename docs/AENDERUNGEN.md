@@ -70,6 +70,10 @@ Noch kürzer am Handy (nur unter 768 px, iPad/Laptop unverändert):
   Fläche über dem Knopf; Regal am alten SE (320 px) 92 % breit.
 - Finanzen: Legende am Kreis zeigt die drei größten Teile + „Weitere (n)“
   (einzeln stehen sie direkt darunter).
+- Ab iPad: Die Motto-Karte zeigt die drei neuesten Vorschläge – vorher
+  leere Fläche neben dem gleich hohen Steckbrief (`Motto`).
+- Eltern-Infos als Liste mit Trennlinien wie die Fragen daneben (vorher je
+  Info ein umrandeter Kasten in der Karte) (`ElternInfosTab`).
 - Gemessen (iPhone 390×844, Bildschirmhöhen): Übersicht 2,73 → 1,90,
   Finanzen Kassenwart 3,34 → 2,87, Schüler 1,60 → 1,47, Eltern 1,64 → 1,51.
 

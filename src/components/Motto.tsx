@@ -186,6 +186,18 @@ export function MottoKarte({ className = "" }: { className?: string }) {
           </>
         }
       >
+        {/* Ab iPad (zwei Karten nebeneinander, gleich hoch): die neuesten
+            Vorschläge statt leerer Fläche neben dem Steckbrief. Am Handy im
+            Regal nicht – die Karte soll dort nicht höher werden. */}
+        {!gewaehlt && sichtbare.length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-1.5 max-sm:hidden">
+            {sichtbare.slice(0, 3).map((x) => (
+              <span key={x.id} className="max-w-full truncate rounded-full bg-white/20 px-2.5 py-1 text-[12.5px] font-semibold">
+                „{x.text}“
+              </span>
+            ))}
+          </div>
+        )}
         <GesperrtZeile hell className="mt-3" />
       </FarbKarte>
       <MottoSheet m={m} r={r} teil={teil} setTeil={setTeil} ansicht={ansicht} setAnsicht={setAnsicht} />

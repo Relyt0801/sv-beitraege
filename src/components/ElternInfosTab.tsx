@@ -126,16 +126,14 @@ export function ElternInfosTab({
         ) : infos.length === 0 ? (
           <p className="mt-2 text-[13px] text-tinte-leise">Noch keine Neuigkeiten.</p>
         ) : (
-          <ul className="mt-3 grid gap-2">
+          // Eine Liste mit Trennlinien wie die Fragen daneben (vorher je Info
+          // ein umrandeter Kasten in der Karte – Karte in Karte). Angeheftet
+          // erkennt man an der Stecknadel.
+          <ul className="gruppe-zellen mt-3">
             {infos.map((i) => {
               const istNeu = Date.parse(i.created_at) > gesehenBis;
               return (
-                <li
-                  key={i.id}
-                  className={`rounded-2xl border p-3.5 ${
-                    i.angeheftet ? "border-brand/40 bg-brand/5" : "border-papier-linie dark:border-slate-700"
-                  }`}
-                >
+                <li key={i.id} className="px-4 py-3">
                   <div className="flex items-baseline gap-2">
                     {i.angeheftet && (
                       <span className="shrink-0 self-center text-brand-dark dark:text-brand" title="Angeheftet">
