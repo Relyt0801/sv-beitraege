@@ -402,7 +402,7 @@ export function teamSchritte(o: {
       anchor: "person",
       title: "Eine Person",
       text: o.kasseBearbeiten
-        ? "Ein Tipp auf das blau umrandete Halbjahr schaltet zwischen offen und bezahlt. Ein Tipp auf den Namen öffnet alle sechs Halbjahre und die Mithilfe – dort kannst du auch frühere oder spätere Halbjahre abhaken oder erlassen."
+        ? "Ein Tipp auf ein Halbjahr schaltet zwischen offen und bezahlt – am Handy steht nur das laufende (blau umrandet). Ein Tipp auf den Namen öffnet alle sechs Halbjahre und die Mithilfe – dort kannst du auch frühere oder spätere Halbjahre abhaken oder erlassen."
         : "Ein Tipp auf den Namen öffnet alle Details – dort trägst du auch ein, wobei jemand geholfen hat.",
     },
   );

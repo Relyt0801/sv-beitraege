@@ -161,20 +161,15 @@ export function FinanzStandardInhalt({ d }: { d: FinanzUebersicht }) {
         />
       </section>
 
-      <PostenBereiche
-        d={d}
-        listeKlasse="md:col-start-2 md:row-start-1 md:row-span-2"
-        geplantKlasse="md:col-start-1 md:row-start-2"
-        vollAb="md"
-        ohneGeplant={!ab768}
-      />
-      {/* Handy: derselbe Baustein wie im Kassenbuch – nur lesen, ein Tipp
-          öffnet die Liste im Blatt */}
-      {!ab768 && (
-        <div className="gruppe-zellen min-w-0">
-          <GeplantKarte alsZeile darf={false} fin={null} />
-        </div>
-      )}
+      <PostenBereiche d={d} listeKlasse="md:col-start-2 md:row-start-1 md:row-span-2" vollAb="md" ohneGeplant />
+      {/* Geplantes – am Handy als Zeile wie im Kassenbuch (nur lesen, ein Tipp
+          öffnet die Liste im Blatt), ab iPad als Karte unter dem Kontostand.
+          Immer DIESE eine Instanz an derselben Stelle, nur Form und Klasse
+          wechseln: Beim Drehen bleibt so ein offenes Blatt offen (vorher zwei
+          Instanzen – das Blatt verschwand, der Fokus fiel auf die Seite). */}
+      <div className={ab768 ? "min-w-0 md:col-start-1 md:row-start-2" : "gruppe-zellen min-w-0"}>
+        <GeplantKarte alsZeile={!ab768} darf={false} fin={null} />
+      </div>
     </div>
   );
 }

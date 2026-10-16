@@ -460,7 +460,9 @@ export function AbstimmungKarte({
       ) : (
         <AuswahlAbstimmung item={item} abgelaufen={abgelaufen} onGestimmt={() => setOffenGehalten(true)} />
       )}
-      {klappbar && auf && (
+      {/* auch nach der ersten Stimme (offenGehalten) – sonst gäbe es nichts zum
+          Zuklappen, bis man die Pinnwand neu öffnet */}
+      {klappbar && !zu && (
         <button
           type="button"
           onClick={() => {
@@ -533,7 +535,9 @@ function ErgebnisKurz({ item, laeuft, onAuf }: { item: TopicItem; laeuft: boolea
       </span>
       <span className="min-w-0 flex-1">
         <span className="block truncate font-semibold">{text}</span>
-        {unter && <span className="block truncate text-[12px] text-tinte-leise">{unter}</span>}
+        {/* zwei Zeilen statt abschneiden: hinten steht „du: …“, die eigene
+            Wahl – am iPhone SE war sie sonst „du: Eig…“ */}
+        {unter && <span className="line-clamp-2 text-[12px] text-tinte-leise">{unter}</span>}
       </span>
       {pct !== null && <span className="zahl shrink-0 font-bold text-brand-dark dark:text-brand">{pct} %</span>}
       <span aria-hidden className="shrink-0 text-[17px] leading-none text-tinte-leise">›</span>

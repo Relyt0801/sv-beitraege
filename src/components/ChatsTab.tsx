@@ -93,6 +93,11 @@ export function ChatsTab() {
   const [anschreiben, setAnschreiben] = useState(false);
   // Blatt „Weitere Komitees“ – am Handy steht dort der ruhige Rest der Liste
   const [alleKomitees, setAlleKomitees] = useState(false);
+  // Komitees, deren Glocke man in der kurzen Handy-Liste eben ausgeschaltet
+  // hat: Sie bleiben stehen (zeigen „aus“), statt unter dem Finger zu
+  // verschwinden – bis man zur Wurzel des Reiters zurückkehrt (wie
+  // offenGehalten in Freitext.tsx).
+  const [gehalten, setGehalten] = useState<ReadonlySet<string>>(() => new Set());
   const { mitteilungen, setKategorie, setKomitee } = useMitteilungen();
   const zaehlt = useZaehltMit();
   const darfVerwalten = can("chats.manage");
@@ -146,6 +151,7 @@ export function ChatsTab() {
       setAnsicht(null);
       setAnschreiben(false);
       setAlleKomitees(false);
+      setGehalten(new Set());
     };
     window.addEventListener("sv:reiter-wurzel", zurWurzel);
     return () => window.removeEventListener("sv:reiter-wurzel", zurWurzel);
@@ -277,14 +283,18 @@ export function ChatsTab() {
   // höchstens 3, der Rest im Blatt. Anlass (Runde 10, Okt. 2026): 7 Zeilen
   // „Noch keine Nachricht · aus“ kosteten ~470 px, „Chats“ musste man am
   // iPhone scrollen. Aktiv = Ungelesenes, Glocke an oder ein Eintrag (keine
-  // Systemzeile) aus den letzten 14 Tagen.
+  // Systemzeile) aus den letzten 14 Tagen. Komitees mit gezähltem
+  // Ungelesenem fallen NIE ins Blatt – sonst stünde am Reiter eine Zahl, die
+  // auf der Seite keiner Zeile gehört (Prüfung Okt. 2026); die übrigen Plätze
+  // bis 3 füllen die anderen aktiven, in der Reihenfolge der Komitees.
   const grenze = Date.now() - KUERZLICH_MS;
   const kuerzlich = new Set(
     isStaff ? items.filter((i) => i.type !== "system" && new Date(i.created_at).getTime() > grenze).map((i) => i.topic_id) : [],
   );
-  const aktiv = (t: Topic) =>
-    (zaehlt(t) && unreadCount(t.id) > 0) || komiteeAn(mitteilungen, t.tag, false) || kuerzlich.has(t.id);
-  const aktiveKomitees = andereChats.filter(aktiv).slice(0, 3);
+  const ungelesen = (t: Topic) => zaehlt(t) && unreadCount(t.id) > 0;
+  const aktiv = (t: Topic) => komiteeAn(mitteilungen, t.tag, false) || kuerzlich.has(t.id) || gehalten.has(t.id);
+  let freiePlaetze = Math.max(0, 3 - andereChats.filter(ungelesen).length);
+  const aktiveKomitees = andereChats.filter((t) => ungelesen(t) || (aktiv(t) && freiePlaetze-- > 0));
   // Bliebe nur EIN Komitee übrig, steht es direkt da – „Alle 1 Komitees ›“
   // wäre eine Zeile, die nur auf eine andere Zeile zeigt.
   const handyKomitees = andereChats.length - aktiveKomitees.length <= 1 ? andereChats : aktiveKomitees;
@@ -313,16 +323,28 @@ export function ChatsTab() {
       onClick={() => oeffne(t.id)}
     />
   );
-  /** Ein Komitee, in dem man nicht ist, als Listenzeile mit Glocke (Team) */
-  const komiteeZeile = (t: Topic, onOpen: () => void = () => oeffne(t.id)) => (
+  /** Ein Komitee, in dem man nicht ist, als Listenzeile mit Glocke (Team).
+   *  Im Blatt (imBlatt) schließt ein Tipp erst das Blatt, dann geht das
+   *  Komitee auf – sonst ginge die Ebene unter dem Blatt auf. */
+  const komiteeZeile = (t: Topic, imBlatt = false) => (
     <ChatZeile
       key={t.id}
       titel={committeeLabel(t.tag)}
       icon={committeeIcon(t.tag)}
       unter={komiteeUnter(t, "Noch keine Nachricht")}
       unread={zaehlt(t) ? unreadCount(t.id) : 0}
-      onOpen={onOpen}
-      glocke={{ an: komiteeAn(mitteilungen, t.tag, false), setAn: (x) => void setKomitee(t.tag, x), name: committeeLabel(t.tag) }}
+      onOpen={() => {
+        if (imBlatt) setAlleKomitees(false);
+        oeffne(t.id);
+      }}
+      glocke={{
+        an: komiteeAn(mitteilungen, t.tag, false),
+        setAn: (x) => {
+          if (!x && !imBlatt) setGehalten((g) => new Set(g).add(t.id));
+          void setKomitee(t.tag, x);
+        },
+        name: committeeLabel(t.tag),
+      }}
     />
   );
 
@@ -545,12 +567,7 @@ export function ChatsTab() {
         <Sheet open={alleKomitees} onClose={() => setAlleKomitees(false)}>
           <SheetKopf titel={komiteeTitel} onClose={() => setAlleKomitees(false)} />
           <Gruppe className="" fuss={GLOCKE_FUSS}>
-            {andereChats.map((t) =>
-              komiteeZeile(t, () => {
-                setAlleKomitees(false);
-                oeffne(t.id);
-              }),
-            )}
+            {andereChats.map((t) => komiteeZeile(t, true))}
           </Gruppe>
         </Sheet>
       )}

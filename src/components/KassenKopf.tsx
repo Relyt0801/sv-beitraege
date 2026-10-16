@@ -76,10 +76,12 @@ function KassenKopfRoh({
       laeuft: h === settings.aktuelles_halbjahr,
     };
   });
-  // Für die Handy-Zeile: Quote des laufenden Halbjahrs und was aus früheren
-  // Halbjahren noch fehlt – damit man sieht, ob sich das Blatt lohnt.
+  // Für die Handy-Zeile: Quote des laufenden Halbjahrs und bei wie vielen
+  // PERSONEN aus früheren Halbjahren noch etwas fehlt – damit man sieht, ob
+  // sich das Blatt lohnt. Je Person einmal gezählt, wie „offen bei 5“ darüber
+  // (vorher Personen × Halbjahre: „früher 13 offen“ bei 8 Personen).
   const quoteJetzt = halbjahre.find((h) => h.laeuft)?.quote ?? 100;
-  const frueherOffen = halbjahre.reduce((n, h) => (!h.kommtNoch && !h.laeuft ? n + h.rest : n), 0);
+  const frueherOffen = students.filter((s) => HY.some((h, i) => i < bis && isActive(s, i) && s.terms[h].status === "offen")).length;
 
   // Eine Kennzahl: Bezeichnung, Wert, eine kurze Zeile darunter, dünner Balken.
   // Alle vier in EINER Karte (ab iPad 1 × 4) – vorher vier einzelne Karten
@@ -201,7 +203,7 @@ function KassenKopfRoh({
         >
           <span className="min-w-0 flex-1 truncate">
             <b className="font-semibold">{settings.aktuelles_halbjahr} läuft</b> · <span className="zahl">{quoteJetzt}{" "}%</span> bezahlt
-            {frueherOffen > 0 && <span className="text-offen"> · früher {frueherOffen} offen</span>}
+            {frueherOffen > 0 && <span className="text-offen dark:text-amber-300"> · früher offen bei {frueherOffen}</span>}
           </span>
           <span className="flex shrink-0 items-center gap-1 text-tinte-leise">
             {/* Unter 360 px braucht die Zeile den Platz für „früher … offen“ */}

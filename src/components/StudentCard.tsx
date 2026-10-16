@@ -83,6 +83,10 @@ function StudentCardRoh({
   const fruehereOffen = HY.filter(
     (h, i) => i < aktIdx && student.terms[h].status === "offen" && !isPreJoin(student, i) && !isDead(student, i),
   );
+  // „auch“ nur, wenn das laufende Halbjahr selbst offen ist – sonst stünde
+  // neben „EF.2 ✓“ ein „auch EF.1 offen“, das nicht stimmt (Prüfung Okt. 2026)
+  const aktOffen =
+    student.terms[settings.aktuelles_halbjahr].status === "offen" && !isPreJoin(student, aktIdx) && !isDead(student, aktIdx);
 
   return (
     <div
@@ -134,17 +138,23 @@ function StudentCardRoh({
           </span>
           {unter && <span className="hidden truncate text-[12px] text-tinte-leise md:block">{unter}</span>}
           {/* Am Handy trägt die Unterzeile, was rechts keinen Platz mehr hat:
-              die Mithilfe (die Spalte fällt weg) und frühere offene Halbjahre
-              (nur das laufende steht als Kästchen da). So bleibt die Person
-              eine Zeile hoch – Okt. 2026: 103 → 65 px je Person. */}
-          <span className="block truncate text-[12px] text-tinte-leise md:hidden">
-            {prozent} % Mithilfe
+              frühere offene Halbjahre (nur das laufende steht als Kästchen da)
+              und die Mithilfe (die Spalte fällt weg). So bleibt die Person
+              eine Zeile hoch – Okt. 2026: 103 → 65 px je Person. Das Offene
+              steht vorn und darf auf eine zweite Zeile umbrechen: Abgeschnitten
+              würde sonst genau das, wofür die Zeile da ist (ab Q1.1 mit zwei
+              offenen Halbjahren schon am iPhone). */}
+          <span className="line-clamp-2 text-[12px] text-tinte-leise md:hidden">
             {fruehereOffen.length > 0 && (
               <>
+                <span className="text-offen dark:text-amber-300">
+                  {aktOffen ? "auch " : ""}
+                  {fruehereOffen.join(", ")} offen
+                </span>
                 {" · "}
-                <span className="text-offen dark:text-amber-300">auch {fruehereOffen.join(", ")} offen</span>
               </>
             )}
+            {prozent} % Mithilfe
             {unter && ` · ${unter}`}
           </span>
         </span>
@@ -162,9 +172,10 @@ function StudentCardRoh({
 
       {/* Halbjahre – Breiten siehe SPALTE_HALBJAHRE (mind. 44 × 44 px je Kästchen).
           Am Handy nur das laufende (w-11 = ein Kästchen, die anderen per CSS
-          ausgeblendet); wer nur liest (Stufenteam, Sprecher), braucht dort
-          gar keins – die Kästchen sind für ihn ohnehin nicht antippbar. */}
-      <div className={`flex w-11 shrink-0 gap-1.5 md:w-auto ${SPALTE_HALBJAHRE} ${canToggleBeitrag ? "" : "max-md:hidden"}`}>
+          ausgeblendet). Auch wer nur liest (Stufenteam, Sprecher), sieht es –
+          nicht antippbar, aber sonst wüsste er nicht, wer das laufende
+          Halbjahr schon bezahlt hat (Prüfung Okt. 2026). */}
+      <div className={`flex w-11 shrink-0 gap-1.5 md:w-auto ${SPALTE_HALBJAHRE}`}>
         {HY.map((h, i) => (
           <TermChip
             key={h}
