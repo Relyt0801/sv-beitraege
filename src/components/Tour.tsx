@@ -205,7 +205,10 @@ export function Tour({
       : { bottom: "calc(env(safe-area-inset-bottom) + 12px)", left: 12, right: 12 };
   } else {
     // Rechner/Tablet: direkt über oder unter dem Element, mittig ausgerichtet
-    const w = 360;
+    // 384 px wie die mittige Karte (24rem): elf bis zwölf Punkte, „Zurück“ und
+    // „Weiter“ passen in eine Reihe – bei 360 brach sie am iPad um, und „Weiter“
+    // rutschte unten aus dem Bild (Prüfung Okt. 2026)
+    const w = Math.min(384, window.innerWidth - 32);
     const links = Math.min(Math.max(16, rect.left + rect.width / 2 - w / 2), window.innerWidth - w - 16);
     kartenStil = unten
       ? { bottom: hoehe - rect.top + PAD + 12, left: links, width: w }

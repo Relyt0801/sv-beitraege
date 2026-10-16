@@ -46,19 +46,18 @@ export function mitVorzeichen(cent: number, kurz = false): string {
 }
 
 /**
- * `listeKlasse` / `geplantKlasse` setzen die beiden Karten im Raster der
- * Seite an ihren Platz (z. B. am Laptop links/rechts oder am Handy in eine
- * andere Reihenfolge) – PostenBereiche liefert sie ohne eigene Hülle.
+ * `listeKlasse` setzt die Karte im Raster der Seite an ihren Platz (z. B. am
+ * Laptop rechts oder am Handy in eine andere Reihenfolge) – PostenBereiche
+ * liefert sie ohne eigene Hülle. „Geplante Aktionen“ stellt der Aufrufer
+ * selbst dar (GeplantKarte, je nach Breite als Zeile oder Karte – EINE
+ * Instanz an fester Stelle, siehe FinanzStandard/FinanzenTab).
  */
 export function PostenBereiche({
-  d, fin, listeKlasse = "", geplantKlasse = "", ohneGeplant = false, onBuchung, vollAb = "lg",
+  d, fin, listeKlasse = "", onBuchung, vollAb = "lg",
 }: {
   d: FinanzUebersicht;
   fin?: FinanzenValue | null;
   listeKlasse?: string;
-  geplantKlasse?: string;
-  /** „Geplante Aktionen“ stellt der Aufrufer selbst dar (Kassenbuch am Handy: als Zeile) */
-  ohneGeplant?: boolean;
   /**
    * Eine einzelne Buchung eines Postens öffnen – dieselbe Detailseite wie
    * in der Buchungsliste (FinanzenTab). Sie geht als Unterseite über dem
@@ -130,8 +129,6 @@ export function PostenBereiche({
           )}
         </ul>
       </section>
-
-      {!ohneGeplant && <GeplantKarte darf={Boolean(fin)} fin={fin ?? null} className={geplantKlasse} />}
 
       <BeitraegeDetail open={auswahl?.typ === "beitraege"} d={d} onClose={() => setAuswahl(null)} />
       <PostenDetail

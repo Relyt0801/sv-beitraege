@@ -161,7 +161,7 @@ export function FinanzStandardInhalt({ d }: { d: FinanzUebersicht }) {
         />
       </section>
 
-      <PostenBereiche d={d} listeKlasse="md:col-start-2 md:row-start-1 md:row-span-2" vollAb="md" ohneGeplant />
+      <PostenBereiche d={d} listeKlasse="md:col-start-2 md:row-start-1 md:row-span-2" vollAb="md" />
       {/* Geplantes – am Handy als Zeile wie im Kassenbuch (nur lesen, ein Tipp
           öffnet die Liste im Blatt), ab iPad als Karte unter dem Kontostand.
           Immer DIESE eine Instanz an derselben Stelle, nur Form und Klasse

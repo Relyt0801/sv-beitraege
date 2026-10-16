@@ -278,24 +278,23 @@ export function FinanzenTab({ kosten }: { kosten: KostenValue }) {
           d={postenDaten}
           fin={darfBuchen ? fin : null}
           listeKlasse="max-lg:order-3"
-          geplantKlasse="max-lg:order-3"
-          ohneGeplant={!breit}
           onBuchung={darfBuchen ? setBuchungAuf : undefined}
         />
 
         {/* ================================================ Geplantes + Kostenanfragen */}
         {/* Am Handy/iPad hoch: EINE Gruppe mit zwei Zeilen (wie die iOS-
             Einstellungen), die Listen im Blatt – vorher zwei Karten, ~300 px.
-            Am Laptop steht „Geplante Aktionen“ als Karte in PostenBereiche,
-            die Kostenanfragen stehen rechts. */}
-        {!breit && (
-          <div className="gruppe-zellen min-w-0 max-lg:order-3">
-            <GeplantKarte alsZeile darf={darfBuchen} fin={darfBuchen ? fin : null} />
-            {zeigeAnfragen && !kostenOben && (
-              <KostenKarte alsZeile kosten={kosten} darfEntscheiden={darfBuchen} vorsitze={meineVorsitze} onEntschieden={fin.neuLaden} />
-            )}
-          </div>
-        )}
+            Am Laptop steht „Geplante Aktionen“ als Karte direkt nach den
+            Posten (Hülle „contents“), die Kostenanfragen stehen rechts.
+            Immer DIESELBE Hülle mit derselben GeplantKarte – nur Klasse und
+            Form wechseln: Beim Drehen über 1024 px bleiben offene Blätter und
+            ein angefangener Entwurf erhalten (vorher zwei Instanzen). */}
+        <div className={breit ? "contents" : "gruppe-zellen min-w-0 max-lg:order-3"}>
+          <GeplantKarte alsZeile={!breit} darf={darfBuchen} fin={darfBuchen ? fin : null} />
+          {!breit && zeigeAnfragen && !kostenOben && (
+            <KostenKarte alsZeile kosten={kosten} darfEntscheiden={darfBuchen} vorsitze={meineVorsitze} onEntschieden={fin.neuLaden} />
+          )}
+        </div>
       </div>
 
       {/* ================================================ Verlauf + Kostenanfragen (rechte Spalte) */}

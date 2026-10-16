@@ -152,14 +152,14 @@ function StudentCardRoh({
               <>
                 <span className="text-offen dark:text-amber-300">
                   {aktOffen ? "auch " : ""}
-                  {/* bricht nur nach einem Komma um; „offen“ bleibt am letzten Halbjahr */}
-                  {offenText}{"\u00a0"}offen
+                  {offenText} offen
                 </span>
                 {" · "}
               </>
             )}
-            {/* festes Leerzeichen: „0“ und „% Mithilfe“ nie auf zwei Zeilen */}
-            <span className="whitespace-nowrap">{prozent}{"\u00a0"}% Mithilfe</span>
+            {/* festes Leerzeichen nur zwischen Zahl und „%“ – mehr zusammenzuhalten
+                schob die Mithilfe bei 320 px in eine abgeschnittene dritte Zeile */}
+            {prozent}{"\u00a0"}% Mithilfe
             {unter && ` · ${unter}`}
           </span>
         </span>
