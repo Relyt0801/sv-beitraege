@@ -383,17 +383,34 @@ const fristText = (iso: string) =>
  * kompakt: Ist die Abstimmung beendet, zeigt die Karte nur Frage und Ergebnis
  * (eine Zeile) – ein Tipp klappt sie auf. Vorher stand eine beendete
  * Abstimmung mit allen Balken ganz oben auf der Pinnwand.
+ * Seit Okt. 2026 genauso eine laufende Auswahl-Abstimmung, bei der man schon
+ * abgestimmt hat („Führend: …“ und darunter „läuft · … · du: …“): am iPhone
+ * stand sonst jede schon erledigte Abstimmung mit allen Balken da (~450 px),
+ * und die noch offenen rutschten aus dem Bild. Freie Antworten klappen nicht zu.
  *
  * Löschen steht nicht mehr als Mülleimer an jeder Karte, sondern hinter „…“
  * in einem Blatt (ganz unten, rot, mit Rückfrage).
  */
 export function AbstimmungKarte({
-  item, kannLoeschen, onDelete, kompakt = false,
-}: { item: TopicItem; kannLoeschen: boolean; onDelete: () => void; kompakt?: boolean }) {
+  item, kannLoeschen, onDelete, kompakt = false, startAuf,
+}: {
+  item: TopicItem;
+  kannLoeschen: boolean;
+  onDelete: () => void;
+  kompakt?: boolean;
+  /** Aufgeklappt beginnen – z. B. angesprungen aus der Vorschau im Chats-Reiter */
+  startAuf?: boolean;
+}) {
   const abgelaufen = item.poll_deadline ? new Date(item.poll_deadline) < new Date() : false;
-  const [auf, setAuf] = useState(false);
+  const [auf, setAuf] = useState(startAuf ?? false);
   const [mehr, setMehr] = useState(false);
-  const zu = kompakt && abgelaufen && !auf;
+  // Wer hier gerade abstimmt, dem klappt die Karte nicht unter dem Finger zu –
+  // sie bleibt offen, bis man „Zuklappen“ tippt oder die Pinnwand neu öffnet.
+  const [offenGehalten, setOffenGehalten] = useState(false);
+  const meine = useTopics().myVotes[item.id] || [];
+  const hatGestimmt = !item.antwort_art && meine.length > 0;
+  const klappbar = kompakt && (abgelaufen || hatGestimmt);
+  const zu = klappbar && !auf && !offenGehalten;
   const art = item.antwort_art
     ? `Freie Antwort · ${ANTWORT_ART_NAME[item.antwort_art]}`
     : item.poll_multi
@@ -437,14 +454,22 @@ export function AbstimmungKarte({
       </div>
 
       {zu ? (
-        <ErgebnisKurz item={item} onAuf={() => setAuf(true)} />
+        <ErgebnisKurz item={item} laeuft={!abgelaufen} onAuf={() => setAuf(true)} />
       ) : item.antwort_art ? (
         <FreiAntworten item={item} abgelaufen={abgelaufen} />
       ) : (
-        <AuswahlAbstimmung item={item} abgelaufen={abgelaufen} />
+        <AuswahlAbstimmung item={item} abgelaufen={abgelaufen} onGestimmt={() => setOffenGehalten(true)} />
       )}
-      {kompakt && abgelaufen && auf && (
-        <button type="button" onClick={() => setAuf(false)} className="mt-1 min-h-[44px] px-1 text-[13px] font-semibold text-brand-dark dark:text-brand">
+      {klappbar && auf && (
+        <button
+          type="button"
+          onClick={() => {
+            // beides zurück – sonst hielte eine Stimme von eben die Karte weiter offen
+            setAuf(false);
+            setOffenGehalten(false);
+          }}
+          className="mt-1 min-h-[44px] px-1 text-[13px] font-semibold text-brand-dark dark:text-brand"
+        >
           Zuklappen
         </button>
       )}
@@ -469,11 +494,17 @@ export function AbstimmungKarte({
   );
 }
 
-/** Beendete Abstimmung zugeklappt: nur das Ergebnis in einer Zeile, Tipp klappt auf. */
-function ErgebnisKurz({ item, onAuf }: { item: TopicItem; onAuf: () => void }) {
-  const { voteCounts } = useTopics();
+/**
+ * Abstimmung zugeklappt: nur das Ergebnis in einer Zeile, Tipp klappt auf.
+ * laeuft (Okt. 2026): noch offen, aber schon abgestimmt – dann „Führend:“
+ * statt „Ergebnis:“ und darunter klein „läuft · 16 Stimmen · du: …“, damit
+ * niemand die Abstimmung für beendet hält und man die eigene Wahl sieht.
+ */
+function ErgebnisKurz({ item, laeuft, onAuf }: { item: TopicItem; laeuft: boolean; onAuf: () => void }) {
+  const { voteCounts, myVotes } = useTopics();
   let text = "Antworten ansehen";
   let pct: number | null = null;
+  let unter: string | null = null;
   if (!item.antwort_art) {
     const optionen = Array.isArray(item.options) ? item.options : [];
     const counts = voteCounts[item.id] || {};
@@ -481,9 +512,14 @@ function ErgebnisKurz({ item, onAuf }: { item: TopicItem; onAuf: () => void }) {
     const max = Math.max(0, ...optionen.map((o) => counts[o.id] || 0));
     const sieger = max > 0 ? optionen.filter((o) => (counts[o.id] || 0) === max) : [];
     if (sieger.length) {
-      text = `${sieger.length > 1 ? "Gleichstand: " : "Ergebnis: "}${sieger.map((o) => o.label).join(", ")}`;
+      text = `${sieger.length > 1 ? "Gleichstand: " : laeuft ? "Führend: " : "Ergebnis: "}${sieger.map((o) => o.label).join(", ")}`;
       pct = gesamt ? Math.round((max / gesamt) * 100) : null;
     } else text = "Keine Stimmen";
+    if (laeuft) {
+      const meine = myVotes[item.id] || [];
+      const du = optionen.filter((o) => meine.includes(o.id)).map((o) => o.label).join(", ");
+      unter = `läuft · ${gesamt} ${gesamt === 1 ? "Stimme" : "Stimmen"}${du ? ` · du: ${du}` : ""}`;
+    }
   }
   return (
     <button
@@ -495,7 +531,10 @@ function ErgebnisKurz({ item, onAuf }: { item: TopicItem; onAuf: () => void }) {
       <span className="shrink-0 text-brand-dark dark:text-brand">
         <Icon name="pokal" size={16} />
       </span>
-      <span className="min-w-0 flex-1 truncate font-semibold">{text}</span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate font-semibold">{text}</span>
+        {unter && <span className="block truncate text-[12px] text-tinte-leise">{unter}</span>}
+      </span>
       {pct !== null && <span className="zahl shrink-0 font-bold text-brand-dark dark:text-brand">{pct} %</span>}
       <span aria-hidden className="shrink-0 text-[17px] leading-none text-tinte-leise">›</span>
     </button>
@@ -503,7 +542,14 @@ function ErgebnisKurz({ item, onAuf }: { item: TopicItem; onAuf: () => void }) {
 }
 
 /** Abstimmung mit Möglichkeiten (und optional „Eigene Antwort“) */
-function AuswahlAbstimmung({ item, abgelaufen }: { item: TopicItem; abgelaufen: boolean }) {
+function AuswahlAbstimmung({
+  item, abgelaufen, onGestimmt,
+}: {
+  item: TopicItem;
+  abgelaufen: boolean;
+  /** Vor jeder Stimme: die Karte hält sich offen (klappt nach dem Abstimmen nicht zu) */
+  onGestimmt?: () => void;
+}) {
   const { myVotes, voteCounts, voters, vote } = useTopics();
   const { uid, isAdmin, banned } = useRole();
   const optionen = Array.isArray(item.options) ? item.options : [];
@@ -536,6 +582,7 @@ function AuswahlAbstimmung({ item, abgelaufen }: { item: TopicItem; abgelaufen: 
   async function waehlen(id: string) {
     if (gesperrt) return;
     const warGewaehlt = meine.includes(id);
+    onGestimmt?.();
     await vote(item.id, id, item.poll_multi);
     // Wer die freie Möglichkeit verlässt (abwählen oder bei Einfachwahl etwas
     // anderes ankreuzen), dessen Text verschwindet mit – sonst stünde ein
