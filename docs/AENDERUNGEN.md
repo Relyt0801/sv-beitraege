@@ -82,7 +82,8 @@ CREATE/ALTER/UPDATE):
 - Klicktest Herzen 9/9. Gegenprobe gegen den alten Stand: 3 Fehler, also
   greift der Test.
 - Klicktest offiziell/inoffiziell 15/15, Vorsitz-Anfragen 9/9.
-- `ui-check` und `leisten-check` auf r39: Ergebnis folgt.
+- `ui-check` 280 Ansichten ohne Fund (axe ohne Befund, keine Konsolenfehler);
+  `leisten-check` 777 Zustände, 0 Abweichungen.
 - Typecheck und Build ohne Fehler.
 
 ## Runde 8a: Offiziell/Inoffiziell schaltbar, Info-Symbol, Mottos löschen (16.10.2026)
