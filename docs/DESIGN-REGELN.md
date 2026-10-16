@@ -55,6 +55,23 @@ wieder passieren.**
   Komitee-Zeilen stehen am Laptop in EINER Karte (`ZuErledigen`). Listen, die
   am Handy gekürzt sind („Alle 8 anzeigen“), stehen ganz da, sobald sie eine
   eigene Spalte haben. Nachmessen mit `tests/platz-check.mjs`.
+- **Am Handy kürzen, nicht verstecken** (Runde 10, Okt. 2026):
+  - Lange ruhige Listen zeigen am Handy nur, was gerade zählt (z. B. Komitees
+    mit Ungelesenem, Glocke an oder neuem Eintrag), dahinter eine graue Zeile
+    „Alle N … ›“ mit dem Rest im Blatt.
+  - Was am Reiter als Zahl zählt (Ungelesenes), fällt **nie** ins Blatt.
+  - Ab iPad (`md`) steht die ganze Liste, sobald sie ohne Scrollen passt.
+    Gekürzt bliebe dort nur Leerraum.
+  - Was eine weggefallene Spalte trug (frühere offene Halbjahre, Mithilfe),
+    wandert in die Unterzeile. Das Wichtige steht vorn, und die Unterzeile
+    darf zweizeilig werden (`line-clamp-2`) statt genau das abzuschneiden.
+  - Was jemand gerade bedient (Glocke aus, eben abgestimmt), verschwindet
+    nicht unter dem Finger. Es bleibt stehen, bis man den Reiter neu öffnet.
+- **Weichen über die Breite:**
+  - Möglichst per CSS (`md:hidden` / `max-md:hidden`).
+  - Muss JS umschalten (`useAbMd`, `useBreit`): EINE Instanz an fester
+    Stelle, nur Form und Klasse wechseln. Sonst schließt beim Drehen ein
+    offenes Blatt, und der Fokus fällt auf die Seite.
 
 ## 3. Kopfleisten und Ebenen
 

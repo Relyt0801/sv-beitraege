@@ -11,6 +11,97 @@ ausführlich (auf Deutsch); hier steht der Überblick dazu.
 
 ---
 
+## Runde 10: Handy kürzer, aus Sicht der Rollen (16.10.2026)
+
+Anlass: In Runde 9 war das Handy unverändert (Mittel 2,09 Bildschirme). Die
+Frage je Rolle war: Was braucht sie oft, und was steht nur doppelt oder leer
+da? Daraus wurden 8 Pakete. Ergebnis (`platz-check`, gleiche Messung):
+
+| | vorher | nachher |
+|---|---|---|
+| Handy gesamt | 2,09 | **1,84** Bildschirme |
+| iPhone 390 × 844 | 1,64 | **1,45** |
+| iPhone SE 320 × 568 | 2,54 | **2,23** |
+| iPad, Laptop | 1,17–1,28 | unverändert |
+
+Die Löcher bleiben im Mittel gleich (Handy 10 %).
+
+**Kasse (Kassenwart, Sprecher, Stufenteam):**
+- Eine Person ist am Handy eine Zeile. Rechts stehen der Betrag und nur das
+  laufende Halbjahr als Kästchen.
+- Die Unterzeile nennt frühere offene Halbjahre zuerst, dann die Mithilfe.
+  Sie darf zweizeilig werden.
+- „auch … offen“ steht nur, wenn das laufende Halbjahr selbst offen ist.
+- Wer nur liest, sieht das Kästchen auch, kann es aber nicht antippen.
+- Kassenkopf am Handy:
+  - Kennzahlen und Halbjahre sind EINE Karte. Die Halbjahre stehen als Zeile
+    da („EF.1 läuft · 38 % bezahlt · früher offen bei N ›“).
+  - Kacheln und Umstellen liegen im Blatt.
+- Messwerte für das Team:
+  - iPhone 2,02 → 1,43 Bildschirme.
+  - iPhone SE 3,16 → 2,16 Bildschirme.
+
+**Chats fürs Team:**
+- „Weitere Komitees“ zeigt am Handy nur aktive Komitees, höchstens 3: mit
+  Ungelesenem, Glocke an oder einem Eintrag der letzten 14 Tage.
+- Der Rest steht im Blatt hinter „Alle N Komitees ›“.
+- Komitees mit Ungelesenem fallen nie ins Blatt.
+- Schaltet man die Glocke in der kurzen Liste aus, bleibt die Zeile stehen.
+- Ab iPad steht die ganze Liste wie bisher.
+- iPhone: 1,37 → 1,00 Bildschirme.
+
+**Komitee-Pinnwand (Vorsitz, Mitglieder):**
+- Laufende Abstimmungen, bei denen man schon abgestimmt hat, stehen
+  zugeklappt da („Führend: … · du: …“).
+- Direkt nach der eigenen Stimme bleibt die Karte offen, und „Zuklappen“
+  steht dabei.
+
+**Übersicht:**
+- Die Komitee-Zeilen stehen in „Für dich offen“.
+- Der Abiball vor dem Verkauf ist nur noch eine Zeile; bei Eltern ist die
+  Karte kompakt.
+
+**Events:**
+- Der leere Block „HEUTE · nichts eingetragen“ fällt am Handy weg, für
+  Schüler und Vorsitz. Am Laptop bleibt er neben der rechten Spalte,
+  sonst bliebe dort ein Loch.
+- Das Team sieht am Handy nur Schichttickets ohne Aktion. Die anderen stehen
+  direkt darunter in „Mitmachen“ mit „Eingeteilt“.
+
+**Finanzen:**
+- „Für alle sichtbar“ am Handy:
+  - Geplante Aktionen sind eine Zeile, die Liste liegt im Blatt.
+  - Stand und Fehlbetrag stehen in vorhandenen Zeilen.
+  - Beim Drehen bleibt ein offenes Blatt offen: Es ist eine Instanz an
+    fester Stelle.
+- Kassenbuch am Handy:
+  - Beitrags-Buchungen zeigen „Nachname, Vorname“ und darunter
+    „Beitrag EF.1 · Datum“.
+  - Erklärsatz und „Nur lesen“ brauchen keinen eigenen Kasten mehr.
+
+**Gegenprüfung** (drei Blickwinkel: Logik, Rollen, Design; jeder Fund in der
+Demo nachgestellt): 10 bestätigte Funde, alle behoben, 1 widerlegt. Die
+wichtigsten:
+- Am Team-Handy konnte ein Komitee mit Ungelesenem im Blatt verschwinden. Die
+  Zahl am Reiter gehörte dann zu keiner sichtbaren Zeile.
+- Die Unterzeile der Kasse schnitt ab Q1.1 genau die offenen Halbjahre ab.
+- „früher 13 offen“ bei 8 Personen: Gezählt wurden Personen × Halbjahre.
+- Beim Drehen schloss sich das Blatt „Geplante Aktionen“.
+
+Zwei Rückschritte fand `platz-check` selbst: In Events am Laptop war das
+Loch größer (20 → 26 %), und die Team-Chats am iPad waren unnötig gekürzt.
+Beide sind behoben.
+
+**Bewusst so gelassen:** Kurze Seiten am Laptop haben unten Leerraum, zum
+Beispiel Eltern → Infos oder Chats für Schüler. Dort ist schlicht nicht mehr
+Inhalt da. Strecken oder Füllen hieße Inhalte erfinden; Apple lässt kurze
+Seiten ebenfalls kurz. Eine geteilte Ansicht für Chats am Laptop (Liste
+links, Chat rechts, wie Nachrichten am Mac) wäre der richtige nächste
+Schritt. Sie ändert aber die Ebenen-Regel (DESIGN-REGELN 3) und ist hier
+nicht gebaut.
+
+**Prüfung (Demo r47 = Endstand, Chromium):** siehe unten, Nachtrag.
+
 ## Runde 9: Platz und Scrollen gemessen, Löcher geschlossen (16.10.2026)
 
 Anlass: „kaum leere Freiräume … so dass man kaum scrollen muss“. Bisher gab
