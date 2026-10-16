@@ -762,6 +762,16 @@ function UmfrageEditor({
   }, [open, umfrage?.id]);
 
   const aendern = (i: number, p: Partial<EntwurfFrage>) => setListe((l) => l.map((f, n) => (n === i ? { ...f, ...p } : f)));
+  function verschieben(i: number, um: -1 | 1) {
+    const j = i + um;
+    if (j < 0 || j >= liste.length) return;
+    setListe((l) => {
+      const n = [...l];
+      [n[i], n[j]] = [n[j], n[i]];
+      return n;
+    });
+    setTypWahl(j);
+  }
   const fehler = !titel.trim()
     ? "Titel fehlt"
     : !liste.length && !mitRankings
@@ -820,45 +830,28 @@ function UmfrageEditor({
         const auswahl = f.typ === "einfach" || f.typ === "mehrfach";
         const kaestchen = `h-[18px] w-[18px] shrink-0 ring-[1.5px] ring-inset ring-black/25 dark:ring-white/35 ${f.typ === "einfach" ? "rounded-full" : "rounded-[5px]"}`;
         return (
-          <Gruppe key={i} titel={`Frage ${i + 1}`} className="mt-5">
-            <div className="flex min-h-[48px] items-center gap-1 pl-4 pr-2">
-              {/* Fragetyp: Häkchen-Liste als Unterseite statt nativer Auswahl */}
+          <section key={i} className="mt-5">
+            {/* Kopf mit „Bearbeiten“ wie in iOS-Abschnitten: sagt, dass hinter der
+                Frage noch Typ, Reihenfolge und Entfernen liegen (die Zeile
+                „Fragetyp ›“ allein verriet das nicht) */}
+            <div className="mb-1.5 flex items-center gap-2 pl-4 pr-1">
+              <h3 className="auf-bild min-w-0 flex-1 text-[13px] font-normal uppercase tracking-[0.02em] text-tinte-leise">Frage {i + 1}</h3>
               <button
                 type="button"
                 onClick={() => setTypWahl(i)}
-                aria-label={`Fragetyp: ${TYP_NAME[f.typ]} – ändern`}
-                className="flex min-h-[44px] min-w-0 flex-1 items-center gap-1 text-left text-[15px] font-semibold text-[#5E5CE6] transition active:opacity-60 dark:text-[#A5A4FF]"
+                aria-label={`Frage ${i + 1} bearbeiten: Typ, Reihenfolge, entfernen`}
+                className="-my-3 flex min-h-[44px] items-center px-3 text-[14px] font-medium text-brand-dark transition active:opacity-60 dark:text-brand"
               >
-                <span className="truncate">{TYP_NAME[f.typ]}</span>
-                {/* „›“ wie jede Zeile, die eine Unterseite öffnet (kein Aufklapp-Pfeil – daneben stehen die Pfeile zum Verschieben) */}
-                <span aria-hidden className="shrink-0 opacity-70">
-                  <Icon name="chevron" size={14} strich={2.4} />
-                </span>
-              </button>
-              {/* Pfeile aus Icon.tsx (keine Textzeichen ▲▼ als Knopf-Symbol, Design-Regeln 5) */}
-              <button type="button" aria-label={`Frage ${i + 1} nach oben`} disabled={i === 0} className="flex h-11 w-11 items-center justify-center rounded-full text-tinte-leise transition active:opacity-50 disabled:opacity-25" onClick={() => setListe((l) => { const n = [...l]; [n[i - 1], n[i]] = [n[i], n[i - 1]]; return n; })}>
-                <span aria-hidden className="-rotate-90">
-                  <Icon name="chevron" size={17} strich={2.4} />
-                </span>
-              </button>
-              <button type="button" aria-label={`Frage ${i + 1} nach unten`} disabled={i === liste.length - 1} className="flex h-11 w-11 items-center justify-center rounded-full text-tinte-leise transition active:opacity-50 disabled:opacity-25" onClick={() => setListe((l) => { const n = [...l]; [n[i + 1], n[i]] = [n[i], n[i + 1]]; return n; })}>
-                <span aria-hidden className="rotate-90">
-                  <Icon name="chevron" size={17} strich={2.4} />
-                </span>
-              </button>
-              <button
-                type="button"
-                aria-label={`Frage ${i + 1} entfernen`}
-                className="flex h-11 w-11 items-center justify-center rounded-full text-tinte-leise"
-                onClick={async () => {
-                  // Mit Text: erst fragen – sonst ist Getipptes mit einem Tipp weg
-                  if ((f.titel.trim() || f.optionen.some((o) => o.trim())) && !(await fragen_(`Frage ${i + 1} entfernen?`, "Entfernen", true))) return;
-                  setListe((l) => l.filter((_, n) => n !== i));
-                }}
-              >
-                <Icon name="muell" size={16} />
+                Bearbeiten
               </button>
             </div>
+            <div className="gruppe-zellen">
+            {/* EINE Zeile (Design-Regeln 2/3): vorher Typ, ▲, ▼ und Mülleimer
+                nebeneinander. Fragetyp, Reihenfolge und Entfernen liegen jetzt
+                auf der Unterseite „Frage n“ – Entfernen unten, mit Rückfrage. */}
+            <Zeile label="Fragetyp" onClick={() => setTypWahl(i)}>
+              <WertRechts>{TYP_NAME[f.typ]}</WertRechts>
+            </Zeile>
             <input className="block w-full bg-transparent px-4 py-3 text-[16px] font-semibold outline-none placeholder:text-tinte-leise" placeholder="Frage" maxLength={160} value={f.titel} onChange={(e) => aendern(i, { titel: e.target.value })} />
             {auswahl &&
               f.optionen.map((o, n) => (
@@ -915,7 +908,8 @@ function UmfrageEditor({
             <Zeile label="Muss beantwortet werden">
               <Schalter an={f.pflicht} onChange={(x) => aendern(i, { pflicht: x })} label="Muss beantwortet werden" />
             </Zeile>
-          </Gruppe>
+            </div>
+          </section>
         );
       })}
       <Gruppe className="mt-5" fuss={liste.some((f) => mitEigener(f)) ? "„Eigene Antwort“ ist wie „Sonstiges: ____“: wer sie wählt, schreibt kurz dazu. Gleiche Texte werden in der Auswertung zusammengezählt." : undefined}>
@@ -972,8 +966,8 @@ function UmfrageEditor({
         </Gruppe>
       </Sheet>
       <Sheet open={open && typWahl !== null} onClose={() => setTypWahl(null)}>
-        <SheetKopf titel="Fragetyp" unter={typWahl !== null ? `Frage ${typWahl + 1} – wie wird geantwortet?` : undefined} onClose={() => setTypWahl(null)} />
-        <Gruppe className="mt-1">
+        <SheetKopf titel={typWahl !== null ? `Frage ${typWahl + 1}` : "Frage"} unter={typWahl !== null ? liste[typWahl]?.titel.trim() || undefined : undefined} onClose={() => setTypWahl(null)} />
+        <Gruppe className="mt-1" titel="Wie wird geantwortet?">
           {(Object.keys(TYP_NAME) as FrageTyp[])
             .filter((t) => t !== "ranking")
             .map((typ) => {
@@ -996,6 +990,29 @@ function UmfrageEditor({
               );
             })}
         </Gruppe>
+        {typWahl !== null && liste.length > 1 && (
+          <Gruppe titel="Reihenfolge" className="mt-6">
+            {/* Die Unterseite bleibt offen und wandert mit der Frage mit */}
+            <Zeile label="Nach oben" blau disabled={typWahl === 0} onClick={() => verschieben(typWahl, -1)} />
+            <Zeile label="Nach unten" blau disabled={typWahl === liste.length - 1} onClick={() => verschieben(typWahl, 1)} />
+          </Gruppe>
+        )}
+        {typWahl !== null && (
+          <Gruppe className="mt-6">
+            <Zeile
+              label="Frage entfernen"
+              rot
+              onClick={async () => {
+                const i = typWahl;
+                const f = liste[i];
+                // Mit Text: erst fragen – sonst ist Getipptes mit einem Tipp weg
+                if (f && (f.titel.trim() || f.optionen.some((o) => o.trim())) && !(await fragen_(`Frage ${i + 1} entfernen?`, "Entfernen", true))) return;
+                setTypWahl(null);
+                setListe((l) => l.filter((_, n) => n !== i));
+              }}
+            />
+          </Gruppe>
+        )}
       </Sheet>
 
       {/* Fußleiste bleibt unten im Blatt sichtbar: Hinweis, was noch fehlt, und die beiden Knöpfe */}

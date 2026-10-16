@@ -92,16 +92,111 @@ export function ProtokollSheet({
 
   const vortag = letzterAutomatischer(staende);
 
-  async function uebernehmen(s: Speicherstand) {
-    setBusy("uebernehmen");
-    const r = await speicherstandUebernehmen(s.id);
+  async function herunterladen(s: Speicherstand) {
+    setBusy(`download:${s.id}`);
+    setFehler("");
+    setInfo("");
+    const r = await speicherstandHerunterladen(s);
     setBusy("");
+    if (!r.ok) setFehler(r.fehler || "Hat nicht geklappt.");
+    else setInfo("Die Datei liegt in deinen Downloads.");
+  }
+
+  // Unterseite „Stand vom …“: liegt über diesem Blatt (Sheet-Stapel → „‹ Protokoll“)
+  const [detail, setDetail] = useState<Speicherstand | null>(null);
+  function detailAuf(s: Speicherstand) {
+    setFehler("");
+    setInfo("");
+    setDetail(s);
+  }
+  function detailZu() {
+    setDetail(null);
     setFrage(null);
     setBestaetigung("");
+  }
+
+  // Meldungen oben im Blatt UND oben auf der Unterseite (sonst lagen sie
+  // unsichtbar hinter der Unterseite: „Datei liegt in deinen Downloads“, Fehler)
+  const meldungen = (
+    <>
+      {fehler && (
+        <div role="alert" className="mb-3 rounded-xl bg-red-500/10 px-3 py-2 text-[13px] font-semibold text-red-600 dark:text-red-400">{fehler}</div>
+      )}
+      {info && (
+        <div role="status" className="mb-3 rounded-xl bg-emerald-500/10 px-3 py-2 text-[13px] font-semibold text-emerald-700 dark:text-emerald-400">
+          {info}
+        </div>
+      )}
+    </>
+  );
+
+  /** Rückfrage vor dem Zurücksetzen – im Blatt (Vortag) oder auf der Unterseite. */
+  function rueckfrage(f: Speicherstand) {
+    return (
+      <div className="mt-4 rounded-2xl border-2 border-amber-500/60 bg-amber-500/5 p-3.5">
+        <div className="mb-1 text-[15px] font-bold text-amber-700 dark:text-amber-400">Speicherstand vom {datumDe(f.tag)} übernehmen?</div>
+        <p className="mb-2 text-[13px] leading-relaxed text-tinte-matt dark:text-slate-300">
+          Personen, Beiträge, Beteiligungen, Kassenbuch, Komitees, Rollen und Rechte gehen auf den Stand von
+          damals zurück. <b>Alles, was seitdem daran geändert wurde, ist weg.</b> Chats, Events, Termine und die
+          Zugänge selbst bleiben unberührt. Der jetzige Stand wird vorher automatisch als Sicherheitskopie
+          weggeschrieben – ein Fehlgriff lässt sich also rückgängig machen.
+        </p>
+        <p className="mb-2 text-[13px] font-semibold">
+          Tippe <span className="rounded bg-papier-matt px-1.5 py-0.5 dark:bg-slate-800">ÜBERNEHMEN</span> zum
+          Bestätigen.
+        </p>
+        <input
+          className="field mb-2"
+          value={bestaetigung}
+          autoFocus
+          onChange={(e) => setBestaetigung(e.target.value)}
+          placeholder="ÜBERNEHMEN"
+        />
+        {fehler && (
+          <p role="alert" className="mb-2 text-[13px] font-semibold text-red-600 dark:text-red-400">
+            {fehler}
+          </p>
+        )}
+        <div className="flex gap-2">
+          <button
+            type="button"
+            disabled={busy === "uebernehmen"}
+            onClick={() => {
+              setFrage(null);
+              setBestaetigung("");
+              setFehler("");
+            }}
+            className="btn-grau flex-1"
+          >
+            Abbrechen
+          </button>
+          <button
+            type="button"
+            disabled={bestaetigung.trim().toUpperCase() !== "ÜBERNEHMEN" || busy !== ""}
+            onClick={() => void uebernehmen(f)}
+            className="min-h-[44px] flex-1 rounded-xl bg-amber-600 px-4 text-[15px] font-bold text-white disabled:opacity-40"
+          >
+            {busy === "uebernehmen" ? "…" : "Jetzt übernehmen"}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  async function uebernehmen(s: Speicherstand) {
+    setBusy("uebernehmen");
+    setFehler("");
+    const r = await speicherstandUebernehmen(s.id);
     if (!r.ok) {
+      // Rückfrage bleibt offen, der Fehler steht darin (vorher: Rückfrage weg,
+      // Fehler nur im Blatt hinter der Unterseite – sah aus wie „nichts passiert“)
+      setBusy("");
       setFehler(r.fehler || "Hat nicht geklappt.");
       return;
     }
+    // busy bleibt bis zum Neuladen gesetzt: nichts mehr doppelt antippbar
+    setFrage(null);
+    setBestaetigung("");
     setInfo(`Speicherstand vom ${datumDe(s.tag)} übernommen. Die Seite lädt gleich neu.`);
     void staendeLaden();
     // Alle offenen Speicher in der App zeigen jetzt Daten von vorhin.
@@ -112,14 +207,7 @@ export function ProtokollSheet({
     <Sheet open={open} onClose={onClose}>
       <SheetKopf titel={nurSicherung ? "Sicherheitskopie" : "Protokoll & Sicherung"} onClose={onClose} />
 
-      {fehler && (
-        <div className="mb-3 rounded-xl bg-red-500/10 px-3 py-2 text-[13px] font-semibold text-red-600 dark:text-red-400">{fehler}</div>
-      )}
-      {info && (
-        <div className="mb-3 rounded-xl bg-emerald-500/10 px-3 py-2 text-[13px] font-semibold text-emerald-700 dark:text-emerald-400">
-          {info}
-        </div>
-      )}
+      {!detail && !(fehler && frage) && meldungen}
 
       {/* ---------------- Sicherung: Aktionen als blaue Zeilen (keine breiten Knöpfe mitten im Blatt) ---------------- */}
       <Gruppe
@@ -194,89 +282,77 @@ export function ProtokollSheet({
               <Icon name="chevron" size={14} />
             </span>
           </summary>
+          {/* Je Stand EINE Zeile (Design-Regel 2): vorher standen „Laden“ und
+              „Übernehmen“ als zwei Knöpfe nebeneinander in jeder Zeile. Beides
+              liegt jetzt auf der Unterseite, Übernehmen unten mit Rückfrage. */}
           <div className="gruppe-zellen">
             {staende.map((s) => (
-              <div key={s.id} className="flex min-h-[48px] items-center gap-1 py-1 pl-4 pr-1.5">
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[15px]">{datumDe(s.tag)}</span>
-                  <span className="block truncate text-[12.5px] text-tinte-leise">
-                    {s.art === "automatisch" ? "nachts" : s.art === "manuell" ? "von Hand" : "vor einer Rücksetzung"} · {s.zeilen} Zeilen
-                  </span>
-                </span>
-                <button
-                  type="button"
-                  aria-label={`Stand vom ${datumDe(s.tag)} herunterladen`}
-                  className="flex min-h-[44px] shrink-0 items-center rounded-full px-3 text-[14px] font-semibold text-brand-dark dark:text-brand"
-                  onClick={async () => {
-                    const r = await speicherstandHerunterladen(s);
-                    if (!r.ok) setFehler(r.fehler || "Hat nicht geklappt.");
-                  }}
+              nurSicherung ? (
+                // Kassenwart: nur Herunterladen möglich – ein Tipp lädt direkt
+                // (eine Unterseite mit nur diesem Knopf wäre ein Umweg)
+                <Zeile
+                  key={s.id}
+                  label={datumDe(s.tag)}
+                  unter={`${artText(s)} · ${s.zeilen} Zeilen`}
+                  ohnePfeil
+                  disabled={busy !== ""}
+                  onClick={() => void herunterladen(s)}
                 >
-                  Laden
-                </button>
-                {!nurSicherung && (
-                  <button
-                    type="button"
-                    className="flex min-h-[44px] shrink-0 items-center rounded-full px-3 text-[14px] font-semibold text-amber-700 dark:text-amber-400"
-                    onClick={() => {
-                      setFrage(s);
-                      setBestaetigung("");
-                    }}
-                  >
-                    Übernehmen
-                  </button>
-                )}
-              </div>
+                  <span className="text-[15px] font-medium text-brand-dark dark:text-brand">{busy === `download:${s.id}` ? "…" : "Laden"}</span>
+                </Zeile>
+              ) : (
+                <Zeile key={s.id} label={datumDe(s.tag)} unter={`${artText(s)} · ${s.zeilen} Zeilen`} onClick={() => detailAuf(s)} />
+              )
             ))}
           </div>
         </details>
       )}
 
+      {/* ---------------- Unterseite: ein älterer Stand ---------------- */}
+      <Sheet open={!!detail} onClose={detailZu}>
+        {detail && (
+          <>
+            <SheetKopf titel={`Stand vom ${datumDe(detail.tag)}`} onClose={detailZu} />
+            {/* Während der Rückfrage steht ein Fehler in ihr (unten, beim Knopf) */}
+            {!(fehler && frage?.id === detail.id) && meldungen}
+            <Gruppe>
+              <Zeile label="Gesichert">
+                <Wert>{artText(detail)}</Wert>
+              </Zeile>
+              <Zeile label="Umfang">
+                <Wert>{detail.zeilen} Zeilen</Wert>
+              </Zeile>
+            </Gruppe>
+            <Gruppe className="mt-6" fuss="Die Datei enthält Namen, Zahlungsstände und die Bankverbindung – nur auf dem eigenen Gerät speichern.">
+              <Zeile
+                label={busy === `download:${detail.id}` ? "Lädt …" : "Herunterladen"}
+                blau
+                disabled={busy !== ""}
+                onClick={() => void herunterladen(detail)}
+              />
+            </Gruppe>
+            {!nurSicherung &&
+              (frage?.id === detail.id ? (
+                rueckfrage(frage)
+              ) : (
+                <Gruppe className="mt-6">
+                  <Zeile
+                    label="Diesen Stand übernehmen"
+                    rot
+                    disabled={busy !== ""}
+                    onClick={() => {
+                      setFrage(detail);
+                      setBestaetigung("");
+                    }}
+                  />
+                </Gruppe>
+              ))}
+          </>
+        )}
+      </Sheet>
+
       {/* ---------------- Rückfrage vor dem Zurücksetzen ---------------- */}
-      {frage && (
-        <div className="mt-4 rounded-2xl border-2 border-amber-500/60 bg-amber-500/5 p-3.5">
-          <div className="mb-1 text-[15px] font-bold text-amber-700 dark:text-amber-400">
-            Speicherstand vom {datumDe(frage.tag)} übernehmen?
-          </div>
-          <p className="mb-2 text-[13px] leading-relaxed text-tinte-matt dark:text-slate-300">
-            Personen, Beiträge, Beteiligungen, Kassenbuch, Komitees, Rollen und Rechte gehen auf den Stand von
-            damals zurück. <b>Alles, was seitdem daran geändert wurde, ist weg.</b> Chats, Events, Termine und die
-            Zugänge selbst bleiben unberührt. Der jetzige Stand wird vorher automatisch als Sicherheitskopie
-            weggeschrieben – ein Fehlgriff lässt sich also rückgängig machen.
-          </p>
-          <p className="mb-2 text-[13px] font-semibold">
-            Tippe <span className="rounded bg-papier-matt px-1.5 py-0.5 dark:bg-slate-800">ÜBERNEHMEN</span> zum
-            Bestätigen.
-          </p>
-          <input
-            className="field mb-2"
-            value={bestaetigung}
-            autoFocus
-            onChange={(e) => setBestaetigung(e.target.value)}
-            placeholder="ÜBERNEHMEN"
-          />
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                setFrage(null);
-                setBestaetigung("");
-              }}
-              className="btn-grau flex-1"
-            >
-              Abbrechen
-            </button>
-            <button
-              type="button"
-              disabled={bestaetigung.trim().toUpperCase() !== "ÜBERNEHMEN" || busy !== ""}
-              onClick={() => void uebernehmen(frage)}
-              className="min-h-[44px] flex-1 rounded-xl bg-amber-600 px-4 text-[15px] font-bold text-white disabled:opacity-40"
-            >
-              {busy === "uebernehmen" ? "…" : "Jetzt übernehmen"}
-            </button>
-          </div>
-        </div>
-      )}
+      {frage && !detail && rueckfrage(frage)}
 
       {/* ---------------- Protokoll ---------------- */}
       {!nurSicherung && (
@@ -340,6 +416,10 @@ export function ProtokollSheet({
       )}
     </Sheet>
   );
+}
+
+function artText(s: Speicherstand) {
+  return s.art === "automatisch" ? "nachts" : s.art === "manuell" ? "von Hand" : "vor einer Rücksetzung";
 }
 
 /** Eine Zeile: Icon des Bereichs, Name, kurz was passiert ist – rechts wann, darunter von wem. */
