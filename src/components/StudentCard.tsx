@@ -1,6 +1,6 @@
 import { memo } from "react";
 import { HY, STATI, type Settings, type Student } from "../lib/types";
-import { offenGesamt, prozentVon } from "../lib/logic";
+import { idx, isDead, isPreJoin, offenGesamt, prozentVon } from "../lib/logic";
 import { TermChip } from "./TermChip";
 import { Avatar } from "./Avatar";
 
@@ -8,8 +8,12 @@ import { Avatar } from "./Avatar";
  * Spaltenbreiten der Kassenliste – EINMAL festgelegt, damit die Spaltenköpfe
  * in App.tsx genau über den Werten stehen (vorher 40 px versetzt).
  *
- * Unter 768 px (Handy, Handy quer) stehen die sechs Halbjahre in einer eigenen
- * Zeile über die volle Breite (≈ 51 × 44 px je Kästchen). Ab 768 px stehen sie
+ * Unter 768 px (Handy, Handy quer) steht nur das laufende Halbjahr als
+ * 44 × 44-px-Kästchen rechts in der Zeile (Okt. 2026: vorher alle sechs in
+ * einer eigenen Zeile darunter – 103 px je Person, am iPhone SE war im ersten
+ * Bild nicht einmal eine ganze Person zu sehen). Frühere offene Halbjahre
+ * nennt die Unterzeile, alle sechs stehen im Personen-Blatt (StudentSheet).
+ * Ab 768 px stehen alle sechs
  * in der Zeile: 6 × 44 px + 5 × 6 px Abstand = 18,5 rem, am Laptop bis 26 rem
  * (≈ 64 px je Kästchen) – vorher waren es 35 × 36 px, zu klein zum sicheren
  * Tippen (ein Fehltipp ändert den Zahlstatus), und daneben ~550 px Leere.
@@ -27,6 +31,11 @@ export const SPALTE_MITHILFE = "md:w-[5.875rem]";
  * Name, offener Betrag, die sechs Halbjahre, Mithilfe. Vorher war jede Person
  * eine eigene Karte; bei 130 Leuten wurde daraus eine sehr lange Kachelwand,
  * in der man nichts vergleichen konnte.
+ *
+ * Am Handy (unter 768 px, Okt. 2026) nur: Name mit Unterzeile (Mithilfe,
+ * frühere offene Halbjahre), Betrag und das laufende Halbjahr – zwei
+ * Bedienelemente statt neun. Vorauszahlungen und ältere Halbjahre laufen über
+ * das Personen-Blatt oder „Mehrere auswählen“.
  */
 function StudentCardRoh({
   student,
@@ -63,8 +72,17 @@ function StudentCardRoh({
   const prozent = prozentVon(punkte, settings);
   // „dabei seit EF.1“ gilt für fast alle und sagt nichts – die zweite Zeile
   // steht nur noch, wenn etwas besonders ist (später dazu, verlässt die Stufe).
-  // Am Handy spart das je Person ~14 px (bei 100 Personen 1400 px Scrollen).
+  // Am Handy hängt es seit Okt. 2026 hinten an der Mithilfe-Unterzeile.
   const unter = leaving ? `verlässt ${student.verlaesst_ab}` : joiningLate ? `dabei ab ${student.beigetreten_ab}` : null;
+  // Am Handy steht nur das laufende Halbjahr als Kästchen da (Okt. 2026). Was
+  // davor noch offen ist, darf dabei nicht verschwinden – sonst stünde neben
+  // „EF.2 ✓“ ein offener Betrag, und keiner wüsste, woher er kommt. Daher nennt
+  // die Unterzeile die früheren offenen Halbjahre (nur solche, in denen die
+  // Person dabei war).
+  const aktIdx = idx(settings.aktuelles_halbjahr);
+  const fruehereOffen = HY.filter(
+    (h, i) => i < aktIdx && student.terms[h].status === "offen" && !isPreJoin(student, i) && !isDead(student, i),
+  );
 
   return (
     <div
@@ -114,7 +132,21 @@ function StudentCardRoh({
           <span className="block truncate text-[14px] font-semibold">
             {student.nachname}, {student.vorname}
           </span>
-          {unter && <span className="block truncate text-[12px] text-tinte-leise">{unter}</span>}
+          {unter && <span className="hidden truncate text-[12px] text-tinte-leise md:block">{unter}</span>}
+          {/* Am Handy trägt die Unterzeile, was rechts keinen Platz mehr hat:
+              die Mithilfe (die Spalte fällt weg) und frühere offene Halbjahre
+              (nur das laufende steht als Kästchen da). So bleibt die Person
+              eine Zeile hoch – Okt. 2026: 103 → 65 px je Person. */}
+          <span className="block truncate text-[12px] text-tinte-leise md:hidden">
+            {prozent} % Mithilfe
+            {fruehereOffen.length > 0 && (
+              <>
+                {" · "}
+                <span className="text-offen dark:text-amber-300">auch {fruehereOffen.join(", ")} offen</span>
+              </>
+            )}
+            {unter && ` · ${unter}`}
+          </span>
         </span>
       </button>
 
@@ -128,8 +160,11 @@ function StudentCardRoh({
         {betrag > 0 ? `${betrag} €` : "✓"}
       </button>
 
-      {/* Halbjahre – Breiten siehe SPALTE_HALBJAHRE (mind. 44 × 44 px je Kästchen) */}
-      <div className={`order-last flex w-full gap-1.5 md:order-none md:w-auto ${SPALTE_HALBJAHRE}`}>
+      {/* Halbjahre – Breiten siehe SPALTE_HALBJAHRE (mind. 44 × 44 px je Kästchen).
+          Am Handy nur das laufende (w-11 = ein Kästchen, die anderen per CSS
+          ausgeblendet); wer nur liest (Stufenteam, Sprecher), braucht dort
+          gar keins – die Kästchen sind für ihn ohnehin nicht antippbar. */}
+      <div className={`flex w-11 shrink-0 gap-1.5 md:w-auto ${SPALTE_HALBJAHRE} ${canToggleBeitrag ? "" : "max-md:hidden"}`}>
         {HY.map((h, i) => (
           <TermChip
             key={h}
@@ -138,15 +173,16 @@ function StudentCardRoh({
             i={i}
             current={settings.aktuelles_halbjahr}
             kompakt
+            className={h !== settings.aktuelles_halbjahr ? "max-md:hidden" : ""}
             onToggle={!selectable && canToggleBeitrag ? () => onToggleTerm(student.id, h) : undefined}
           />
         ))}
       </div>
 
-      {/* Mithilfe */}
+      {/* Mithilfe – am Handy steht sie in der Unterzeile des Namens */}
       <button
         onClick={() => (selectable ? onToggleSelect(student.id) : onOpen(student.id))}
-        className={`-my-2 flex shrink-0 items-center justify-end gap-1.5 py-3 ${SPALTE_MITHILFE}`}
+        className={`-my-2 hidden shrink-0 items-center justify-end gap-1.5 py-3 md:flex ${SPALTE_MITHILFE}`}
         aria-label={`Mithilfe ${prozent} Prozent`}
       >
         <span className="hidden h-1.5 w-12 overflow-hidden rounded-full bg-papier-matt dark:bg-slate-800 md:block">
