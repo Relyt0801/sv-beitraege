@@ -15,7 +15,7 @@ import { PersonAnlegenSheet } from "./PersonAnlegenSheet";
 import { KinderSheet } from "./KinderSheet";
 import { Icon } from "./Icon";
 import { Schalter } from "./Schalter";
-import { Gruppe, Wert, Zeile, ZeileMitSchalter } from "./Liste";
+import { Gruppe, Wert, Zeile, ZeileHaken, ZeileMitSchalter } from "./Liste";
 import { Sheet, SheetKopf } from "./Sheet";
 // Sperrdauern und die Ist-gesperrt-Frage stehen beim Chat-Knopf – eine Quelle fuer beide.
 import { DAUERN, isBanned } from "./MuteKnopf";
@@ -156,7 +156,24 @@ export function RolesTab() {
       {/* Anzeige-Schalter als eine iOS-Gruppe – beim Suchen ausgeblendet,
           damit die Treffer direkt unter dem Feld stehen (wie in der Kasse) */}
       {!q.trim() && (
-        <Gruppe className="mb-4">
+        // Fußnote erklärt den Punkt vor jeder Person – vorher nur als title
+        // (am Handy nie zu sehen). Hier und nicht unter der Liste: bei 300
+        // Konten stünde sie sonst ganz unten.
+        <Gruppe
+          className="mb-4"
+          fuss={
+            <span className="flex flex-wrap gap-x-4">
+              <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+                <span aria-hidden className="h-2 w-2 rounded-full bg-emerald-500" />
+                eigenes Passwort
+              </span>
+              <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+                <span aria-hidden className="h-2 w-2 rounded-full bg-slate-300 dark:bg-slate-600" />
+                noch Startpasswort
+              </span>
+            </span>
+          }
+        >
           {(isAdmin || isOp) && <Zeile label="Person hinzufügen" blau onClick={() => setAnlegen(true)} />}
           <ZeileMitSchalter label={<>Elternzugänge anzeigen <span className="ml-1 text-tinte-leise">{elternAnzahl}</span></>}>
             <Schalter an={zeigeEltern} onChange={setZeigeEltern} />
@@ -236,11 +253,18 @@ export function RolesTab() {
         const p = personId ? profiles.find((x) => x.user_id === personId) : undefined;
         if (!p) return null;
         const st = p.student_id ? nachId.get(p.student_id) : null;
-        const name = st ? `${st.vorname} ${st.nachname}` : p.username || "Konto";
-        const geschuetzt = p.is_op || p.user_id === opUserId;
-        const rolleGesperrt = geschuetzt || (!isAdmin && NUR_ADMIN.includes(p.role));
         const istEltern = p.role === "eltern";
         const kinder = istEltern ? kinderVon(p).map((k) => `${k.vorname} ${k.nachname}`) : [];
+        // Elternzugang heißt nach dem Kind, nicht nach dem Login (der steht darunter)
+        const name = st
+          ? `${st.vorname} ${st.nachname}`
+          : istEltern
+            ? kinder.length
+              ? `Eltern von ${kinder.join(" und ")}`
+              : "Elternzugang ohne Kind"
+            : p.username || "Konto";
+        const geschuetzt = p.is_op || p.user_id === opUserId;
+        const rolleGesperrt = geschuetzt || (!isAdmin && NUR_ADMIN.includes(p.role));
         const koms = committeesOf(p.user_id);
         const banned = isBanned(p);
         return (
@@ -321,11 +345,11 @@ const ROLLE_HINWEIS: Partial<Record<Role, string>> = {
 
 /**
  * Blatt einer Person – aufgebaut wie eine Seite der iOS-Einstellungen:
- * oben EINE Zeile „Rolle“ (selten geändert – die Auswahl mit Häkchen und
- * einem Satz je Rolle liegt auf einer Unterseite im selben Blatt), darunter
- * das Häufige: Komitees mit Häkchen, einzelne Rechte und Konto. Vorher
- * füllten sieben Rollen-Zeilen den ersten Bildschirm, Rechte und Konto
- * lagen unter dem Rand.
+ * oben je EINE Zeile „Rolle“ und „Komitees: Abiball, Abizeitung ›“ (die
+ * Auswahl mit Häkchen liegt jeweils auf einer Unterseite im selben Blatt),
+ * darunter einzelne Rechte und Konto – alles ohne Scrollen sichtbar. Vorher
+ * füllten erst sieben Rollen-, später acht Komitee-Zeilen den ersten
+ * Bildschirm, und „Chat sperren“ lag unter dem Rand.
  */
 function PersonBlatt({
   name, profil, onClose, rolleGesperrt, gesperrtGrund, auswahl, vergeben, onRolle,
@@ -347,7 +371,7 @@ function PersonBlatt({
   pwBusy?: boolean;
   sperre?: { gesperrt: boolean; aufheben: () => void; sperren: (ms: number | null) => void };
 }) {
-  const [seite, setSeite] = useState<null | "rolle" | "sperre">(null);
+  const [seite, setSeite] = useState<null | "rolle" | "sperre" | "komitees">(null);
 
   // Chat sperren: die Dauern auf einer eigenen Unterseite oben im Blatt.
   // Vorher klappten sie unter dem Knopf auf – am iPhone unter dem Rand, und
@@ -369,6 +393,23 @@ function PersonBlatt({
               }}
             />
           ))}
+        </Gruppe>
+      </Sheet>
+    );
+
+  // Komitees mit Häkchen auf einer Unterseite im selben Blatt (Esc/Zurück-
+  // Taste gehen eine Seite zurück). Vorher standen acht Komitee-Zeilen auf der
+  // ersten Seite und schoben „Konto“ (Chat sperren) unter den Rand.
+  // Mehrfachauswahl: die Seite bleibt offen, „‹ Name“ führt zurück.
+  if (seite === "komitees" && komitees)
+    return (
+      <Sheet open hoch onClose={onClose}>
+        <SheetKopf titel="Komitees" unter={`In welchen Komitees ist ${name}?`} zurueck={{ text: name, onClick: () => setSeite(null) }} onClose={onClose} />
+        <Gruppe className="" fuss="Mehrere möglich. Jede Änderung gilt sofort.">
+          {COMMITTEES.map((c) => {
+            const an = komitees.gewaehlt.includes(c.slug);
+            return <ZeileHaken key={c.slug} label={c.label} gewaehlt={an} onClick={() => komitees.setzen(c.slug, !an)} />;
+          })}
         </Gruppe>
       </Sheet>
     );
@@ -415,12 +456,19 @@ function PersonBlatt({
   // in voller Höhe, damit der Kopf beim Umblättern nicht springt
   return (
     <Sheet open hoch onClose={onClose}>
-      <SheetKopf titel={name} unter={`${profil.username ?? ""} · ${rolleName(profil.role)}`} onClose={onClose} />
+      {/* Eltern: Rolle steht schon in der Zeile darunter – oben nur der Login */}
+      <SheetKopf titel={name} unter={profil.role === "eltern" ? profil.username ?? "" : `${profil.username ?? ""} · ${rolleName(profil.role)}`} onClose={onClose} />
 
+      {/* Rolle und Komitees als je EINE Zeile – Auswahl auf Unterseiten */}
       <Gruppe className="" fuss={gesperrtGrund}>
         <Zeile label="Rolle" onClick={rolleGesperrt ? undefined : () => setSeite("rolle")}>
           <Wert>{rolleName(profil.role)}</Wert>
         </Zeile>
+        {komitees && (
+          <Zeile label="Komitees" onClick={() => setSeite("komitees")}>
+            <Wert>{komitees.gewaehlt.length ? COMMITTEES.filter((c) => komitees.gewaehlt.includes(c.slug)).map((c) => c.label).join(", ") : "Keine"}</Wert>
+          </Zeile>
+        )}
       </Gruppe>
 
       {kinder && (
@@ -428,30 +476,6 @@ function PersonBlatt({
           <Zeile label="Verknüpfte Kinder" onClick={kinder.oeffnen}>
             <span className={`truncate text-[15px] ${kinder.warnt ? "font-medium text-offen" : "text-tinte-matt dark:text-slate-300"}`}>{kinder.text}</span>
           </Zeile>
-        </Gruppe>
-      )}
-
-      {komitees && (
-        <Gruppe titel="Komitees">
-          {COMMITTEES.map((c) => {
-            const an = komitees.gewaehlt.includes(c.slug);
-            return (
-              <button
-                key={c.slug}
-                type="button"
-                aria-pressed={an}
-                onClick={() => komitees.setzen(c.slug, !an)}
-                className="flex min-h-[48px] w-full items-center gap-3 px-4 py-2 text-left transition active:bg-black/[0.04] dark:active:bg-white/[0.06]"
-              >
-                <span className="min-w-0 flex-1 truncate text-[15px]">{c.label}</span>
-                {an && (
-                  <span className="shrink-0 text-brand-dark dark:text-brand">
-                    <Icon name="haken" size={18} strich={2.5} />
-                  </span>
-                )}
-              </button>
-            );
-          })}
         </Gruppe>
       )}
 

@@ -29,8 +29,8 @@ const ERKLAERUNG = "Lesen = mitlesen. Schreiben = mitreden, abstimmen, To-dos ab
  * Entweder eine einzelne Person oder ein ganzes Komitee.
  *
  * Aufgebaut wie die iOS-Einstellungen: je Zugriff EINE Zeile („Abizeitung –
- * liest in Motto & Pullis“), antippen öffnet ein Blatt mit „Zugriff
- * entziehen“ ganz unten. „Neuer Zugriff“ ist die letzte, blaue Zeile und
+ * liest in Motto & Pullis“), antippen öffnet ein Blatt: „Darf“ (Lesen /
+ * Schreiben) mit Häkchen umstellbar, „Zugriff entziehen“ ganz unten. „Neuer Zugriff“ ist die letzte, blaue Zeile und
  * öffnet ein Blatt mit Auswahllisten (Häkchen) statt nativer Auswahlfelder.
  * Vorher: zwei <select>, zwei lose Knöpfe, ein bildschirmbreiter Knopf mitten
  * auf der Seite und ein 🗑 in jeder Zeile.
@@ -91,6 +91,18 @@ export function KomiteeZugriff() {
     setDetail(null);
   }
 
+  // „Darf“ nachträglich umstellen – vorher nur über Entziehen und neu anlegen.
+  // Die Policy „camode manage“ (for all, komitees.access) erlaubt das Update.
+  async function modusSetzen(z: Zugriff, mode: "read" | "write") {
+    if (z.mode === mode) return;
+    if (hasSupabase) {
+      const { error } = await supabase!.from("committee_access").update({ mode }).eq("id", z.id);
+      if (error) return meldeFehler("Nicht möglich: " + error.message);
+      void laden();
+    } else setListe((l) => l.map((x) => (x.id === z.id ? { ...x, mode } : x)));
+    setDetail({ ...z, mode });
+  }
+
   async function geben(tag: string, wer: string, modus: "read" | "write"): Promise<boolean> {
     const eintrag = {
       tag,
@@ -137,11 +149,13 @@ export function KomiteeZugriff() {
               <Zeile label="Wer">
                 <Wert>{zeige.from_tag ? `Ganzes Komitee ${committeeLabel(zeige.from_tag)}` : nameVon(zeige.user_id!)}</Wert>
               </Zeile>
-              <Zeile label="Darf">
-                <Wert>{MODUS_TEXT[zeige.mode]}</Wert>
-              </Zeile>
             </Gruppe>
-            <p className="mt-1.5 px-4 text-[13px] leading-snug text-tinte-leise">{ERKLAERUNG}</p>
+            {/* Wie im Blatt „Neuer Zugriff“: Häkchen, gilt sofort */}
+            <Gruppe titel="Darf" fuss={ERKLAERUNG}>
+              {(["read", "write"] as const).map((m) => (
+                <ZeileHaken key={m} label={MODUS_TEXT[m]} gewaehlt={zeige.mode === m} onClick={() => void modusSetzen(zeige, m)} />
+              ))}
+            </Gruppe>
             <Gruppe className="mt-6">
               <Zeile label="Zugriff entziehen" rot onClick={() => void entziehen(zeige)} />
             </Gruppe>

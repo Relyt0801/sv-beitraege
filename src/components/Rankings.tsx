@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Sheet, SheetKopf } from "./Sheet";
-import { Gruppe, Wert, Zeile, ZeileEingabe, ZeileMitSchalter } from "./Liste";
+import { Gruppe, Wert, Zeile, ZeileEingabe, ZeileHaken, ZeileMitSchalter } from "./Liste";
+import { Suchfeld } from "./KontoZeile";
 import { FussLeiste as FussLeisteBlatt } from "./FussLeiste";
 import { Schalter } from "./Schalter";
 import { AusHinweis } from "./Funktionen";
@@ -141,11 +142,12 @@ export function RankingKarten({ className = "" }: { className?: string }) {
                   { h: 22, f: MEDAILLE[0], n: 1 },
                   { h: 10, f: MEDAILLE[2], n: 3 },
                 ].map((x) => (
-                  <span key={x.n} className="w-[14px] rounded-t-[3px] sm:w-5" style={{ height: x.h, background: x.f }} />
+                  <span key={x.n} className="w-[13px] rounded-t-[3px] sm:w-4" style={{ height: x.h, background: x.f }} />
                 ))}
               </div>
-              {/* Platz für das Treppchen (Handy 46 px, ab sm 64 px) plus Luft – sonst läuft der Text hinein */}
-              <div className="pr-14 text-[12px] font-semibold uppercase tracking-[0.02em] text-white/80 sm:pr-[4.5rem]">Abi-Ranking</div>
+              {/* Platz für das Treppchen (Handy 43 px, ab sm 52 px) plus Luft – sonst läuft der Text hinein.
+                  Einzeilig: an Android 360 und iPad hoch brach „Abi-Ranking“ um und schob die Kachel 18 px tiefer */}
+              <div className="whitespace-nowrap pr-12 text-[12px] font-semibold uppercase tracking-[0.02em] text-white/80 sm:pr-14">Abi-Ranking</div>
               <div className="mt-0.5 text-[1.2rem] font-bold leading-tight">{ART_STIL[art].kurz}</div>
               <div className="mt-1 text-[12.5px] leading-snug text-white/80">
                 {wahlen
@@ -232,7 +234,23 @@ function RankingSheet({ art, onClose, r, runden }: { art: RankingArt | null; onC
   const ansicht: Ansicht = ansichtWahl ?? (offenAnzahl > 0 || imTeil.some((k) => runden.offeneVon(k.id)) ? "abstimmen" : "ergebnisse");
   const wahl = wahlId ? r.kategorien.find((k) => k.id === wahlId) || null : null;
 
+  // Wie in iOS: „‹ Schüler-Ranking“ kommt an derselben Stelle der Übersicht
+  // heraus, von der aus man die Kategorie geöffnet hat (die Kategorie selbst
+  // beginnt oben und ist mit langer Namensliste viel höher als die Übersicht)
+  const marke = useRef<HTMLSpanElement>(null);
+  const uebersichtY = useRef(0);
+  const oeffnen = (k: RankingKategorie) => {
+    uebersichtY.current = scrollBereich(marke.current)?.scrollTop ?? 0;
+    setWahlId(k.id);
+  };
+  useLayoutEffect(() => {
+    if (wahlId || fertig) return;
+    const p = scrollBereich(marke.current);
+    if (p) p.scrollTop = uebersichtY.current;
+  }, [wahlId, fertig]);
+
   const schliessen = () => {
+    uebersichtY.current = 0;
     setWahlId(null);
     setSuche("");
     setAnsicht(null);
@@ -256,7 +274,8 @@ function RankingSheet({ art, onClose, r, runden }: { art: RankingArt | null; onC
   const nachStimme = (k: RankingKategorie) => {
     const n = naechsteOffene(k.id);
     if (n) {
-      melde(`Gespeichert – weiter mit „${n.titel}“`, "erfolg");
+      // Keine Meldung: sie lag über der letzten Personenreihe. Rückmeldung ist
+      // der neue Titel, der von rechts hereingleitet.
       setWahlId(n.id);
     } else {
       melde("Gespeichert", "erfolg");
@@ -296,6 +315,7 @@ function RankingSheet({ art, onClose, r, runden }: { art: RankingArt | null; onC
           />
         ) : (
           <>
+            <span ref={marke} hidden />
             <SheetKopf
               titel={ART_STIL[zuletzt].titel}
               unter="Geheim: gezählt wird nur, wie oft jemand gewählt wurde."
@@ -335,7 +355,7 @@ function RankingSheet({ art, onClose, r, runden }: { art: RankingArt | null; onC
                 kategorien={imTeil}
                 r={r}
                 runden={runden}
-                onOeffnen={(k) => setWahlId(k.id)}
+                onOeffnen={oeffnen}
                 anders={offenAnders > 0 ? { anzahl: offenAnders, teil: andererTeil, wechseln: () => (setTeil(andererTeil), setSuche("")) } : undefined}
               />
 
@@ -364,9 +384,9 @@ function RankingSheet({ art, onClose, r, runden }: { art: RankingArt | null; onC
               ) : gefiltert.length === 0 ? (
                 <p className="py-6 text-center text-[14px] text-tinte-leise">Keine Kategorie mit „{suche.trim()}“.</p>
               ) : ansicht === "abstimmen" ? (
-                <AbstimmListe kategorien={gefiltert} r={r} runden={runden} name={name} topSichtbar={topSichtbar} onOeffnen={(k) => setWahlId(k.id)} />
+                <AbstimmListe kategorien={gefiltert} r={r} runden={runden} name={name} topSichtbar={topSichtbar} onOeffnen={oeffnen} />
               ) : (
-                <ErgebnisKacheln kategorien={gefiltert} r={r} name={name} topSichtbar={topSichtbar} gewinner={gewinner} onOeffnen={(k) => setWahlId(k.id)} />
+                <ErgebnisKacheln kategorien={gefiltert} r={r} name={name} topSichtbar={topSichtbar} gewinner={gewinner} onOeffnen={oeffnen} />
               )}
             </TeilWischer>
             <VerwaltetVon bereich="Die Rankings" komitee="Abizeitung" darf={darfEinstellungen} />
@@ -786,38 +806,43 @@ function Abstimmen({
   const g = gewinner.von(k.id, "gewinner");
   const h = gewinner.von(k.id, "herzen");
   const aktiveLehrer = lehrer.filter((l) => l.aktiv);
+  // Neue Kategorie (auch nach dem Weiterspringen): oben anfangen – die Liste
+  // darunter ist lang, sonst stünde man mitten in den Namen der nächsten
+  const wurzel = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => nachObenScrollen(wurzel.current), []);
+  const stimmenText = st?.stimmen ? `${st.stimmen} ${st.stimmen === 1 ? "Stimme" : "Stimmen"}` : "Noch keine Stimmen";
   return (
-    <div className="animate-vonRechts">
+    <div ref={wurzel} className="animate-vonRechts">
       {/* Derselbe klebende Kopf wie überall: „‹ Schüler-Ranking“, Titel, ✕ */}
       <SheetKopf titel={k.titel} zurueck={{ text: ART_STIL[k.art].titel, onClick: zurueck }} onClose={onClose} />
 
-      {/* Teil, Art, Podest – das Wichtigste ohne Scrollen (Titel steht im Kopf) */}
-      <div className="feld-grau mt-1 p-4 shadow-[0_1px_3px_rgba(0,0,0,.05)]">
+      {/* Teil, Art, kleines Podest – knapp, damit die Wahl darunter gleich
+          sichtbar ist (vorher 139 px hoher Kasten mit 50 px hohen Balken) */}
+      <div className="feld-grau mt-1 px-4 py-3 shadow-[0_1px_3px_rgba(0,0,0,.05)]">
         <div className="flex items-center gap-2">
           <TeilMarke teil={k.bereich} />
           <span className="text-[12px] font-semibold uppercase tracking-[0.06em] text-tinte-leise">{ART_STIL[k.art].kurz}</span>
+          <span className="zahl ml-auto text-[12.5px] text-tinte-leise">{stimmenText}</span>
         </div>
         {topSichtbar ? (
-          <div className="mt-3 flex items-end justify-center gap-2">
-            {[1, 0, 2].map((i) => {
-              const t = st?.top[i];
-              return (
-                <div key={i} className="flex w-1/3 flex-col items-center">
-                  <span className="mb-1 w-full truncate text-center text-[12.5px] font-semibold">{t ? name(t.ziel) : "–"}</span>
-                  <span
-                    className="flex w-full items-start justify-center rounded-t-xl pt-1 text-[13px] font-bold text-[#1C1C1E]"
-                    style={{ height: [50, 36, 26][i], background: MEDAILLE[i] }}
-                  >
-                    {t ? t.n : ""}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
+          st?.top.length ? (
+            <div className="mt-2.5 flex items-end gap-2">
+              {[1, 0, 2].map((i) => {
+                const t = st.top[i];
+                return (
+                  <div key={i} className="flex w-1/3 min-w-0 flex-col">
+                    <span className="mb-1 flex min-w-0 items-baseline justify-center gap-1 text-[12.5px]">
+                      <span className={`truncate ${t ? "font-semibold" : "text-tinte-leise"}`}>{t ? name(t.ziel) : "–"}</span>
+                      {t && <span className="zahl shrink-0 font-semibold text-tinte-leise">{t.n}</span>}
+                    </span>
+                    <span aria-hidden className="w-full rounded-t-lg" style={{ height: [20, 14, 9][i], background: MEDAILLE[i] }} />
+                  </div>
+                );
+              })}
+            </div>
+          ) : null
         ) : (
-          <p className="mt-1 text-[13px] text-tinte-leise">
-            {st?.stimmen ? `${st.stimmen} ${st.stimmen === 1 ? "Stimme" : "Stimmen"} bisher` : "Noch keine Stimmen"} · Plätze gibt das Komitee frei.
-          </p>
+          <p className="mt-1 text-[13px] text-tinte-leise">Die Plätze gibt das Komitee frei.</p>
         )}
         {onKueren && (
           <div className="mt-3 flex gap-2">
@@ -867,11 +892,9 @@ function Abstimmen({
       </div>
 
       {!stichwahl && (
-        <>
-          <p className="mb-2 px-1 text-[13px] text-tinte-leise">
-            {k.id in r.meine ? `Deine Stimme: ${r.meine[k.id] ? name(r.meine[k.id]) : "Weiß nicht"} – du kannst sie ändern.` : "Wähle aus:"}
-          </p>
+        <div className="mt-4">
           <ZielWahl
+            hinweis={k.id in r.meine ? `Deine Stimme: ${r.meine[k.id] ? name(r.meine[k.id]) : "Weiß nicht"} – du kannst sie ändern.` : "Wähle aus:"}
             art={k.art}
             personen={personen}
             lehrer={aktiveLehrer}
@@ -888,13 +911,34 @@ function Abstimmen({
               timer.current = window.setTimeout(() => gestimmtRef.current?.(), 450);
             }}
           />
-        </>
+        </div>
       )}
     </div>
   );
 }
 
-/** Auswahl einer Person der Stufe oder einer Lehrkraft (auch in Pop-up-Umfragen) */
+/** Nächster Scrollbereich darüber (Blatt, Pop-up) */
+function scrollBereich(el: HTMLElement | null): HTMLElement | null {
+  for (let p = el?.parentElement; p; p = p.parentElement) {
+    const o = getComputedStyle(p).overflowY;
+    if (o === "auto" || o === "scroll") return p;
+  }
+  return null;
+}
+function nachObenScrollen(el: HTMLElement | null) {
+  const p = scrollBereich(el);
+  if (p) p.scrollTop = 0;
+}
+
+/**
+ * Auswahl einer Person der Stufe oder einer Lehrkraft (auch in Pop-up-Umfragen).
+ *
+ * Eine iOS-Gruppe aus Zeilen: kleiner Namenskreis, Name, Haken rechts – oben
+ * „Weiß nicht“, darüber die Suche. Kein eigener Scrollbereich: es scrollt nur
+ * das Blatt. Vorher ein Raster aus 3–4 Karten je Reihe mit max-h 46dvh, das
+ * am SE schon bei 8 Personen in sich scrollte (Scrollen im Scrollen), und
+ * „Weiß nicht“ als 41 px hoher Knopf ganz unten.
+ */
 export function ZielWahl({
   art,
   personen,
@@ -902,6 +946,7 @@ export function ZielWahl({
   wert,
   gewaehlt,
   setzen,
+  hinweis,
 }: {
   art: RankingArt;
   personen: StufenPerson[];
@@ -910,49 +955,74 @@ export function ZielWahl({
   /** true: es gibt schon eine Antwort (auch „weiß nicht“) */
   gewaehlt: boolean;
   setzen: (ziel: string | null) => void;
+  /** Kleine Zeile über der Liste („Wähle aus:“, „Deine Stimme: …“) */
+  hinweis?: string;
 }) {
   const [suche, setSuche] = useState("");
+  const wurzel = useRef<HTMLDivElement>(null);
+  // Neue Frage (Pop-up-Umfrage): oben anfangen, nicht mitten in der langen Liste
+  useLayoutEffect(() => nachObenScrollen(wurzel.current), []);
   const q = suche.trim().toLowerCase();
-  const liste =
+  const alle =
     art === "schueler"
-      ? personen.filter((p) => !q || `${p.vorname} ${p.nachname}`.toLowerCase().includes(q)).map((p) => ({ id: p.id, oben: p.vorname, unten: p.nachname, kuerzel: `${p.vorname[0] || ""}${p.nachname[0] || ""}` }))
-      : lehrer.filter((l) => !q || `${l.name} ${l.faecher}`.toLowerCase().includes(q)).map((l) => ({ id: l.id, oben: l.name, unten: l.faecher, kuerzel: l.name.replace(/^(Frau|Herr|Fr\.|Hr\.)\s+/i, "").slice(0, 2).toUpperCase() }));
+      ? personen.map((p) => ({
+          id: p.id,
+          label: `${p.vorname} ${p.nachname}`.trim(),
+          unter: undefined as string | undefined,
+          such: `${p.vorname} ${p.nachname}`.toLowerCase(),
+          kuerzel: `${p.vorname[0] || ""}${p.nachname[0] || ""}`,
+        }))
+      : lehrer.map((l) => ({
+          id: l.id,
+          label: l.name,
+          unter: l.faecher || undefined,
+          such: `${l.name} ${l.faecher}`.toLowerCase(),
+          kuerzel: l.name.replace(/^(Frau|Herr|Fr\.|Hr\.)\s+/i, "").slice(0, 2).toUpperCase(),
+        }));
+  const liste = q ? alle.filter((p) => p.such.includes(q)) : alle;
+  const weissNicht = gewaehlt && !wert;
 
   return (
-    <>
-      <input className="field mb-2" placeholder={art === "schueler" ? "Name suchen" : "Lehrkraft suchen"} value={suche} onChange={(e) => setSuche(e.target.value)} />
-      <div className="-mx-1 grid max-h-[46dvh] grid-cols-3 gap-2 overflow-y-auto p-1 sm:grid-cols-4">
-        {liste.map((p) => {
-          const an = wert === p.id;
-          return (
-            <button
-              key={p.id}
-              onClick={() => setzen(p.id)}
-              className={`flex flex-col items-center gap-1 rounded-2xl px-1 pb-2 pt-2.5 transition active:scale-95 ${
-                an ? "bg-[#E9C460]/20 ring-2 ring-[#C99A1E]" : "zelle"
-              }`}
-            >
-              <span className={`flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br text-[14px] font-bold text-white ${personVerlauf(p.id)}`}>
+    <div ref={wurzel}>
+      {/* Suche erst bei längeren Listen (wie bei den Kategorien) */}
+      {(alle.length > 6 || q) && <Suchfeld wert={suche} onChange={setSuche} platzhalter={art === "schueler" ? "Name suchen" : "Lehrkraft suchen"} />}
+      {hinweis && <p className="mb-1.5 px-4 text-[13px] leading-snug text-tinte-leise">{hinweis}</p>}
+      {/* Im weißen Pop-up (Umfragen) wäre die weiße Gruppe unsichtbar: dort ein feiner Rand */}
+      <Gruppe className="[.bg-white_&]:rounded-[0.875rem] [.bg-white_&]:ring-1 [.bg-white_&]:ring-black/[0.08] dark:[.bg-white_&]:ring-white/10">
+        {/* „Weiß nicht“ oben – bei 100 Namen läge es sonst ganz unten */}
+        {!q && (
+          <ZeileHaken
+            label="Weiß nicht"
+            gewaehlt={weissNicht}
+            onClick={() => setzen(null)}
+            symbol={
+              <span aria-hidden className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[rgb(118_118_128/0.16)] text-[15px] font-bold text-tinte-leise dark:bg-[rgb(118_118_128/0.3)]">
+                ?
+              </span>
+            }
+          />
+        )}
+        {liste.map((p) => (
+          <ZeileHaken
+            key={p.id}
+            label={p.label}
+            unter={p.unter}
+            gewaehlt={wert === p.id}
+            onClick={() => setzen(p.id)}
+            symbol={
+              <span aria-hidden className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br text-[12px] font-bold text-white ${personVerlauf(p.id)}`}>
                 {p.kuerzel}
               </span>
-              <span className="w-full truncate text-center text-[12.5px] font-semibold">{p.oben}</span>
-              {p.unten && <span className="-mt-1 w-full truncate text-center text-[12px] text-tinte-leise">{p.unten}</span>}
-            </button>
-          );
-        })}
-      </div>
-      {liste.length === 0 && (
-        <p className="py-6 text-center text-[13.5px] text-tinte-leise">{art === "lehrer" ? "Noch keine Lehrkräfte eingetragen." : "Niemand gefunden."}</p>
-      )}
-      <button
-        onClick={() => setzen(null)}
-        className={`mt-3 w-full rounded-full py-2.5 text-[14px] font-semibold transition ${
-          gewaehlt && !wert ? "bg-[rgb(118_118_128/0.2)]" : "bg-[rgb(118_118_128/0.1)] text-tinte-matt dark:text-slate-300"
-        }`}
-      >
-        {gewaehlt && !wert ? "✓ Weiß nicht" : "Weiß nicht"}
-      </button>
-    </>
+            }
+          />
+        ))}
+        {liste.length === 0 && (
+          <div className="px-4 py-5 text-center text-[14px] text-tinte-leise">
+            {q ? `Niemand mit „${suche.trim()}“.` : art === "lehrer" ? "Noch keine Lehrkräfte eingetragen." : "Noch niemand in der Stufe."}
+          </div>
+        )}
+      </Gruppe>
+    </div>
   );
 }
 
@@ -999,6 +1069,7 @@ export function RankingVerwaltungSheet({ open, onClose }: { open: boolean; onClo
     <>
       {/* Bleibt offen unter „Küren“ – das steht als Unterseite an seiner Stelle */}
       <RankingEinstellungen
+        titel="Rankings verwalten"
         open={open}
         onClose={onClose}
         r={r}
@@ -1019,6 +1090,7 @@ export function RankingVerwaltungSheet({ open, onClose }: { open: boolean; onClo
  * der Reihenfolge der Spec; jede nur, wenn man sie darf.
  */
 function RankingEinstellungen({
+  titel = "Einstellungen",
   open,
   onClose,
   r,
@@ -1038,6 +1110,8 @@ function RankingEinstellungen({
   setTeil: (t: Teil) => void;
   onKueren: (k: RankingKategorie) => void;
   gewinner: ReturnType<typeof useGewinner>;
+  /** Kopf des Blatts: „Einstellungen“ (Zahnrad) bzw. „Rankings verwalten“ (Profil → Funktionen, wie die angetippte Zeile) */
+  titel?: string;
 }) {
   const { can } = useRole();
   const [artWahl, setArt] = useState<RankingArt | null>(null);
@@ -1070,7 +1144,11 @@ function RankingEinstellungen({
     <>
       {/* Bleibt offen unter Lehrkräfte/Runde starten (Unterseiten, Stapel in Sheet.tsx) */}
       <Sheet open={open} onClose={schliessen}>
-        <SheetKopf titel="Einstellungen" unter="Rankings – gilt für den gewählten Teil und die gewählte Art." onClose={schliessen} />
+        <SheetKopf
+          titel={titel}
+          unter={titel === "Einstellungen" ? "Rankings – gilt für den gewählten Teil und die gewählte Art." : "Gilt für den gewählten Teil und die gewählte Art."}
+          onClose={schliessen}
+        />
         <TeilUmschalter teil={teil} setTeil={setTeil} className="mb-3" />
         <div className="seg mb-1" role="tablist" aria-label="Art">
           {(["schueler", "lehrer"] as RankingArt[]).map((a) => (

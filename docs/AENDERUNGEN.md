@@ -11,6 +11,29 @@ ausführlich (auf Deutsch); hier steht der Überblick dazu.
 
 ---
 
+## Eltern und Verwaltung: weniger Scrollen (16.10.2026)
+
+Zwei Rollen gezielt nachgeschärft, die in der zweiten Prüfung am meisten
+Platz verschenkten:
+
+- **Eltern (`ElternApp`, `AbiTicket`, `Staffel`, `KontoTab`,
+  `ElternInfosTab`):** Kinder-Karten kompakt mit je einer Zeile
+  „Mithilfe“ und „Abiball-Ticket“, Legende nur einmal; Geschwister ab 700 px
+  nebeneinander. Tickets der Familie in einer Karte (`TicketFamilie`), die
+  Staffel zeigt eine Balkenskala mit den Namen der Geschwister. Konto ohne
+  umhüllende Karte, Kopier-Knöpfe 44 px. Eine angefangene Frage an das
+  Stufenteam bleibt erhalten, auch nach Reiterwechsel. iPhone-Übersicht
+  2215 → 1579 px, am Laptop passt sie auf einen Bildschirm.
+- **Admin/Stufenteam (`Rankings`, `RolesTab`, `FunktionenSheet`,
+  `KomiteeZugriff`, `RollenRechteTab`):** Ranking-Wahl als Liste mit Haken
+  statt großer Kacheln, Suche ab 7 Einträgen, „Weiß nicht“ als Zeile,
+  Podium kompakter. Komitees einer Person als eine Zeile mit Unterseite;
+  Legende der Passwort-Punkte; Eltern heißen „Eltern von …“. Themen mit nur
+  einer Funktion öffnen diese direkt. Beim Fremdzugriff ist „Darf“
+  änderbar. Die Rollen-Ansicht (Liste/Rechte) wird gemerkt.
+- **Tour:** Das Loch der Hervorhebung bleibt mindestens 4 px unter dem
+  oberen Rand.
+
 ## Zweite Gesamtprüfung nach Rollen (16.10.2026)
 
 Dieselbe Prüfung noch einmal auf dem neuen Stand: keine Rolle meldete mehr
