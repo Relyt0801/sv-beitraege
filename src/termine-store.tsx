@@ -158,6 +158,8 @@ export function TermineProvider({ children }: { children: ReactNode }) {
     setTermine(d.termine);
     setAktionen(d.aktionen);
     setBewerbungen(d.bewerbungen);
+    // ?rolle=vorsitz: leitet das Komitee Abizeitung (dort ist man Mitglied)
+    setVorsitz(rolle === "vorsitz" ? { abizeitung: [uid] } : {});
   }, [demoIch, demoPersonen]);
 
   const lokalSpeichern = useCallback((next: Termin[]) => {

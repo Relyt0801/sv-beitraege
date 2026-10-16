@@ -12,6 +12,7 @@ Test-Konten gibst du nur beim Aufruf als Umgebungsvariable mit.
 | `last-test.mjs` | bis zu 260 Personen öffnen gleichzeitig die App | PowerShell | nein (nur lesend) |
 | `ui-check.mjs` | alle Rollen × 4 Größen × hell/dunkel × jeder Reiter, Barrierefreiheit | PowerShell | nein (Demo-Modus) |
 | `masse-check.mjs` | 400 Personen, 1.500 Nachrichten, Klicksturm, Doppeltipp | PowerShell | nein (Demo-Modus) |
+| `leisten-check.mjs` | Kopf- und Reiterleiste an fester Stelle: 7 Größen × 6 Rollen, jeder Reiter oben/unten, Reiterwechsel, Chat/Kalender offen, nach Blatt | PowerShell | nein (Demo-Modus) |
 
 ## Einmal einrichten (PowerShell, im Projektordner)
 
@@ -45,7 +46,13 @@ Fenster 2 (PowerShell, Projektordner):
 ```powershell
 node tests/ui-check.mjs
 node tests/masse-check.mjs
+node tests/leisten-check.mjs
 ```
+
+`leisten-check` meldet jede Ansicht, in der Kopf- oder Reiterleiste woanders
+steht als sonst auf diesem Gerät – und am Laptop jedes zweite Band unter der
+Kopfzeile (der Fehler „Headbar nach unten verschoben“, DESIGN-REGELN 3).
+Eingrenzen mit `$env:GERAETE="390x844,1440x900"` und `$env:ROLLEN="stufenteam"`.
 
 Mit `$env:BILDER="1"` vorher speichert `ui-check` Bildschirmfotos nach
 `tests/ergebnisse/bilder/` (der Ordner wird nicht eingecheckt).

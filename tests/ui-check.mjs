@@ -15,7 +15,7 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { browserStarten, TOUR_WEG, DEMO_BASIS, ordner } from './_umgebung.mjs';
 
-const ROLLEN = (process.env.ROLLEN || 'schueler,sprecher,stufenteam,kassenwart,admin,eltern,eltern-leer').split(',');
+const ROLLEN = (process.env.ROLLEN || 'schueler,vorsitz,sprecher,stufenteam,kassenwart,admin,eltern,eltern-leer').split(',');
 const GROESSEN = [
   { n: 'SE320', w: 320, h: 568, mobil: true },
   { n: 'iPhone390', w: 390, h: 844, mobil: true },

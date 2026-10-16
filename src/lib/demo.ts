@@ -7,15 +7,18 @@ import type { Buchung, KassenKategorie } from "./finanzen";
  * Demo-Modus – nur ohne Datenbank (`npm run demo` oder lokaler Modus).
  *
  * Über die Adresse wählt man, als wer man die App sieht:
- *   ?rolle=schueler | stufenteam | kassenwart | admin | eltern | eltern-leer
+ *   ?rolle=schueler | stufenteam | kassenwart | admin | eltern | eltern-leer | vorsitz
  * "eltern-leer" ist ein Elternzugang ohne zugeordnetes Kind.
+ * "vorsitz" ist ein Schüler, der das Komitee Abizeitung leitet (Kosten-
+ * anfragen stellen, Vorsitz-Funktionen) – ohne diese Rolle ließ sich die
+ * Sicht der Komitee-Vorsitzenden in der Demo gar nicht prüfen.
  *
  * Alles hier sind erfundene Daten im Browser. Mit echter Datenbank gibt
  * demoRolle() immer null zurück – dann hat nichts in dieser Datei Wirkung.
  */
-export type DemoRolle = Role | "eltern-leer";
+export type DemoRolle = Role | "eltern-leer" | "vorsitz";
 
-const ROLLEN: DemoRolle[] = ["schueler", "sprecher", "stv_sprecher", "stufenteam", "kassenwart", "admin", "eltern", "eltern-leer"];
+const ROLLEN: DemoRolle[] = ["schueler", "sprecher", "stv_sprecher", "stufenteam", "kassenwart", "admin", "eltern", "eltern-leer", "vorsitz"];
 const MERKER = "sv:demo-rolle";
 
 export function demoRolle(): DemoRolle | null {
@@ -33,10 +36,10 @@ export function demoRolle(): DemoRolle | null {
   }
 }
 
-/** Die Rolle, mit der die App rechnet ("eltern-leer" ist auch nur "eltern"). */
+/** Die Rolle, mit der die App rechnet ("eltern-leer" ist auch nur "eltern", "vorsitz" ein Schüler). */
 export function demoRolleAlsRolle(r: DemoRolle | null): Role | null {
   if (!r) return null;
-  return r === "eltern-leer" ? "eltern" : r;
+  return r === "eltern-leer" ? "eltern" : r === "vorsitz" ? "schueler" : r;
 }
 
 /** Eigene Kennung im Demo-Modus. */

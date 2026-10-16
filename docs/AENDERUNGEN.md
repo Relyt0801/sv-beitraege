@@ -11,6 +11,71 @@ ausführlich (auf Deutsch); hier steht der Überblick dazu.
 
 ---
 
+## Vorher/Nachher der Kopfleiste, Sicht der Komitee-Vorsitzenden (16.10.2026)
+
+**Vorher/Nachher am Bildschirm.** Der Stand vor der Korrektur (`3989f39^`)
+und der heutige Stand wurden als Demo nebeneinander gebaut und am Laptop
+(1440 × 900) mit offenem Komitee-Chat fotografiert:
+
+- vorher: unter der App-Kopfzeile (0–111 px) ein zweites Band (115–219 px)
+  mit Zurück-Taste bei y = 123 – genau das Bild „Headbar nach unten
+  verschoben“;
+- nachher: eine Kopfzeile, Zurück-Taste und Chat-Titel stehen darin
+  (y = 8), darunter beginnt direkt der Verlauf.
+
+`tests/leisten-check.mjs` prüft das jetzt auch geometrisch: steht bei offenem
+Chat/Kalender am Laptop eine Zurück-Taste **unter** der Kopfzeile, gilt das
+als Abweichung (`Zurück bei y=[123] (unter der Kopfzeile – zweites Band)`).
+Gegen den alten Stand schlägt der Test an, gegen den neuen nicht.
+
+**Demo-Rolle „vorsitz“.** Bisher ließ sich die Sicht der Komitee-Vorsitzenden
+in der Demo gar nicht ansehen. `?rolle=vorsitz` ist ein Schüler, der das
+Komitee Abizeitung leitet (`src/lib/demo.ts`, `src/termine-store.tsx`). Die
+Rolle läuft in `ui-check.mjs` und `leisten-check.mjs` mit.
+
+**Was Vorsitzende brauchen – und was geändert ist:**
+
+- Finanzen: „Kostenanfragen“ (Geld fürs Komitee anfragen, Stand der eigenen
+  Anfragen) stand ganz unten unter Kontostand, Aktionen und Plänen. Für
+  Vorsitzende ist das die eigentliche Aufgabe in diesem Reiter – steht jetzt
+  oben (`FinanzenTab.tsx`). Wer die Finanzen sieht (Kassenwart, Team), hat
+  die Anfragen weiterhin in der eigenen Ansicht.
+- Übersicht, „Aus deinen Komitees“: die Zeile zeigt „Vorsitz · 1 Abstimmung
+  · 1 To-do offen“ – man sieht sofort, wo man leitet (`ZuErledigen.tsx`).
+- Events: die Karte „Vorsitz Abizeitung – Anfragen“ (Termin-Anfragen fürs
+  Komitee) stand schon oben; unverändert.
+
+Prüfung auf diesem Stand (Demo, Chromium): `leisten-check.mjs` 7 Größen ×
+7 Rollen (mit Vorsitz) = 777 Zustände, **0 Abweichungen**, 84 geöffnete
+Chats/Kalender in Ordnung; `ui-check.mjs` 280 Ansichten (8 Rollen), nichts
+überstehend, nichts unter der Reiterleiste, keine Konsolenfehler, axe ohne
+Fund. Fotos nach Regel 8 (iPhone/Laptop, hell, dunkel, dunkel mit Bild) für
+Übersicht und Finanzen der Vorsitz-Rolle angesehen.
+
+## Kopf- und Reiterleiste: eigener Test (16.10.2026)
+
+Zum ursprünglichen Fehlerbild („die Headbar ist nach unten verschoben“ – am
+Laptop stand bei offenem Chat ein zweites Band unter der App-Kopfzeile) gibt
+es jetzt `tests/leisten-check.mjs`. Er misst die festen Leisten je Gerät und
+Rolle in jedem Reiter (oben und ganz unten gescrollt), beim Reiterwechsel aus
+gescrollter Lage, nach einem Blatt und mit offenem Chat/Kalender.
+
+- Ergebnis auf dem Stand von `main` (Demo, Chromium): 7 Größen (320–1440 px)
+  × 6 Rollen, 672 Zustände, **0 Abweichungen**. Handy/iPad hoch: Kopf
+  `[0,60]`, Reiterleiste unten; Laptop/iPad quer: eine Kopfzeile `[0,111]`
+  mit Reitern. Chat/Kalender: am Laptop kein zweites Band, ihr Kopf steht in
+  `#kopf-ebene`; am Handy eine Vollbild-Ebene ab 0 px über der Reiterleiste
+  (Zurück-Taste 8 px unter der Oberkante, Eingabe unten).
+- Gegenprobe: Baut man das alte zweite Band nach, meldet der Test
+  `ABWEICHUNG … oben [[0,111],[111,167]]` und endet mit Exit-Code 1.
+- Dieselben Zustände in WebKit (Safari-Engine, WebKitGTK 2.52 per WebDriver,
+  App in einem Rahmen mit exakter Gerätegröße): 320, 390, 820, 1180 und
+  1440 px × Schüler/Team/Kassenwart/Eltern, 150 Zustände – je Gerät überall
+  dieselben Leisten, alle 14 geöffneten Chats/Kalender wie erwartet.
+- Nicht prüfbar aus dieser Umgebung: echtes iPhone (Safe Area, Gummiband,
+  Tastatur) und echter Login – die Netzwerkregel der Cloud-Umgebung sperrt
+  `*.supabase.co`, und es ist kein Testkonto hinterlegt.
+
 ## Weniger Scrollen am Handy, Test in WebKit (16.10.2026)
 
 Gemessen mit Demo-Daten (Seitenhöhe in Bildschirmen, iPhone 390 × 844, alle
