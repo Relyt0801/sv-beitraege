@@ -1029,7 +1029,8 @@ function art(b: Buchung, kategorien: KassenKategorie[] = []): { farbe: string; i
 const monatName = (m: string) =>
   new Date(m + "-01T12:00:00").toLocaleDateString("de-DE", { month: "long", year: "numeric" });
 
-const KURZ = 5;
+/** So viele neueste Buchungen zeigt die Vorschau am Handy/iPad hoch */
+const VORSCHAU = 4;
 
 function VerlaufKarte({
   buchungen, kategorien, darf, onLoeschen, onKategorie, aktionName,
@@ -1044,6 +1045,8 @@ function VerlaufKarte({
   const [filter, setFilter] = useState<Filter>("alle");
   const [q, setQ] = useState("");
   const [auswahl, setAuswahl] = useState<Buchung | null>(null);
+  // Handy/iPad hoch: alle Buchungen (Filter, Suche, Monate) im Blatt
+  const [alleOffen, setAlleOffen] = useState(false);
 
   const liste = useMemo(() => {
     const n = q.trim().toLowerCase();
@@ -1054,6 +1057,7 @@ function VerlaufKarte({
       return true;
     });
   }, [buchungen, filter, q, aktionName]);
+  const neueste = useMemo(() => [...buchungen].sort((x, y) => y.datum.localeCompare(x.datum)).slice(0, VORSCHAU), [buchungen]);
 
   // Nach Monaten gruppiert, jeder Monat klappt auf. Offen ist zuerst nur der
   // neueste; beim Suchen sind alle Treffer-Monate offen.
@@ -1066,10 +1070,6 @@ function VerlaufKarte({
     return [...m.entries()];
   }, [liste]);
   const [offen, setOffen] = useState<Set<string>>(() => new Set());
-  // Am Handy/iPad zeigt ein offener Monat zuerst die neuesten KURZ Buchungen
-  // (vorher alle – die Seite war am iPhone gut drei Bildschirme lang). Am
-  // Laptop scrollt die Spalte in sich, dort bleibt alles sichtbar (nur CSS).
-  const [ganz, setGanz] = useState<Set<string>>(() => new Set());
   const neuester = gruppen[0]?.[0];
   const istOffen = (monat: string) => (q.trim() ? true : offen.has(monat) !== (monat === neuester));
   const umschalten = (monat: string) =>
@@ -1080,26 +1080,17 @@ function VerlaufKarte({
       return neu;
     });
 
-  // Kürzen nur ohne Suche und erst ab KURZ + 2 (eine einzelne versteckte Zeile lohnt den Knopf nicht)
-  const gekuerzt = (monat: string, n: number) => !q.trim() && !ganz.has(monat) && n > KURZ + 1;
-
   const FILTER: [Filter, string][] = [
     ["alle", "Alle"],
     ["ein", "Einnahmen"],
     ["aus", "Ausgaben"],
   ];
 
-  return (
-    // Am Laptop die rechte Spalte: klebt unter der Kopfzeile, Filter und Suche
-    // bleiben stehen, nur die Monate scrollen (eigene Höhe = Fensterhöhe).
-    // lg:-mb-[6.5rem]: Ein klebendes Element bleibt mit seinem Außenrand im
-    // Rasterfeld. Unter dem Raster liegen am Laptop noch 6,5 rem Seitenrand
-    // (pb-6 hier, pb-4 an <main>, lg:pb-16 in App.tsx) – ohne den negativen
-    // Rand schob das Rasterende den Block am Seitenende nach oben, und
-    // „Buchungen“, Filter und Suche verschwanden unter der Kopfzeile.
-    <section className="min-w-0 max-lg:order-2 lg:sticky lg:top-[calc(var(--kopf)+0.75rem)] lg:-mb-[6.5rem] lg:flex lg:max-h-[calc(100dvh-var(--kopf)-1.5rem)] lg:flex-col">
+  /** Filter, Suche und Monate – am Laptop in der Spalte, am Handy im Blatt */
+  const ganzeListe = (imBlatt: boolean) => (
+    <>
       <div className="mb-2 flex flex-wrap items-center gap-3 px-1 pt-2 lg:shrink-0 lg:pt-0">
-        <h2 className="auf-bild mr-auto text-[1.375rem] font-bold tracking-[-0.02em]">Buchungen</h2>
+        {!imBlatt && <h2 className="auf-bild mr-auto text-[1.375rem] font-bold tracking-[-0.02em]">Buchungen</h2>}
         <div className="seg w-full sm:w-80" role="radiogroup" aria-label="Buchungen filtern">
           {FILTER.map(([k, label]) => (
             <button key={k} role="radio" aria-checked={filter === k} onClick={() => setFilter(k)} className={`seg-item whitespace-nowrap ${filter === k ? "seg-aktiv" : ""}`}>
@@ -1115,6 +1106,7 @@ function VerlaufKarte({
         <input
           className="min-w-0 flex-1 bg-transparent text-base outline-none placeholder:text-tinte-leise"
           placeholder="Suchen, z. B. Waffel oder Abiball"
+          aria-label="Buchungen durchsuchen"
           value={q}
           onChange={(e) => setQ(e.target.value)}
         />
@@ -1166,38 +1158,64 @@ function VerlaufKarte({
                 </button>
                 </li>
                 {auf &&
-                  zeilen.map((b, i) => (
-                    <BuchungsZeile
-                      key={b.id}
-                      b={b}
-                      kategorien={kategorien}
-                      aktionName={aktionName}
-                      onOeffnen={() => setAuswahl(b)}
-                      klasse={gekuerzt(monat, zeilen.length) && i >= KURZ ? "max-lg:hidden" : undefined}
-                    />
+                  zeilen.map((b) => (
+                    <BuchungsZeile key={b.id} b={b} kategorien={kategorien} aktionName={aktionName} onOeffnen={() => setAuswahl(b)} />
                   ))}
-                {auf && gekuerzt(monat, zeilen.length) && (
-                  <li className="lg:hidden">
-                    <button
-                      onClick={(e) => {
-                        // Der Knopf verschwindet – Fokus auf die erste neu sichtbare
-                        // Buchung (Kind 0 ist der Monatskopf), sonst fiel er auf <body>
-                        const ul = e.currentTarget.closest("ul");
-                        setGanz((alt) => new Set(alt).add(monat));
-                        requestAnimationFrame(() => ul?.children[KURZ + 1]?.querySelector<HTMLElement>("button")?.focus());
-                      }}
-                      className="flex min-h-[48px] w-full items-center px-4 text-left text-[15px] font-medium text-brand-dark transition active:bg-black/[0.04] dark:text-brand dark:active:bg-white/[0.06]"
-                    >
-                      Alle {zeilen.length} Buchungen anzeigen
-                    </button>
-                  </li>
-                )}
               </ul>
             );
           })}
         </div>
         </div>
       )}
+    </>
+  );
+
+  return (
+    // Am Laptop die rechte Spalte: klebt unter der Kopfzeile, Filter und Suche
+    // bleiben stehen, nur die Monate scrollen (eigene Höhe = Fensterhöhe).
+    // lg:-mb-[6.5rem]: Ein klebendes Element bleibt mit seinem Außenrand im
+    // Rasterfeld. Unter dem Raster liegen am Laptop noch 6,5 rem Seitenrand
+    // (pb-6 hier, pb-4 an <main>, lg:pb-16 in App.tsx) – ohne den negativen
+    // Rand schob das Rasterende den Block am Seitenende nach oben, und
+    // „Buchungen“, Filter und Suche verschwanden unter der Kopfzeile.
+    <section className="min-w-0 max-lg:order-2 lg:sticky lg:top-[calc(var(--kopf)+0.75rem)] lg:-mb-[6.5rem] lg:flex lg:max-h-[calc(100dvh-var(--kopf)-1.5rem)] lg:flex-col">
+      {/* Handy/iPad hoch: wie „Letzte Transaktionen“ in Wallet – die neuesten
+          Buchungen und „Alle Buchungen ›“; Filter, Suche und Monate im Blatt.
+          Vorher standen Filter, Suche und alle Monate auf der Seite (gut ein
+          Bildschirm). */}
+      <div className="lg:hidden">
+        <div className="mb-2 px-1 pt-2">
+          <h2 className="auf-bild text-[1.375rem] font-bold tracking-[-0.02em]">Buchungen</h2>
+        </div>
+        {buchungen.length === 0 ? (
+          <div className="card py-10 text-center text-[14px] text-tinte-leise">Keine Buchungen.</div>
+        ) : (
+          <ul className="liste border border-black/[0.04] dark:border-white/[0.06]">
+            {neueste.map((b) => (
+              <BuchungsZeile key={b.id} b={b} kategorien={kategorien} aktionName={aktionName} onOeffnen={() => setAuswahl(b)} />
+            ))}
+            <li>
+              <button
+                onClick={() => setAlleOffen(true)}
+                className="flex min-h-[48px] w-full items-center gap-2 px-4 text-left transition active:bg-black/[0.04] dark:active:bg-white/[0.06]"
+              >
+                <span className="min-w-0 flex-1 text-[15px] font-medium text-brand-dark dark:text-brand">Alle {buchungen.length} Buchungen</span>
+                <span className="shrink-0 text-[13px] text-tinte-leise">suchen, filtern</span>
+                <span aria-hidden className="shrink-0 text-tinte-leise">
+                  <Icon name="chevron" size={14} strich={2.4} />
+                </span>
+              </button>
+            </li>
+          </ul>
+        )}
+      </div>
+      {/* Laptop/iPad quer: die ganze Liste in der Spalte (contents: die Teile
+          bleiben Kinder der Flex-Spalte, sonst scrollt die Liste nicht in sich) */}
+      <div className="max-lg:hidden lg:contents">{ganzeListe(false)}</div>
+      <Sheet open={alleOffen} onClose={() => setAlleOffen(false)}>
+        <SheetKopf titel="Buchungen" onClose={() => setAlleOffen(false)} />
+        {ganzeListe(true)}
+      </Sheet>
 
       <BuchungDetail
         buchung={auswahl ? buchungen.find((x) => x.id === auswahl.id) ?? auswahl : null}
@@ -1239,18 +1257,17 @@ function Betrag({ b, gross }: { b: Buchung; gross?: boolean }) {
 }
 
 function BuchungsZeile({
-  b, kategorien, aktionName, onOeffnen, klasse,
+  b, kategorien, aktionName, onOeffnen,
 }: {
   b: Buchung;
   kategorien: KassenKategorie[];
   aktionName: (id: string) => string;
   onOeffnen: () => void;
-  klasse?: string;
 }) {
   const kat = b.kategorie_id ? kategorien.find((k) => k.id === b.kategorie_id) : null;
   const zu = kat ? kat.name : zuweisungText(b, aktionName);
   return (
-    <li className={klasse}>
+    <li>
       <button
         onClick={onOeffnen}
         className="flex w-full items-center gap-3 px-4 py-2.5 text-left transition hover:bg-black/[0.02] active:bg-black/[0.05] dark:hover:bg-white/[0.03] dark:active:bg-white/[0.07]"

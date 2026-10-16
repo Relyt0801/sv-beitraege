@@ -78,9 +78,16 @@ Noch kürzer am Handy (nur unter 768 px, iPad/Laptop unverändert):
   Handy als eine Zeile „Ziel Abiball · 17 %“ mit Farbbalken, ein Tipp zeigt
   Kreis und ganze Legende im Blatt (`FinanzenTab`); die Ticket-Staffel der
   Mithilfe am Handy hinter „So sinkt dein Ticketpreis ›“ (`MyKasse`).
+- Buchungen am Handy/iPad hoch wie „Letzte Transaktionen“ in Wallet: die
+  4 neuesten und „Alle N Buchungen · suchen, filtern ›“; Filter, Suche und
+  Monate im Blatt, eine Buchung öffnet darüber („‹ Buchungen“). Am Laptop
+  und iPad quer unverändert die klebende Spalte (`FinanzenTab`).
+- Profil-Avatar: mittelhelle Namensfarben (Himmelblau) werden für die
+  Initialen leicht abgedunkelt, damit sie 4,5:1 erreichen
+  (`grundFuerInitialen`, `Avatar`).
 - Gemessen (iPhone 390×844, Bildschirmhöhen): Übersicht 2,73 → 1,85,
-  Finanzen Kassenwart 3,34 → 2,73, Schüler 1,60 → 1,47, Eltern 1,64 → 1,51;
-  größte Lücke im Inhalt 66 px.
+  Finanzen Kassenwart 3,34 → 2,37 (iPad hoch 2,25 → 1,76), Schüler
+  1,60 → 1,47, Eltern 1,64 → 1,51; größte Lücke im Inhalt 66 px.
 
 ## Eltern und Verwaltung: weniger Scrollen (16.10.2026)
 
