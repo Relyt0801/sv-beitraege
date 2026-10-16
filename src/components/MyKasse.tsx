@@ -55,6 +55,7 @@ export function MyKasse({
   const { contributions } = useStore();
   const { sichtbar } = useFunktionen();
   const [ueberweisen, setUeberweisen] = useState(false);
+  const [staffelOffen, setStaffelOffen] = useState(false);
   // Läuft der Ticketverkauf (rechts die Kasse)? Dann braucht das Ticket die
   // volle Breite – sonst steht es neben „Mithilfe bei Aktionen“.
   const [ticketBreit, setTicketBreit] = useState(false);
@@ -245,7 +246,10 @@ export function MyKasse({
           </div>
         </div>
 
-        <StaffelKacheln pct={pct} settings={settings} />
+        {/* Die Staffel (5 Stufen) ab iPad direkt; am Handy hinter einer Zeile –
+            Ring und Satz darüber sagen schon das Wichtigste (wie viel fehlt,
+            was es spart). Vorher gut 120 px mehr auf der Übersicht. */}
+        <StaffelKacheln pct={pct} settings={settings} className="mt-4 max-md:hidden" />
 
         {/* Noch nichts eingetragen: eine Zeile hier statt einer leeren Karte */}
         {!hatBeitraege && (
@@ -253,7 +257,21 @@ export function MyKasse({
             Noch keine Mithilfe eingetragen. Wenn du bei einer Aktion hilfst, trägt das Stufenteam sie ein.
           </p>
         )}
+        <button
+          type="button"
+          onClick={() => setStaffelOffen(true)}
+          className="-mb-2 mt-1 flex min-h-[44px] w-full items-center justify-between text-left text-[14px] font-medium text-brand-dark transition active:opacity-60 dark:text-brand md:hidden"
+        >
+          So sinkt dein Ticketpreis
+          <Icon name="chevron" size={14} strich={2.4} />
+        </button>
       </section>
+      <Sheet open={staffelOffen} onClose={() => setStaffelOffen(false)}>
+        <SheetKopf titel="Mithilfe und Ticketpreis" onClose={() => setStaffelOffen(false)} />
+        <div className="card p-4">
+          <StaffelKacheln pct={pct} settings={settings} className="" />
+        </div>
+      </Sheet>
 
       {/* ------------------------------------------ meine Beiträge */}
       {hatBeitraege && (

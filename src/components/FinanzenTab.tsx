@@ -358,6 +358,43 @@ function UebersichtKarte({
   const ganz =
     ziel.ziel_cent > 0 && stand > 0 && stand < ziel.ziel_cent ? (summe * ziel.ziel_cent) / stand : summe;
   const prozent = ziel.ziel_cent > 0 ? Math.round((stand / ziel.ziel_cent) * 100) : null;
+  const zielTitel = ziel.ziel_cent > 0 ? `Ziel ${ziel.ziel_titel}: ${euroKurz(ziel.ziel_cent)}` : "Woher das Geld kommt";
+  const [kreisOffen, setKreisOffen] = useState(false);
+  /** Kreis + Legende – ab 640 px in der Karte, am Handy im Blatt (dort ohne eigene Überschrift) */
+  const kreisUndLegende = (imBlatt: boolean) => (
+    <>
+      <Kreis teile={teile} ganz={ganz} prozent={prozent} summe={summe} dunkel={dunkel} />
+      <div className="min-w-0 flex-1">
+        {!imBlatt && <div className="mb-1.5 text-[13px] font-bold">{zielTitel}</div>}
+        <ul className="grid grid-cols-[minmax(0,1fr)] gap-1.5">
+          {teile.map((t) => (
+            <li key={t.key} className="flex items-center gap-2.5 text-[13px]">
+              <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: t.farbe }} />
+              <span className="min-w-0 flex-1 truncate font-semibold">{t.label}</span>
+              <span className="zahl shrink-0 font-bold">{euroKurz(t.cent)}</span>
+            </li>
+          ))}
+          {zahlen.aus > 0 && (
+            <li className="flex items-center gap-2.5 text-[13px] text-tinte-leise">
+              <span className="h-3 w-3 shrink-0" />
+              <span className="min-w-0 flex-1 truncate">
+                <span className="sm:hidden">Ausgaben</span>
+                <span className="max-sm:hidden">abzüglich Ausgaben</span>
+              </span>
+              <span className="zahl shrink-0 font-bold">−{euroKurz(zahlen.aus)}</span>
+            </li>
+          )}
+          {ziel.ziel_cent > stand && (
+            <li className="flex items-center gap-2.5 text-[13px] text-tinte-leise">
+              <span className="h-3 w-3 shrink-0 rounded-full bg-papier-linie dark:bg-slate-700" />
+              <span className="min-w-0 flex-1 truncate">Fehlt noch</span>
+              <span className="zahl shrink-0 font-bold">{euroKurz(ziel.ziel_cent - stand)}</span>
+            </li>
+          )}
+        </ul>
+      </div>
+    </>
+  );
 
   return (
     <section className="card p-5">
@@ -386,56 +423,39 @@ function UebersichtKarte({
 
       <Kennzahlen ein={zahlen.ein} aus={zahlen.aus} offen={offen ? { ...offen, halbjahr } : null} />
 
-      {/* Kreis + Legende – auch am Handy nebeneinander (Kreis dort kleiner):
-          untereinander nahmen sie fast eine halbe Bildschirmhöhe ein. */}
-      <div className="mt-4 flex items-start gap-3.5 border-t border-papier-linie pt-4 dark:border-slate-800 sm:items-center sm:gap-4">
-        <Kreis teile={teile} ganz={ganz} prozent={prozent} summe={summe} dunkel={dunkel} />
-        <div className="min-w-0 flex-1">
-          <div className="mb-1.5 text-[13px] font-bold">
-            {ziel.ziel_cent > 0 ? `Ziel ${ziel.ziel_titel}: ${euroKurz(ziel.ziel_cent)}` : "Woher das Geld kommt"}
-          </div>
-          <ul className="grid grid-cols-[minmax(0,1fr)] gap-1.5">
-            {/* Am Handy die drei größten Teile, der Rest als „Weitere“ – einzeln
-                stehen sie direkt darunter in „Aktionen, Beiträge und Sonstiges“.
-                Mit allen acht Zeilen war die Legende höher als der Kreis. */}
-            {teile.map((t, i) => (
-              <li key={t.key} className={`flex items-center gap-2.5 text-[13px] ${teile.length > 4 && i >= 3 ? "max-sm:hidden" : ""}`}>
-                <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: t.farbe }} />
-                <span className="min-w-0 flex-1 truncate font-semibold">{t.label}</span>
-                <span className="zahl shrink-0 font-bold">{euroKurz(t.cent)}</span>
-              </li>
-            ))}
-            {teile.length > 4 && (
-              <li className="flex items-center gap-2.5 text-[13px] sm:hidden">
-                <span className="flex h-3 w-3 shrink-0 overflow-hidden rounded-full">
-                  {teile.slice(3).map((t) => (
-                    <span key={t.key} className="h-full flex-1" style={{ background: t.farbe }} />
-                  ))}
-                </span>
-                <span className="min-w-0 flex-1 truncate font-semibold">Weitere ({teile.length - 3})</span>
-                <span className="zahl shrink-0 font-bold">{euroKurz(teile.slice(3).reduce((n, t) => n + t.cent, 0))}</span>
-              </li>
-            )}
-            {zahlen.aus > 0 && (
-              <li className="flex items-center gap-2.5 text-[13px] text-tinte-leise">
-                <span className="h-3 w-3 shrink-0" />
-                <span className="min-w-0 flex-1 truncate">
-                  <span className="sm:hidden">Ausgaben</span>
-                  <span className="max-sm:hidden">abzüglich Ausgaben</span>
-                </span>
-                <span className="zahl shrink-0 font-bold">−{euroKurz(zahlen.aus)}</span>
-              </li>
-            )}
-            {ziel.ziel_cent > stand && (
-              <li className="flex items-center gap-2.5 text-[13px] text-tinte-leise">
-                <span className="h-3 w-3 shrink-0 rounded-full bg-papier-linie dark:bg-slate-700" />
-                <span className="min-w-0 flex-1 truncate">Fehlt noch</span>
-                <span className="zahl shrink-0 font-bold">{euroKurz(ziel.ziel_cent - stand)}</span>
-              </li>
-            )}
-          </ul>
-        </div>
+      {/* Am Handy EINE Zeile mit Balken (wie die Zusammenfassungen in Health):
+          Ziel, Prozent, was fehlt – ein Tipp zeigt Kreis und ganze Legende im
+          Blatt. Kreis + acht Legendenzeilen waren am Handy ~200 px hoch.
+          Ab 640 px stehen Kreis und Legende wie bisher in der Karte. */}
+      <button
+        type="button"
+        onClick={() => setKreisOffen(true)}
+        className="mt-4 flex w-full items-center gap-3 border-t border-papier-linie pt-4 text-left transition active:opacity-60 dark:border-slate-800 sm:hidden"
+      >
+        <span className="min-w-0 flex-1">
+          <span className="flex items-baseline justify-between gap-2 text-[13px]">
+            <span className="min-w-0 truncate font-bold">{zielTitel}</span>
+            {prozent !== null && <span className="zahl shrink-0 font-bold">{prozent} %</span>}
+          </span>
+          <span aria-hidden className="mt-1.5 flex h-2 overflow-hidden rounded-full bg-papier-linie dark:bg-slate-700">
+            {ganz > 0 && teile.map((t) => <span key={t.key} className="h-full" style={{ width: `${(t.cent / ganz) * 100}%`, background: t.farbe }} />)}
+          </span>
+          <span className="mt-1 block text-[12px] text-tinte-leise">
+            {ziel.ziel_cent > stand ? `Fehlt noch ${euroKurz(ziel.ziel_cent - stand)} · ` : ""}
+            {teile.length} {teile.length === 1 ? "Quelle" : "Quellen"}
+          </span>
+        </span>
+        <span aria-hidden className="shrink-0 text-tinte-leise">
+          <Icon name="chevron" size={14} strich={2.4} />
+        </span>
+      </button>
+      <div className="mt-4 flex items-start gap-3.5 border-t border-papier-linie pt-4 dark:border-slate-800 max-sm:hidden sm:items-center sm:gap-4">
+        {kreisUndLegende(false)}
       </div>
+      <Sheet open={kreisOffen} onClose={() => setKreisOffen(false)}>
+        <SheetKopf titel={zielTitel} onClose={() => setKreisOffen(false)} />
+        <div className="card flex items-center gap-4 p-4">{kreisUndLegende(true)}</div>
+      </Sheet>
     </section>
   );
 }

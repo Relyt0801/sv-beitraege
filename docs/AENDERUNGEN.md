@@ -74,8 +74,13 @@ Noch kürzer am Handy (nur unter 768 px, iPad/Laptop unverändert):
   leere Fläche neben dem gleich hohen Steckbrief (`Motto`).
 - Eltern-Infos als Liste mit Trennlinien wie die Fragen daneben (vorher je
   Info ein umrandeter Kasten in der Karte) (`ElternInfosTab`).
-- Gemessen (iPhone 390×844, Bildschirmhöhen): Übersicht 2,73 → 1,90,
-  Finanzen Kassenwart 3,34 → 2,87, Schüler 1,60 → 1,47, Eltern 1,64 → 1,51.
+- Zusammenfassung → Detail (wie Health): Finanzen-Kreis mit Legende am
+  Handy als eine Zeile „Ziel Abiball · 17 %“ mit Farbbalken, ein Tipp zeigt
+  Kreis und ganze Legende im Blatt (`FinanzenTab`); die Ticket-Staffel der
+  Mithilfe am Handy hinter „So sinkt dein Ticketpreis ›“ (`MyKasse`).
+- Gemessen (iPhone 390×844, Bildschirmhöhen): Übersicht 2,73 → 1,85,
+  Finanzen Kassenwart 3,34 → 2,73, Schüler 1,60 → 1,47, Eltern 1,64 → 1,51;
+  größte Lücke im Inhalt 66 px.
 
 ## Eltern und Verwaltung: weniger Scrollen (16.10.2026)
 
