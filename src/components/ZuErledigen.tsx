@@ -64,7 +64,7 @@ const sym = (icon: IconName, farbe: string): ReactNode => (
 
 export function ZuErledigen({ className = "" }: { className?: string }) {
   const { isStaff, isEltern } = useRole();
-  const { aktionen } = useTermine();
+  const { aktionen, meineVorsitze } = useTermine();
   const ich = useFuerMichOffen();
   const team = useTeamAufgaben();
   // Blätter: Abstimmung bzw. Info direkt hier
@@ -105,7 +105,8 @@ export function ZuErledigen({ className = "" }: { className?: string }) {
           key={`k-${t.id}`}
           symbol={sym("chats", "bg-[#5856D6]")}
           label={committeeLabel(t.tag!)}
-          unter={`${teile.join(" · ")} offen`}
+          // Vorsitz: gleich sichtbar, dass man das Komitee leitet
+          unter={`${meineVorsitze.includes(t.tag!) ? "Vorsitz · " : ""}${teile.join(" · ")} offen`}
           // Öffnet das Komitee auf der Pinnwand beim ersten offenen Eintrag
           onClick={() => {
             window.location.hash = `chats/${t.id}/${erstes.id}`;

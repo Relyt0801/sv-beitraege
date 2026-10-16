@@ -20,7 +20,7 @@ import path from 'node:path';
 import { browserStarten, TOUR_WEG, DEMO_BASIS, ordner } from './_umgebung.mjs';
 
 const GERAETE = (process.env.GERAETE || '320x568,360x800,375x667,390x844,820x1180,1180x820,1440x900').split(',').map((s) => s.split('x').map(Number));
-const ROLLEN = (process.env.ROLLEN || 'schueler,sprecher,stufenteam,kassenwart,admin,eltern').split(',');
+const ROLLEN = (process.env.ROLLEN || 'schueler,vorsitz,sprecher,stufenteam,kassenwart,admin,eltern').split(',');
 const BREIT = 1024; // ab hier eine Kopfzeile mit Reiterleiste darin (App.tsx, useBreit)
 
 const messen = (page) =>
@@ -44,7 +44,18 @@ const messen = (page) =>
     const er = ebene && ebene !== document.body ? ebene.getBoundingClientRect() : null;
     const untenDrauf = document.elementFromPoint(vw / 2, vh - 25);
     const ke = document.getElementById('kopf-ebene');
+    // Zurück-Knopf einer offenen Ebene (Chat: aria-label „Zurück“, Kalender:
+    // „‹ Events“ mit Pfeil). Steht er UNTER der App-Kopfzeile, ist das genau das
+    // zweite Band („Headbar nach unten verschoben“).
+    const kopf = document.querySelector('header');
+    const kopfUnten = kopf ? kopf.getBoundingClientRect().bottom : 0;
+    const zurueck = [...document.querySelectorAll('button')]
+      .filter((x) => { const r = x.getBoundingClientRect(); return r.width > 0 && r.height > 0 && getComputedStyle(x).visibility !== 'hidden'; })
+      .filter((x) => /^Zurück/.test(x.getAttribute('aria-label') || '') || x.innerHTML.includes('m15 6-6 6 6 6'))
+      .map((x) => Math.round(x.getBoundingClientRect().top));
     return {
+      zurueckOben: zurueck,
+      zurueckUnterKopf: zurueck.some((t) => t >= kopfUnten - 2),
       oben: JSON.stringify(oben),
       unten: JSON.stringify(unten),
       ebene: er ? [Math.round(er.top), Math.round(er.bottom)] : null,
@@ -143,9 +154,9 @@ for (const [g, liste] of Object.entries(nachGeraet)) {
   let ebenenFehler = 0;
   for (const z of liste.filter((x) => /offen$/.test(x.zustand))) {
     const ok = breit
-      ? sig(z) === soll && z.kopfEbene > 0 // eine Kopfzeile, Kopf der Ebene darin
+      ? sig(z) === soll && z.kopfEbene > 0 && !z.zurueckUnterKopf // eine Kopfzeile, Kopf der Ebene darin, kein Zurück darunter
       : z.ebene && z.ebene[0] === 0 && z.reiterleisteVerdeckt; // Vollbild-Ebene über allem
-    if (!ok) { abweichungen++; ebenenFehler++; console.log(`  ABWEICHUNG ${z.rolle} · ${z.zustand}: ${breit ? `${sig(z)} · #kopf-ebene ${z.kopfEbene}` : `Ebene ${JSON.stringify(z.ebene)} · Reiterleiste verdeckt: ${z.reiterleisteVerdeckt}`}`); }
+    if (!ok) { abweichungen++; ebenenFehler++; console.log(`  ABWEICHUNG ${z.rolle} · ${z.zustand}: ${breit ? `${sig(z)} · #kopf-ebene ${z.kopfEbene} · Zurück bei y=${JSON.stringify(z.zurueckOben)}${z.zurueckUnterKopf ? ' (unter der Kopfzeile – zweites Band)' : ''}` : `Ebene ${JSON.stringify(z.ebene)} · Reiterleiste verdeckt: ${z.reiterleisteVerdeckt}`}`); }
   }
   const ebenen = liste.filter((x) => /offen$/.test(x.zustand)).length;
   if (ebenen) console.log(`  Chat/Kalender offen: ${ebenen}× geprüft (erwartet: ${breit ? 'eine Kopfzeile, Kopf in #kopf-ebene' : 'Vollbild-Ebene ab 0 px, Reiterleiste verdeckt'}) – ${ebenenFehler ? `${ebenenFehler} Abweichung(en)` : 'in Ordnung'}`);

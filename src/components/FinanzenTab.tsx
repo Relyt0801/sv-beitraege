@@ -175,10 +175,13 @@ export function FinanzenTab({ kosten }: { kosten: KostenValue }) {
           </InKopf>
         )}
         {darfSehen && <p className="auf-bild hidden px-1 text-[13px] leading-snug text-tinte-leise lg:block">{ANSICHT_TEXT.standard}</p>}
-        <FinanzStandard aktionName={aktionName} />
+        {/* Komitee-Vorsitz: „Geld anfragen“ und der Stand der eigenen Anfragen
+            sind hier das, was man tut – darum zuerst, nicht unter allen Summen
+            (Prüfung aus Sicht der Vorsitzenden, Okt. 2026) */}
         {!darfSehen && meineVorsitze.length > 0 && (
           <KostenKarte kosten={kosten} darfEntscheiden={false} vorsitze={meineVorsitze} />
         )}
+        <FinanzStandard aktionName={aktionName} />
       </div>
     );
   }

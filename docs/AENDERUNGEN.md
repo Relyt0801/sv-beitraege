@@ -11,6 +11,40 @@ ausführlich (auf Deutsch); hier steht der Überblick dazu.
 
 ---
 
+## Vorher/Nachher der Kopfleiste, Sicht der Komitee-Vorsitzenden (16.10.2026)
+
+**Vorher/Nachher am Bildschirm.** Der Stand vor der Korrektur (`3989f39^`)
+und der heutige Stand wurden als Demo nebeneinander gebaut und am Laptop
+(1440 × 900) mit offenem Komitee-Chat fotografiert:
+
+- vorher: unter der App-Kopfzeile (0–111 px) ein zweites Band (115–219 px)
+  mit Zurück-Taste bei y = 123 – genau das Bild „Headbar nach unten
+  verschoben“;
+- nachher: eine Kopfzeile, Zurück-Taste und Chat-Titel stehen darin
+  (y = 8), darunter beginnt direkt der Verlauf.
+
+`tests/leisten-check.mjs` prüft das jetzt auch geometrisch: steht bei offenem
+Chat/Kalender am Laptop eine Zurück-Taste **unter** der Kopfzeile, gilt das
+als Abweichung (`Zurück bei y=[123] (unter der Kopfzeile – zweites Band)`).
+Gegen den alten Stand schlägt der Test an, gegen den neuen nicht.
+
+**Demo-Rolle „vorsitz“.** Bisher ließ sich die Sicht der Komitee-Vorsitzenden
+in der Demo gar nicht ansehen. `?rolle=vorsitz` ist ein Schüler, der das
+Komitee Abizeitung leitet (`src/lib/demo.ts`, `src/termine-store.tsx`). Die
+Rolle läuft in `ui-check.mjs` und `leisten-check.mjs` mit.
+
+**Was Vorsitzende brauchen – und was geändert ist:**
+
+- Finanzen: „Kostenanfragen“ (Geld fürs Komitee anfragen, Stand der eigenen
+  Anfragen) stand ganz unten unter Kontostand, Aktionen und Plänen. Für
+  Vorsitzende ist das die eigentliche Aufgabe in diesem Reiter – steht jetzt
+  oben (`FinanzenTab.tsx`). Wer die Finanzen sieht (Kassenwart, Team), hat
+  die Anfragen weiterhin in der eigenen Ansicht.
+- Übersicht, „Aus deinen Komitees“: die Zeile zeigt „Vorsitz · 1 Abstimmung
+  · 1 To-do offen“ – man sieht sofort, wo man leitet (`ZuErledigen.tsx`).
+- Events: die Karte „Vorsitz Abizeitung – Anfragen“ (Termin-Anfragen fürs
+  Komitee) stand schon oben; unverändert.
+
 ## Kopf- und Reiterleiste: eigener Test (16.10.2026)
 
 Zum ursprünglichen Fehlerbild („die Headbar ist nach unten verschoben“ – am
