@@ -81,16 +81,19 @@ export function schichtVorzeichen(status: SchichtStatus): string {
 export function SchichtSchild({ status, klein = false }: { status: SchichtStatus; klein?: boolean }) {
   if (!status) return null;
   const groesse = klein ? "px-2 py-0.5 text-[12px]" : "px-2.5 py-1 text-[12px]";
+  // Klein unter 380 px (iPhone SE, Anzeige-Zoom): nur das Zeichen, das Wort
+  // für Bildschirmleser – sonst wurden Uhrzeit und Plätze daneben abgeschnitten
+  const wort = klein ? "max-[379px]:sr-only" : "";
   if (status === "eingeteilt")
     return (
       <span className={`inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-600 font-bold text-white shadow-sm ${groesse}`}>
-        <Haken /> Eingeteilt
+        <Haken /> <span className={wort}>Eingeteilt</span>
       </span>
     );
   if (status === "gemeldet")
     return (
       <span className={`shrink-0 whitespace-nowrap rounded-full border border-brand/50 font-bold text-brand ${groesse}`}>
-        ⏳ angemeldet
+        <span aria-hidden>⏳</span> <span className={wort}>angemeldet</span>
       </span>
     );
   return (

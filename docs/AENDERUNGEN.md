@@ -52,6 +52,20 @@ im Blatt, wie in den iOS-Einstellungen.
   Kasse, „nichts eingetragen“ an anderen Tagen wieder als eigene Zeile, keine
   doppelte Überschrift im Blatt „Kostenanfragen“, Höhenschätzung der
   Laptop-Spalten in Events ohne die entfernte Fußzeile.
+- **Zweite Gegenprüfung** (auf 320–412 px nachgemessen): „Geplante Aktionen“
+  zeigt rechts nur die Anzahl, „nächste am 3. Nov. · 2 vorbei“ steht in der
+  zweiten Zeile (rechts wurde es am iPhone abgeschnitten); der Blattkopf zählt
+  genauso („1 geplant · 2 vorbei“). „Kostenanfragen“ rechts nur „keine offen“.
+  Team unter 360 px: „Nichts eingetragen.“ wieder als eigene Zeile (neben
+  „+ Termin“ abgeschnitten). Die Eltern-Statuszeile steht neben statt in der
+  Überschrift. Gruppe und Höhenschätzung in Events nutzen dieselbe Regel
+  (`sichtbarEingeklappt`).
+- **Schmale Handys (320–379 px: iPhone SE, Anzeige-Zoom):** In Events wurden
+  „Diese Woche“, Aktionsnamen und Uhrzeiten abgeschnitten (bei 320 px zehn
+  Stellen je Team-Rolle). Jetzt: Kalender-Knopf und Aktionen unter 360 px ohne
+  Symbol, Titel unter 340 px 16 px, lange Aktionsnamen zweizeilig statt „…“,
+  Schichtschilder unter 380 px nur mit Zeichen (✓, ⏳; das Wort für
+  Bildschirmleser). Übrig bleiben gewollte Kürzungen (Vorschauen, Nebenzeilen).
 - **Test in WebKit** (die Engine von Safari): WebKitGTK 2.52 mit
   `WebKitWebDriver` unter Xvfb, App in einem Rahmen mit exakt 390 × 844,
   375 × 667, 820 × 1180 und 1440 × 900 – 120 Ansichten, 6 Rollen: nichts

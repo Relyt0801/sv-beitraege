@@ -107,7 +107,7 @@ export function Wochenstreifen({
           ganz lesbar. „Termin eintragen“ (Team) steht unten in der Tageszeile,
           direkt bei dem Tag, für den es gilt. */}
       <div className="mb-1 flex items-center gap-1">
-        <h2 className="min-w-0 flex-1 truncate pl-1 text-[17px] font-bold tracking-[-0.02em]">
+        <h2 className="min-w-0 flex-1 truncate pl-1 text-[17px] font-bold tracking-[-0.02em] max-[339px]:text-[16px]">
           {dieseWoche ? "Diese Woche" : monatBeschriftung()}
         </h2>
         <button
@@ -134,7 +134,10 @@ export function Wochenstreifen({
           aria-label="Ganzen Kalender öffnen"
           title="Ganzen Kalender öffnen – Monat, Woche und Tag"
         >
-          <Icon name="kalender" size={16} />
+          {/* unter 360 px ohne Symbol – sonst blieb für „Diese Woche“ kein Platz */}
+          <span className="max-[359px]:hidden">
+            <Icon name="kalender" size={16} />
+          </span>
           Kalender
           {neueTermine.size > 0 && (
             <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[12px] font-bold text-white">
@@ -242,9 +245,10 @@ export function Wochenstreifen({
             {gewaehlt === heute ? "Heute" : tagLang(gewaehlt)}
             {/* Leerer Tag heute: in derselben Zeile statt einer eigenen darunter.
                 Andere Tage („DI, 21. OKTOBER“ + „Heute“-Knopf) hätten dafür
-                keinen Platz – dort bleibt die eigene Zeile. */}
+                keinen Platz – dort bleibt die eigene Zeile. Mit „+ Termin“
+                (Team) reicht der Platz erst ab 360 px. */}
             {ready && desTages.length === 0 && gewaehlt === heute && (
-              <span className="font-normal normal-case tracking-normal"> · nichts eingetragen</span>
+              <span className={`font-normal normal-case tracking-normal ${onNeu ? "max-[359px]:hidden" : ""}`}> · nichts eingetragen</span>
             )}
           </span>
           <span className="flex shrink-0 items-center gap-2">
@@ -279,7 +283,11 @@ export function Wochenstreifen({
             <SkelettText zeilen={2} />
           </div>
         ) : desTages.length === 0 ? (
-          gewaehlt === heute ? null : <div className="px-1 py-2.5 text-[14px] text-tinte-leise">Nichts eingetragen.</div>
+          gewaehlt !== heute ? (
+            <div className="px-1 py-2.5 text-[14px] text-tinte-leise">Nichts eingetragen.</div>
+          ) : onNeu ? (
+            <div className="px-1 py-2.5 text-[14px] text-tinte-leise min-[360px]:hidden">Nichts eingetragen.</div>
+          ) : null
         ) : (
           <ul className="grid">
             {desTages.map((t) => (

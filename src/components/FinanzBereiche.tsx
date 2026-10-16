@@ -817,6 +817,10 @@ export function GeplantKarte({ darf, fin, className = "", alsZeile = false }: { 
   const h = heuteKey();
   // Vorbei ist vorbei – nur der Kassenwart sieht sie noch (zum Aufräumen)
   const sichtbar = liste.filter((g) => darf || !g.datum || g.datum >= h);
+  // Gezählt wird, was noch ansteht; Vergangenes (sieht nur der Kassenwart,
+  // zum Aufräumen) wird getrennt genannt – in der Zeile und im Blattkopf gleich
+  const anstehend = sichtbar.filter((g) => !g.datum || g.datum >= h);
+  const anzahlVorbei = sichtbar.length - anstehend.length;
   const katFarbe = (id: string | null) => fin?.kategorien.find((k) => k.id === id)?.farbe ?? null;
   const blatt = (
     <GeplantSheet
@@ -830,19 +834,16 @@ export function GeplantKarte({ darf, fin, className = "", alsZeile = false }: { 
   );
 
   if (alsZeile) {
-    // Gezählt wird, was noch ansteht; Vergangenes (sieht nur der Kassenwart,
-    // zum Aufräumen) steht getrennt dahinter: „1 · ab 3. Nov. · 2 vorbei“
-    const anstehend = sichtbar.filter((g) => !g.datum || g.datum >= h);
-    const vorbei = sichtbar.length - anstehend.length;
+    // Rechts nur die Anzahl, Datum und „vorbei“ in der zweiten Zeile – rechts
+    // daneben war am Handy kein Platz („1 · ab 3. Nov. · 2 v…“, Prüfung Okt. 2026)
     const kommend = anstehend.filter((g) => g.datum);
     const ab = kommend[0]?.datum ? new Date(kommend[0].datum + "T12:00:00").toLocaleDateString("de-DE", { day: "numeric", month: "short" }) : null;
-    const wert = [anstehend.length === 0 ? "keine" : ab ? `${anstehend.length} · ab ${ab}` : String(anstehend.length), vorbei ? `${vorbei} vorbei` : null]
-      .filter(Boolean)
-      .join(" · ");
+    const unter = [ab ? `nächste am ${ab}` : null, anzahlVorbei ? `${anzahlVorbei} vorbei` : null].filter(Boolean).join(" · ");
     return (
       <>
         <Zeile
           label="Geplante Aktionen"
+          unter={unter || undefined}
           symbol={
             <Symbol farbe="bg-[#FF9500]">
               <Icon name="kalender" size={16} strich={2.2} />
@@ -850,9 +851,7 @@ export function GeplantKarte({ darf, fin, className = "", alsZeile = false }: { 
           }
           onClick={() => setListeAuf(true)}
         >
-          <span className="zahl truncate text-[15px] text-tinte-leise">
-            {wert}
-          </span>
+          <span className="zahl whitespace-nowrap text-[15px] text-tinte-leise">{anstehend.length || "keine"}</span>
         </Zeile>
         <Sheet open={listeAuf} onClose={() => setListeAuf(false)}>
           <SheetKopf titel="Geplante Aktionen" onClose={() => setListeAuf(false)} />
@@ -876,7 +875,7 @@ export function GeplantKarte({ darf, fin, className = "", alsZeile = false }: { 
   function geplantListe(karte: boolean) {
     return (
       <div className={karte ? "card p-4" : ""}>
-        <BereichKopf titel={karte ? (sichtbar.length ? `${sichtbar.length} geplant` : "Nichts geplant") : "Geplante Aktionen"} onNeu={darf ? () => setOffen("neu") : undefined} />
+        <BereichKopf titel={karte ? [anstehend.length ? `${anstehend.length} geplant` : "Nichts geplant", anzahlVorbei ? `${anzahlVorbei} vorbei` : null].filter(Boolean).join(" · ") : "Geplante Aktionen"} onNeu={darf ? () => setOffen("neu") : undefined} />
         {sichtbar.length === 0 ? (
           <p className="text-[13px] text-tinte-leise">Gerade ist nichts geplant.</p>
         ) : (
