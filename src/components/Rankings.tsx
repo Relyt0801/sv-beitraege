@@ -935,6 +935,7 @@ function Abstimmen({
           startText="Runde starten"
           wahlTitel="Stichwahl"
           standardName="Stichwahl"
+          mitHerz={!aufgeteilt}
           nurWahl
         />
       </div>

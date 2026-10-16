@@ -7,6 +7,7 @@ import { FUNKTIONEN, FUNKTION_THEMEN, darfSchalten, useFunktionen, type Funktion
 import { Icon, type IconName } from "./Icon";
 import { WortfilterSchalter } from "./AutorInfo";
 import { WF_BEREICHE, useWfRecht, type WfBereich } from "../lib/wortfilter-bereiche";
+import { useAufgeteilt } from "../lib/teile";
 import { Gruppe, Wert, Zeile } from "./Liste";
 
 const SYMBOL: Record<FunktionKey, { icon: IconName; farbe: string }> = {
@@ -19,16 +20,13 @@ const SYMBOL: Record<FunktionKey, { icon: IconName; farbe: string }> = {
   abiball: { icon: "kasse", farbe: "bg-[#8E8E93]" },
 };
 /** Welche Wortfilter-Bereiche gehören zur Funktion? */
-/** Ein einzelner Wortfilter unter einer Funktion: sagen, welchen Teil er schaltet */
-function wfTitel(b: WfBereich): string {
-  const t = WF_BEREICHE.find((x) => x.key === b)?.titel || "";
-  return t.includes("(inoffiziell)") ? "Wortfilter · Inoffiziell" : t.includes("(offiziell)") ? "Wortfilter · Offiziell" : "Wortfilter";
-}
+/** Am schmalsten Handy (< 360 px) passt nicht jeder Titel neben den Schalter */
+const KURZ: Partial<Record<FunktionKey, string>> = { spotify: "Spotify" };
 
 const WF: Record<FunktionKey, WfBereich[]> = {
   album: ["steckbrief", "kommentare", "kommentare_inoffiziell"],
   spotify: [],
-  // beide Teile: wer nur einen davon verwalten darf, sieht genau diesen
+  // je Teil ein Filter – ohne Aufteilung bleibt nur der erste (siehe wfDa)
   zitate: ["zitate", "zitate_inoffiziell"],
   rankings: ["rankings", "rankings_inoffiziell"],
   motto: ["motto", "motto_inoffiziell"],
@@ -69,6 +67,19 @@ export function FunktionenSheet({ open, onClose }: { open: boolean; onClose: () 
   const { an, setzen } = useFunktionen();
   const { can } = useRole();
   const wfRecht = useWfRecht();
+  // Ohne Aufteilung gibt es je Bereich nur EINEN Wortfilter (wie in den
+  // Einstellungen des Bereichs) – ohne „offiziell“ im Namen
+  const geteilt: Record<string, boolean> = {
+    motto: useAufgeteilt("motto"),
+    zitate: useAufgeteilt("zitate"),
+    rankings: useAufgeteilt("rankings"),
+    kommentare: useAufgeteilt("kommentare"),
+  };
+  const wfDa = (b: WfBereich) => !b.endsWith("_inoffiziell") || geteilt[b.replace("_inoffiziell", "")] !== false;
+  const wfName = (b: WfBereich) => {
+    const t = WF_BEREICHE.find((x) => x.key === b)?.titel || b;
+    return geteilt[b] === false ? t.replace(" (offiziell)", "") : t;
+  };
   const album = useAlbumOptional();
   const [fenster, setFenster] = useState<Fenster>(null);
   // perm -> Rollen, die es dürfen
@@ -129,7 +140,7 @@ export function FunktionenSheet({ open, onClose }: { open: boolean; onClose: () 
     const wer = perm ? rollen[perm] || [] : [];
     const alleDa = perm ? ALLE.every((r) => wer.includes(r)) : false;
     const verwalten = links[k].filter((x) => x.darf);
-    const wf = WF[k].filter(wfRecht);
+    const wf = WF[k].filter(wfRecht).filter(wfDa);
     const sym = SYMBOL[k];
     return (
       <div key={k} className="gruppe-zellen">
@@ -138,7 +149,16 @@ export function FunktionenSheet({ open, onClose }: { open: boolean; onClose: () 
           <span aria-hidden className={`symbol ${sym.farbe}`}>
             <Icon name={sym.icon} size={17} strich={2.2} />
           </span>
-          <span className="min-w-0 flex-1 truncate text-[16px] font-semibold leading-snug max-[359px]:text-[15px]">{f.titel}</span>
+          <span className="min-w-0 flex-1 truncate text-[16px] font-semibold leading-snug max-[359px]:text-[15px]">
+            {KURZ[k] ? (
+              <>
+                <span className="max-[359px]:hidden">{f.titel}</span>
+                <span className="min-[360px]:hidden">{KURZ[k]}</span>
+              </>
+            ) : (
+              f.titel
+            )}
+          </span>
           <Schalter
             an={an[k]}
             label={f.titel}
@@ -169,7 +189,7 @@ export function FunktionenSheet({ open, onClose }: { open: boolean; onClose: () 
           </label>
         )}
         {/* Ein Wortfilter: gleich der Schalter. Mehrere: eine Zeile „Wortfilter ›“ */}
-        {wf.length === 1 && <WortfilterSchalter bereich={wf[0]} zeile einzeilig titel={wfTitel(wf[0])} className="!pl-[58px]" />}
+        {wf.length === 1 && <WortfilterSchalter bereich={wf[0]} zeile einzeilig titel="Wortfilter" className="!pl-[58px]" />}
         {wf.length > 1 && (
           <button
             type="button"
@@ -260,13 +280,13 @@ export function FunktionenSheet({ open, onClose }: { open: boolean; onClose: () 
         </Sheet>
         {/* Mehrere Wortfilter einer Funktion: Unterseite mit je einem Schalter */}
         {sichtbare
-          .filter((k) => WF[k].filter(wfRecht).length > 1)
+          .filter((k) => WF[k].filter(wfRecht).filter(wfDa).length > 1)
           .map((k) => (
             <Sheet key={k} open={open && fenster === `wf:${k}`} onClose={() => setFenster(null)}>
               <SheetKopf titel={`Wortfilter · ${FUNKTIONEN.find((x) => x.key === k)!.titel}`} onClose={() => setFenster(null)} />
               <Gruppe className="mt-1">
-                {WF[k].map((b) => (
-                  <WortfilterSchalter key={b} bereich={b} zeile einzeilig titel={WF_BEREICHE.find((x) => x.key === b)?.titel} />
+                {WF[k].filter(wfDa).map((b) => (
+                  <WortfilterSchalter key={b} bereich={b} zeile einzeilig titel={wfName(b)} />
                 ))}
               </Gruppe>
             </Sheet>

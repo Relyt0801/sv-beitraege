@@ -72,8 +72,10 @@ export function ProfilSheet({
   const [modusOffen, setModusOffen] = useState(false);
 
   const meine = committeesOf(uid);
-  // Rolle mit eigenem Titel (Stufensprecher, Kassenwart …) – eigene Zeile unter „Konto“
+  // Rolle mit eigenem Titel (Stufensprecher, Kassenwart …) – eigene Zeile unter „Konto“;
+  // am 320-px-Handy passt „Stv. Schülersprecher*in“ nicht neben „Rolle“
   const rolle = !istEltern && role ? ROLE_TITEL[role] || "" : "";
+  const rolleSchmal = role === "stv_sprecher" ? "Stv. Sprecher*in" : rolle;
   const istAdmin = role === "admin";
   const istKassenwart = role === "kassenwart";
 
@@ -332,7 +334,10 @@ export function ProfilSheet({
           {/* Komitee-Wunsch: Unterseite „‹ Mein Profil“ mit Häkchen-Liste (unten) */}
           {rolle && (
             <Zeile symbol={<Sym icon="schild" farbe="bg-[#5856D6]" />} label="Rolle">
-              <Wert>{rolle}</Wert>
+              <Wert>
+                <span className="max-[359px]:hidden">{rolle}</span>
+                <span className="min-[360px]:hidden">{rolleSchmal}</span>
+              </Wert>
             </Zeile>
           )}
           {/* Komitee: rechts die eigenen Komitees, ein Tipp → „Komitee wechseln“
@@ -341,9 +346,11 @@ export function ProfilSheet({
             <Zeile
               symbol={<Sym icon="rollen" farbe="bg-[#32ADE6]" />}
               label={meine.length || isStaff ? "Komitee" : "Komitee wählen"}
+              // Ein offener Wechsel steht klein darunter – das jetzige Komitee bleibt sichtbar
+              unter={hatAntrag ? (meine.length ? "Wechsel angefragt" : "Angefragt") : undefined}
               onClick={hatAntrag || isStaff ? undefined : () => setAntragOffen(true)}
             >
-              {hatAntrag ? <Wert>Angefragt</Wert> : meine.length > 0 && <Wert>{meine.map(committeeLabel).join(", ")}</Wert>}
+              {meine.length > 0 && <Wert>{meine.map(committeeLabel).join(", ")}</Wert>}
             </Zeile>
           )}
         </Gruppe>

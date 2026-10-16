@@ -366,7 +366,8 @@ export function useGewinner(bereich: GewinnerBereich, aktiv: boolean) {
   );
 
   const zuruecknehmen = useCallback(
-    async (gruppe: string, art: GewinnerArt) => {
+    // leise = true: ohne eigene Meldung (z. B. Aufräumen des anderen Teils)
+    async (gruppe: string, art: GewinnerArt, leise = false) => {
       if (!hasSupabase) {
         const i = demoGewinner.findIndex((x) => x.bereich === bereich && x.gruppe === gruppe && x.art === art);
         if (i >= 0) demoGewinner.splice(i, 1);
@@ -375,7 +376,7 @@ export function useGewinner(bereich: GewinnerBereich, aktiv: boolean) {
       }
       const { error } = await supabase!.rpc("gewinner_zuruecknehmen", { p_bereich: bereich, p_gruppe: gruppe, p_art: art });
       if (error) return meldeFehler(error.message);
-      melde("Zurückgenommen");
+      if (!leise) melde("Zurückgenommen");
       void laden();
     },
     [bereich, laden],

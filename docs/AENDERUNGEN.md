@@ -86,6 +86,52 @@ CREATE/ALTER/UPDATE):
   `leisten-check` 777 Zustände, 0 Abweichungen.
 - Typecheck und Build ohne Fehler.
 
+**Nachprüfung von 8d.** Eine zweite Prüfung aus drei Blickwinkeln, jeder Fund
+gegengeprüft, hat 14 Funde bestätigt (11 verschiedene). Alle sind behoben:
+- **Blockierend, durch 8d entstanden:** In Rankings ohne Aufteilung konnte
+  niemand mehr über den Gewinner der Herzen abstimmen. Der Wahl-Liste fehlte
+  `mitHerz`. Jetzt ist `mitHerz` in `RundenAbschnitt`, `RundenStandKarte`,
+  `RundenEinstellungen` und `RundeStartenSheet` Pflicht, der Typecheck meldet
+  jede vergessene Stelle. Umfragen übergeben ausdrücklich `false`.
+- **Zitate ohne Aufteilung:**
+  - Eine neue Runde zählt in der angezeigten Gruppe weiter. Vorher stand
+    „Runde 4 starten“ da, gestartet wurde aber „Runde 2“ in einer anderen
+    Gruppe.
+  - Eine noch offene Runde aus dem früheren anderen Teil lässt sich in den
+    Einstellungen beenden („Ältere Runde N beenden“), beim Motto ebenso.
+  - Beim Küren räumt die App einen alten Gewinner im anderen Teil still mit
+    weg, „Zurücknehmen“ nimmt beide. Vorher rückte der alte nach.
+- **Motto:** Der Abgleich gegen die geladenen Vorschläge gilt nur noch in der
+  Demo. Mit Datenbank sehen Schüler ausgeblendete Vorschläge nicht, sonst
+  fehlten diese in Rangliste und Küren. Nach dem Löschen lädt die App die
+  Runden neu.
+- **Datenbank `gewinner_kueren`:**
+  - Mit Aufteilung lehnt sie ein inoffizielles Motto ab („erst nach
+    Offiziell verschieben“). Küren ist kein Weg um die Zustimmungen herum.
+  - Ohne Aufteilung verschiebt sie das Motto mit Protokolleintrag
+    „bereich.verschoben“.
+  - Ist angewendet (`gewinner_kueren_aufteilung`, nur CREATE OR REPLACE).
+- **Profil:**
+  - „Stv. Schülersprecher*in“ heißt am 320-px-Handy „Stv. Sprecher*in“, statt
+    gekürzt zu werden.
+  - Bei einem offenen Komitee-Wechsel bleibt das jetzige Komitee rechts
+    stehen, „Wechsel angefragt“ steht klein darunter.
+- **Funktionen:**
+  - Ohne Aufteilung gibt es je Bereich nur einen Wortfilter, ohne
+    „(offiziell)“, wie in den Einstellungen des Bereichs.
+  - „Spotify im Steckbrief“ heißt unter 360 px „Spotify“.
+- **Kacheln:** Der Vorleser sagt, was die Zahl zählt: „neu“ bei Chats,
+  „Text wartet auf dich“ beim Album, sonst „offen“.
+
+**Prüfung (Demo r40 = Endstand, Chromium):**
+- Klicktest Herzen in Rankings 7/7. Gegenprobe auf r39: 2 Fehler, der Test
+  greift also.
+- Herzen beim Motto 9/9.
+- Zitate-Runden ohne Aufteilung 5/5.
+- Offiziell/inoffiziell 15/15, Vorsitz-Anfragen 9/9.
+- Fotos bei 320 px (hell, dunkel, Bild): nichts gekürzt, keine Seitenfehler.
+- `ui-check` und `leisten-check` auf r40: Ergebnis folgt.
+
 ## Runde 8a: Offiziell/Inoffiziell schaltbar, Info-Symbol, Mottos löschen (16.10.2026)
 
 Rückmeldung: „Gewinner der Herzen macht keinen Sinn mehr mit offiziell /

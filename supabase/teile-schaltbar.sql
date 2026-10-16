@@ -194,13 +194,16 @@ create or replace trigger motto_geloescht_schuetzen before update on public.mott
   for each row execute function public.motto_geloescht_schuetzen();
 
 -- ---------------------------------------------------------------------
--- 4) Küren: nichts Gelöschtes; das offizielle Motto liegt im Teil offiziell
---    (ohne Aufteilung kann es aus dem alten inoffiziellen Teil kommen – dann
---    wird es dabei verschoben, der Wortfilter prüft es wie beim Verschieben)
+-- 4) Küren: nichts Gelöschtes; das offizielle Motto liegt im Teil offiziell.
+--    Mit Aufteilung: ein inoffizielles Motto erst verschieben (Antrag mit
+--    Zustimmungen) – Küren ist kein Weg daran vorbei. Ohne Aufteilung kann es
+--    aus dem alten inoffiziellen Teil kommen: dann wird es dabei verschoben
+--    (Wortfilter prüft wie beim Verschieben, Protokoll „bereich.verschoben“).
 -- ---------------------------------------------------------------------
 create or replace function public.gewinner_kueren(p_bereich text, p_gruppe text, p_art text, p_ziel text,
                                                   p_label text, p_unter text default '', p_stimmen int default null)
 returns void language plpgsql security definer set search_path = public as $$
+declare v_motto public.motto_vorschlaege;
 begin
   if auth.uid() is null or not public.gewinner_recht(p_bereich) then
     raise exception 'Keine Berechtigung' using errcode = '42501';
@@ -209,9 +212,18 @@ begin
     raise exception 'Dieser Vorschlag wurde gelöscht.';
   end if;
   if p_bereich = 'motto' and p_gruppe = 'offiziell' and p_art = 'gewinner' then
-    perform set_config('sv.verschieben', '1', true);
-    update public.motto_vorschlaege set bereich = 'offiziell' where id::text = p_ziel and bereich <> 'offiziell';
-    perform set_config('sv.verschieben', '', true);
+    select * into v_motto from public.motto_vorschlaege where id::text = p_ziel;
+    if found and v_motto.bereich <> 'offiziell' then
+      if coalesce((select (teile->>'motto')::boolean from public.app_settings where id = 1), true) then
+        raise exception 'Dieser Vorschlag liegt im Teil Inoffiziell – erst nach Offiziell verschieben.';
+      end if;
+      perform set_config('sv.verschieben', '1', true);
+      update public.motto_vorschlaege set bereich = 'offiziell' where id = v_motto.id;
+      perform set_config('sv.verschieben', '', true);
+      perform public.audit_schreiben('bereich.verschoben', 'inhalte', null, 'motto_vorschlaege',
+        '„' || left(v_motto.text, 60) || '“ ist jetzt offiziell (beim Küren)',
+        jsonb_build_object('tabelle', 'motto_vorschlaege', 'id', v_motto.id, 'nach', 'offiziell'));
+    end if;
   end if;
   insert into public.gewinner (bereich, gruppe, art, ziel_id, label, unter, stimmen)
   values (p_bereich, p_gruppe, p_art, p_ziel, left(p_label, 300), left(coalesce(p_unter, ''), 200), p_stimmen)

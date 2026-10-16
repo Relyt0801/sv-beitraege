@@ -1195,6 +1195,8 @@ function ErgebnisSheet({
                       stand={runden}
                       gruppe={f.id}
                       gruppeTitel={f.titel}
+                      // Umfragen kennen keinen Gewinner der Herzen
+                      mitHerz={false}
                       quellen={Object.entries(e.zaehlung)
                         .filter(([k]) => !(eigen && k === EIGENE_NAME))
                         .map(([k, v]) => ({ id: k.slice(0, 100), label: f.typ === "person" ? pName[k] || "Unbekannt" : k, punkte: v }))}
@@ -1280,7 +1282,7 @@ export function UmfrageStichwahlen({ className = "" }: { className?: string }) {
       <Kachel icon="umfrage" farbe="bg-brand" titel={st.offene.length === 1 ? "Stichwahl" : `${st.offene.length} Stichwahlen`} unter="Aus einer Umfrage – das Team hat eine engere Auswahl gestartet.">
         {st.offene.map((r) => (
           <div key={r.id} className="mt-3">
-            <RundenAbschnitt stand={st} gruppe={r.gruppe} gruppeTitel={r.gruppe_titel} quellen={[]} leitet={false} gesperrt={banned} />
+            <RundenAbschnitt stand={st} gruppe={r.gruppe} gruppeTitel={r.gruppe_titel} quellen={[]} leitet={false} gesperrt={banned} mitHerz={false} />
           </div>
         ))}
       </Kachel>

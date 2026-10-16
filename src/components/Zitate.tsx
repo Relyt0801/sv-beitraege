@@ -9,7 +9,7 @@ import { ZustimmungsMarke } from "./ZustimmungsMarke";
 import { AusHinweis } from "./Funktionen";
 import { frage, melde, meldeFehler } from "../lib/melder";
 import { useRunden, type KandidatEingabe, type Runde, type RundenStand } from "../lib/runden";
-import { RundenAbschnitt, RundenMarke, RundeStartenSheet, SichtbarkeitWahl, Stepper } from "./Runden";
+import { rundeBeenden, RundenAbschnitt, RundenMarke, RundeStartenSheet, SichtbarkeitWahl, Stepper } from "./Runden";
 import { useErgebnisSichtbarkeit } from "../lib/ergebnisse";
 import { FarbKachel, FarbKarte, KnopfGlas, KnopfHell, VerwaltetVon } from "./Kachel";
 import { AutorInfo, WortfilterSchalter } from "./AutorInfo";
@@ -1054,6 +1054,9 @@ function ZitateEinstellungen({
   const offen = r.offeneVon(gruppe);
   const letzte = r.letzteBeendete(gruppe);
   const runde = offen || letzte;
+  // Ohne Aufteilung: eine noch offene Runde des früheren anderen Teils steht
+  // sonst nirgends – hier wenigstens zum Beenden
+  const weitere = !aufgeteilt ? r.offene.filter((x) => (x.gruppe === "offiziell" || x.gruppe === "") && x.id !== offen?.id) : [];
   const hmZahl = offen ? r.kandidatenVon(offen.id).filter((k) => k.hm).length : 0;
   const wahlZahl = offen ? r.kandidatenVon(offen.id).filter((k) => !k.hm).length : 0;
 
@@ -1171,6 +1174,9 @@ function ZitateEinstellungen({
                 <Wert>{quellen.length} Zitate</Wert>
               </Zeile>
             )}
+            {weitere.map((w) => (
+              <Zeile key={w.id} label={`Ältere Runde ${w.nr} beenden`} rot onClick={() => rundeBeenden(r, w)} />
+            ))}
           </Gruppe>
         )}
 
@@ -1228,9 +1234,10 @@ function ZitateEinstellungen({
       <RundeStartenSheet
         offen={start !== null}
         quellen={start || []}
-        // „Nächste Runde“ bleibt in ihrer Gruppe; eine neue Runde ohne
-        // Aufteilung landet wie alles Neue im Teil offiziell
-        gruppe={offen ? gruppe : rundenGruppe(t)}
+        // Dieselbe Gruppe wie angezeigt: ohne Aufteilung zählt eine neue Runde
+        // die jüngste weiter (auch eine alte aus '') – Nummer, Name und
+        // Ergebnis-Verlauf passen so zusammen
+        gruppe={gruppe}
         gruppeTitel={aufgeteilt ? TEIL_NAME[t] : ""}
         stand={r}
         mitHerz={!aufgeteilt}
@@ -1246,9 +1253,19 @@ function ZitateEinstellungen({
         herzen={h}
         ohneHerzen={aufgeteilt}
         hinweis={!aufgeteilt ? undefined : t === "offiziell" ? "Der offizielle Gewinner kommt so ins Abibuch." : "Nur für die Stufe – wird nicht gedruckt."}
-        onKueren={(art, k, leise) => gw.kueren({ gruppe: t, art, ziel_id: k.id, label: k.label, unter: (k.unter || "").replace(/^♥ Herzens-Kandidat( · )?/, ""), stimmen: k.stimmen ?? null }, leise)}
-        // ohne Aufteilung kann der Gewinner noch im anderen Teil stehen
-        onZuruecknehmen={(art) => gw.zuruecknehmen(((art === "herzen" ? h : g)?.gruppe as Teil | undefined) ?? t, art)}
+        onKueren={async (art, k, leise) => {
+          const ok = await gw.kueren({ gruppe: t, art, ziel_id: k.id, label: k.label, unter: (k.unter || "").replace(/^♥ Herzens-Kandidat( · )?/, ""), stimmen: k.stimmen ?? null }, leise);
+          // Ohne Aufteilung gibt es EINEN Gewinner: einen alten im anderen Teil
+          // still mit wegräumen – sonst käme er nach „Zurücknehmen“ wieder
+          if (ok && !aufgeteilt && gw.von(ANDERER[t], art)) await gw.zuruecknehmen(ANDERER[t], art, true);
+          return ok;
+        }}
+        onZuruecknehmen={async (art) => {
+          if (aufgeteilt) return gw.zuruecknehmen(t, art);
+          // ohne Aufteilung: beide Teile, damit kein alter Gewinner nachrückt
+          const da = (["offiziell", "inoffiziell"] as const).filter((x) => gw.von(x, art));
+          for (const [i, x] of da.entries()) await gw.zuruecknehmen(x, art, i > 0);
+        }}
         onFertig={nachKueren}
       />
     </>

@@ -198,6 +198,7 @@ export function AlbumKarte({ className = "" }: { className?: string }) {
         unter={prozent ? `Dein Steckbrief: ${prozent} %` : "Dein Steckbrief wartet"}
         zahl={offeneFreigaben}
         zahlRot
+        zahlWort={offeneFreigaben === 1 ? "Text wartet auf dich" : "Texte warten auf dich"}
         aus={!an.album}
         // Warten Texte auf mich, führt die rote Zahl gleich dorthin (wie „n Texte warten ›“ auf der großen Karte)
         onClick={() => oeffne(offeneFreigaben === 0 ? null : offeneFreigaben === 1 ? `__schreiben__:${wartend[0].student_id}` : "__fuer_mich__")}

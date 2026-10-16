@@ -285,6 +285,7 @@ export function ChatsTab() {
       titel={committeeLabel(t.tag)}
       unter={komiteeUnter(t, "Mein Komitee – noch keine Nachricht")}
       zahl={unreadCount(t.id)}
+      zahlWort="neu"
       zahlRot
       onClick={() => oeffne(t.id)}
     />
@@ -314,6 +315,7 @@ export function ChatsTab() {
           titel="Stufenteam-Chat"
           unter={vorschau([teamChat.id], "Nur fürs Team")}
           zahl={unreadCount(teamChat.id)}
+          zahlWort="neu"
           zahlRot
           onClick={() => oeffne(teamChat.id)}
         />,
@@ -326,6 +328,7 @@ export function ChatsTab() {
         titel="Schüler"
         unter={offeneTickets.length ? `${offeneTickets.length} ${offeneTickets.length === 1 ? "Gespräch" : "Gespräche"} offen` : "Kein Gespräch offen"}
         zahl={ticketUngelesen}
+        zahlWort="neu"
         zahlRot
         onClick={() => setAnsicht("schueler")}
       />,
@@ -336,6 +339,7 @@ export function ChatsTab() {
         titel="Eltern"
         unter={eltern.offen ? `${eltern.offen} ${eltern.offen === 1 ? "Gespräch" : "Gespräche"} offen` : "Kein Gespräch offen"}
         zahl={eltern.neu}
+        zahlWort="neu"
         zahlRot
         onClick={() => setAnsicht("eltern")}
       />,
@@ -362,6 +366,7 @@ export function ChatsTab() {
         titel="Frag das Stufenteam"
         unter={vorschau(tickets.map((t) => t.id), "Frag hier alles – das Team antwortet dir")}
         zahl={ticketUngelesen}
+        zahlWort="neu"
         zahlRot
         onClick={() => setTeamOffen(true)}
       />,

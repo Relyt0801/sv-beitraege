@@ -240,6 +240,7 @@ export function FarbKachel({
   unter,
   zahl,
   zahlRot = false,
+  zahlWort = "offen",
   breit = false,
   gedaempft = false,
   aus = false,
@@ -261,6 +262,8 @@ export function FarbKachel({
   zahl?: number;
   /** true = rote Zahl (Ungelesenes/Offenes), sonst weiße Kapsel */
   zahlRot?: boolean;
+  /** Was die Zahl zählt – für den Vorleser („Chats, 5 neu“); Standard „offen“ */
+  zahlWort?: string;
   /** über beide Spalten */
   breit?: boolean;
   /** ruhiger (z. B. „nichts offen“): etwas blasser */
@@ -319,7 +322,7 @@ export function FarbKachel({
       </span>
       <span className="relative mt-auto block pt-3">
         <span className="block text-[16px] font-semibold leading-tight tracking-[-0.01em]">{titel}</span>
-        {zahl ? <span className="sr-only">{`, ${zahl} offen`}</span> : null}
+        {zahl ? <span className="sr-only">{`, ${zahl} ${zahlWort}`}</span> : null}
         {unter && <span className="mt-0.5 line-clamp-2 block text-[12.5px] leading-snug text-white/85">{unter}</span>}
       </span>
     </button>

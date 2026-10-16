@@ -87,6 +87,16 @@ function rundeVon(teil: Teil, r: RundenStand, teilVon: Map<string, Teil>, aufget
   return passend.find((x) => x.offen) || [...passend].sort((a, b) => b.created_at.localeCompare(a.created_at))[0] || null;
 }
 
+/**
+ * Gibt es den Vorschlag noch? Mit Datenbank erkennt kandidatenVon gelöschte
+ * schon am Label „(gelöscht)“ – m.mottos taugt dort nicht als Maßstab, weil
+ * Schüler ausgeblendete Vorschläge (RLS) gar nicht laden. In der Demo löscht
+ * loeschen() den Vorschlag nur aus der Liste, die Runde behält das Label.
+ */
+function nochDa(m: MottoWahl, id: string): boolean {
+  return hasSupabase || m.mottos.some((x) => x.id === id);
+}
+
 const teilKarte = (mottos: Motto[]) => new Map(mottos.map((x) => [x.id, x.bereich] as const));
 
 /**
@@ -336,11 +346,10 @@ function MottoSheet({
     const herz = new Map<string, number>();
     let kandidaten: Kandidat[];
     if (runde) {
-      // nur, was es noch gibt (gelöschte Vorschläge lassen sich nicht küren)
-      const da = new Set(m.mottos.map((x) => x.id));
+      // gelöschte Vorschläge lassen sich nicht küren (siehe nochDa)
       const ks = r
         .kandidatenVon(runde.id)
-        .filter((k) => da.has(k.ziel_id))
+        .filter((k) => nochDa(m, k.ziel_id))
         .map((k) => ({ ...k, n: rundeZahlenDa ? r.zahl(runde.id, k.ziel_id) ?? 0 : null }));
       const sortiert = (l: typeof ks) => (rundeZahlenDa ? [...l].sort((a, b) => (b.n ?? 0) - (a.n ?? 0)) : l);
       for (const k of ks) if (k.hm && k.n != null) herz.set(k.ziel_id, k.n);
@@ -567,7 +576,17 @@ function MottoSheet({
         }
         onFertig={nachKueren}
       />
-      <VorschlagBlatt x={offen ? bearbeiteMotto : null} onClose={() => setBearbeite(null)} m={m} verschieben={verschieben} vs={vs} aufgeteilt={aufgeteilt} />
+      <VorschlagBlatt
+        x={offen ? bearbeiteMotto : null}
+        onClose={() => setBearbeite(null)}
+        m={m}
+        verschieben={verschieben}
+        vs={vs}
+        aufgeteilt={aufgeteilt}
+        // Runden-Kandidaten neu laden: sie tragen jetzt das Label „(gelöscht)“
+        // (für runden_kandidaten gibt es kein Live-Abo)
+        onGeloescht={() => void r.laden()}
+      />
     </>
   );
 }
@@ -959,12 +978,11 @@ function ErgebnisAnsicht({
   const [alleLikes, setAlleLikes] = useState(false);
   const likes = sichtbare.map((x) => ({ id: x.id, label: x.text, unter: x.erklaerung, n: m.zahl(x.id, "like") })).sort((a, b) => b.n - a.n);
   const zeigeLikes = alleLikes ? likes : likes.slice(0, 10);
-  // gelöschte Vorschläge (nicht mehr in m.mottos) fallen aus der Rangliste
-  const da = new Set(m.mottos.map((x) => x.id));
+  // gelöschte Vorschläge fallen aus der Rangliste (siehe nochDa)
   const ks = runde
     ? r
         .kandidatenVon(runde.id)
-        .filter((k) => da.has(k.ziel_id))
+        .filter((k) => nochDa(m, k.ziel_id))
         .map((k) => ({ id: k.ziel_id, label: k.label, unter: k.unter, hm: !!k.hm, n: r.zahl(runde.id, k.ziel_id) ?? 0 }))
     : [];
   const wahl = ks.filter((k) => !k.hm).sort((a, b) => b.n - a.n);
@@ -1208,6 +1226,7 @@ function EinstellungenBlatt({
           startText="Runde starten"
           wahlTitel="Abimotto-Wahl"
           mitHerz={!aufgeteilt}
+          weitere={aufgeteilt ? [] : r.offene.filter((x) => x.id !== runde?.id)}
           className={darfVerwalten ? "mt-5" : "mt-4"}
         />
       </div>
@@ -1293,6 +1312,7 @@ function VorschlagBlatt({
   vs,
   verschieben,
   aufgeteilt,
+  onGeloescht,
 }: {
   x: Motto | null;
   onClose: () => void;
@@ -1301,6 +1321,7 @@ function VorschlagBlatt({
   /** gemeinsame Rückfrage + Antrag (useMottoVerschieben) */
   verschieben: (x: Motto) => Promise<boolean>;
   aufgeteilt: boolean;
+  onGeloescht: () => void;
 }) {
   const [text, setText] = useState("");
   const [erkl, setErkl] = useState("");
@@ -1395,6 +1416,7 @@ function VorschlagBlatt({
                   const f = await m.loeschen(x.id);
                   if (f) return meldeFehler("Ging nicht: " + f);
                   melde("Gelöscht", "erfolg");
+                  onGeloescht();
                   onClose();
                 })
               }

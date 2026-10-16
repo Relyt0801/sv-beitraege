@@ -140,7 +140,7 @@ export function naechsteRundeQuellen(stand: RundenStand, runde: Runde): (Kandida
 }
 
 /** Runde beenden – mit Rückfrage, überall gleich */
-function rundeBeenden(stand: RundenStand, runde: Runde) {
+export function rundeBeenden(stand: RundenStand, runde: Runde) {
   void frage(`Runde ${runde.nr} beenden? Danach kann niemand mehr abstimmen.`, "Beenden", true).then(async (ok) => {
     if (!ok) return;
     const f = await stand.aendern(runde.id, { offen: false });
@@ -185,7 +185,7 @@ export function RundenAbschnitt({
   gesperrt,
   startText = "Runde starten",
   wahlTitel = "Wahl",
-  mitHerz = false,
+  mitHerz,
   nurWahl = false,
   standardName,
 }: {
@@ -198,7 +198,8 @@ export function RundenAbschnitt({
   gesperrt: boolean;
   startText?: string;
   wahlTitel?: string;
-  mitHerz?: boolean;
+  /** Gewinner der Herzen möglich (Motto/Zitate/Rankings: nur ohne Aufteilung; Umfragen: nie) */
+  mitHerz: boolean;
   /** nur die Wahl-Liste (Stand und Steuerung stehen woanders) */
   nurWahl?: boolean;
   /** Name der ersten Runde, z. B. „Stichwahl“ (Standard „Engere Auswahl“) */
@@ -549,13 +550,14 @@ export function RundenErgebnisBlatt({
   stand,
   runde,
   wahlTitel = "Wahl",
-  mitHerz = false,
+  mitHerz,
   onClose,
 }: {
   stand: RundenStand;
   runde: Runde | null;
   wahlTitel?: string;
-  mitHerz?: boolean;
+  /** Gewinner der Herzen möglich (Motto/Zitate/Rankings: nur ohne Aufteilung; Umfragen: nie) */
+  mitHerz: boolean;
   onClose: () => void;
 }) {
   const t = runde ? stand.teilnehmer(runde.id) : 0;
@@ -601,7 +603,7 @@ export function RundenStandKarte({
   gesperrt = false,
   startText = "Runde starten",
   wahlTitel = "Wahl",
-  mitHerz = false,
+  mitHerz,
   standardName,
   onAbstimmen,
   onErgebnis,
@@ -618,7 +620,8 @@ export function RundenStandKarte({
   gesperrt?: boolean;
   startText?: string;
   wahlTitel?: string;
-  mitHerz?: boolean;
+  /** Gewinner der Herzen möglich (Motto/Zitate/Rankings: nur ohne Aufteilung; Umfragen: nie) */
+  mitHerz: boolean;
   /** Name der ersten Runde, z. B. „Stichwahl“ (Standard „Engere Auswahl“) */
   standardName?: string;
   /** „Abstimmen“: Standard = zur Wahl-Liste (RundenAbschnitt) scrollen */
@@ -770,9 +773,10 @@ export function RundenEinstellungen({
   titel = "Abstimmung",
   startText = "Runde starten",
   wahlTitel = "Wahl",
-  mitHerz = false,
+  mitHerz,
   standardName,
   fuss,
+  weitere = [],
   className = "mt-4",
 }: {
   stand: RundenStand;
@@ -783,10 +787,17 @@ export function RundenEinstellungen({
   titel?: string;
   startText?: string;
   wahlTitel?: string;
-  mitHerz?: boolean;
+  /** Gewinner der Herzen möglich (Motto/Zitate/Rankings: nur ohne Aufteilung; Umfragen: nie) */
+  mitHerz: boolean;
   /** Name der ersten Runde, z. B. „Stichwahl“ (Standard „Engere Auswahl“) */
   standardName?: string;
   fuss?: ReactNode;
+  /**
+   * Weitere offene Runden, die hier sonst nirgends stehen – ohne Aufteilung
+   * die Runde aus dem früheren anderen Teil. Nur zum Beenden (sonst ließe
+   * sie sich erst nach erneutem Aufteilen schließen).
+   */
+  weitere?: Runde[];
   className?: string;
 }) {
   const [starten, setStarten] = useState<null | (KandidatEingabe & { punkte?: number })[]>(null);
@@ -830,6 +841,20 @@ export function RundenEinstellungen({
           </button>
         </div>
       )}
+      {weitere.length > 0 && (
+        <div className="gruppe-zellen mt-2">
+          {weitere.map((w) => (
+            <button
+              key={w.id}
+              type="button"
+              onClick={() => rundeBeenden(stand, w)}
+              className="flex min-h-[48px] w-full items-center px-4 py-2 text-left text-[15px] font-semibold text-red-600 transition active:bg-black/[0.04] dark:text-red-400 dark:active:bg-white/[0.06]"
+            >
+              Ältere Runde {w.nr} beenden
+            </button>
+          ))}
+        </div>
+      )}
       {(fuss || (!offen && quellen.length < 2)) && (
         <p className="mt-1.5 px-4 text-[13px] leading-snug text-tinte-leise">{fuss ?? "Für eine Runde braucht es mindestens zwei Möglichkeiten."}</p>
       )}
@@ -854,7 +879,7 @@ export function RundeStartenSheet({
   gruppe,
   gruppeTitel,
   stand,
-  mitHerz = false,
+  mitHerz,
   wahlTitel = "Wahl",
   standardName,
   onClose,
@@ -864,7 +889,8 @@ export function RundeStartenSheet({
   gruppe: string;
   gruppeTitel: string;
   stand: RundenStand;
-  mitHerz?: boolean;
+  /** Gewinner der Herzen möglich (Motto/Zitate/Rankings: nur ohne Aufteilung; Umfragen: nie) */
+  mitHerz: boolean;
   wahlTitel?: string;
   /** Name der ersten Runde (Standard „Engere Auswahl“, bei Rankings „Stichwahl“) */
   standardName?: string;
