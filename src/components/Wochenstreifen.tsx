@@ -24,8 +24,13 @@ export function Wochenstreifen({
   onOeffnen,
   onNeu,
   onTag,
+  leererTagBleibt = false,
 }: {
   onKalender: (tag: string) => void;
+  /** Neben einer rechten Spalte (Laptop) bleibt „HEUTE · nichts eingetragen“
+   *  stehen: Dort kostet die Zeile keine Seitenhöhe, und ohne sie bliebe
+   *  links unter dem Streifen ein Loch (platz-check Okt. 2026). */
+  leererTagBleibt?: boolean;
   /** Termin antippen: ansehen – und fürs Team ändern oder löschen */
   onOeffnen?: (t: Termin) => void;
   /** Nur wer Termine eintragen darf: Knopf „＋ Termin“ in der Tageszeile, legt am gewählten Tag an */
@@ -103,8 +108,9 @@ export function Wochenstreifen({
   // fällt ganz weg. „HEUTE · nichts eingetragen“ sagte nur, was der blaue
   // Kreis ohne Punkt schon zeigt – und schob am Handy das erste „Eintragen“
   // um 65 px nach unten (Prüfung Okt. 2026: am iPhone SE unter dem Rand).
-  // Andere Tage, Tage mit Einträgen und das Team („+ Termin“) behalten ihn.
-  const ohneTagesblock = ready && !onNeu && gewaehlt === heute && desTages.length === 0;
+  // Andere Tage, Tage mit Einträgen, das Team („+ Termin“) und der Laptop
+  // neben der rechten Spalte (leererTagBleibt) behalten ihn.
+  const ohneTagesblock = ready && !onNeu && !leererTagBleibt && gewaehlt === heute && desTages.length === 0;
 
   return (
     <section className="card mb-5 overflow-hidden p-3 sm:p-4" data-tour="wochenstreifen">
@@ -250,13 +256,13 @@ export function Wochenstreifen({
           <div className="mb-1 flex min-h-[44px] items-center justify-between gap-2 px-1">
             <span className="min-w-0 truncate text-[13px] font-semibold uppercase tracking-[0.02em] text-tinte-leise">
               {gewaehlt === heute ? "Heute" : tagLang(gewaehlt)}
-              {/* Leerer Tag heute (gibt es hier nur noch fürs Team, siehe
+              {/* Leerer Tag heute (fürs Team und neben der rechten Spalte, siehe
                   ohneTagesblock): in derselben Zeile statt einer eigenen darunter.
                   Andere Tage („DI, 21. OKTOBER“ + „Heute“-Knopf) hätten dafür
                   keinen Platz – dort bleibt die eigene Zeile. Neben „+ Termin“
                   reicht der Platz erst ab 360 px. */}
               {ready && desTages.length === 0 && gewaehlt === heute && (
-                <span className="font-normal normal-case tracking-normal max-[359px]:hidden"> · nichts eingetragen</span>
+                <span className={`font-normal normal-case tracking-normal ${onNeu ? "max-[359px]:hidden" : ""}`}> · nichts eingetragen</span>
               )}
             </span>
             <span className="flex shrink-0 items-center gap-2">
@@ -293,10 +299,10 @@ export function Wochenstreifen({
           ) : desTages.length === 0 ? (
             gewaehlt !== heute ? (
               <div className="px-1 py-2.5 text-[14px] text-tinte-leise">Nichts eingetragen.</div>
-            ) : (
+            ) : onNeu ? (
               // heute leer, Team: unter 360 px passt der Hinweis nicht neben „+ Termin“
               <div className="px-1 py-2.5 text-[14px] text-tinte-leise min-[360px]:hidden">Nichts eingetragen.</div>
-            )
+            ) : null
           ) : (
             <ul className="grid">
               {desTages.map((t) => (

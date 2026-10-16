@@ -273,7 +273,7 @@ export function ChatsTab() {
     .sort((a, b) => (reihenfolge.get(a.tag) ?? 99) - (reihenfolge.get(b.tag) ?? 99));
   const meineChats = komiteeChats.filter((t) => meineKoms.includes(t.tag));
   const andereChats = komiteeChats.filter((t) => !meineKoms.includes(t.tag));
-  // Fürs Team am Handy (unter lg) nur die Komitees, in denen etwas los ist –
+  // Fürs Team am Handy (unter md) nur die Komitees, in denen etwas los ist –
   // höchstens 3, der Rest im Blatt. Anlass (Runde 10, Okt. 2026): 7 Zeilen
   // „Noch keine Nachricht · aus“ kosteten ~470 px, „Chats“ musste man am
   // iPhone scrollen. Aktiv = Ungelesenes, Glocke an oder ein Eintrag (keine
@@ -449,21 +449,22 @@ export function ChatsTab() {
       )}
 
       {/* Komitee-Chats: ruhige Liste. Fürs Team mit Glocke je Komitee.
-          Am Handy (unter lg) nur die aktiven, dahinter „Alle N Komitees ›“
+          Am Handy (unter md) nur die aktiven, dahinter „Alle N Komitees ›“
           (wie „Alle 8 anzeigen“ in Finanzen; grau, Blau ist „Neu anlegen“).
-          Ab lg die ganze Liste mit Fußnote wie bisher. Weiche per CSS statt
+          Ab md (iPad) die ganze Liste mit Fußnote wie bisher – dort passt
+          sie ohne Scrollen, gekürzt bliebe nur ein leerer halber Bildschirm. Weiche per CSS statt
           useBreit: beide Gruppen bleiben eingehängt, die Zeile, die das Blatt
           öffnet, wird beim Drehen nicht neu gebaut (Fokus-Rückgabe). */}
       {andereChats.length > 0 &&
         (isStaff ? (
           <>
-            <Gruppe className="lg:hidden" titel={komiteeTitel}>
+            <Gruppe className="md:hidden" titel={komiteeTitel}>
               {handyKomitees.map((t) => komiteeZeile(t))}
               {andereChats.length > handyKomitees.length && (
                 <Zeile label={`Alle ${andereChats.length} Komitees`} onClick={() => setAlleKomitees(true)} />
               )}
             </Gruppe>
-            <Gruppe className="max-lg:hidden" titel={komiteeTitel} fuss={GLOCKE_FUSS}>
+            <Gruppe className="max-md:hidden" titel={komiteeTitel} fuss={GLOCKE_FUSS}>
               {andereChats.map((t) => komiteeZeile(t))}
             </Gruppe>
           </>

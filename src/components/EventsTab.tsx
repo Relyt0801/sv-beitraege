@@ -350,6 +350,7 @@ export function EventsTab() {
           onOeffnen={(t) => setAngesehen(t)}
           onNeu={darfTermine ? terminNeu : undefined}
           onTag={setStreifenTag}
+          leererTagBleibt={rechteSpalte}
         />
         {rechteSpalte && (
           <div className="min-w-0">
