@@ -44,8 +44,23 @@ es dafür nur Fotos und keine Zahl.
   Dort heißt es „Nicht bereit“, die Prüfung sagt warum. So lassen sich Zeile
   und Aufklappen ohne Datenbank testen und fotografieren.
 
-**Prüfung (Demo r43, Chromium):**
-- PRUEFUNG_R9
+**Prüfung (Demo r44 = Endstand, Chromium):**
+- `platz-check` 165 Ansichten, 0 über den Grenzen. Gegenüber dem
+  Live-Stand ist keine Ansicht schlechter geworden.
+  - Übersicht iPad quer/Laptop: 1,47–1,75 → 1,41–1,68 Bildschirme,
+    Löcher 15–21 % → 8–13 %.
+  - Finanzen iPad hoch: Löcher 25–30 % → 9–14 %.
+  - Mittel Handy: 2,09 Bildschirme und 11 % Löcher, unverändert.
+- `ui-check` 280 Ansichten ohne Fund (axe ohne Befund, keine
+  Konsolenfehler).
+- `leisten-check` 777 Zustände, 0 Abweichungen.
+- Klicktests:
+  - offiziell/inoffiziell 15/15
+  - Anfragen 9/9
+  - Herzen 9/9
+  - Rankings-Herzen 7/7
+  - Zitate-Runden 5/5
+- Typecheck und Build ohne Fehler.
 
 ## Runde 8d: Korrekturen aus der Prüfung von Runde 8 (16.10.2026)
 
