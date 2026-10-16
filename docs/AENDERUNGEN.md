@@ -45,6 +45,13 @@ Rolle läuft in `ui-check.mjs` und `leisten-check.mjs` mit.
 - Events: die Karte „Vorsitz Abizeitung – Anfragen“ (Termin-Anfragen fürs
   Komitee) stand schon oben; unverändert.
 
+Prüfung auf diesem Stand (Demo, Chromium): `leisten-check.mjs` 7 Größen ×
+7 Rollen (mit Vorsitz) = 777 Zustände, **0 Abweichungen**, 84 geöffnete
+Chats/Kalender in Ordnung; `ui-check.mjs` 280 Ansichten (8 Rollen), nichts
+überstehend, nichts unter der Reiterleiste, keine Konsolenfehler, axe ohne
+Fund. Fotos nach Regel 8 (iPhone/Laptop, hell, dunkel, dunkel mit Bild) für
+Übersicht und Finanzen der Vorsitz-Rolle angesehen.
+
 ## Kopf- und Reiterleiste: eigener Test (16.10.2026)
 
 Zum ursprünglichen Fehlerbild („die Headbar ist nach unten verschoben“ – am
