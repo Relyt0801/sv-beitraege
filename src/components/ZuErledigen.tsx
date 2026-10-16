@@ -187,31 +187,28 @@ export function ZuErledigen({ className = "" }: { className?: string }) {
   // rechts 2–3 Zeilen leer (platz-check Okt. 2026); untereinander kostete die
   // zweite Überschrift Höhe. So ist es immer die niedrigste Höhe ohne Loch.
   // Am Handy weiter zwei Gruppen untereinander.
+  // Die Zeilen in `zeilen` (sie öffnen Blätter) stehen bei JEDER Breite an
+  // derselben Stelle im Baum – nur die Komitee-Zeilen wandern. Sonst baute
+  // React sie beim Drehen des iPads neu auf, und nach dem Schließen eines
+  // Blatts fand der Fokus seinen Auslöser nicht mehr (Sheet.tsx).
   const titel = isStaff ? "Zu erledigen" : "Für dich offen";
   return (
     <>
-      {(zeilen.length > 0 || komitee.length > 0) &&
-        (breit ? (
-          <div className={className}>
-            <Gruppe titel={zeilen.length ? titel : "Aus deinen Komitees"} className="" spalten>
+      {(zeilen.length > 0 || komitee.length > 0) && (
+        <div className={className}>
+          {(zeilen.length > 0 || breit) && (
+            <Gruppe titel={zeilen.length ? titel : "Aus deinen Komitees"} className="" spalten={breit}>
               {zeilen}
+              {breit ? komitee : null}
+            </Gruppe>
+          )}
+          {!breit && komitee.length > 0 && (
+            <Gruppe titel="Aus deinen Komitees" className={zeilen.length ? "mt-4" : ""}>
               {komitee}
             </Gruppe>
-          </div>
-        ) : (
-          <div className={className}>
-            {zeilen.length > 0 && (
-              <Gruppe titel={titel} className="">
-                {zeilen}
-              </Gruppe>
-            )}
-            {komitee.length > 0 && (
-              <Gruppe titel="Aus deinen Komitees" className={zeilen.length ? "mt-4" : ""}>
-                {komitee}
-              </Gruppe>
-            )}
-          </div>
-        ))}
+          )}
+        </div>
+      )}
       <AbstimmungBlatt id={abstimmungId} onClose={() => setAbstimmungId(null)} />
       <InfoBlatt id={infoId} onClose={() => setInfoId(null)} />
       {schichtOffen && (

@@ -49,9 +49,14 @@ const messen = (page) =>
     const inLeiste = (e) => !!e.closest('header, [role=dialog]') || leistenEl.some((n) => n.contains(e));
     let spalte = main.parentElement;
     while (spalte && spalte !== document.body && spalte.getBoundingClientRect().width >= vw - 1) spalte = spalte.parentElement === document.body ? null : spalte.parentElement;
-    const sr = (spalte && spalte !== document.body ? spalte : main).getBoundingClientRect();
-    const links = Math.max(0, Math.round(Math.min(sr.left, main.getBoundingClientRect().left)));
-    const rechts = Math.min(vw, Math.round(Math.max(sr.right, main.getBoundingClientRect().right)));
+    // Inhaltsfläche = Kasten OHNE seinen Innenabstand – sonst zählte der Rand
+    // mal als Loch (ElternApp: px-4 an <main>) und mal nicht (App: px-3 am
+    // Wrapper außen), und die Werte wären zwischen den Ansichten nicht vergleichbar
+    const innenFlaeche = (e) => { const r = e.getBoundingClientRect(); const cs = getComputedStyle(e); return [r.left + parseFloat(cs.paddingLeft), r.right - parseFloat(cs.paddingRight)]; };
+    const [sl, sr] = innenFlaeche(spalte && spalte !== document.body ? spalte : main);
+    const [ml, mr] = innenFlaeche(main);
+    const links = Math.max(0, Math.round(Math.min(sl, ml)));
+    const rechts = Math.min(vw, Math.round(Math.max(sr, mr)));
 
     const seitenweit = (e) => { const r = e.getBoundingClientRect(); return r.width >= vw * 0.98 && r.height >= vh * 0.9; };
     const hatFlaeche = (e) => {
