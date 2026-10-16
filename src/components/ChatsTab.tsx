@@ -486,7 +486,9 @@ export function ChatsTab() {
                 <Zeile label={`Alle ${andereChats.length} Komitees`} onClick={() => setAlleKomitees(true)} />
               )}
             </Gruppe>
-            <Gruppe className="max-md:hidden" titel={komiteeTitel} fuss={GLOCKE_FUSS}>
+            {/* ab Laptop zwei Spalten (Gruppe spalten): 7 Komitees sind dann
+                4 Zeilen statt 7 über die ganze Breite (DESIGN-REGELN 2) */}
+            <Gruppe className="max-md:hidden" titel={komiteeTitel} fuss={GLOCKE_FUSS} spalten>
               {andereChats.map((t) => komiteeZeile(t))}
             </Gruppe>
           </>
