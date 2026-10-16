@@ -90,6 +90,14 @@ in inoffiziell, Komitee und Admins dürfen löschen – ohne Benachrichtigungen.
   der Linse, am Rand wächst sie beim Drücken nur nach innen. Nachgemessen
   0–700 ms bei 320, 390 und 1440 px: bleibt in der Kapsel.
 
+**Prüfung Runde 8 (zusammengeführter Stand, Demo, Chromium):**
+`leisten-check` 777 Zustände, 0 Abweichungen (84 offene Chats/Kalender in
+Ordnung); `ui-check` 280 Ansichten, nichts überstehend, nichts unter der
+Reiterleiste, keine Konsolenfehler, axe ohne Fund; Klicktest
+offiziell/inoffiziell 15/15 (iPhone hell, Laptop dunkel: Info-Symbol,
+Schalter aus/an, kein „Offiziell“ ohne Aufteilung, Motto löschen);
+Klicktest Vorsitz-Anfragen 9/9. Typecheck und Build ohne Fehler.
+
 ## Nachtrag: Vorsitz-Funktionen in der Demo, Terminanfragen nicht abgeschnitten (16.10.2026)
 
 Eine unabhängige Prüfung des Diffs von #19 fand Folgendes. Anfragen-Speicher,
