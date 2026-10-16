@@ -115,6 +115,7 @@ export function MottoKarte({ className = "" }: { className?: string }) {
   const m = useMotto(darf, uid);
   const r = useRunden("motto", darf, uid, can("motto.runden"));
   const [teil, setTeil] = useTeil("motto");
+  const aufgeteilt = useAufgeteilt("motto");
   const [ansicht, setAnsicht] = useState<null | "liste" | "neu">(null);
   if (!darf) return null;
 
@@ -168,7 +169,7 @@ export function MottoKarte({ className = "" }: { className?: string }) {
           runde && !gewaehlt ? (
             <span className="flex flex-wrap gap-1.5">
               <RundenMarke runde={runde} hell />
-              {runde.hm_aktiv && <span className="inline-flex items-center rounded-full bg-white/20 px-2.5 py-1 text-[12px] font-semibold">♥ Gewinner der Herzen</span>}
+              {!aufgeteilt && runde.hm_aktiv && <span className="inline-flex items-center rounded-full bg-white/20 px-2.5 py-1 text-[12px] font-semibold">♥ Gewinner der Herzen</span>}
             </span>
           ) : undefined
         }
@@ -335,7 +336,12 @@ function MottoSheet({
     const herz = new Map<string, number>();
     let kandidaten: Kandidat[];
     if (runde) {
-      const ks = r.kandidatenVon(runde.id).map((k) => ({ ...k, n: rundeZahlenDa ? r.zahl(runde.id, k.ziel_id) ?? 0 : null }));
+      // nur, was es noch gibt (gelöschte Vorschläge lassen sich nicht küren)
+      const da = new Set(m.mottos.map((x) => x.id));
+      const ks = r
+        .kandidatenVon(runde.id)
+        .filter((k) => da.has(k.ziel_id))
+        .map((k) => ({ ...k, n: rundeZahlenDa ? r.zahl(runde.id, k.ziel_id) ?? 0 : null }));
       const sortiert = (l: typeof ks) => (rundeZahlenDa ? [...l].sort((a, b) => (b.n ?? 0) - (a.n ?? 0)) : l);
       for (const k of ks) if (k.hm && k.n != null) herz.set(k.ziel_id, k.n);
       kandidaten = [
@@ -494,6 +500,7 @@ function MottoSheet({
                   fuerAlle={ergebnisse.alle.motto}
                   darfKueren={darfKueren}
                   gekuert={!!gewinner}
+                  mitHerz={!aufgeteilt}
                   onKueren={kuerenOeffnen}
                 />
               )}
@@ -774,7 +781,7 @@ function VorschlagListe({
             darfVerwalten={darfVerwalten}
             aufgeteilt={aufgeteilt}
             gewinner={x.id === gewinnerId ? "gewinner" : x.id === herzenId ? "herzen" : null}
-            antrag={darfVerwalten ? antragZu(x.id) : null}
+            antrag={darfVerwalten && aufgeteilt ? antragZu(x.id) : null}
             onBearbeiten={() => onBearbeiten(x)}
             onVerschieben={() => onVerschieben(x)}
           />
@@ -933,6 +940,7 @@ function ErgebnisAnsicht({
   fuerAlle,
   darfKueren,
   gekuert,
+  mitHerz,
   onKueren,
 }: {
   m: MottoWahl;
@@ -944,14 +952,23 @@ function ErgebnisAnsicht({
   fuerAlle: boolean;
   darfKueren: boolean;
   gekuert: boolean;
+  /** Gewinner der Herzen nur ohne Aufteilung */
+  mitHerz: boolean;
   onKueren: () => void;
 }) {
   const [alleLikes, setAlleLikes] = useState(false);
   const likes = sichtbare.map((x) => ({ id: x.id, label: x.text, unter: x.erklaerung, n: m.zahl(x.id, "like") })).sort((a, b) => b.n - a.n);
   const zeigeLikes = alleLikes ? likes : likes.slice(0, 10);
-  const ks = runde ? r.kandidatenVon(runde.id).map((k) => ({ id: k.ziel_id, label: k.label, unter: k.unter, hm: !!k.hm, n: r.zahl(runde.id, k.ziel_id) ?? 0 })) : [];
+  // gelöschte Vorschläge (nicht mehr in m.mottos) fallen aus der Rangliste
+  const da = new Set(m.mottos.map((x) => x.id));
+  const ks = runde
+    ? r
+        .kandidatenVon(runde.id)
+        .filter((k) => da.has(k.ziel_id))
+        .map((k) => ({ id: k.ziel_id, label: k.label, unter: k.unter, hm: !!k.hm, n: r.zahl(runde.id, k.ziel_id) ?? 0 }))
+    : [];
   const wahl = ks.filter((k) => !k.hm).sort((a, b) => b.n - a.n);
-  const herz = ks.filter((k) => k.hm).sort((a, b) => b.n - a.n);
+  const herz = mitHerz ? ks.filter((k) => k.hm).sort((a, b) => b.n - a.n) : [];
   const nichts = !runde && (!likesSichtbar || likes.length === 0);
 
   return (

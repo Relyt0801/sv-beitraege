@@ -10,7 +10,7 @@ import { useRole } from "../auth/RoleProvider";
 import { hasSupabase, supabase } from "../lib/supabase";
 import { farbwert, lesbarerName, namensfarbe, speichereProfil, waehlbareFarben } from "../lib/profil";
 import { passwortProblem } from "../lib/passwort";
-import { SELECTABLE_COMMITTEES, rolleUndKomitees } from "../lib/committees";
+import { ROLE_TITEL, SELECTABLE_COMMITTEES, committeeLabel } from "../lib/committees";
 import { ladeKomiteeAntraege, stelleKomiteeAntrag } from "../lib/komitee-antrag";
 import { useTheme, type Modus } from "../lib/theme";
 import { fehlerText } from "../lib/netz";
@@ -72,6 +72,8 @@ export function ProfilSheet({
   const [modusOffen, setModusOffen] = useState(false);
 
   const meine = committeesOf(uid);
+  // Rolle mit eigenem Titel (Stufensprecher, Kassenwart …) – eigene Zeile unter „Konto“
+  const rolle = !istEltern && role ? ROLE_TITEL[role] || "" : "";
   const istAdmin = role === "admin";
   const istKassenwart = role === "kassenwart";
 
@@ -136,16 +138,15 @@ export function ProfilSheet({
       <div className="gruppe-zellen">
         <div className="flex min-h-[60px] items-center gap-3 px-4 py-2">
           {!istEltern && <Avatar userId={uid} size={44} />}
-          {/* Der Name hat Vorrang (bis 65 %), die Rolle kürzt mit „…“ */}
+          {/* Nur der Name – Rolle und Komitees stehen ausgeschrieben unter
+              „Konto“ (vorher rechts daneben, am Handy bis „Stufensprech…“ gekürzt) */}
           <span
-            className="max-w-[65%] shrink-0 truncate text-[17px] font-semibold tracking-[-0.01em]"
+            className="min-w-0 flex-1 truncate text-[17px] font-semibold tracking-[-0.01em]"
             style={istEltern ? undefined : { color: namensfarbe(mein?.farbe, theme === "dark") }}
           >
             {istEltern ? mein?.anzeigename || "Ihr Zugang" : `${personIcon(role, meine)} | ${lesbarerName(mein?.anzeigename || "") || "Dein Name"}`}
           </span>
-          <span className="min-w-0 flex-1 truncate text-right text-[15px] text-tinte-matt dark:text-slate-300">
-            {istEltern ? "Elternzugang" : rolleUndKomitees(role, meine) || "Noch kein Komitee"}
-          </span>
+          {istEltern && <span className="shrink-0 text-[15px] text-tinte-matt dark:text-slate-300">Elternzugang</span>}
         </div>
       </div>
 
@@ -268,7 +269,7 @@ export function ProfilSheet({
 
       {/* ------------------------------------------------ Mitteilungen
           Keine Fußnote mehr: Hinweise und „Kommt nichts an?“ klappt die
-          Zeile „Auf diesem Gerät“ auf. */}
+          Zeile „Dieses Gerät“ auf. */}
       {(hasSupabase || !istEltern) && (
         <Gruppe titel="Mitteilungen">
           {!istEltern && (
@@ -291,7 +292,7 @@ export function ProfilSheet({
 
       {/* ------------------------------------------------ Konto */}
       {/* Ohne Fußnote: „Angefragt“ steht schon rechts in der Komitee-Zeile */}
-      {(hasSupabase || (!isStaff && !istEltern)) && (
+      {(hasSupabase || (!istEltern && (!isStaff || meine.length > 0 || !!rolle))) && (
         <Gruppe titel="Konto">
           {hasSupabase && (
             <AufZeile
@@ -329,13 +330,20 @@ export function ProfilSheet({
             </>
           )}
           {/* Komitee-Wunsch: Unterseite „‹ Mein Profil“ mit Häkchen-Liste (unten) */}
-          {!isStaff && !istEltern && (
+          {rolle && (
+            <Zeile symbol={<Sym icon="schild" farbe="bg-[#5856D6]" />} label="Rolle">
+              <Wert>{rolle}</Wert>
+            </Zeile>
+          )}
+          {/* Komitee: rechts die eigenen Komitees, ein Tipp → „Komitee wechseln“
+              (Stufenteam & Co. tragen ihre Komitees nur zur Ansicht) */}
+          {!istEltern && (!isStaff || meine.length > 0) && (
             <Zeile
               symbol={<Sym icon="rollen" farbe="bg-[#32ADE6]" />}
-              label={meine.length ? "Komitee wechseln" : "Komitee wählen"}
-              onClick={hatAntrag ? undefined : () => setAntragOffen(true)}
+              label={meine.length || isStaff ? "Komitee" : "Komitee wählen"}
+              onClick={hatAntrag || isStaff ? undefined : () => setAntragOffen(true)}
             >
-              {hatAntrag && <Wert>Angefragt</Wert>}
+              {hatAntrag ? <Wert>Angefragt</Wert> : meine.length > 0 && <Wert>{meine.map(committeeLabel).join(", ")}</Wert>}
             </Zeile>
           )}
         </Gruppe>
@@ -526,8 +534,8 @@ function HintergrundZeile() {
 }
 
 /**
- * „Auf diesem Gerät“: Mitteilungen anschalten bzw. ihr Zustand. Ist nichts
- * mehr anzuschalten (an, blockiert, nicht eingerichtet), klappt die Zeile die
+ * „Dieses Gerät“: Mitteilungen anschalten bzw. ihr Zustand. Ist nichts
+ * mehr anzuschalten (an, blockiert, nicht bereit), klappt die Zeile die
  * Prüfung „Kommt bei mir nichts an?“ auf – so stört sie niemanden, der kein
  * Problem hat. Vorher stand sie samt zwei Hinweisen als Fußtext unter der
  * Gruppe. Bis eben verschluckte die App jeden Fehler beim Versenden (siehe
@@ -550,9 +558,13 @@ function PushZeile({ istEltern }: { istEltern: boolean }) {
   }, [offen]);
 
   const symbol = <Sym icon="info" farbe="bg-[#FF3B30]" />;
+  // Noch nicht an: der Knopf steht direkt in der Zeile (wer Mitteilungen nicht
+  // an hat, soll ihn sofort sehen – die Prüfung sagte dann ohnehin nur
+  // „anschalten“). Sonst klappt die Zeile den Zustand und die Prüfung auf.
+  // Kurze Wörter: am 320-px-Handy passen Bezeichnung und Zustand nebeneinander.
   if (pushConfigured() && perm !== "granted" && perm !== "denied")
     return (
-      <Zeile label="Auf diesem Gerät" symbol={symbol}>
+      <Zeile label="Dieses Gerät" symbol={symbol}>
         <button
           disabled={busy}
           onClick={async () => {
@@ -569,10 +581,10 @@ function PushZeile({ istEltern }: { istEltern: boolean }) {
       </Zeile>
     );
 
-  const zustand = !pushConfigured() ? "Nicht eingerichtet" : perm === "granted" ? "An" : "Blockiert";
+  const zustand = !pushConfigured() ? "Nicht bereit" : perm === "granted" ? "An" : "Blockiert";
   return (
     <>
-      <AufZeile symbol={symbol} label="Auf diesem Gerät" wert={zustand} auf={offen} onClick={() => setOffen((o) => !o)} />
+      <AufZeile symbol={symbol} label="Dieses Gerät" wert={zustand} auf={offen} onClick={() => setOffen((o) => !o)} />
       {offen && (
         <div className="animate-fadeIn space-y-1.5 px-4 pb-3 pt-2 text-[13px] leading-relaxed text-tinte-matt dark:text-slate-300">
           {perm === "denied" && <p>{istEltern ? "Ihr" : "Dein"} Browser blockiert Mitteilungen – in den Browser-Einstellungen wieder erlauben.</p>}

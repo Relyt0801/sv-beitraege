@@ -80,8 +80,11 @@ wieder passieren.**
     liest, sieht dort „Nur lesen …“). Finanzen am Laptop/iPad quer: links
     Kontostand, Aktionen, Geplantes; rechts oben die Karte „Buchungen“
     (Monate zugeklappt, mindestens die obere Hälfte), darunter die
-    Kostenanfragen (höchstens die Hälfte, scrollen in sich). Am Handy
-    bleibt die Reihenfolge Kontostand → Buchungen → Rest.
+    Kostenanfragen (höchstens die Hälfte, scrollen in sich; wer nur liest,
+    sieht sie nur, wenn es Anfragen gibt – sonst nehmen die Buchungen die
+    ganze Höhe). Am Handy: Kontostand → Kostenanfragen (nur wenn etwas offen ist
+    oder man Vorsitz ist) → Buchungen → Rest; sonst stehen die
+    Kostenanfragen als Zeile neben „Geplant“ unten.
   - Zahlen an Reitern stehen nie im Textfluss (`GlasLeiste`: absolut an der
     Ecke) – sonst rutscht die mittig gesetzte Leiste, sobald eine Zahl kommt
     oder geht. In einem `ChatKopf` stehen Seiten-Knöpfe („+ Neu“) VOR dem

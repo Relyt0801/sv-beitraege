@@ -49,6 +49,9 @@ export interface Kandidat {
   /** Herzens-Kandidat: zählt nicht zur Wahl, nur zum Gewinner der Herzen */
   hm?: boolean;
 }
+/** Label, das motto_loeschen den Kandidaten eines gelöschten Mottos gibt */
+const GELOESCHT = "(gelöscht)";
+
 export interface KandidatEingabe {
   id: string;
   label: string;
@@ -301,7 +304,8 @@ export function useRunden(bereich: RundenBereich, aktiv: boolean, uid: string | 
   const offene = runden.filter((r) => r.offen);
   const offeneVon = (gruppe: string) => offene.find((r) => r.gruppe === gruppe) || null;
   const letzteBeendete = (gruppe: string) => runden.find((r) => !r.offen && r.gruppe === gruppe) || null;
-  const kandidatenVon = (rundeId: string) => kandidaten.filter((k) => k.runde_id === rundeId).sort((a, b) => a.sort - b.sort);
+  // Gelöschte Mottos (motto_loeschen setzt das Label) tauchen nirgends mehr auf
+  const kandidatenVon = (rundeId: string) => kandidaten.filter((k) => k.runde_id === rundeId && k.label !== GELOESCHT).sort((a, b) => a.sort - b.sort);
   const istHmVon = (rundeId: string, ziel: string) => kandidaten.some((k) => k.runde_id === rundeId && k.ziel_id === ziel && k.hm);
   /** Eigene Stimmen der Wahl (ohne Gewinner der Herzen) */
   const meineIn = (rundeId: string) =>

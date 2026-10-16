@@ -199,7 +199,8 @@ export function AlbumKarte({ className = "" }: { className?: string }) {
         zahl={offeneFreigaben}
         zahlRot
         aus={!an.album}
-        onClick={() => oeffne(null)}
+        // Warten Texte auf mich, führt die rote Zahl gleich dorthin (wie „n Texte warten ›“ auf der großen Karte)
+        onClick={() => oeffne(offeneFreigaben === 0 ? null : offeneFreigaben === 1 ? `__schreiben__:${wartend[0].student_id}` : "__fuer_mich__")}
       />
       <FarbKarte
         className="max-sm:hidden"

@@ -149,6 +149,16 @@ function rundeBeenden(stand: RundenStand, runde: Runde) {
   });
 }
 
+/**
+ * Titel der Gruppe einer Runde. „Offiziell“/„Inoffiziell“ steht nur da,
+ * solange der Bereich aufgeteilt ist: mitHerz heißt in Motto, Zitate und
+ * Rankings genau „ohne Aufteilung“ (nur dann gibt es den Gewinner der Herzen).
+ * Ältere Runden tragen den Teil noch im Titel.
+ */
+function gruppenTitel(t: string, mitHerz: boolean) {
+  return mitHerz && (t === "Offiziell" || t === "Inoffiziell") ? "" : t;
+}
+
 /** Zur Wahl-Karte einer Runde scrollen (sie trägt die id „runde-<id>“) */
 function zurRunde(rundeId: string) {
   const el = document.getElementById(`runde-${rundeId}`);
@@ -209,11 +219,12 @@ export function RundenAbschnitt({
           zahlenSehen={leitet}
           gesperrt={gesperrt}
           wahlTitel={wahlTitel}
+          mitHerz={mitHerz}
           onWeiter={() => setStarten(naechsteRundeQuellen(stand, offen))}
         />
       ) : nurWahl ? null : (
         <>
-          {letzte && (leitet || letzte.ergebnis_sichtbar) && <ErgebnisKurz stand={stand} runde={letzte} wahlTitel={wahlTitel} />}
+          {letzte && (leitet || letzte.ergebnis_sichtbar) && <ErgebnisKurz stand={stand} runde={letzte} wahlTitel={wahlTitel} mitHerz={mitHerz} />}
           {leitet && quellen.length >= 2 && (
             <StartZeile titel={startText} unter={`${letzte ? `Runde ${letzte.nr + 1}` : "Runde 2"}: die Besten auswählen, Stimmen je Person festlegen`} onClick={() => setStarten(quellen)} />
           )}
@@ -257,6 +268,7 @@ function RundenKarte({
   zahlenSehen,
   gesperrt,
   wahlTitel,
+  mitHerz,
   onWeiter,
   kompakt = false,
 }: {
@@ -264,6 +276,8 @@ function RundenKarte({
   runde: Runde;
   /** ohne Runden-Marke und Gruppen-Titel (stehen schon in der Stand-Karte) */
   kompakt?: boolean;
+  /** Gewinner der Herzen gibt es nur ohne Aufteilung (siehe gruppenTitel) */
+  mitHerz: boolean;
   /** Steuerung unter der Karte zeigen */
   leitet: boolean;
   /** Zahlen sehen, auch wenn nicht freigegeben (wer leitet) */
@@ -275,7 +289,9 @@ function RundenKarte({
   const alle = stand.kandidatenVon(runde.id);
   const wahl = alle.filter((k) => !k.hm);
   const herz = alle.filter((k) => k.hm);
-  const herzLaeuft = !!runde.hm_aktiv && herz.length >= 2;
+  const herzDa = mitHerz && herz.length >= 2;
+  const herzLaeuft = herzDa && !!runde.hm_aktiv;
+  const titel = gruppenTitel(runde.gruppe_titel, mitHerz);
   const meine = stand.meineIn(runde.id);
   const zahlenDa = zahlenSehen || runde.ergebnis_sichtbar;
   const sortiere = (ks: typeof alle) =>
@@ -299,7 +315,7 @@ function RundenKarte({
                   <StimmPunkte vergeben={meine.length} gesamt={runde.stimmen} />
                 </span>
               </div>
-              {runde.gruppe_titel && <div className="mt-1.5 text-[15px] font-semibold leading-snug text-tinte-matt dark:text-slate-300">{runde.gruppe_titel}</div>}
+              {titel && <div className="mt-1.5 text-[15px] font-semibold leading-snug text-tinte-matt dark:text-slate-300">{titel}</div>}
             </>
           )}
           <div className={kompakt ? "" : "mt-2"}>
@@ -322,7 +338,7 @@ function RundenKarte({
         </div>
       )}
 
-      {leitet && <RundeSteuern stand={stand} runde={runde} hatHerz={herz.length >= 2} onWeiter={onWeiter} />}
+      {leitet && <RundeSteuern stand={stand} runde={runde} hatHerz={herzDa} onWeiter={onWeiter} />}
     </section>
   );
 }
@@ -454,7 +470,7 @@ function SteuerZeilen({ stand, runde, hatHerz, onWeiter }: { stand: RundenStand;
 }
 
 /** Rangliste einer Runde (Wahl und, falls vorhanden, Gewinner der Herzen) */
-function RundenRangliste({ stand, runde, wahlTitel }: { stand: RundenStand; runde: Runde; wahlTitel: string }) {
+function RundenRangliste({ stand, runde, wahlTitel, mitHerz }: { stand: RundenStand; runde: Runde; wahlTitel: string; mitHerz: boolean }) {
   const alle = stand
     .kandidatenVon(runde.id)
     .map((k) => ({ ...k, n: stand.zahl(runde.id, k.ziel_id) ?? 0 }))
@@ -485,7 +501,7 @@ function RundenRangliste({ stand, runde, wahlTitel }: { stand: RundenStand; rund
         <h3 className="mb-1.5 px-4 text-[13px] uppercase tracking-[0.02em] text-tinte-leise">{wahlTitel}</h3>
         <Liste ks={wahl} />
       </div>
-      {herz.length >= 2 && (
+      {mitHerz && herz.length >= 2 && (
         <div>
           <h3 className={`mb-1.5 flex items-center gap-1.5 px-4 text-[13px] uppercase tracking-[0.02em] ${HERZ.text}`}>
             <Icon name="herz" size={12} strich={2.4} /> Gewinner der Herzen
@@ -500,7 +516,7 @@ function RundenRangliste({ stand, runde, wahlTitel }: { stand: RundenStand; rund
 /** Medaillenfarben Gold, Silber, Bronze – wie bei den Rankings */
 const MEDAILLE = ["#E9C460", "#C0C4CC", "#D4A373"];
 
-function ErgebnisKurz({ stand, runde, wahlTitel }: { stand: RundenStand; runde: Runde; wahlTitel: string }) {
+function ErgebnisKurz({ stand, runde, wahlTitel, mitHerz }: { stand: RundenStand; runde: Runde; wahlTitel: string; mitHerz: boolean }) {
   const wahl = stand
     .kandidatenVon(runde.id)
     .filter((k) => !k.hm)
@@ -522,7 +538,7 @@ function ErgebnisKurz({ stand, runde, wahlTitel }: { stand: RundenStand; runde: 
         </span>
       </summary>
       <div className="px-0 pb-3">
-        <RundenRangliste stand={stand} runde={runde} wahlTitel={wahlTitel} />
+        <RundenRangliste stand={stand} runde={runde} wahlTitel={wahlTitel} mitHerz={mitHerz} />
       </div>
     </details>
   );
@@ -533,24 +549,27 @@ export function RundenErgebnisBlatt({
   stand,
   runde,
   wahlTitel = "Wahl",
+  mitHerz = false,
   onClose,
 }: {
   stand: RundenStand;
   runde: Runde | null;
   wahlTitel?: string;
+  mitHerz?: boolean;
   onClose: () => void;
 }) {
   const t = runde ? stand.teilnehmer(runde.id) : 0;
+  const titel = runde ? gruppenTitel(runde.gruppe_titel, mitHerz) : "";
   return (
     <Sheet open={!!runde} onClose={onClose}>
       {runde && (
         <>
           <SheetKopf
             titel={`Ergebnis · Runde ${runde.nr}`}
-            unter={`${runde.offen ? "Läuft noch" : "Beendet"}${runde.gruppe_titel ? ` · ${runde.gruppe_titel}` : ""} · ${t} ${t === 1 ? "Person hat" : "Personen haben"} gewählt`}
+            unter={`${runde.offen ? "Läuft noch" : "Beendet"}${titel ? ` · ${titel}` : ""} · ${t} ${t === 1 ? "Person hat" : "Personen haben"} gewählt`}
             onClose={onClose}
           />
-          <RundenRangliste stand={stand} runde={runde} wahlTitel={wahlTitel} />
+          <RundenRangliste stand={stand} runde={runde} wahlTitel={wahlTitel} mitHerz={mitHerz} />
         </>
       )}
     </Sheet>
@@ -623,6 +642,7 @@ export function RundenStandKarte({
     const fertig = meine >= offen.stimmen;
     const t = stand.teilnehmer(offen.id);
     const ergebnisDa = leitet || offen.ergebnis_sichtbar;
+    const titel = gruppeTitel || gruppenTitel(offen.gruppe_titel, mitHerz);
     inhalt = (
       <section className={`relative overflow-hidden rounded-[1.4rem] bg-gradient-to-br p-4 text-white ${verlauf} ${schatten}`}>
         <div aria-hidden className="pointer-events-none absolute -right-8 -top-10 h-32 w-32 rounded-full bg-white/15 blur-2xl" />
@@ -636,7 +656,7 @@ export function RundenStandKarte({
           {fertig ? "Deine Stimmen sind drin" : "Abstimmung läuft"}
         </div>
         <div className="relative mt-0.5 text-[13.5px] leading-snug text-white/85">
-          {gruppeTitel || offen.gruppe_titel ? `${gruppeTitel || offen.gruppe_titel} · ` : ""}
+          {titel ? `${titel} · ` : ""}
           {stimmenSatz(stand, offen, gesperrt)}
         </div>
         <div className="relative mt-3.5 flex flex-wrap items-center gap-2">
@@ -730,7 +750,7 @@ export function RundenStandKarte({
         standardName={standardName}
         onClose={() => setStarten(null)}
       />
-      <RundenErgebnisBlatt stand={stand} runde={ergebnis} wahlTitel={wahlTitel} onClose={() => setErgebnis(null)} />
+      <RundenErgebnisBlatt stand={stand} runde={ergebnis} wahlTitel={wahlTitel} mitHerz={mitHerz} onClose={() => setErgebnis(null)} />
     </>
   );
 }
@@ -773,7 +793,7 @@ export function RundenEinstellungen({
   if (!leitet) return null;
   const offen = stand.offeneVon(gruppe);
   const letzte = stand.letzteBeendete(gruppe);
-  const herzDa = offen ? stand.kandidatenVon(offen.id).filter((k) => k.hm).length >= 2 : false;
+  const herzDa = mitHerz && offen ? stand.kandidatenVon(offen.id).filter((k) => k.hm).length >= 2 : false;
   const t = offen ? stand.teilnehmer(offen.id) : 0;
 
   return (

@@ -53,6 +53,26 @@ const ANDERER: Record<Teil, Teil> = { offiziell: "inoffiziell", inoffiziell: "of
 const zitatLabel = (z: Zitat) => `„${zitatOhneZeichen(z.text)}“`;
 const zitatUnter = (z: Zitat) => `— ${z.wer}${z.kontext ? `, ${z.kontext}` : ""}`;
 
+/**
+ * Runden-Gruppe für Anzeige und Steuerung. Ohne Aufteilung gibt es nur EINEN
+ * Bereich – dann zählt die Gruppe mit der offenen bzw. jüngsten Runde, auch
+ * eine, die noch im inoffiziellen Teil ('') gestartet wurde.
+ */
+function anzeigeGruppe(r: RundenStand, teil: Teil, aufgeteilt: boolean): string {
+  if (aufgeteilt) return rundenGruppe(teil);
+  const offen = r.offeneVon("offiziell") || r.offeneVon("");
+  if (offen) return offen.gruppe;
+  const a = r.letzteBeendete("offiziell");
+  const b = r.letzteBeendete("");
+  if (a && b) return a.created_at >= b.created_at ? a.gruppe : b.gruppe;
+  return (a || b)?.gruppe ?? rundenGruppe(teil);
+}
+
+/** Gekürter Gewinner – ohne Aufteilung aus beiden Teilen (der offizielle zuerst) */
+function gewinnerVon(gw: GewinnerStand, teil: Teil, art: GewinnerArt, aufgeteilt: boolean): Gewinner | null {
+  return aufgeteilt ? gw.von(teil, art) : gw.von("offiziell", art) || gw.von("inoffiziell", art);
+}
+
 /* ====================================================================== */
 /* Karte auf der Startseite                                               */
 /* ====================================================================== */
@@ -353,11 +373,11 @@ function WandAnsicht({
 }) {
   const { banned } = useRole();
   const aufgeteilt = useAufgeteilt("zitate");
-  const gruppe = rundenGruppe(teil);
+  const gruppe = anzeigeGruppe(r, teil, aufgeteilt);
   const runde = r.offeneVon(gruppe);
-  const g = gw.von(teil, "gewinner");
+  const g = gewinnerVon(gw, teil, "gewinner", aufgeteilt);
   // Gewinner der Herzen nur ohne Aufteilung (sonst ist das der inoffizielle Teil)
-  const h = aufgeteilt ? null : gw.von(teil, "herzen");
+  const h = aufgeteilt ? null : gewinnerVon(gw, teil, "herzen", aufgeteilt);
   return (
     <>
       {/* Stand ganz oben: die laufende Runde (Abstimmen ohne Scrollen) …
@@ -385,8 +405,8 @@ function Wand({ wand, teil, gw, v, einreichen }: { wand: Zitatwand; teil: Teil; 
   const aufgeteilt = useAufgeteilt("zitate");
   const frei = useMemo(() => wand.zitate.filter((z) => z.status === "frei" && imTeil(z.bereich, teil, aufgeteilt)), [wand.zitate, teil, aufgeteilt]);
   const meineOffenen = wand.zitate.filter((z) => z.status === "offen" && imTeil(z.bereich, teil, aufgeteilt) && wand.istMeins(z.id));
-  const g = gw.von(teil, "gewinner");
-  const h = aufgeteilt ? null : gw.von(teil, "herzen");
+  const g = gewinnerVon(gw, teil, "gewinner", aufgeteilt);
+  const h = aufgeteilt ? null : gewinnerVon(gw, teil, "herzen", aufgeteilt);
 
   const rang = useMemo(() => [...frei].sort((a, b) => wand.stimmenVon(b.id) - wand.stimmenVon(a.id)).map((z) => z.id), [frei, wand]);
   const liste = frei
@@ -518,7 +538,8 @@ function ZitatZeile({ z, platz, wand, v, marken }: { z: Zitat; platz: number; wa
   const [edit, setEdit] = useState<null | { text: string; wer: string; kontext: string }>(null);
   const darfPruefen = can("zitate.pruefen");
   const aufgeteilt = useAufgeteilt("zitate");
-  const antrag = darfPruefen ? v.antragZu(z.id) : null;
+  // Anträge nur, solange es zwei Teile gibt (Ausschalten schließt sie)
+  const antrag = darfPruefen && aufgeteilt ? v.antragZu(z.id) : null;
   const verschieben = useVerschieben(wand, v);
 
   if (edit)
@@ -653,13 +674,14 @@ function ErgebnisZeile({ platz, label, unter, n, max, herz, marken = [] }: { pla
 }
 
 /** Ergebnis bzw. Zwischenstand einer Runde – Wahl und Gewinner der Herzen getrennt */
-function RundenErgebnis({ r, runde, marke }: { r: RundenStand; runde: Runde; marke: (id: string) => GewinnerArt[] }) {
+function RundenErgebnis({ r, runde, marke, mitHerz }: { r: RundenStand; runde: Runde; marke: (id: string) => GewinnerArt[]; mitHerz: boolean }) {
   const alle = r
     .kandidatenVon(runde.id)
     .map((k) => ({ ...k, n: r.zahl(runde.id, k.ziel_id) ?? 0 }))
     .sort((a, b) => b.n - a.n);
   const wahl = alle.filter((k) => !k.hm);
-  const herz = alle.filter((k) => k.hm);
+  // Gewinner der Herzen nur ohne Aufteilung
+  const herz = mitHerz ? alle.filter((k) => k.hm) : [];
   const t = r.teilnehmer(runde.id);
   if (!wahl.length) return null;
   return (
@@ -688,11 +710,11 @@ function ErgebnisAnsicht({ wand, r, gw, teil, einstellungen }: { wand: Zitatwand
   const leitet = can("zitate.runden");
   const darfKueren = leitet || can("zitate.pruefen");
   const aufgeteilt = useAufgeteilt("zitate");
-  const gruppe = rundenGruppe(teil);
+  const gruppe = anzeigeGruppe(r, teil, aufgeteilt);
   const offen = r.offeneVon(gruppe);
   const letzte = r.letzteBeendete(gruppe);
-  const g = gw.von(teil, "gewinner");
-  const h = aufgeteilt ? null : gw.von(teil, "herzen");
+  const g = gewinnerVon(gw, teil, "gewinner", aufgeteilt);
+  const h = aufgeteilt ? null : gewinnerVon(gw, teil, "herzen", aufgeteilt);
   const marke = (id: string): GewinnerArt[] => [...(g?.ziel_id === id ? (["gewinner"] as const) : []), ...(h?.ziel_id === id ? (["herzen"] as const) : [])];
   const sichtbar = (x: Runde | null): x is Runde => !!x && (leitet || x.ergebnis_sichtbar);
 
@@ -720,8 +742,8 @@ function ErgebnisAnsicht({ wand, r, gw, teil, einstellungen }: { wand: Zitatwand
           </Zeile>
         </Gruppe>
       )}
-      {sichtbar(offen) && <RundenErgebnis r={r} runde={offen} marke={marke} />}
-      {sichtbar(letzte) && <RundenErgebnis r={r} runde={letzte} marke={marke} />}
+      {sichtbar(offen) && <RundenErgebnis r={r} runde={offen} marke={marke} mitHerz={!aufgeteilt} />}
+      {sichtbar(letzte) && <RundenErgebnis r={r} runde={letzte} marke={marke} mitHerz={!aufgeteilt} />}
       {top.length > 0 && (
         <Gruppe titel="Beliebteste Zitate" fuss="Gezählt wird das Feuer auf der Wand – eine Stimme je Person und Zitat.">
           {top.map((x, i) => (
@@ -878,13 +900,13 @@ function Pruefen({ wand, teil, setTeil, v }: { wand: Zitatwand; teil: Teil; setT
   const zu = useZustimmungen("zitat", alle.length > 0, uid);
   const verschieben = useVerschieben(wand, v);
   // Anträge zu Zitaten, die nicht (mehr) auf der Wand stehen, sonst nirgends sichtbar
-  const antraege = v.liste.filter((a) => !wand.zitate.some((z) => z.id === a.ziel_id && z.status === "frei"));
+  const antraege = aufgeteilt ? v.liste.filter((a) => !wand.zitate.some((z) => z.id === a.ziel_id && z.status === "frei")) : [];
 
   return (
     <div className="space-y-2.5">
       {antraege.length > 0 && <VerschiebeListe liste={antraege} v={v} titel="Offene Verschiebe-Anträge" />}
       {offen.map((z) => {
-        const antrag = v.antragZu(z.id);
+        const antrag = aufgeteilt ? v.antragZu(z.id) : null;
         return (
           <div key={z.id} className="animate-aufsteigen rounded-2xl zelle p-4">
             {aufgeteilt && (
@@ -1028,7 +1050,7 @@ function ZitateEinstellungen({
   const [kueren, setKueren] = useState(false);
   const [lehrer, setLehrer] = useState(false);
 
-  const gruppe = rundenGruppe(t);
+  const gruppe = anzeigeGruppe(r, t, aufgeteilt);
   const offen = r.offeneVon(gruppe);
   const letzte = r.letzteBeendete(gruppe);
   const runde = offen || letzte;
@@ -1061,8 +1083,8 @@ function ZitateEinstellungen({
     return [...quellen].sort((a, b) => b.punkte - a.punkte).map((q) => ({ id: q.id, label: q.label, unter: q.unter, stimmen: wand.zahlenSichtbar ? q.punkte : null }));
   }, [runde, r, quellen, wand.zahlenSichtbar, aufgeteilt]);
 
-  const g = gw.von(t, "gewinner");
-  const h = aufgeteilt ? null : gw.von(t, "herzen");
+  const g = gewinnerVon(gw, t, "gewinner", aufgeteilt);
+  const h = aufgeteilt ? null : gewinnerVon(gw, t, "herzen", aufgeteilt);
   const fehler = (f: string | null) => f && meldeFehler("Ging nicht: " + f);
   const zeigeWf = wfRecht("zitate");
 
@@ -1206,7 +1228,9 @@ function ZitateEinstellungen({
       <RundeStartenSheet
         offen={start !== null}
         quellen={start || []}
-        gruppe={gruppe}
+        // „Nächste Runde“ bleibt in ihrer Gruppe; eine neue Runde ohne
+        // Aufteilung landet wie alles Neue im Teil offiziell
+        gruppe={offen ? gruppe : rundenGruppe(t)}
         gruppeTitel={aufgeteilt ? TEIL_NAME[t] : ""}
         stand={r}
         mitHerz={!aufgeteilt}
@@ -1223,7 +1247,8 @@ function ZitateEinstellungen({
         ohneHerzen={aufgeteilt}
         hinweis={!aufgeteilt ? undefined : t === "offiziell" ? "Der offizielle Gewinner kommt so ins Abibuch." : "Nur für die Stufe – wird nicht gedruckt."}
         onKueren={(art, k, leise) => gw.kueren({ gruppe: t, art, ziel_id: k.id, label: k.label, unter: (k.unter || "").replace(/^♥ Herzens-Kandidat( · )?/, ""), stimmen: k.stimmen ?? null }, leise)}
-        onZuruecknehmen={(art) => gw.zuruecknehmen(t, art)}
+        // ohne Aufteilung kann der Gewinner noch im anderen Teil stehen
+        onZuruecknehmen={(art) => gw.zuruecknehmen(((art === "herzen" ? h : g)?.gruppe as Teil | undefined) ?? t, art)}
         onFertig={nachKueren}
       />
     </>

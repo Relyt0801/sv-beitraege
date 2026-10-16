@@ -479,5 +479,13 @@ export function useAlleVerschiebungen(aktiv: boolean) {
     },
     [laden],
   );
-  return { liste, zustimmen, ablehnen, laden };
+  // Nur Bereiche, die gerade aufgeteilt sind (Ausschalten schließt die Anträge
+  // in der Datenbank; bis die Liste neu geladen ist, hier schon ausgeblendet)
+  const an: Record<TeilTabelle, boolean> = {
+    zitate: useAufgeteilt("zitate"),
+    ranking_kategorien: useAufgeteilt("rankings"),
+    motto_vorschlaege: useAufgeteilt("motto"),
+    album_kommentare: useAufgeteilt("kommentare"),
+  };
+  return { liste: liste.filter((v) => an[v.tabelle]), zustimmen, ablehnen, laden };
 }

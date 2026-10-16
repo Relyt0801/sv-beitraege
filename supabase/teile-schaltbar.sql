@@ -16,7 +16,14 @@
 -- 3) Motto-Vorschläge löschen (Komitee = motto.verwalten, Admin):
 --    motto_loeschen(id) leert den Vorschlag und markiert ihn (geloescht_at);
 --    der Text steht nur noch im Protokoll. Keine Benachrichtigung. Nicht für
---    Kandidaten einer laufenden Runde und nicht für gekürte Gewinner.
+--    Kandidaten einer laufenden Wahl und nicht für gekürte Gewinner. Likes
+--    zählen danach nicht mehr, Runden zeigen „(gelöscht)“, gekürt werden kann
+--    er nicht mehr; geloescht_at ändert nur motto_loeschen (Trigger).
+-- 4) Schutz: Ausschalten der Aufteilung erledigt offene Verschiebe-Anträge;
+--    das offizielle Motto liegt immer im Teil offiziell (beim Küren wird es
+--    dorthin verschoben – mit Wortfilter); app_settings lässt sich nicht
+--    löschen (sonst ließen sich teile/funktionen per Löschen + Neuanlegen
+--    an den Schutz-Triggern vorbei ändern).
 --
 -- Ohne DELETE/DROP-Anweisungen: nur Spalten/Funktionen hinzufügen bzw.
 -- Funktionen mit gleicher Signatur ersetzen. Keine Personendaten.
@@ -66,6 +73,13 @@ begin
   update public.app_settings set teile = coalesce(teile, '{}'::jsonb) || jsonb_build_object(p_bereich, p_an)
    where id = 1 returning teile into neu;
   perform set_config('sv.teile', '', true);
+  -- Ohne Aufteilung gibt es nichts zu verschieben: offene Anträge erledigen sich
+  if not p_an then
+    update public.verschiebungen set erledigt_at = now(), abgelehnt = true
+     where erledigt_at is null
+       and tabelle = case p_bereich when 'motto' then 'motto_vorschlaege' when 'zitate' then 'zitate'
+                                    when 'rankings' then 'ranking_kategorien' else 'album_kommentare' end;
+  end if;
   perform public.audit_schreiben('teile.geschaltet', 'inhalte', null, p_bereich,
     'Offiziell/Inoffiziell bei „' || p_bereich || '“ ' || case when p_an then 'eingeschaltet' else 'ausgeschaltet' end,
     jsonb_build_object('bereich', p_bereich, 'an', p_an));
@@ -136,20 +150,95 @@ begin
   if m.gewaehlt or exists (select 1 from public.gewinner g where g.bereich = 'motto' and g.ziel_id = p_id::text) then
     raise exception 'Ist als Gewinner gekürt – erst den Gewinner zurücknehmen.';
   end if;
+  -- Gesperrt nur, solange er in einer laufenden Wahl steht (Herzens-Kandidaten
+  -- nur, wenn das Herz-Voting auch läuft)
   if exists (select 1 from public.runden_kandidaten k join public.abstimm_runden r on r.id = k.runde_id
-              where r.bereich = 'motto' and r.offen and k.ziel_id = p_id::text) then
+              where r.bereich = 'motto' and r.offen and k.ziel_id = p_id::text and (not k.hm or r.hm_aktiv)) then
     raise exception 'Steht in der laufenden Abstimmung – erst nach der Runde löschen.';
   end if;
   -- Erst ins Protokoll (mit dem Text), dann leeren
   perform public.audit_schreiben('motto.geloescht', 'inhalte', null, 'Abimotto',
     'Motto-Vorschlag gelöscht: „' || left(m.text, 80) || '“',
     jsonb_build_object('id', p_id, 'text', m.text, 'erklaerung', m.erklaerung, 'bereich', m.bereich));
+  perform set_config('sv.motto_loeschen', '1', true);
   update public.motto_vorschlaege
      set geloescht_at = now(), ausgeblendet = true, text = '(gelöscht)', erklaerung = ''
    where id = p_id;
+  perform set_config('sv.motto_loeschen', '', true);
+  -- Likes zählen nicht mehr („N Personen haben gelikt“), Runden zeigen den
+  -- Text nicht mehr (Kandidaten tragen eine Kopie)
+  update public.motto_stimmen set an = false where vorschlag_id = p_id and an;
+  update public.runden_kandidaten set label = '(gelöscht)', unter = '' where ziel_id = p_id::text;
   -- Offene Verschiebe-Anträge dazu erledigen sich damit
   update public.verschiebungen set erledigt_at = now(), abgelehnt = true
    where tabelle = 'motto_vorschlaege' and ziel_id = p_id and erledigt_at is null;
 end $$;
 revoke all on function public.motto_loeschen(uuid) from public, anon;
 grant execute on function public.motto_loeschen(uuid) to authenticated;
+
+-- geloescht_at nur über motto_loeschen; Gelöschtes bleibt ausgeblendet
+-- (sonst ließe es sich per API ohne Protokoll löschen bzw. wieder einblenden)
+create or replace function public.motto_geloescht_schuetzen()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  if coalesce(current_setting('sv.wiederherstellung', true), '') = '1' then return new; end if;
+  if new.geloescht_at is distinct from old.geloescht_at
+     and coalesce(current_setting('sv.motto_loeschen', true), '') <> '1' then
+    raise exception 'Löschen bitte über „Vorschlag löschen“.' using errcode = '42501';
+  end if;
+  if old.geloescht_at is not null then new.ausgeblendet := true; end if;
+  return new;
+end $$;
+revoke all on function public.motto_geloescht_schuetzen() from public, anon, authenticated;
+create or replace trigger motto_geloescht_schuetzen before update on public.motto_vorschlaege
+  for each row execute function public.motto_geloescht_schuetzen();
+
+-- ---------------------------------------------------------------------
+-- 4) Küren: nichts Gelöschtes; das offizielle Motto liegt im Teil offiziell
+--    (ohne Aufteilung kann es aus dem alten inoffiziellen Teil kommen – dann
+--    wird es dabei verschoben, der Wortfilter prüft es wie beim Verschieben)
+-- ---------------------------------------------------------------------
+create or replace function public.gewinner_kueren(p_bereich text, p_gruppe text, p_art text, p_ziel text,
+                                                  p_label text, p_unter text default '', p_stimmen int default null)
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  if auth.uid() is null or not public.gewinner_recht(p_bereich) then
+    raise exception 'Keine Berechtigung' using errcode = '42501';
+  end if;
+  if p_bereich = 'motto' and exists (select 1 from public.motto_vorschlaege where id::text = p_ziel and geloescht_at is not null) then
+    raise exception 'Dieser Vorschlag wurde gelöscht.';
+  end if;
+  if p_bereich = 'motto' and p_gruppe = 'offiziell' and p_art = 'gewinner' then
+    perform set_config('sv.verschieben', '1', true);
+    update public.motto_vorschlaege set bereich = 'offiziell' where id::text = p_ziel and bereich <> 'offiziell';
+    perform set_config('sv.verschieben', '', true);
+  end if;
+  insert into public.gewinner (bereich, gruppe, art, ziel_id, label, unter, stimmen)
+  values (p_bereich, p_gruppe, p_art, p_ziel, left(p_label, 300), left(coalesce(p_unter, ''), 200), p_stimmen)
+  on conflict (bereich, gruppe, art) do update
+    set ziel_id = excluded.ziel_id, label = excluded.label, unter = excluded.unter, stimmen = excluded.stimmen,
+        gekuert_von = auth.uid(), gekuert_at = now();
+  if p_bereich = 'motto' and p_gruppe = 'offiziell' and p_art = 'gewinner' then
+    update public.motto_vorschlaege set gewaehlt = (id::text = p_ziel),
+           gewaehlt_at = case when id::text = p_ziel then now() else null end
+     where gewaehlt or id::text = p_ziel;
+  end if;
+  perform public.audit_schreiben('gewinner.gekuert', 'inhalte', null, p_bereich,
+    case p_art when 'herzen' then 'Gewinner der Herzen' else 'Gewinner' end || ': „' || left(p_label, 60) || '“',
+    jsonb_build_object('bereich', p_bereich, 'gruppe', p_gruppe, 'art', p_art, 'ziel', p_ziel));
+end $$;
+
+-- ---------------------------------------------------------------------
+-- 5) app_settings nicht löschbar (Schutz-Trigger greifen nur beim Ändern)
+-- ---------------------------------------------------------------------
+create or replace function public.app_settings_nicht_loeschen()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  if coalesce(current_setting('sv.wiederherstellung', true), '') <> '1' then
+    raise exception 'Die Einstellungen der App lassen sich nicht löschen.' using errcode = '42501';
+  end if;
+  return old;
+end $$;
+revoke all on function public.app_settings_nicht_loeschen() from public, anon, authenticated;
+create or replace trigger app_settings_nicht_loeschen before delete on public.app_settings
+  for each row execute function public.app_settings_nicht_loeschen();

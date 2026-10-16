@@ -19,12 +19,19 @@ const SYMBOL: Record<FunktionKey, { icon: IconName; farbe: string }> = {
   abiball: { icon: "kasse", farbe: "bg-[#8E8E93]" },
 };
 /** Welche Wortfilter-Bereiche gehören zur Funktion? */
+/** Ein einzelner Wortfilter unter einer Funktion: sagen, welchen Teil er schaltet */
+function wfTitel(b: WfBereich): string {
+  const t = WF_BEREICHE.find((x) => x.key === b)?.titel || "";
+  return t.includes("(inoffiziell)") ? "Wortfilter · Inoffiziell" : t.includes("(offiziell)") ? "Wortfilter · Offiziell" : "Wortfilter";
+}
+
 const WF: Record<FunktionKey, WfBereich[]> = {
   album: ["steckbrief", "kommentare", "kommentare_inoffiziell"],
   spotify: [],
-  zitate: ["zitate"],
-  rankings: ["rankings"],
-  motto: ["motto"],
+  // beide Teile: wer nur einen davon verwalten darf, sieht genau diesen
+  zitate: ["zitate", "zitate_inoffiziell"],
+  rankings: ["rankings", "rankings_inoffiziell"],
+  motto: ["motto", "motto_inoffiziell"],
   umfragen: ["umfragen"],
   abiball: [],
 };
@@ -131,7 +138,7 @@ export function FunktionenSheet({ open, onClose }: { open: boolean; onClose: () 
           <span aria-hidden className={`symbol ${sym.farbe}`}>
             <Icon name={sym.icon} size={17} strich={2.2} />
           </span>
-          <span className="min-w-0 flex-1 text-[16px] font-semibold leading-snug">{f.titel}</span>
+          <span className="min-w-0 flex-1 truncate text-[16px] font-semibold leading-snug max-[359px]:text-[15px]">{f.titel}</span>
           <Schalter
             an={an[k]}
             label={f.titel}
@@ -162,7 +169,7 @@ export function FunktionenSheet({ open, onClose }: { open: boolean; onClose: () 
           </label>
         )}
         {/* Ein Wortfilter: gleich der Schalter. Mehrere: eine Zeile „Wortfilter ›“ */}
-        {wf.length === 1 && <WortfilterSchalter bereich={wf[0]} zeile einzeilig titel="Wortfilter" className="!pl-[58px]" />}
+        {wf.length === 1 && <WortfilterSchalter bereich={wf[0]} zeile einzeilig titel={wfTitel(wf[0])} className="!pl-[58px]" />}
         {wf.length > 1 && (
           <button
             type="button"

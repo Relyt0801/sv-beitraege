@@ -85,12 +85,14 @@ function quellenFuer(k: RankingKategorie, r: Rankings, personen: StufenPerson[],
  * ihren Stimmen, auch die Herzens-Kandidaten für den Gewinner der Herzen)
  * und die Top 3 des Rankings – doppelte zusammengefasst, nach Stimmen.
  */
-function kuerKandidaten(k: RankingKategorie, r: Rankings, runden: RundenStand, name: NameFn): KuerKandidat[] {
+function kuerKandidaten(k: RankingKategorie, r: Rankings, runden: RundenStand, name: NameFn, mitHerz: boolean): KuerKandidat[] {
   const m = new Map<string, KuerKandidat>();
   const runde = runden.offeneVon(k.id) || runden.letzteBeendete(k.id);
   if (runde)
     for (const x of runden.kandidatenVon(runde.id))
-      m.set(x.ziel_id, { id: x.ziel_id, label: x.label, unter: x.hm ? "Herzens-Kandidat" : `Runde ${runde.nr} – Stichwahl`, stimmen: runden.zahl(runde.id, x.ziel_id) ?? null });
+      // Herzens-Kandidaten nur ohne Aufteilung (sonst gibt es keinen Gewinner der Herzen)
+      if (mitHerz || !x.hm)
+        m.set(x.ziel_id, { id: x.ziel_id, label: x.label, unter: x.hm ? "Herzens-Kandidat" : `Runde ${runde.nr} – Stichwahl`, stimmen: runden.zahl(runde.id, x.ziel_id) ?? null });
   for (const t of r.stand.find((s) => s.kategorie_id === k.id)?.top || [])
     if (!m.has(t.ziel)) m.set(t.ziel, { id: t.ziel, label: name(t.ziel), stimmen: t.n });
   return [...m.values()].sort((a, b) => (b.stimmen ?? -1) - (a.stimmen ?? -1));
@@ -786,7 +788,7 @@ function KuerenFuerKategorie({
   const aufgeteilt = useAufgeteilt("rankings");
   // Nur neu bauen, wenn sich wirklich etwas ändert – sonst setzt das
   // KuerenBlatt bei jedem Neuladen (alle 15 s) die Auswahl zurück.
-  const roh = k ? kuerKandidaten(k, r, runden, name) : [];
+  const roh = k ? kuerKandidaten(k, r, runden, name, !aufgeteilt) : [];
   const schluessel = JSON.stringify(roh);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const kandidaten = useMemo(() => roh, [schluessel]);
@@ -1412,7 +1414,7 @@ function KategorienListe({ r, art, teil, aufgeteilt, v }: { r: Rankings; art: Ra
         titel={`${mitTeil("Kategorien", teil, aufgeteilt)} · ${liste.length}`}
       >
         {liste.map((k) => {
-          const antrag = v.antragZu(k.id);
+          const antrag = aufgeteilt ? v.antragZu(k.id) : null;
           const stimmen = r.stand.find((x) => x.kategorie_id === k.id)?.stimmen ?? 0;
           // Zweite Zeile immer (Stimmen, ggf. Antrag): so darf auch ein langer Titel umbrechen
           const unter = [stimmen ? `${stimmen} ${stimmen === 1 ? "Stimme" : "Stimmen"}` : "Noch keine Stimmen", antrag ? `Antrag nach ${TEIL_NAME[antrag.nach]} ${antrag.stimmen}/${antrag.noetig}` : ""]

@@ -214,6 +214,10 @@ export function FinanzenTab({ kosten }: { kosten: KostenValue }) {
   // unten. Am Laptop stehen sie immer rechts unter den Buchungen.
   const offeneAnfragen = kosten.anfragen.filter((a) => a.status === "offen").length;
   const kostenOben = zeigeAnfragen && (offeneAnfragen > 0 || meineVorsitze.length > 0);
+  // Am Laptop rechts unter den Buchungen – für den Kassenwart immer (er
+  // entscheidet), für alle, die nur lesen, nur wenn es Anfragen gibt; sonst
+  // nehmen die Buchungen die ganze Höhe
+  const kostenRechts = zeigeAnfragen && (darfBuchen || meineVorsitze.length > 0 || (kosten.bereit && kosten.anfragen.length > 0));
 
   return (
     // lg:pb-0/-mb-20: am Laptop hebt das die Seitenränder darunter auf (pb-4
@@ -311,9 +315,9 @@ export function FinanzenTab({ kosten }: { kosten: KostenValue }) {
           onLoeschen={fin.loeschen}
           onKategorie={fin.buchungKategorie}
           aktionName={aktionName}
-          allein={!zeigeAnfragen}
+          allein={!kostenRechts}
         />
-        {breit && zeigeAnfragen && (
+        {breit && kostenRechts && (
           <KostenKarte spalte kosten={kosten} darfEntscheiden={darfBuchen} vorsitze={meineVorsitze} onEntschieden={fin.neuLaden} />
         )}
       </div>
@@ -1234,11 +1238,15 @@ function VerlaufKarte({
     }
     return [...m.entries()];
   }, [liste]);
-  const [offen, setOffen] = useState<Set<string>>(() => new Set());
+  // Karte (Laptop) und Blatt (Handy) merken sich getrennt, was offen ist –
+  // im Blatt ist der neueste Monat von sich aus offen (Set = umgeschaltet)
+  const [offenKarte, setOffenKarte] = useState<Set<string>>(() => new Set());
+  const [offenBlatt, setOffenBlatt] = useState<Set<string>>(() => new Set());
   const neuester = gruppen[0]?.[0];
-  const istOffen = (monat: string, imBlatt: boolean) => (q.trim() ? true : offen.has(monat) !== (imBlatt && monat === neuester));
-  const umschalten = (monat: string) =>
-    setOffen((alt) => {
+  const istOffen = (monat: string, imBlatt: boolean) =>
+    q.trim() ? true : imBlatt ? offenBlatt.has(monat) !== (monat === neuester) : offenKarte.has(monat);
+  const umschalten = (monat: string, imBlatt: boolean) =>
+    (imBlatt ? setOffenBlatt : setOffenKarte)((alt) => {
       const neu = new Set(alt);
       if (neu.has(monat)) neu.delete(monat);
       else neu.add(monat);
@@ -1252,10 +1260,10 @@ function VerlaufKarte({
   ];
 
   /** Monatskopf: Name, Anzahl, Summe, Pfeil – ein Tipp klappt den Monat auf oder zu */
-  const monatKopf = (monat: string, zeilen: Buchung[], auf: boolean, klasse: string) => {
+  const monatKopf = (monat: string, zeilen: Buchung[], auf: boolean, imBlatt: boolean, klasse: string) => {
     const summe = zeilen.reduce((n, b) => n + (b.quelle === "abgleich" ? 0 : b.cent), 0);
     return (
-      <button onClick={() => umschalten(monat)} aria-expanded={auf} className={`flex min-h-[52px] w-full items-center gap-3 py-2.5 text-left transition ${klasse}`}>
+      <button onClick={() => umschalten(monat, imBlatt)} aria-expanded={auf} className={`flex min-h-[52px] w-full items-center gap-3 py-2.5 text-left transition ${klasse}`}>
         <span className="min-w-0 flex-1">
           <span className="block text-[16px] font-semibold">{monatName(monat)}</span>
           <span className="block text-[12.5px] text-tinte-leise">
@@ -1322,7 +1330,7 @@ function VerlaufKarte({
             const auf = istOffen(monat, true);
             return (
               <ul key={monat} className="liste border border-black/[0.04] dark:border-white/[0.06]">
-                <li>{monatKopf(monat, zeilen, auf, "px-4 active:bg-black/[0.04] dark:active:bg-white/[0.06]")}</li>
+                <li>{monatKopf(monat, zeilen, auf, true, "px-4 active:bg-black/[0.04] dark:active:bg-white/[0.06]")}</li>
                 {auf &&
                   zeilen.map((b) => (
                     <BuchungsZeile key={b.id} b={b} kategorien={kategorien} aktionName={aktionName} onOeffnen={() => setAuswahl(b)} />
@@ -1383,7 +1391,8 @@ function VerlaufKarte({
           als eigene Karte direkt auf dem Hintergrund. */}
       <div className="card flex min-h-0 flex-1 flex-col overflow-hidden p-5 pb-0 max-lg:hidden">
         {filterUndSuche(false)}
-        <div className="-mx-5 min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-2">
+        {/* scroll-pt: Mit der Tastatur bleibt die fokussierte Zeile unter dem klebenden Monatskopf sichtbar */}
+        <div className="-mx-5 min-h-0 flex-1 scroll-pt-14 overflow-y-auto overscroll-contain px-5 pb-2">
           {liste.length === 0 ? (
             <p className="py-8 text-center text-[14px] text-tinte-leise">Keine Buchungen.</p>
           ) : (
@@ -1396,7 +1405,7 @@ function VerlaufKarte({
                         Abschnittsköpfe in Mail) – deckend in der Kartenfarbe,
                         aufgeklappt mit Linie darunter (klebt mit) */}
                     <div className="sticky top-0 z-[1] -mx-5 bg-white px-5 dark:bg-slate-900">
-                      {monatKopf(monat, zeilen, auf, `active:opacity-60 ${auf ? "border-b border-papier-linie dark:border-slate-800" : ""}`)}
+                      {monatKopf(monat, zeilen, auf, false, `active:opacity-60 ${auf ? "border-b border-papier-linie dark:border-slate-800" : ""}`)}
                     </div>
                     {auf && (
                       <ul className="divide-y divide-papier-linie dark:divide-slate-800">

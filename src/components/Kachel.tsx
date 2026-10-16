@@ -304,8 +304,10 @@ export function FarbKachel({
         </span>
         <span className="flex items-center gap-1.5">
           {aus && <span className="rounded-full bg-black/25 px-2 py-0.5 text-[12px] font-semibold">Aus</span>}
+          {/* Die Zahl liest der Vorleser nach dem Titel (sr-only unten), nicht davor ohne Bedeutung */}
           {zahl ? (
             <span
+              aria-hidden
               className={`zahl flex h-[22px] min-w-[22px] items-center justify-center rounded-full px-1.5 text-[12.5px] font-bold ${
                 zahlRot ? "bg-[#FF3B30] text-white ring-2 ring-white/90" : "bg-white text-tinte"
               }`}
@@ -317,6 +319,7 @@ export function FarbKachel({
       </span>
       <span className="relative mt-auto block pt-3">
         <span className="block text-[16px] font-semibold leading-tight tracking-[-0.01em]">{titel}</span>
+        {zahl ? <span className="sr-only">{`, ${zahl} offen`}</span> : null}
         {unter && <span className="mt-0.5 line-clamp-2 block text-[12.5px] leading-snug text-white/85">{unter}</span>}
       </span>
     </button>

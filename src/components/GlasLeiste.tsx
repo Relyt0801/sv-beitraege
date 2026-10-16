@@ -102,7 +102,12 @@ export function GlasLeiste<K extends string>({
   // Beim Drücken wächst die Linse – am ersten und letzten Reiter nur nach
   // innen, sonst stünde sie über den Rand der Kapsel
   const stelle = reiter.findIndex((r) => r.key === aktiv);
-  const ursprung = stelle === 0 ? "left center" : stelle === reiter.length - 1 ? "right center" : "center";
+  const ursprungNeu = stelle === 0 ? "left center" : stelle === reiter.length - 1 ? "right center" : "center";
+  // Solange die Linse vergrößert ist, bleibt ihr Ursprung stehen – sonst
+  // spränge sie, wenn sich „aktiv“ während des Drückens ändert
+  const ursprungRef = useRef(ursprungNeu);
+  if (!gedrueckt) ursprungRef.current = ursprungNeu;
+  const ursprung = ursprungRef.current;
 
   return (
     <div
