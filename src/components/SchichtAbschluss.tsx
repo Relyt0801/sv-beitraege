@@ -199,7 +199,7 @@ export function SchichtAbschluss() {
                     {t.von ? ` · ${uhr(t.von)}${t.bis ? `–${uhr(t.bis)}` : ""}` : ""}
                   </span>
                 </span>
-                <span className="zahl shrink-0 rounded-full bg-brand/10 px-2 py-0.5 text-[12px] font-bold text-brand dark:bg-brand/20">
+                <span className="zahl shrink-0 rounded-full bg-brand/10 px-2 py-0.5 text-[12px] font-bold text-brand dark:text-brand-dark dark:bg-brand/20">
                   +{a.prozent} %
                 </span>
               </div>

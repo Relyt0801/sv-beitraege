@@ -249,7 +249,7 @@ export function Kalender({
           {kalenderDemo && (
             <button
               onClick={() => setSyncOffen(true)}
-              className="mb-2.5 flex min-h-[44px] w-full items-center gap-2 rounded-xl bg-brand/10 px-3 py-2 text-left text-[13px] font-semibold text-brand-dark transition active:scale-[0.99] dark:bg-brand/20 dark:text-brand-soft"
+              className="mb-2.5 flex min-h-[44px] w-full items-center gap-2 rounded-xl bg-brand/10 px-3 py-2 text-left text-[13px] font-semibold text-brand-dark transition active:scale-[0.99] dark:bg-brand/20 dark:text-brand-dark"
             >
               <span aria-hidden>📱⇄</span>
               <span className="min-w-0 flex-1 truncate">
@@ -720,7 +720,7 @@ function TagesAnsicht({
                   )}
                 </span>
                 {!st(t) && meins(t) && (
-                  <span className="shrink-0 rounded-full bg-brand/10 px-2 py-0.5 text-[12px] font-bold text-brand-dark dark:bg-brand/20 dark:text-brand">
+                  <span className="shrink-0 rounded-full bg-brand/10 px-2 py-0.5 text-[12px] font-bold text-brand-dark dark:bg-brand/20 dark:text-brand-dark">
                     für dich
                   </span>
                 )}

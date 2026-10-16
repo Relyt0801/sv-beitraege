@@ -176,7 +176,7 @@ export function ElternApp() {
               title="Ihr Zugang"
               className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition active:scale-90"
             >
-              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-500 text-white ring-2 ring-white dark:ring-slate-900">
+              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-600 text-white ring-2 ring-white dark:ring-slate-900">
                 <Icon name="person" size={20} strich={2} />
               </span>
             </button>
@@ -255,7 +255,7 @@ export function ElternApp() {
             // Tippfläche 44 px wie in der Schüler-App, der runde Knopf bleibt 40 px
             className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition active:scale-90"
           >
-            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-500 text-[14px] font-semibold text-white ring-2 ring-white dark:ring-slate-900">
+            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-600 text-[14px] font-semibold text-white ring-2 ring-white dark:ring-slate-900">
               {familienKuerzel}
             </span>
           </button>

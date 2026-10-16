@@ -671,7 +671,7 @@ function Glocke({ an, setAn, name }: { an: boolean; setAn: (an: boolean) => void
       // after: unsichtbar vergrößerte Trefferfläche (die Kapsel selbst bleibt klein und ruhig)
       className={`relative flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-[12px] font-bold transition after:absolute after:-inset-x-1 after:-inset-y-3 after:content-[''] active:scale-95 ${
         an
-          ? "bg-brand/[0.08] text-[#004f9e] dark:bg-brand/20 dark:text-brand-soft"
+          ? "bg-brand/[0.08] text-[#004f9e] dark:bg-brand/20 dark:text-brand-dark"
           : "bg-[rgb(118_118_128/0.12)] text-tinte-matt dark:bg-[rgb(118_118_128/0.24)] dark:text-slate-300"
       }`}
     >

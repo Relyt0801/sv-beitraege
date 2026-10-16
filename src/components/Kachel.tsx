@@ -8,9 +8,21 @@ import { useRole } from "../auth/RoleProvider";
  * role=button, Tastatur (Enter/Leertaste) und der Klick. Knöpfe, Links und
  * Eingaben IN der Karte behalten ihre eigene Wirkung – ein Tipp darauf löst
  * nicht zusätzlich die Karte aus.
+ *
+ * `nurZeiger`: Die Karte hat eigene Knöpfe, einer davon tut dasselbe wie der
+ * Kartentipp („Alle ansehen“). Dann bleibt nur der Tipp mit Finger/Maus –
+ * ohne role=button, sonst lägen Knöpfe in einem Knopf (axe
+ * „nested-interactive“, 50 Stellen); Tastatur und Vorlesen nehmen den Knopf.
  */
-export function karteKlick(onClick?: () => void, label?: string) {
+export function karteKlick(onClick?: () => void, label?: string, nurZeiger = false) {
   if (!onClick) return {};
+  if (nurZeiger)
+    return {
+      onClick: (e: MouseEvent<HTMLElement>) => {
+        if ((e.target as HTMLElement).closest("button, a, input, select, textarea")) return;
+        onClick();
+      },
+    };
   return {
     role: "button" as const,
     tabIndex: 0,
@@ -180,7 +192,7 @@ export function FarbKarte({
 }) {
   return (
     <section
-      {...karteKlick(onClick, label)}
+      {...karteKlick(onClick, label, Boolean(knoepfe))}
       className={`relative flex flex-1 flex-col overflow-hidden rounded-[1.4rem] bg-gradient-to-br p-4 text-white sm:p-5 ${verlauf} ${schatten} ${onClick ? KARTE_KLICK_KLASSE : ""} ${className}`}
     >
       {deko && (

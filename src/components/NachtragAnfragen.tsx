@@ -72,7 +72,7 @@ function NachtragKarte({ n, onOpen }: { n: Nachtrag; onOpen: () => void }) {
             {n.titel} · {tagLang(n.datum)}
           </span>
         </span>
-        <span className="zahl shrink-0 rounded-full bg-brand/10 px-2.5 py-0.5 text-[13px] font-bold text-brand-dark dark:bg-brand/20 dark:text-brand">
+        <span className="zahl shrink-0 rounded-full bg-brand/10 px-2.5 py-0.5 text-[13px] font-bold text-brand-dark dark:bg-brand/20 dark:text-brand-dark">
           {n.punkte !== null ? `+${n.punkte} %` : "% ?"}
         </span>
         <span aria-hidden className="shrink-0 text-[17px] leading-none text-tinte-leise">›</span>

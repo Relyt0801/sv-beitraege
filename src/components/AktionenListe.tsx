@@ -400,12 +400,12 @@ function AktionGruppe({
       aria-expanded={prozentOffen}
       aria-label={`Zählt ${prozentText} – antippen zum Ändern`}
       title="Prozent ändern"
-      className={`zahl relative z-10 -my-2 flex min-h-[44px] shrink-0 items-center gap-1 rounded-full px-1.5 text-[12px] font-bold text-brand`}
+      className={`zahl relative z-10 -my-2 flex min-h-[44px] shrink-0 items-center gap-1 rounded-full px-1.5 text-[12px] font-bold text-brand dark:text-brand-dark`}
     >
       <span className={`rounded-full px-2 py-0.5 ${prozentOffen ? "bg-brand text-white" : "bg-brand/10 dark:bg-brand/20"}`}>{prozentText}</span>
     </button>
   ) : (
-    <span className="zahl shrink-0 rounded-full bg-brand/10 px-2 py-0.5 text-[12px] font-bold text-brand dark:bg-brand/20">{prozentText}</span>
+    <span className="zahl shrink-0 rounded-full bg-brand/10 px-2 py-0.5 text-[12px] font-bold text-brand dark:text-brand-dark dark:bg-brand/20">{prozentText}</span>
   );
 
   return (

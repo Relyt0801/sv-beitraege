@@ -40,7 +40,10 @@
      (weiß auf #0A84FF = 3,6:1, auf #0071E3 = 4,7:1). */
   --brand-fuell: 0 113 227;    /* #0071E3 */
   --brand-soft: 64 156 255;
-  --brand-dark: 100 170 255;
+  /* Blaue Schrift auf blau getöntem Grund (bg-brand/20): #78B6FF – 5,6:1 auf
+     Karten (#1C1C1E), 4,9:1 in Blättern (#2C2C2E). #64AAFF schaffte in
+     Blättern nur 4,27:1 (Zähler-Chip „×3“ in den Umfrage-Ergebnissen). */
+  --brand-dark: 120 182 255;
   --papier: 0 0 0;
   --karte: 28 28 30;
   --linie: 56 56 58;

@@ -159,7 +159,7 @@ export function TextGruppen({
               </span>
               {meins && <span className="mt-0.5 shrink-0 text-[12px] font-semibold text-brand-dark dark:text-brand">du</span>}
               {g.n > 1 && (
-                <span className="zahl mt-px shrink-0 rounded-full bg-brand/15 px-2 py-0.5 text-[12px] font-bold text-brand-dark dark:bg-brand/20 dark:text-brand">
+                <span className="zahl mt-px shrink-0 rounded-full bg-brand/15 px-2 py-0.5 text-[12px] font-bold text-brand-dark dark:bg-brand/20 dark:text-brand-dark">
                   ×{g.n}
                 </span>
               )}
