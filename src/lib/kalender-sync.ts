@@ -50,7 +50,7 @@ async function nutzername(): Promise<string | null> {
 /** Darf diese Person die Kalender-Verbindung (Testphase) sehen? Immer nein,
  *  solange KALENDER_SYNC_AN aus ist. */
 export function useKalenderDemo(): boolean {
-  // Freigabe über den Rechte-Reiter („Kalender-Verbindung (Testphase)“) –
+  // Freigabe unter Rollen → „Rechte je Rolle“ („Kalender-Verbindung (Testphase)“) –
   // Namen stehen so nicht im Code. Die Function prüft dasselbe.
   const { can } = useRole();
   const perm = can("kalender.test");

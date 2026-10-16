@@ -89,6 +89,12 @@ export default {
       borderRadius: {
         "4xl": "2rem",
       },
+      // Die EINE Spalte der App (App.tsx, Kopfzeile, ChatEbene, Eltern-App).
+      // Wächst auf großen Bildschirmen mit (index.css, --spalte) – bei 1920 px
+      // blieben mit festen 64rem links und rechts je ~450 px leer.
+      maxWidth: {
+        "5xl": "var(--spalte)",
+      },
       boxShadow: {
         card: "0 1px 2px rgba(0,0,0,.04), 0 0 0 .5px rgba(0,0,0,.03)",
         cardDark: "none",

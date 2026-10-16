@@ -34,23 +34,29 @@ export function TermChip({
   const inactive = pre || dead;
   const isCur = h === current;
 
-  let cls: string, glyph: string;
+  // `wort`: was ein Bildschirmleser sagt – „EF.1: offen“ statt „EF.1 Euro“
+  let cls: string, glyph: string, wort: string;
   if (pre) {
     cls = "border-dashed border-black/25 text-tinte-leise dark:border-slate-600 dark:text-slate-500";
     glyph = "–";
+    wort = "noch nicht dabei";
   } else if (dead) {
     cls = "bg-red-100 text-red-500 border-red-200 opacity-70 dark:bg-red-500/15 dark:text-red-300 dark:border-red-500/25";
     glyph = "×";
+    wort = "nicht mehr dabei";
   } else if (t.status === "offen" && i > idx(current)) {
     // Kommt erst noch: nicht wie eine Schuld aussehen lassen
     cls = "bg-[rgb(118_118_128/0.1)] text-tinte-leise border-transparent";
     glyph = GLYPH.offen;
+    wort = "später";
   } else {
     cls = STATUS_CLASS[t.status];
     glyph = GLYPH[t.status];
+    wort = t.status;
   }
 
-  const size = big ? "h-14 text-sm" : kompakt ? "h-9 text-[12px]" : "h-12 text-[13px] sm:h-[52px] lg:h-16 lg:text-[15px]";
+  // kompakt (Kassenliste): 44 px hoch – Mindestmaß für Tippflächen (vorher 36 px)
+  const size = big ? "h-14 text-sm" : kompakt ? "h-11 text-[12px]" : "h-12 text-[13px] sm:h-[52px] lg:h-16 lg:text-[15px]";
   const ring = isCur
     ? kompakt
       ? "ring-2 ring-brand"
@@ -62,11 +68,12 @@ export function TermChip({
     <button
       type="button"
       disabled={!clickable}
+      aria-label={`${h}: ${wort}`}
       onClick={(e) => {
         e.stopPropagation();
         onToggle?.();
       }}
-      className={`flex flex-1 basis-0 flex-col items-center justify-center gap-0.5 border font-bold leading-none transition ${kompakt ? "rounded-md" : "rounded-xl"} ${size} ${cls} ${ring} ${
+      className={`flex flex-1 basis-0 flex-col items-center justify-center gap-0.5 border font-bold leading-none transition ${kompakt ? "rounded-lg" : "rounded-xl"} ${size} ${cls} ${ring} ${
         clickable ? "cursor-pointer active:scale-95" : "cursor-default"
       }`}
     >
@@ -94,7 +101,8 @@ export function HalbjahrLegende({ nichtDabei = false }: { nichtDabei?: boolean }
     { cls: STATUS_CLASS.bezahlt, glyph: GLYPH.bezahlt, text: "bezahlt" },
     { cls: STATUS_CLASS.offen, glyph: GLYPH.offen, text: "offen" },
     { cls: STATUS_CLASS.erlassen, glyph: GLYPH.erlassen, text: "erlassen", fett: true },
-    { cls: "bg-[rgb(118_118_128/0.1)] text-tinte-leise border-transparent", glyph: GLYPH.offen, text: "später fällig" },
+    // Wortwahl überall gleich (K10): künftige Halbjahre heißen „später“ (grau)
+    { cls: "bg-[rgb(118_118_128/0.1)] text-tinte-leise border-transparent", glyph: GLYPH.offen, text: "später" },
   ];
   const punkt = (e: (typeof eintraege)[number]) => (
     <li key={e.text} className="flex min-w-0 items-center gap-1 whitespace-nowrap">
@@ -109,7 +117,9 @@ export function HalbjahrLegende({ nichtDabei = false }: { nichtDabei?: boolean }
   );
   return (
     <div className="mt-3 text-[12px] text-tinte-matt dark:text-slate-300" aria-label="Legende">
-      <ul className="flex flex-nowrap items-center justify-between gap-x-2">{eintraege.map(punkt)}</ul>
+      {/* Am Handy über die Breite verteilt, am Laptop dicht beieinander – sonst
+          stand „bezahlt“ ganz links und „später“ 1000 px weiter rechts */}
+      <ul className="flex flex-nowrap items-center justify-between gap-x-2 lg:justify-start lg:gap-x-6">{eintraege.map(punkt)}</ul>
       {nichtDabei && (
         <ul className="mt-1.5 flex">
           {punkt({

@@ -11,14 +11,16 @@ import { useEvents } from "../events-store";
 import { normalize, offenGesamt, sortStudents } from "../lib/logic";
 import { NEUE_TYPEN, TYPE_META, type EventType } from "../lib/events";
 import { useFunktionen } from "../lib/funktionen";
+import { terminNeuAnfordern } from "./TerminSheet";
 
 /**
  * „Neu erstellen“ im Events-Reiter.
  *
  * Oben die zwei Arten, die hier im Blatt ausgefüllt werden (Info, Abstimmung).
- * Direkt darunter – nicht mehr hinter „Vorlagen“ versteckt – die zwei Dinge,
- * die ein eigenes Fenster haben: die Aktion mit Schichten (Waffelverkauf &
- * Co.) und die Pop-up-Umfrage.
+ * Direkt darunter – nicht mehr hinter „Vorlagen“ versteckt – die Dinge, die
+ * ein eigenes Fenster haben: der Termin (für alle mit „Termine verwalten“ –
+ * „Neu“ ist fürs Team DER Knopf zum Anlegen), die Aktion mit Schichten
+ * (Waffelverkauf & Co.) und die Pop-up-Umfrage.
  */
 export function EventComposer({
   open,
@@ -34,8 +36,9 @@ export function EventComposer({
   onUmfrage?: () => void;
 }) {
   const { students, settings, punkte } = useStore();
-  const { can } = useRole();
+  const { can, isStaff } = useRole();
   const { sichtbar } = useFunktionen();
+  const termineErlaubt = isStaff || can("termine.manage");
   const umfragenErlaubt = Boolean(onUmfrage) && sichtbar("umfragen") && (can("umfragen.verwalten") || can("umfragen.ergebnisse"));
   const { createEvent } = useEvents();
 
@@ -108,24 +111,26 @@ export function EventComposer({
     <Sheet open={open} onClose={onClose}>
       <SheetKopf titel={<>Neu erstellen</>} onClose={onClose} />
 
-      {/* Art des Beitrags – zwei gleich breite Felder, nichts bricht um */}
-      <div className="seg mb-3" role="tablist" aria-label="Art des Beitrags">
-        {NEUE_TYPEN.map((t) => (
-          <button
-            key={t}
-            role="tab"
-            aria-selected={type === t}
-            onClick={() => setType(t)}
-            className={`seg-item whitespace-nowrap !py-2 !text-[14px] ${type === t ? "seg-aktiv" : ""}`}
-          >
-            {TYPE_META[t].label}
-          </button>
-        ))}
-      </div>
-
-      {/* Die zwei Dinge mit eigenem Fenster stehen gleich sichtbar daneben */}
-      {(onVorlagen || umfragenErlaubt) && (
-        <Gruppe titel="Oder etwas anderes anlegen" className="mb-4">
+      {/* Die Dinge mit eigenem Fenster zuerst – darunter der Beitrag, dessen
+          Umschalter (Info | Abstimmung) jetzt direkt über seinen Feldern steht
+          (vorher lag diese Gruppe dazwischen). */}
+      {(termineErlaubt || onVorlagen || umfragenErlaubt) && (
+        <Gruppe titel="Anlegen" className="mb-5">
+          {termineErlaubt && (
+            <Zeile
+              onClick={() => {
+                onClose();
+                terminNeuAnfordern();
+              }}
+              symbol={
+                <Symbol farbe="bg-[#FF3B30]">
+                  <Icon name="kalender" size={17} strich={2.2} />
+                </Symbol>
+              }
+              label="Termin"
+              unter="Sitzung, Klausur, Ferien – steht im Kalender"
+            />
+          )}
           {onVorlagen && (
             <Zeile
               onClick={onVorlagen}
@@ -152,6 +157,24 @@ export function EventComposer({
           )}
         </Gruppe>
       )}
+
+      {/* Art des Beitrags – zwei gleich breite Felder, nichts bricht um */}
+      <h3 className="mb-1.5 px-4 text-[13px] font-normal uppercase tracking-[0.02em] text-tinte-leise">
+        {termineErlaubt || onVorlagen || umfragenErlaubt ? "Oder Beitrag in Events" : "Beitrag in Events"}
+      </h3>
+      <div className="seg mb-3" role="tablist" aria-label="Art des Beitrags">
+        {NEUE_TYPEN.map((t) => (
+          <button
+            key={t}
+            role="tab"
+            aria-selected={type === t}
+            onClick={() => setType(t)}
+            className={`seg-item whitespace-nowrap !py-2 !text-[14px] ${type === t ? "seg-aktiv" : ""}`}
+          >
+            {TYPE_META[t].label}
+          </button>
+        ))}
+      </div>
 
       <input className="field mb-3" placeholder="Überschrift" aria-label="Überschrift" value={title} onChange={(e) => setTitle(e.target.value)} />
       <textarea

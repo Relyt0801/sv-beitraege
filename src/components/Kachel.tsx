@@ -8,9 +8,21 @@ import { useRole } from "../auth/RoleProvider";
  * role=button, Tastatur (Enter/Leertaste) und der Klick. Knöpfe, Links und
  * Eingaben IN der Karte behalten ihre eigene Wirkung – ein Tipp darauf löst
  * nicht zusätzlich die Karte aus.
+ *
+ * `nurZeiger`: Die Karte hat eigene Knöpfe, einer davon tut dasselbe wie der
+ * Kartentipp („Alle ansehen“). Dann bleibt nur der Tipp mit Finger/Maus –
+ * ohne role=button, sonst lägen Knöpfe in einem Knopf (axe
+ * „nested-interactive“, 50 Stellen); Tastatur und Vorlesen nehmen den Knopf.
  */
-export function karteKlick(onClick?: () => void, label?: string) {
+export function karteKlick(onClick?: () => void, label?: string, nurZeiger = false) {
   if (!onClick) return {};
+  if (nurZeiger)
+    return {
+      onClick: (e: MouseEvent<HTMLElement>) => {
+        if ((e.target as HTMLElement).closest("button, a, input, select, textarea")) return;
+        onClick();
+      },
+    };
   return {
     role: "button" as const,
     tabIndex: 0,
@@ -43,7 +55,13 @@ export const KARTE_KLICK_KLASSE =
 export function FussLeiste({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
     <div
-      className={`sticky bottom-0 z-10 -mx-5 -mb-[calc(env(safe-area-inset-bottom)+1.5rem)] mt-4 bg-papier/95 px-5 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-3 shadow-[0_-10px_14px_-12px_rgba(0,0,0,.18)] backdrop-blur dark:bg-slate-900/95 ${className}`}
+      // Wie FussLeiste.tsx: Chrome und Safari messen „sticky“ vom Inhaltsrand,
+      // nicht vom Blattrand. Mit bottom-0 rutschte die Leiste um das Polster
+      // (1,5 rem + Home-Indikator) nach oben, sobald der Inhalt das Blatt fast
+      // füllte – dann lag sie dauerhaft über der letzten Zeile („Noch kein
+      // offizieller Kommentar …“ halb verdeckt) und scrollen ging nicht mehr.
+      style={{ bottom: "calc(-1 * (env(safe-area-inset-bottom) + 1.5rem))" }}
+      className={`sticky z-10 -mx-5 -mb-[calc(env(safe-area-inset-bottom)+1.5rem)] mt-4 bg-papier/95 px-5 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-3 shadow-[0_-10px_14px_-12px_rgba(0,0,0,.18)] backdrop-blur dark:bg-slate-900/95 ${className}`}
     >
       {children}
     </div>
@@ -135,7 +153,8 @@ export function KleinerRing({ prozent, groesse = 40 }: { prozent: number; groess
           className="stroke-brand transition-[stroke-dashoffset] duration-700 ease-ios"
         />
       </svg>
-      <span className="zahl absolute text-[11px] font-semibold">{prozent}</span>
+      {/* 12 px = Mindestschrift (Design-Regeln 5); „100“ passt auch in den 40-px-Ring */}
+      <span className="zahl absolute text-[12px] font-semibold">{prozent}</span>
     </span>
   );
 }
@@ -179,7 +198,7 @@ export function FarbKarte({
 }) {
   return (
     <section
-      {...karteKlick(onClick, label)}
+      {...karteKlick(onClick, label, Boolean(knoepfe))}
       className={`relative flex flex-1 flex-col overflow-hidden rounded-[1.4rem] bg-gradient-to-br p-4 text-white sm:p-5 ${verlauf} ${schatten} ${onClick ? KARTE_KLICK_KLASSE : ""} ${className}`}
     >
       {deko && (
@@ -228,7 +247,7 @@ export function FarbKachel({
   verlauf: string;
   /** farbiger Schatten, z. B. "shadow-[0_10px_24px_-14px_rgba(0,102,204,.9)]" */
   schatten?: string;
-  /** Emoji oder <Icon …/> */
+  /** <Icon …/> (Design-Regeln 5) – Komitee-Emojis aus lib/committees sind Daten und bleiben erlaubt */
   symbol: ReactNode;
   titel: ReactNode;
   /** eine (höchstens zwei) Zeilen Stand, z. B. „2 offen“ oder die letzte Nachricht */
@@ -257,8 +276,18 @@ export function FarbKachel({
         breit ? "col-span-2" : ""
       } ${gedaempft ? "opacity-80 saturate-[.85]" : ""}`}
     >
-      {/* Deko: das Symbol noch einmal groß und blass in der Ecke */}
-      <span aria-hidden className="pointer-events-none absolute -bottom-4 -right-3 text-[4.75rem] leading-none opacity-[0.16] [filter:grayscale(1)_brightness(3)]">
+      {/* Deko: das Symbol noch einmal groß und blass in der Ecke. Ein <Icon> hat eine
+          feste Pixelgröße – hier wird es auf Deko-Größe gezogen (Emoji: über die Schrift).
+          Strich-Symbole sind ohnehin weiß (currentColor). Ein Komitee-Emoji ist
+          dagegen ein farbiges Bild: mit brightness(3) wurde z. B. 📰 zu einem
+          hellen Rechteck. Emojis darum nur grau und weich eingeblendet
+          (soft-light: hellt/dunkelt die Kachelfarbe ab, wie eine Prägung). */}
+      <span
+        aria-hidden
+        className={`pointer-events-none absolute -bottom-4 -right-3 text-[4.75rem] leading-none [&_svg]:h-[4.75rem] [&_svg]:w-[4.75rem] ${
+          typeof symbol === "string" ? "opacity-50 mix-blend-soft-light [filter:grayscale(1)]" : "opacity-[0.16]"
+        }`}
+      >
         {symbol}
       </span>
       <span className="relative flex items-start justify-between gap-2">

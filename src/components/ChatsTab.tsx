@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { SkelettKarten } from "./Skelett";
-import { useTopics, type Topic } from "../topics-store";
+import { useTopics, type Topic, type TopicItem } from "../topics-store";
 import { useRole } from "../auth/RoleProvider";
 import { UnbanRequests } from "./UnbanRequests";
 import { KomiteeRequests } from "./KomiteeRequests";
@@ -8,7 +8,7 @@ import { ElternGespraecheEbene, ElternInfosEbene, useElternZahlen } from "./Elte
 import { COMMITTEES, committeeIcon, committeeLabel } from "../lib/committees";
 import { KomiteePage } from "./KomiteePage";
 import { BannHinweis } from "./BannHinweis";
-import { ChatBlasen, ChatEbene, ChatEingabe, ChatKopf } from "./ChatBlasen";
+import { ChatBlasen, ChatEbene, ChatEingabe, ChatKopf, GespraechKnoepfe, GespraechMehrBlatt } from "./ChatBlasen";
 import { Avatar } from "./Avatar";
 import { useProfiles } from "../profiles-store";
 import { useStore } from "../store";
@@ -19,13 +19,13 @@ import { lesbarerName } from "../lib/profil";
 import { frage } from "../lib/melder";
 import { NachtragAnfragen } from "./NachtragAnfragen";
 import { MeldungenAnfragen } from "./Melden";
-import { NachtragSheet } from "./NachtragSheet";
 import { Schalter } from "./Schalter";
 import { kategorieAn, komiteeAn, useMitteilungen, type Kategorie } from "../lib/mitteilungen";
 import { useZaehltMit } from "../lib/chat-zaehler";
 import { FotoFreigaben } from "./FotoFreigaben";
 import { FarbKachel } from "./Kachel";
-import { Gruppe } from "./Liste";
+import { Gruppe, Symbol, Wert, Zeile, ZeileMitSchalter } from "./Liste";
+import { FussLeiste } from "./FussLeiste";
 import { Icon, type IconName } from "./Icon";
 import { ZustimmungsMarke } from "./ZustimmungsMarke";
 import { TABELLE_NAME, TEIL_NAME, useAlleVerschiebungen, type Verschiebung, type TeilTabelle } from "../lib/teile";
@@ -40,7 +40,6 @@ const TEAM_CHAT_TITLE = "Stufenteam";
 const FARBE = {
   komitee: { verlauf: "from-[#6E6CF0] to-[#4341C8]", schatten: "shadow-[0_10px_24px_-14px_rgba(67,65,200,.9)]" },
   team: { verlauf: "from-[#1E8CFF] to-[#0058C8]", schatten: "shadow-[0_10px_24px_-14px_rgba(0,88,200,.9)]" },
-  nachtragen: { verlauf: "from-[#30B852] to-[#1D7F35]", schatten: "shadow-[0_10px_24px_-14px_rgba(29,127,53,.9)]" },
   anfragen: { verlauf: "from-[#FF9F0A] to-[#E2560B]", schatten: "shadow-[0_10px_24px_-14px_rgba(226,86,11,.9)]" },
   schueler: { verlauf: "from-[#2FB0CC] to-[#0F7690]", schatten: "shadow-[0_10px_24px_-14px_rgba(15,118,144,.9)]" },
   eltern: { verlauf: "from-[#FF4F6F] to-[#D1103F]", schatten: "shadow-[0_10px_24px_-14px_rgba(209,16,63,.9)]" },
@@ -49,6 +48,20 @@ const FARBE = {
 
 /** Unterseiten des Chats-Reiters – jede als eigene Ebene über allem. */
 type Ansicht = "anfragen" | "schueler" | "eltern" | "elterninfos" | null;
+/** Teil einer Komitee-Seite (KomiteePage): Chat oder Pinnwand */
+type Teil = "chat" | "uebersicht";
+
+/**
+ * Was im Chats-Reiter offen war – wie bei iOS behält ein Reiter seinen Stand,
+ * wenn man kurz in einen anderen wechselt (vorher war der offene Chat nach
+ * Übersicht → Chats weg). Nur im Speicher: ein Neuladen beginnt wieder bei
+ * den Kacheln. Erneutes Antippen des Reiters (sv:reiter-wurzel) leert ihn.
+ */
+const merker: { openId: string | null; teamOffen: boolean; ansicht: Ansicht; teil?: Teil } = {
+  openId: null,
+  teamOffen: false,
+  ansicht: null,
+};
 
 /** Diese Benachrichtigungen führen zu den Anfragen (lib/sprung.ts). */
 const ANFRAGE_ZIELE: Sprungziel[] = ["nachtrag", "komitee", "entsperren", "meldung", "foto"];
@@ -71,10 +84,9 @@ const istAnfrageSprung = () => {
  *     Kopfleiste und Zurück-Pfeil, wie in iMessage.
  */
 export function ChatsTab() {
-  const { topics, items, members, ready, unreadCount, createTopic, committeesOf, uid } = useTopics();
+  const { topics, items, members, ready, unreadCount, createTopic, committeesOf, uid, myVotes } = useTopics();
   const { can, isStaff } = useRole();
   const [anschreiben, setAnschreiben] = useState(false);
-  const [nachtragen, setNachtragen] = useState(false);
   const { mitteilungen, setKategorie, setKomitee } = useMitteilungen();
   const zaehlt = useZaehltMit();
   const darfVerwalten = can("chats.manage");
@@ -84,18 +96,53 @@ export function ChatsTab() {
   // so entstanden am 24.09.2026 doppelte Komitee-Chats. Zusätzlich überspringt
   // die Datenbank Doppelte selbst (supabase/komitee-chats-eindeutig.sql).
   const siehtAlle = can("chats.view_all");
-  const [openId, setOpenId] = useState<string | null>(null);
-  const [teamOffen, setTeamOffen] = useState(false);
+  const [openId, setOpenId] = useState<string | null>(() => merker.openId);
+  // Mit welchem Teil eine Komitee-Seite aufgeht (Vorschau-Zeilen: Pinnwand oder Chat)
+  const [openTeil, setOpenTeil] = useState<Teil | undefined>(() => merker.teil);
+  // Eintrag der Pinnwand, zu dem die Seite beim Öffnen springt (nur einmal, nicht gemerkt)
+  const [openZiel, setOpenZiel] = useState<string | undefined>();
+  const [teamOffen, setTeamOffen] = useState(() => merker.teamOffen);
   // Kam man über eine Benachrichtigung zu einer Anfrage, gleich die Anfragen
   // zeigen. Schon beim ersten Zeichnen prüfen: Die Anfrage-Komponenten
   // nehmen die Marke (#anfrage-…) beim Einhängen sofort aus der Adresse.
-  const [ansicht, setAnsicht] = useState<Ansicht>(() => (istAnfrageSprung() ? "anfragen" : null));
+  const [ansicht, setAnsicht] = useState<Ansicht>(() => (istAnfrageSprung() ? "anfragen" : merker.ansicht));
   const [anfragenZahl, setAnfragenZahl] = useState(0);
   const angelegt = useRef(false);
   const eltern = useElternZahlen(isStaff);
 
   const chats = topics.filter((t) => t.kind === "chat");
   const teamChat = chats.find((t) => !t.tag) ?? null;
+
+  // Stand für den nächsten Besuch des Reiters merken
+  useEffect(() => {
+    merker.openId = openId;
+    merker.teamOffen = teamOffen;
+    merker.ansicht = ansicht;
+    if (!openId) merker.teil = undefined;
+  }, [openId, teamOffen, ansicht]);
+
+  /** Einen Komitee-Chat öffnen – optional gleich auf der Pinnwand, bei einem bestimmten Eintrag */
+  const oeffne = useCallback((id: string, teil?: Teil, ziel?: string) => {
+    setOpenTeil(teil);
+    setOpenZiel(ziel);
+    merker.teil = teil;
+    setOpenId(id);
+  }, []);
+
+  // Reiter „Chats“ noch einmal angetippt (lib/gescrollt.ts): zurück zu den
+  // Kacheln – alle offenen Ebenen schließen, wie in iOS-Apps.
+  useEffect(() => {
+    const zurWurzel = (e: Event) => {
+      const r = (e as CustomEvent<unknown>).detail;
+      if (r !== undefined && r !== "themen" && r !== "chats") return;
+      setOpenId(null);
+      setTeamOffen(false);
+      setAnsicht(null);
+      setAnschreiben(false);
+    };
+    window.addEventListener("sv:reiter-wurzel", zurWurzel);
+    return () => window.removeEventListener("sv:reiter-wurzel", zurWurzel);
+  }, []);
 
   // Benachrichtigung, während der Reiter schon offen ist. Als Layout-Effekt,
   // damit dieser Zuhörer VOR denen der Anfrage-Komponenten an der Reihe ist –
@@ -110,23 +157,40 @@ export function ChatsTab() {
     return () => window.removeEventListener("hashchange", pruefe);
   }, []);
 
-  // Aus einer Benachrichtigung (#chat-<id>): genau diesen Chat öffnen
+  // Aus einer Benachrichtigung (#chat-<id>): genau diesen Chat öffnen.
+  // Ebenso „#chats/<ziel>“ (Absprache R2: App.tsx öffnet nur den Reiter und
+  // lässt die Marke stehen): <chat-id>, <chat-id>/<eintrag-id> (Pinnwand bei
+  // diesem Eintrag) oder eine Unterseite (anfragen, schueler, eltern, elterninfos).
   useEffect(() => {
     if (!ready) return;
-    const oeffne = () => {
-      const m = window.location.hash.match(/^#chat-([0-9a-f-]{36})$/i);
+    const ausAdresse = () => {
+      const unter = window.location.hash.match(/^#chats\/([^/]+)(?:\/(.+))?$/);
+      const m = unter ?? window.location.hash.match(/^#chat-([0-9a-f-]{36})$/i);
       if (!m) return;
       history.replaceState(null, "", window.location.pathname + window.location.search);
-      const t = topics.find((x) => x.id === m[1]);
+      const ziel = decodeURIComponent(m[1]);
+      // „#chats/team“: Schüler öffnen ihr Gespräch mit dem Stufenteam
+      if (unter && ziel === "team" && !isStaff) {
+        setOpenId(null);
+        return setTeamOffen(true);
+      }
+      if (unter && isStaff && (["anfragen", "schueler", "eltern", "elterninfos"] as const).includes(ziel as never)) {
+        setOpenId(null);
+        return setAnsicht(ziel as Ansicht);
+      }
+      const t = topics.find((x) => x.id === ziel);
       if (!t) return;
       // Schüler sehen ihre Gespräche mit dem Team als einen durchgehenden Chat
       if (t.kind === "ticket" && !isStaff) return setTeamOffen(true);
-      setOpenId(t.id);
+      const eintrag = unter?.[2] ? items.find((i) => i.id === decodeURIComponent(unter[2]) && i.topic_id === t.id) : undefined;
+      const aufPinnwand = eintrag && (eintrag.type === "umfrage" || eintrag.type === "todo" || eintrag.pinned);
+      if (aufPinnwand) oeffne(t.id, "uebersicht", eintrag.id);
+      else oeffne(t.id, eintrag ? "chat" : undefined);
     };
-    oeffne();
-    window.addEventListener("hashchange", oeffne);
-    return () => window.removeEventListener("hashchange", oeffne);
-  }, [ready, topics, isStaff]);
+    ausAdresse();
+    window.addEventListener("hashchange", ausAdresse);
+    return () => window.removeEventListener("hashchange", ausAdresse);
+  }, [ready, topics, items, isStaff, oeffne]);
   const meineKoms = committeesOf(uid);
 
   // Fehlende Chats einmalig anlegen – nur wer Chats verwalten darf, kann das.
@@ -171,6 +235,17 @@ export function ChatsTab() {
     [items, uid],
   );
 
+  /**
+   * Untertitel eines Komitees (Kachel und Liste). Vorher stand „noch keine
+   * Nachricht“ neben einer roten 5 – die 5 steckte auf der Pinnwand. Jetzt
+   * sagt die Zeile, wo das Neue ist, und sonst, was offen ist.
+   */
+  const komiteeUnter = (t: Topic, leer: string) => {
+    const nPin = unreadCount(t.id, "uebersicht");
+    if (nPin && !unreadCount(t.id, "chat")) return `${nPin} neu auf der Pinnwand`;
+    return vorschau([t.id], "") || standText(items, t.id, myVotes) || leer;
+  };
+
   const glocke = (k: Kategorie) => ({ an: kategorieAn(mitteilungen, k), setAn: (an: boolean) => void setKategorie(k, an) });
 
   if (!ready)
@@ -191,6 +266,14 @@ export function ChatsTab() {
     .sort((a, b) => (reihenfolge.get(a.tag) ?? 99) - (reihenfolge.get(b.tag) ?? 99));
   const meineChats = komiteeChats.filter((t) => meineKoms.includes(t.tag));
   const andereChats = komiteeChats.filter((t) => !meineKoms.includes(t.tag));
+  // Vorschau-Gruppen unter den Kacheln (nur Schüler): eigene Komitees mit Inhalt
+  // und die letzte Nachricht im Gespräch mit dem Team
+  const vorschauKomitees = isStaff ? [] : meineChats.filter((t) => items.some((i) => i.topic_id === t.id && i.type !== "system"));
+  const ticketIds = new Set(tickets.map((t) => t.id));
+  const teamLetzte = isStaff
+    ? null
+    : items.filter((i) => ticketIds.has(i.topic_id) && i.type === "nachricht").sort(neuesteZuerst)[0] ?? null;
+  const vorschauZahl = vorschauKomitees.length + (teamLetzte ? 1 : 0);
 
   // ------------------------------------------------------------ Kacheln
   const kacheln: JSX.Element[] = [];
@@ -200,13 +283,14 @@ export function ChatsTab() {
       {...FARBE.komitee}
       symbol={committeeIcon(t.tag)}
       titel={committeeLabel(t.tag)}
-      unter={vorschau([t.id], "Mein Komitee – noch keine Nachricht")}
+      unter={komiteeUnter(t, "Mein Komitee – noch keine Nachricht")}
       zahl={unreadCount(t.id)}
       zahlRot
-      onClick={() => setOpenId(t.id)}
+      onClick={() => oeffne(t.id)}
     />
   );
 
+  // Symbole wie in den Köpfen der Ebenen, die sie öffnen (Design-Regeln 5: keine Emojis)
   if (isStaff) {
     kacheln.push(
       <FarbKachel
@@ -226,19 +310,19 @@ export function ChatsTab() {
         <FarbKachel
           key="teamchat"
           {...FARBE.team}
-          symbol="👑"
+          symbol={<Icon name="chats" size={19} strich={2.2} />}
           titel="Stufenteam-Chat"
           unter={vorschau([teamChat.id], "Nur fürs Team")}
           zahl={unreadCount(teamChat.id)}
           zahlRot
-          onClick={() => setOpenId(teamChat.id)}
+          onClick={() => oeffne(teamChat.id)}
         />,
       );
     kacheln.push(
       <FarbKachel
         key="schueler"
         {...FARBE.schueler}
-        symbol="🎓"
+        symbol={<Icon name="person" size={19} strich={2.2} />}
         titel="Schüler"
         unter={offeneTickets.length ? `${offeneTickets.length} ${offeneTickets.length === 1 ? "Gespräch" : "Gespräche"} offen` : "Kein Gespräch offen"}
         zahl={ticketUngelesen}
@@ -248,7 +332,7 @@ export function ChatsTab() {
       <FarbKachel
         key="eltern"
         {...FARBE.eltern}
-        symbol="👪"
+        symbol={<Icon name="rollen" size={19} strich={2.2} />}
         titel="Eltern"
         unter={eltern.offen ? `${eltern.offen} ${eltern.offen === 1 ? "Gespräch" : "Gespräche"} offen` : "Kein Gespräch offen"}
         zahl={eltern.neu}
@@ -258,7 +342,7 @@ export function ChatsTab() {
       <FarbKachel
         key="elterninfos"
         {...FARBE.infos}
-        symbol="📣"
+        symbol={<Icon name="info" size={19} strich={2.2} />}
         titel="Infos für Eltern"
         unter={eltern.infos ? `${eltern.infos} veröffentlicht` : "Noch nichts veröffentlicht"}
         onClick={() => setAnsicht("elterninfos")}
@@ -267,34 +351,33 @@ export function ChatsTab() {
     // Eigene Komitees des Teams ebenfalls als Kachel – die übrigen in der Liste
     for (const t of meineChats) kacheln.push(komiteeKachel(t));
   } else {
+    // „Mithilfe nachtragen“ steht nicht mehr hier: dafür gibt es oben in der
+    // Kopfzeile auf jedem Reiter „+ Nachtragen“ (ein Antrag ist kein Chat).
     for (const t of meineChats) kacheln.push(komiteeKachel(t));
     kacheln.push(
       <FarbKachel
         key="frag"
         {...FARBE.team}
-        symbol="🛡️"
+        symbol={<Icon name="schild" size={19} strich={2.2} />}
         titel="Frag das Stufenteam"
         unter={vorschau(tickets.map((t) => t.id), "Frag hier alles – das Team antwortet dir")}
         zahl={ticketUngelesen}
         zahlRot
         onClick={() => setTeamOffen(true)}
       />,
-      <FarbKachel
-        key="nachtragen"
-        {...FARBE.nachtragen}
-        symbol="🙌"
-        titel="Mithilfe nachtragen"
-        unter="Vergessen eingetragen? Hier beantragen."
-        onClick={() => setNachtragen(true)}
-      />,
     );
   }
   // Ungerade Anzahl: die letzte Kachel geht über beide Spalten (am Handy)
   const breitLetzte = kacheln.length % 2 === 1;
+  // Am Rechner so viele Spalten, dass keine halbe Reihe leer bleibt
+  // (6 Kacheln: 3 + 3 statt 4 + 2; eine einzelne Kachel über die ganze Breite)
+  const n = kacheln.length;
+  const lgSpalten =
+    n === 1 ? "lg:grid-cols-1" : n === 2 ? "lg:grid-cols-2" : n === 3 || n === 5 || n === 6 || n === 9 ? "lg:grid-cols-3" : "lg:grid-cols-4";
 
   return (
     <div className="space-y-6 pb-4">
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className={`grid grid-cols-2 gap-3 ${lgSpalten}`}>
         {kacheln.map((k, i) =>
           breitLetzte && i === kacheln.length - 1 ? (
             <div key={k.key} className="col-span-2 grid lg:col-span-1">
@@ -307,9 +390,22 @@ export function ChatsTab() {
       </div>
 
       {!isStaff && meineChats.length === 0 && (
-        <p className="-mt-2 px-4 text-[13px] leading-snug text-tinte-leise">
+        <p className="auf-bild -mt-2 px-4 text-[13px] leading-snug text-tinte-leise">
           Du bist noch in keinem Komitee. Das Stufenteam kann dich eintragen – dann steht dein Komitee-Chat hier oben.
         </p>
+      )}
+
+      {/* Schüler/Komitee-Mitglieder: was im eigenen Komitee wartet und die
+          letzte Nachricht mit dem Team, direkt unter den Kacheln (vorher war
+          der Rest des Reiters leer). Am Laptop zwei Spalten – aber nur, wenn
+          es mehr als eine Gruppe gibt (sonst endete eine Gruppe in der Mitte). */}
+      {vorschauZahl > 0 && (
+        <div className={`grid gap-x-5 gap-y-6 lg:items-start ${vorschauZahl > 1 ? "lg:grid-cols-2" : ""}`}>
+          {vorschauKomitees.map((t) => (
+            <KomiteeVorschau key={t.id} topic={t} onOeffnen={(teil, ziel) => oeffne(t.id, teil, ziel)} />
+          ))}
+          {teamLetzte && <TeamVorschau letzte={teamLetzte} uid={uid} onOeffnen={() => setTeamOffen(true)} />}
+        </div>
       )}
 
       {/* Komitee-Chats: ruhige Liste. Fürs Team mit Glocke je Komitee. */}
@@ -327,9 +423,9 @@ export function ChatsTab() {
                   key={t.id}
                   titel={committeeLabel(t.tag)}
                   icon={committeeIcon(t.tag)}
-                  unter={vorschau([t.id], "Noch keine Nachricht")}
+                  unter={komiteeUnter(t, "Noch keine Nachricht")}
                   unread={zaehlt(t) ? unreadCount(t.id) : 0}
-                  onOpen={() => setOpenId(t.id)}
+                  onOpen={() => oeffne(t.id)}
                   glocke={{ an, setAn: (x) => void setKomitee(t.tag, x), name: committeeLabel(t.tag) }}
                 />
               );
@@ -339,7 +435,7 @@ export function ChatsTab() {
           // Schüler sehen andere Komitees normalerweise gar nicht (Datenbank);
           // falls doch (Testbetrieb), zugeklappt, damit nichts überladen wirkt.
           <details className="group">
-            <summary className="flex min-h-[40px] cursor-pointer list-none items-center gap-1.5 px-4 text-[13px] uppercase tracking-[0.02em] text-tinte-leise [&::-webkit-details-marker]:hidden">
+            <summary className="auf-bild flex min-h-[44px] cursor-pointer list-none items-center gap-1.5 px-4 text-[13px] uppercase tracking-[0.02em] text-tinte-leise [&::-webkit-details-marker]:hidden">
               Weitere Komitees ({andereChats.length})
               <span className="transition group-open:rotate-90" aria-hidden>
                 <Icon name="chevron" size={13} />
@@ -352,14 +448,12 @@ export function ChatsTab() {
                   titel={committeeLabel(t.tag)}
                   icon={committeeIcon(t.tag)}
                   unread={0}
-                  onOpen={() => setOpenId(t.id)}
+                  onOpen={() => oeffne(t.id)}
                 />
               ))}
             </div>
           </details>
         ))}
-
-      <NachtragSheet open={nachtragen} onClose={() => setNachtragen(false)} />
 
       {/* ---------------------------------------------- Ebenen (Vollbild) */}
       {isStaff && (
@@ -377,7 +471,7 @@ export function ChatsTab() {
           offene={offeneTickets}
           erledigt={tickets.filter((t) => t.status === "erledigt")}
           onBack={() => setAnsicht(null)}
-          onOpen={(id) => setOpenId(id)}
+          onOpen={(id) => oeffne(id)}
           onAnschreiben={() => setAnschreiben(true)}
           glocke={glocke("schueler")}
         />
@@ -392,13 +486,175 @@ export function ChatsTab() {
           er geöffnet wurde; Zurück führt dann wieder in diese Liste. */}
       {offen &&
         (offen.kind === "chat" ? (
-          <KomiteePage key={offen.id} topic={offen} onBack={() => setOpenId(null)} />
+          <KomiteePage
+            key={offen.id}
+            topic={offen}
+            startTeil={openTeil}
+            startZiel={openZiel}
+            onTeil={(t) => {
+              merker.teil = t;
+            }}
+            onBack={() => setOpenId(null)}
+          />
         ) : (
           <TicketChat key={offen.id} topic={offen} onBack={() => setOpenId(null)} />
         ))}
 
       {isStaff && <SchuelerAnschreiben open={anschreiben} onClose={() => setAnschreiben(false)} />}
     </div>
+  );
+}
+
+/* ------------------------------------------------ Vorschau eines Komitees */
+
+const abgelaufen = (i: TopicItem) => Boolean(i.poll_deadline) && new Date(i.poll_deadline!).getTime() < Date.now();
+const neuesteZuerst = (a: TopicItem, b: TopicItem) => (a.created_at < b.created_at ? 1 : -1);
+const fristKurz = (iso: string) =>
+  new Date(iso).toLocaleString("de-DE", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+const zeitKurz = (iso: string) => {
+  const d = new Date(iso);
+  return d.toDateString() === new Date().toDateString()
+    ? d.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })
+    : d.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" });
+};
+
+/** Was in einem Komitee offen ist, als eine Zeile („1 Abstimmung offen · 2 To-dos offen“). */
+function standText(items: TopicItem[], topicId: string, myVotes: Record<string, unknown[]>): string {
+  const eig = items.filter((i) => i.topic_id === topicId);
+  // Nur Abstimmungen, bei denen man selbst noch nicht abgestimmt hat
+  // Freitext-Abstimmungen (antwort_art) nicht: ihre Antwort liegt in
+  // topic_antworten, myVotes bliebe leer (wie KomiteeVorschau/ZuErledigen)
+  const umfragen = eig.filter((i) => i.type === "umfrage" && !i.antwort_art && !abgelaufen(i) && !(myVotes[i.id] || []).length).length;
+  const todos = eig.filter((i) => i.type === "todo" && !i.done).length;
+  const teile: string[] = [];
+  if (umfragen) teile.push(`${umfragen} ${umfragen === 1 ? "Abstimmung" : "Abstimmungen"} offen`);
+  if (todos) teile.push(`${todos} ${todos === 1 ? "To-do" : "To-dos"} offen`);
+  if (teile.length) return teile.join(" · ");
+  const pin = eig.filter((i) => i.type === "nachricht" && i.pinned).sort(neuesteZuerst)[0];
+  return pin ? `Angepinnt: ${pin.body}` : "";
+}
+
+/**
+ * Was im eigenen Komitee wartet – direkt unter den Kacheln, damit man nicht
+ * erst den Chat öffnen muss (und der Reiter nicht halb leer bleibt):
+ * neuestes Angepinntes, offene Abstimmungen (ohne eigene Stimme zuerst),
+ * offene To-dos und die letzte Nachricht. Jede Zeile öffnet die passende
+ * Stelle (Pinnwand oder Chat). Ist nichts da, fehlt die Gruppe ganz.
+ */
+function KomiteeVorschau({ topic, onOeffnen }: { topic: Topic; onOeffnen: (teil: Teil, ziel?: string) => void }) {
+  const { items, myVotes, uid } = useTopics();
+  // Gesperrte dürfen nicht abstimmen – dann auch kein „Abstimmen“ anbieten
+  const { banned } = useRole();
+  const eig = items.filter((i) => i.topic_id === topic.id);
+  const pin = eig.filter((i) => i.type === "nachricht" && i.pinned).sort(neuesteZuerst)[0];
+  const ohneStimme = (u: TopicItem) => !u.antwort_art && !(myVotes[u.id] || []).length;
+  const umfragen = eig
+    .filter((i) => i.type === "umfrage" && !abgelaufen(i))
+    .sort((a, b) => Number(ohneStimme(b)) - Number(ohneStimme(a)) || neuesteZuerst(a, b))
+    .slice(0, 2);
+  const todos = eig.filter((i) => i.type === "todo" && !i.done).sort(neuesteZuerst);
+  const letzte = eig.filter((i) => i.type === "nachricht" && !i.pinned).sort(neuesteZuerst)[0];
+
+  const zeilen: JSX.Element[] = [];
+  if (pin)
+    zeilen.push(
+      <Zeile
+        key="pin"
+        label={<span className="line-clamp-2 [overflow-wrap:anywhere]">{pin.body}</span>}
+        unter="Angepinnt"
+        symbol={
+          <Symbol farbe="bg-[#E8590C]">
+            <Icon name="pin" size={17} strich={2.2} />
+          </Symbol>
+        }
+        onClick={() => onOeffnen("uebersicht", pin.id)}
+      />,
+    );
+  // Jede Zeile springt zu IHREM Eintrag auf der Pinnwand (mittig, kurz hervorgehoben)
+  for (const u of umfragen)
+    zeilen.push(
+      <Zeile
+        key={u.id}
+        label={<span className="line-clamp-2 [overflow-wrap:anywhere]">{u.body}</span>}
+        unter={u.poll_deadline ? `Abstimmung · bis ${fristKurz(u.poll_deadline)}` : "Abstimmung"}
+        symbol={
+          <Symbol farbe="bg-[#5E5CE6]">
+            <Icon name="umfrage" size={17} strich={2.2} />
+          </Symbol>
+        }
+        onClick={() => onOeffnen("uebersicht", u.id)}
+      >
+        {banned ? null : ohneStimme(u) ? (
+          <span className="text-[15px] font-medium text-brand-dark dark:text-brand">Abstimmen</span>
+        ) : !u.antwort_art ? (
+          <Wert>Abgestimmt</Wert>
+        ) : null}
+      </Zeile>,
+    );
+  if (todos.length)
+    zeilen.push(
+      <Zeile
+        key="todos"
+        label="To-dos"
+        unter={<span className="line-clamp-1 [overflow-wrap:anywhere]">{todos[0].body}</span>}
+        symbol={
+          <Symbol farbe="bg-[#248A3D]">
+            <Icon name="haken" size={17} strich={2.4} />
+          </Symbol>
+        }
+        onClick={() => onOeffnen("uebersicht", todos[0].id)}
+      >
+        <Wert>{todos.length} offen</Wert>
+      </Zeile>,
+    );
+  if (letzte) {
+    const wer = letzte.created_by === uid ? "Du" : lesbarerName(letzte.author || "").split(" ")[0] || "Jemand";
+    zeilen.push(
+      <Zeile
+        key="chat"
+        label={
+          <span className="line-clamp-2 [overflow-wrap:anywhere]">
+            <span className="font-semibold">{wer}:</span> {letzte.body}
+          </span>
+        }
+        unter={`Letzte Nachricht · ${zeitKurz(letzte.created_at)}`}
+        symbol={
+          <Symbol farbe="bg-[#007AFF]">
+            <Icon name="chats" size={17} strich={2.2} />
+          </Symbol>
+        }
+        onClick={() => onOeffnen("chat")}
+      />,
+    );
+  }
+  if (!zeilen.length) return null;
+  return (
+    <Gruppe className="" titel={committeeLabel(topic.tag)}>
+      {zeilen}
+    </Gruppe>
+  );
+}
+
+/** Schüler: die letzte Nachricht im Gespräch mit dem Stufenteam – ein Tipp öffnet den Chat. */
+function TeamVorschau({ letzte, uid, onOeffnen }: { letzte: TopicItem; uid: string | null; onOeffnen: () => void }) {
+  const wer = letzte.created_by === uid ? "Du" : "Stufenteam";
+  return (
+    <Gruppe className="" titel="Stufenteam">
+      <Zeile
+        label={
+          <span className="line-clamp-2 [overflow-wrap:anywhere]">
+            <span className="font-semibold">{wer}:</span> {letzte.body}
+          </span>
+        }
+        unter={`Letzte Nachricht · ${zeitKurz(letzte.created_at)}`}
+        symbol={
+          <Symbol farbe="bg-[#007AFF]">
+            <Icon name="schild" size={17} strich={2.2} />
+          </Symbol>
+        }
+        onClick={onOeffnen}
+      />
+    </Gruppe>
   );
 }
 
@@ -417,11 +673,11 @@ function Glocke({ an, setAn, name }: { an: boolean; setAn: (an: boolean) => void
       // after: unsichtbar vergrößerte Trefferfläche (die Kapsel selbst bleibt klein und ruhig)
       className={`relative flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-[12px] font-bold transition after:absolute after:-inset-x-1 after:-inset-y-3 after:content-[''] active:scale-95 ${
         an
-          ? "bg-brand/[0.08] text-[#004f9e] dark:bg-brand/20 dark:text-brand-soft"
+          ? "bg-brand/[0.08] text-[#004f9e] dark:bg-brand/20 dark:text-brand-dark"
           : "bg-[rgb(118_118_128/0.12)] text-tinte-matt dark:bg-[rgb(118_118_128/0.24)] dark:text-slate-300"
       }`}
     >
-      <span aria-hidden>{an ? "🔔" : "🔕"}</span>
+      <Icon name={an ? "glocke" : "glocke-aus"} size={14} strich={2.2} />
       {an ? "an" : "aus"}
     </button>
   );
@@ -452,7 +708,7 @@ function ChatZeile({
           {unter && <span className="block truncate text-[12.5px] text-tinte-leise">{unter}</span>}
         </span>
         {unread > 0 && (
-          <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[11px] font-bold text-white">
+          <span className="zahl flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[12px] font-bold text-white">
             {unread > 9 ? "9+" : unread}
           </span>
         )}
@@ -474,11 +730,16 @@ function ChatZeile({
 function MitteilungsGruppe({ an, setAn, name, fuss }: { an: boolean; setAn: (an: boolean) => void; name: string; fuss?: string }) {
   return (
     <Gruppe titel="Mitteilungen" fuss={fuss} className="mt-6">
-      <div className="flex min-h-[48px] items-center gap-3 px-4 py-2">
-        <span aria-hidden className="text-[15px]">{an ? "🔔" : "🔕"}</span>
-        <span className="min-w-0 flex-1 text-[15px]">{name}</span>
+      <ZeileMitSchalter
+        label={name}
+        symbol={
+          <Symbol farbe="bg-[#FF3B30]">
+            <Icon name="glocke" size={17} strich={2.2} />
+          </Symbol>
+        }
+      >
         <Schalter an={an} onChange={setAn} label={`Mitteilungen für ${name}`} />
-      </div>
+      </ZeileMitSchalter>
     </Gruppe>
   );
 }
@@ -490,7 +751,7 @@ function Leer({ icon, text }: { icon: IconName; text: string }) {
       <span aria-hidden className="flex h-14 w-14 items-center justify-center rounded-full bg-brand/10 text-brand dark:bg-brand/20">
         <Icon name={icon} size={26} />
       </span>
-      <p className="auf-bild mt-3 max-w-xs text-[14px] leading-snug text-tinte-leise">{text}</p>
+      <p className="auf-bild mx-auto mt-3 max-w-xs text-[14px] leading-snug text-tinte-leise">{text}</p>
     </div>
   );
 }
@@ -524,7 +785,7 @@ function useMeldungenZahl(box: HTMLElement | null) {
 function AnfragenAbschnitt({ titel, n, children }: { titel: string; n: number; children: React.ReactNode }) {
   return (
     <section className={n ? "mb-6" : "hidden"}>
-      <h3 className="mb-1.5 px-4 text-[13px] uppercase tracking-[0.02em] text-tinte-leise">
+      <h3 className="auf-bild mb-1.5 px-4 text-[13px] uppercase tracking-[0.02em] text-tinte-leise">
         {titel} <span className="zahl">· {n}</span>
       </h3>
       <div className="grid gap-2.5 lg:grid-cols-2">{children}</div>
@@ -564,6 +825,7 @@ function AnfragenEbene({
   return (
     <ChatEbene
       sichtbar={sichtbar}
+      onSchliessen={onBack}
       label="Anfragen"
       // Listen beginnen oben – die erste Anfrage ist die wichtigste, nicht die letzte
       start="oben"
@@ -695,7 +957,8 @@ function TeamChatSchueler({ tickets, onBack }: { tickets: Topic[]; onBack: () =>
   return (
     <ChatEbene
       label="Stufenteam"
-      kopf={<ChatKopf onBack={onBack} symbol={<Icon name="schild" size={17} strich={2.2} />} titel="Stufenteam" unter="Frag hier alles – das Team antwortet dir" />}
+      onSchliessen={onBack}
+      kopf={<ChatKopf onBack={onBack} symbol={<Icon name="schild" size={17} strich={2.2} />} titel="Stufenteam" unter="Das Team antwortet dir hier" />}
       fuss={banned ? undefined : <ChatEingabe wert={text} setWert={setText} onSenden={senden} />}
     >
       {banned ? (
@@ -715,12 +978,13 @@ function TeamChatSchueler({ tickets, onBack }: { tickets: Topic[]; onBack: () =>
   );
 }
 
-/** Teamansicht: ein Ticket als Chat, mit Erledigt- und Löschen-Knopf. */
+/** Teamansicht: ein Ticket als Chat – im Kopf „Erledigt“ und „…“ (Löschen im Blatt). */
 function TicketChat({ topic, onBack }: { topic: Topic; onBack: () => void }) {
   const { items, postItem, deleteItem, deleteTopic, updateTopic, markRead, committeesOf, uid } = useTopics();
   const { role, can, isStaff, banned } = useRole();
   const { profile } = useProfiles();
   const [text, setText] = useState("");
+  const [mehr, setMehr] = useState(false);
 
   const liste = items
     .filter((i) => i.topic_id === topic.id)
@@ -740,54 +1004,46 @@ function TicketChat({ topic, onBack }: { topic: Topic; onBack: () => void }) {
   const person = useTicketPerson(topic);
   const name = person ? profile[person]?.anzeigename : "";
   const erledigt = topic.status === "erledigt";
+  const umschalten = () => void updateTopic(topic.id, { status: erledigt ? "offen" : "erledigt" });
 
   return (
     <ChatEbene
       label={name || "Frage"}
+      onSchliessen={onBack}
       kopf={
         <ChatKopf
           onBack={onBack}
           symbol={<Avatar userId={person} name={name} size={32} />}
           titel={name || "Frage"}
           unter={erledigt ? `Erledigt · ${topic.title}` : topic.title}
-          rechts={
-            isStaff && (
-              <>
-                <button
-                  className={`flex h-10 items-center gap-1 rounded-full px-3 text-[13px] font-semibold transition active:scale-95 ${
-                    erledigt
-                      ? "bg-[rgb(118_118_128/0.12)] text-brand-dark dark:bg-[rgb(118_118_128/0.24)] dark:text-brand"
-                      : "bg-[#248A3D] text-white dark:bg-[#30D158] dark:text-black"
-                  }`}
-                  onClick={() => updateTopic(topic.id, { status: erledigt ? "offen" : "erledigt" })}
-                  title={erledigt ? "Wieder öffnen" : "Als erledigt markieren"}
-                >
-                  {!erledigt && <Icon name="haken" size={15} strich={2.6} />}
-                  {erledigt ? "Öffnen" : "Erledigt"}
-                </button>
-                {can("chats.manage") && (
-                  <button
-                    className="iconbtn"
-                    title="Gespräch löschen"
-                    aria-label="Gespräch löschen"
-                    onClick={async () => {
-                      if (await frage("Diese Frage samt Verlauf löschen?", "Löschen", true)) {
-                        void deleteTopic(topic.id);
-                        onBack();
-                      }
-                    }}
-                  >
-                    <Icon name="muell" size={17} />
-                  </button>
-                )}
-              </>
-            )
-          }
+          rechts={isStaff && <GespraechKnoepfe erledigt={erledigt} onErledigt={umschalten} onMehr={() => setMehr(true)} />}
         />
       }
       fuss={banned ? undefined : <ChatEingabe wert={text} setWert={setText} onSenden={senden} platzhalter="Antworten" />}
     >
       <ChatBlasen liste={liste} uid={uid} darfLoeschen={can("chats.delete_messages")} onDelete={deleteItem} />
+      {isStaff && (
+        <GespraechMehrBlatt
+          open={mehr}
+          onClose={() => setMehr(false)}
+          titel={name || "Frage"}
+          unter={erledigt ? `Erledigt · ${topic.title}` : topic.title}
+          erledigt={erledigt}
+          onErledigt={umschalten}
+          loeschen={
+            can("chats.manage")
+              ? {
+                  frage: "Diese Frage samt Verlauf löschen?",
+                  fuss: "Alle Nachrichten darin verschwinden – auch für die Schülerin oder den Schüler.",
+                  onLoeschen: () => {
+                    void deleteTopic(topic.id);
+                    onBack();
+                  },
+                }
+              : undefined
+          }
+        />
+      )}
     </ChatEbene>
   );
 }
@@ -894,9 +1150,11 @@ function SchuelerAnschreiben({ open, onClose }: { open: boolean; onClose: () => 
           <input className="field" placeholder="z. B. Waffelstand 1. Pause" value={betreff} maxLength={60} onChange={(e) => setBetreff(e.target.value)} />
           <label className="mb-1.5 mt-4 block px-4 text-[13px] uppercase tracking-[0.02em] text-tinte-leise">Nachricht</label>
           <textarea className="field min-h-[90px]" value={text} onChange={(e) => setText(e.target.value)} />
-          <button disabled={busy || !betreff.trim() || !text.trim()} onClick={senden} className="btn-primary mt-5">
-            {busy ? "Wird gesendet …" : "Senden"}
-          </button>
+          <FussLeiste>
+            <button disabled={busy || !betreff.trim() || !text.trim()} onClick={senden} className="btn-primary">
+              {busy ? "Wird gesendet …" : "Senden"}
+            </button>
+          </FussLeiste>
         </>
       )}
     </Sheet>
@@ -917,14 +1175,12 @@ function TicketListe({
   onAnschreiben: () => void;
   glocke: { an: boolean; setAn: (an: boolean) => void };
 }) {
-  const { unreadCount, deleteTopic } = useTopics();
-  const loeschen = (t: Topic) => async () => {
-    if (await frage(`Das Gespräch „${t.title}" endgültig löschen?\n\nAlle Nachrichten darin verschwinden.`, "Löschen", true))
-      void deleteTopic(t.id);
-  };
+  const { unreadCount } = useTopics();
+  // Löschen steht im geöffneten Gespräch (oben rechts) – nicht als Mülleimer in jeder Zeile
   return (
     <ChatEbene
       label="Gespräche mit Schülern"
+      onSchliessen={onBack}
       start="oben"
       kopf={
         <ChatKopf
@@ -946,14 +1202,14 @@ function TicketListe({
         ) : (
           <Gruppe titel="Offen" className="">
             {offene.map((t) => (
-              <TicketZeile key={t.id} topic={t} unread={unreadCount(t.id)} onOpen={() => onOpen(t.id)} onDelete={loeschen(t)} />
+              <TicketZeile key={t.id} topic={t} unread={unreadCount(t.id)} onOpen={() => onOpen(t.id)} />
             ))}
           </Gruppe>
         )}
 
         {erledigt.length > 0 && (
           <details className="group mt-6">
-            <summary className="flex min-h-[40px] cursor-pointer list-none items-center gap-1.5 px-4 text-[13px] uppercase tracking-[0.02em] text-tinte-leise [&::-webkit-details-marker]:hidden">
+            <summary className="auf-bild flex min-h-[44px] cursor-pointer list-none items-center gap-1.5 px-4 text-[13px] uppercase tracking-[0.02em] text-tinte-leise [&::-webkit-details-marker]:hidden">
               Erledigt ({erledigt.length})
               <span className="transition group-open:rotate-90" aria-hidden>
                 <Icon name="chevron" size={13} />
@@ -961,7 +1217,7 @@ function TicketListe({
             </summary>
             <div className="gruppe-zellen mt-1">
               {erledigt.map((t) => (
-                <TicketZeile key={t.id} topic={t} unread={0} onOpen={() => onOpen(t.id)} onDelete={loeschen(t)} />
+                <TicketZeile key={t.id} topic={t} unread={0} onOpen={() => onOpen(t.id)} />
               ))}
             </div>
           </details>
@@ -975,8 +1231,8 @@ function TicketListe({
 
 /** Eine Zeile „Gespräch mit …“ in der Liste der Schüler-Gespräche. */
 function TicketZeile({
-  topic, unread, onOpen, onDelete,
-}: { topic: Topic; unread: number; onOpen: () => void; onDelete?: () => void }) {
+  topic, unread, onOpen,
+}: { topic: Topic; unread: number; onOpen: () => void }) {
   const { profile } = useProfiles();
   const person = useTicketPerson(topic);
   const name = person ? profile[person]?.anzeigename : "";
@@ -992,7 +1248,7 @@ function TicketZeile({
           <span className="block truncate text-[12.5px] text-tinte-leise">{topic.title}</span>
         </span>
         {unread > 0 && (
-          <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[11px] font-bold text-white">
+          <span className="zahl flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[12px] font-bold text-white">
             {unread > 9 ? "9+" : unread}
           </span>
         )}
@@ -1001,17 +1257,8 @@ function TicketZeile({
             <Icon name="haken" size={16} strich={2.6} />
           </span>
         )}
+        <span aria-hidden className="shrink-0 text-[17px] leading-none text-tinte-leise">›</span>
       </button>
-      {onDelete && (
-        <button
-          onClick={onDelete}
-          className="mr-2 flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-tinte-leise transition hover:text-red-500 active:scale-90"
-          aria-label="Gespräch löschen"
-          title="Gespräch löschen"
-        >
-          <Icon name="muell" size={17} />
-        </button>
-      )}
     </div>
   );
 }

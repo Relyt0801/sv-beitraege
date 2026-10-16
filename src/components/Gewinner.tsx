@@ -90,11 +90,11 @@ export function GewinnerBuehne({
 /** Kleine Marke an einem Eintrag, der gewonnen hat */
 export function GewinnerMarke({ art }: { art: GewinnerArt }) {
   return art === "gewinner" ? (
-    <span className="inline-flex items-center gap-1 rounded-full bg-[#F5B53F]/20 px-2 py-0.5 text-[11.5px] font-bold text-[#9A5B00] dark:text-[#FFD66B]">
+    <span className="inline-flex items-center gap-1 rounded-full bg-[#F5B53F]/20 px-2 py-0.5 text-[12px] font-bold text-[#9A5B00] dark:text-[#FFD66B]">
       <Krone size={12} /> Gewinner
     </span>
   ) : (
-    <span className="inline-flex items-center gap-1 rounded-full bg-[#FF4F7B]/15 px-2 py-0.5 text-[11.5px] font-bold text-[#C2185B] dark:text-[#FF8FB1]">
+    <span className="inline-flex items-center gap-1 rounded-full bg-[#FF4F7B]/15 px-2 py-0.5 text-[12px] font-bold text-[#C2185B] dark:text-[#FF8FB1]">
       <Herz size={11} /> Herzen
     </span>
   );

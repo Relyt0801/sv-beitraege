@@ -137,9 +137,18 @@ export function TermineProvider({ children }: { children: ReactNode }) {
   // ist man selbst in einer Schicht eingeteilt und für eine gemeldet.
   const { studentId: demoIch } = useRole();
   const { students: demoPersonen } = useStore();
+  // Nur EINMAL je eigener Person erzeugen (wie demo.current in lib/finanzen.ts).
+  // Vorher hing der Effekt an der ganzen Personenliste: Jede Zahlung in der
+  // Kasse erzeugte alle Termine neu – was man in der Demo an Terminen und
+  // Schichten geändert hatte, war weg, und der Zähler an „Events“ sprang ohne
+  // Grund von 8 auf „9+“.
+  const demoFuer = useRef<string | null>(null);
   useEffect(() => {
     const rolle = demoRolle();
     if (hasSupabase || !rolle || !demoPersonen.length) return;
+    const schluessel = demoIch ?? "-";
+    if (demoFuer.current === schluessel) return;
+    demoFuer.current = schluessel;
     const uid = demoUid(rolle) ?? LOCAL_UID;
     uidRef.current = uid;
     setMeineUid(uid);

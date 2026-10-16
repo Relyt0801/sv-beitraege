@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { SchliessenKnopf, ZurueckKnopf, useBlattKopf, useZurueckKanal } from "./Sheet";
 
 /**
  * Bausteine im Stil der iOS-Einstellungen – überall in der App gleich:
@@ -67,6 +68,7 @@ export function Zeile({
   ohnePfeil?: boolean;
 }) {
   const farbe = rot ? "text-red-600 dark:text-red-400" : blau ? "text-brand-dark dark:text-brand" : "";
+  const hatWert = children !== undefined && children !== null && children !== false && children !== "";
   const inhalt = (
     <>
       {symbol}
@@ -77,9 +79,13 @@ export function Zeile({
           <span className="mt-0.5 block text-[12.5px] leading-snug text-tinte-leise">{unter}</span>
         </span>
       ) : (
-        <span className={`shrink-0 text-[15px] ${rot ? "font-semibold" : blau ? "font-medium" : ""} ${farbe}`}>{label}</span>
+        // Ohne Wert rechts darf eine lange Bezeichnung umbrechen (statt „›“
+        // aus der Zeile zu schieben). Mit Wert/Eingabefeld bleibt sie ganz
+        // (höchstens 65 % breit) – sonst brach „Bezeichnung“ neben einem
+        // Eingabefeld mitten im Wort um.
+        <span className={`text-[15px] leading-snug ${hatWert ? "max-w-[65%] shrink-0" : "min-w-0 flex-1"} ${rot ? "font-semibold" : blau ? "font-medium" : ""} ${farbe}`}>{label}</span>
       )}
-      <span className={`flex min-w-0 items-center justify-end gap-1.5 ${unter ? "shrink-0" : "flex-1"}`}>{children}</span>
+      {(hatWert || unter) && <span className={`flex min-w-0 items-center justify-end gap-1.5 ${unter ? "shrink-0" : "flex-1"}`}>{children}</span>}
       {onClick && !rot && !blau && !ohnePfeil && <span aria-hidden className="shrink-0 text-[17px] leading-none text-tinte-leise">›</span>}
     </>
   );
@@ -195,33 +201,13 @@ export function Wert({ children, stark }: { children: ReactNode; stark?: boolean
   );
 }
 
-/** Auswahlfeld in einer Zeile – sieht aus wie ein Wert, öffnet die native Auswahl. */
-export function ZeileAuswahl({
-  value,
-  onChange,
-  children,
-  label,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  children: ReactNode;
-  label: string;
-}) {
-  return (
-    <select
-      aria-label={label}
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className="max-w-[60%] cursor-pointer appearance-none truncate bg-transparent text-right text-[15px] text-tinte-matt outline-none dark:text-slate-300"
-    >
-      {children}
-    </select>
-  );
-}
-
 /**
  * Kopf eines Blatts wie eine Rechnung bei Apple: oben mittig ein Bild, darunter
  * eine kleine Zeile, die große Zahl und ein Titel. Rechts oben schließen.
+ *
+ * Im Blatt-Stapel (siehe Sheet.tsx) wie SheetKopf: als Unterseite links
+ * „‹ <Seite davor>“, und ✕ schließt den ganzen Stapel. `zurueck` setzt einen
+ * eigenen Zurück-Knopf (Unterseite im selben Blatt).
  */
 export function RechnungKopf({
   bild,
@@ -231,6 +217,7 @@ export function RechnungKopf({
   titel,
   unter,
   onClose,
+  zurueck,
 }: {
   bild?: ReactNode;
   oben?: ReactNode;
@@ -239,23 +226,22 @@ export function RechnungKopf({
   titel?: ReactNode;
   unter?: ReactNode;
   onClose?: () => void;
+  zurueck?: { text: string; onClick: () => void };
 }) {
+  // Für „‹ …“ einer Unterseite zählt die kleine Zeile („Mithilfe nachtragen“)
+  const lage = useBlattKopf(oben ?? titel);
+  useZurueckKanal(zurueck?.onClick);
+  const zurueckJetzt = zurueck ?? (lage?.kind && onClose ? { text: lage.zurueckText, onClick: onClose } : undefined);
   return (
     <div className="relative flex flex-col items-center pt-1 text-center">
-      {onClose && (
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Schließen"
-          className="absolute -right-1.5 -top-1.5 flex h-11 w-11 items-center justify-center rounded-full transition active:scale-90"
-        >
-          <span className="flex h-[30px] w-[30px] items-center justify-center rounded-full bg-[rgb(118_118_128/0.12)] text-[13px] font-bold text-tinte-leise dark:bg-[rgb(118_118_128/0.24)]">
-            ✕
-          </span>
-        </button>
-      )}
+      {zurueckJetzt && <ZurueckKnopf text={zurueckJetzt.text} onClick={zurueckJetzt.onClick} className="absolute left-0 top-0.5 max-w-[38%]" />}
+      {onClose && <SchliessenKnopf onClick={lage?.kind ? lage.alleSchliessen : onClose} className="absolute -right-1.5 top-0.5" />}
       {bild}
-      {oben && <div className="mt-2 text-[13px] font-semibold text-tinte-leise">{oben}</div>}
+      {oben && (
+        <div id={lage?.titelId} className="mt-2 text-[13px] font-semibold text-tinte-leise">
+          {oben}
+        </div>
+      )}
       {wert !== undefined && (
         <div className={`zahl mt-1 text-[2.6rem] font-extrabold leading-none tracking-[-0.03em] ${wertKlasse}`}>{wert}</div>
       )}

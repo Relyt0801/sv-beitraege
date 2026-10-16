@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Sheet, SheetKopf } from "./Sheet";
-import { Gruppe, Zeile, ZeileAuswahl, ZeileEingabe } from "./Liste";
-import { BlattFuss } from "./Freitext";
+import { Gruppe, Symbol, Wert as WertRechts, Zeile, ZeileEingabe, ZeileHaken } from "./Liste";
+// Dieselbe Fußleiste wie in allen anderen Blättern (FussLeiste.tsx: bündig am Blattrand)
+import { FussLeiste as BlattFuss } from "./FussLeiste";
 import { Schalter } from "./Schalter";
 import { useRole } from "../auth/RoleProvider";
 import { useStore } from "../store";
@@ -42,9 +43,10 @@ import { frage as fragen_, melde, meldeFehler } from "../lib/melder";
 import { useRunden } from "../lib/runden";
 import { RundenAbschnitt, SichtbarkeitWahl } from "./Runden";
 import { Kachel } from "./Kachel";
-import { Icon } from "./Icon";
+import { Icon, type IconName } from "./Icon";
 import { TextGruppen, ZahlenAuswertung, gruppiereTexte } from "./Freitext";
 import { WortfilterSchalter } from "./AutorInfo";
+import { useWfRecht } from "../lib/wortfilter-bereiche";
 
 const name = (p: UPerson) => `${p.vorname} ${p.nachname}`;
 
@@ -190,7 +192,7 @@ function UmfrageLauf({
         {/* Kopf: Farbverlauf, Fortschritt in Segmenten */}
         <div className="relative shrink-0 overflow-hidden bg-brand px-5 pb-5 pt-4 text-white">
           <div className="relative flex items-center gap-2">
-            <span className="rounded-full bg-white/20 px-2.5 py-1 text-[11.5px] font-bold uppercase tracking-[0.08em]">
+            <span className="rounded-full bg-white/20 px-2.5 py-1 text-[12px] font-bold uppercase tracking-[0.08em]">
               {umfrage.pflicht ? "Kurze Umfrage" : "Umfrage"}
             </span>
             {nochWeitere > 0 && <span className="text-[12px] font-semibold text-white/75">+{nochWeitere} weitere</span>}
@@ -410,7 +412,7 @@ function Antwort({ f, wert, personen, setzen }: { f: Frage; wert: Wert | undefin
                     {p.nachname[0]}
                   </span>
                   <span className="w-full truncate text-center text-[12.5px] font-semibold">{p.vorname}</span>
-                  <span className="-mt-1 w-full truncate text-center text-[11px] text-tinte-leise">{p.nachname}</span>
+                  <span className="-mt-1 w-full truncate text-center text-[12px] text-tinte-leise">{p.nachname}</span>
                 </button>
               );
             })}
@@ -496,7 +498,7 @@ function EigenesFeld({ start, sichern }: { start: string; sichern: (t: string) =
         onChange={(e) => setText(e.target.value)}
         onBlur={() => raus(text)}
       />
-      <p className="mt-1 px-1 text-right text-[11.5px] text-tinte-leise">{text.length} / 120</p>
+      <p className="mt-1 px-1 text-right text-[12px] text-tinte-leise">{text.length} / 120</p>
     </div>
   );
 }
@@ -536,7 +538,7 @@ function TextAntwort({ art, text, setText, speichern }: { art: TextArt; text: st
         onBlur={() => sichern(text)}
       />
       {!ok && <p className="mt-1.5 px-1 text-[13px] font-semibold text-red-600 dark:text-red-400">Bitte nur eine Zahl eingeben.</p>}
-      {art === "kurz" && <p className="mt-1 px-1 text-right text-[11.5px] text-tinte-leise">{text.length} / 120</p>}
+      {art === "kurz" && <p className="mt-1 px-1 text-right text-[12px] text-tinte-leise">{text.length} / 120</p>}
     </div>
   );
 }
@@ -548,9 +550,12 @@ type EntwurfFrage = Omit<Frage, "id" | "umfrage_id">;
 
 type Vorlage = { titel: string; beschreibung: string; fragen: EntwurfFrage[]; mitRankings?: boolean };
 
-const VORLAGEN: { name: string; beschreibung: string; bauen: (kategorien: string[]) => Vorlage }[] = [
+/** Vorlagen für „Neue Umfrage“ – Symbol und Farbe wie die Funktion in Profil → Funktionen */
+const VORLAGEN: { name: string; beschreibung: string; icon: IconName; farbe: string; bauen: (kategorien: string[]) => Vorlage }[] = [
   {
-    name: "🏆 Rankings ausfüllen",
+    name: "Rankings ausfüllen",
+    icon: "pokal",
+    farbe: "bg-[#32ADE6]",
     beschreibung: "Alle Schüler- und Lehrer-Rankings als Pflicht abfragen.",
     bauen: () => ({
       titel: "Abi-Rankings",
@@ -560,7 +565,9 @@ const VORLAGEN: { name: string; beschreibung: string; bauen: (kategorien: string
     }),
   },
   {
-    name: "🗳️ Welche Rankings?",
+    name: "Welche Rankings?",
+    icon: "stimme",
+    farbe: "bg-brand",
     beschreibung: "Abstimmen, welche Kategorien ins Ranking kommen.",
     bauen: () => ({
       titel: "Welche Rankings sollen rein?",
@@ -578,7 +585,9 @@ const VORLAGEN: { name: string; beschreibung: string; bauen: (kategorien: string
     }),
   },
   {
-    name: "📝 Steckbrief-Kategorien",
+    name: "Steckbrief-Kategorien",
+    icon: "buch",
+    farbe: "bg-[#FF2D55]",
     beschreibung: "Abstimmen, was in jeden Steckbrief kommt.",
     bauen: (kategorien) => ({
       titel: "Was soll in den Steckbrief?",
@@ -615,55 +624,60 @@ export function UmfragenSheet({ open, onClose }: { open: boolean; onClose: () =>
 
   return (
     <>
-      <Sheet open={open && !bearbeite && !ergebnisVon} onClose={onClose}>
+      <Sheet open={open} onClose={onClose}>
         <SheetKopf titel="Umfragen" unter="Erscheinen als Pop-up beim nächsten Öffnen der App. Fortschritt wird gespeichert." onClose={onClose} />
-        <WortfilterSchalter bereich="umfragen" className="mb-4" />
-        <AusHinweis funktion="umfragen" className="-mt-2 mb-3" />
-        {verwalten && (
-          <>
-            <button className="btn-primary w-full" onClick={() => (setVorlage(null), setBearbeite("neu"))}>
-              + Neue Umfrage
-            </button>
-            <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
-              {VORLAGEN.map((t) => (
-                <button
-                  key={t.name}
-                  onClick={() => {
-                    setVorlage(t.bauen(kategorien));
-                    setBearbeite("neu");
-                  }}
-                  className="w-full rounded-2xl zelle px-3.5 py-3 text-left transition active:scale-[.98]"
-                >
-                  <span className="block text-[14px] font-semibold">{t.name}</span>
-                  <span className="mt-0.5 block text-[12px] leading-snug text-tinte-leise">{t.beschreibung}</span>
-                </button>
-              ))}
-            </div>
-          </>
-        )}
-        {gruppen.map(([titel, liste]) =>
-          liste.length ? (
-            <Gruppe key={titel} titel={titel}>
-              {liste.map((u) => (
-                <Zeile
-                  key={u.id}
-                  label={
-                    <span className="flex items-center gap-2">
-                      {u.status === "aktiv" && <span className="h-2 w-2 animate-pulse rounded-full bg-[#30D158]" />}
-                      <span className="max-w-[12rem] truncate">{u.titel}</span>
-                    </span>
-                  }
-                  onClick={() => (u.status === "entwurf" && verwalten ? setBearbeite(u) : setErgebnisVon(u))}
-                >
-                  <span className="truncate text-[13px] text-tinte-leise">
-                    {v.fragen.filter((f) => f.umfrage_id === u.id).length} Fragen{u.mit_rankings ? " + Rankings" : ""} · {ZIEL_NAME[u.zielgruppe]}
-                  </span>
-                </Zeile>
-              ))}
-            </Gruppe>
-          ) : null,
-        )}
-        {v.umfragen.length === 0 && <p className="mt-6 text-center text-[14px] text-tinte-leise">Noch keine Umfragen.</p>}
+        <AusHinweis funktion="umfragen" className="mb-3" />
+        {/* Erst, was läuft und was als Entwurf wartet – dann „Neue Umfrage“
+            (Vorlagen als Zeilen, „Leere Umfrage“ blau als letzte), dann Beendetes */}
+        <div className="[&>section:first-child]:!mt-1">
+        {gruppen.map(([titel, liste]) => (
+          <Fragment key={titel}>
+            {liste.length > 0 && (
+              <Gruppe titel={titel}>
+                {liste.map((u) => {
+                  const n = v.fragen.filter((f) => f.umfrage_id === u.id).length;
+                  return (
+                    <Zeile
+                      key={u.id}
+                      label={
+                        <span className="flex items-center gap-2">
+                          {u.status === "aktiv" && <span className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-[#30D158]" />}
+                          <span className="truncate">{u.titel}</span>
+                        </span>
+                      }
+                      unter={`${n} ${n === 1 ? "Frage" : "Fragen"}${u.mit_rankings ? " + Rankings" : ""} · ${ZIEL_NAME[u.zielgruppe]}`}
+                      onClick={() => (u.status === "entwurf" && verwalten ? setBearbeite(u) : setErgebnisVon(u))}
+                    />
+                  );
+                })}
+              </Gruppe>
+            )}
+            {titel === "Entwürfe" && verwalten && (
+              <Gruppe titel="Neue Umfrage">
+                {VORLAGEN.map((t) => (
+                  <Zeile
+                    key={t.name}
+                    label={t.name}
+                    unter={t.beschreibung}
+                    symbol={
+                      <Symbol farbe={t.farbe}>
+                        <Icon name={t.icon} size={16} strich={2.2} />
+                      </Symbol>
+                    }
+                    onClick={() => {
+                      setVorlage(t.bauen(kategorien));
+                      setBearbeite("neu");
+                    }}
+                  />
+                ))}
+                <Zeile label="Leere Umfrage" blau onClick={() => (setVorlage(null), setBearbeite("neu"))} />
+              </Gruppe>
+            )}
+          </Fragment>
+        ))}
+        </div>
+        {v.umfragen.length === 0 && !verwalten && <p className="mt-6 text-center text-[14px] text-tinte-leise">Noch keine Umfragen.</p>}
+        <WortfilterGruppe />
       </Sheet>
 
       <UmfrageEditor
@@ -682,6 +696,17 @@ export function UmfragenSheet({ open, onClose }: { open: boolean; onClose: () =>
         onClose={() => setErgebnisVon(null)}
       />
     </>
+  );
+}
+
+/** Wortfilter für Umfragen – als eigene Gruppe am Ende (nur wer ihn schalten darf) */
+function WortfilterGruppe() {
+  const darf = useWfRecht()("umfragen");
+  if (!darf) return null;
+  return (
+    <Gruppe titel="Wortfilter">
+      <WortfilterSchalter zeile bereich="umfragen" titel="Fragen und freie Antworten" />
+    </Gruppe>
   );
 }
 
@@ -712,9 +737,16 @@ function UmfrageEditor({
   const [liste, setListe] = useState<EntwurfFrage[]>([]);
   const [busy, setBusy] = useState(false);
   const [benachrichtigen, setBenachrichtigen] = useState(true);
+  // Unterseiten zum Auswählen (Häkchen-Liste statt nativer Auswahl): „Für wen“ und der Fragetyp je Frage
+  const [zielWahl, setZielWahl] = useState(false);
+  const [typWahl, setTypWahl] = useState<number | null>(null);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      setZielWahl(false);
+      setTypWahl(null);
+      return;
+    }
     setTitel(umfrage?.titel ?? vorlage?.titel ?? "");
     setText(umfrage?.beschreibung ?? vorlage?.beschreibung ?? "");
     setZiel(umfrage?.zielgruppe ?? "schueler");
@@ -730,6 +762,16 @@ function UmfrageEditor({
   }, [open, umfrage?.id]);
 
   const aendern = (i: number, p: Partial<EntwurfFrage>) => setListe((l) => l.map((f, n) => (n === i ? { ...f, ...p } : f)));
+  function verschieben(i: number, um: -1 | 1) {
+    const j = i + um;
+    if (j < 0 || j >= liste.length) return;
+    setListe((l) => {
+      const n = [...l];
+      [n[i], n[j]] = [n[j], n[i]];
+      return n;
+    });
+    setTypWahl(j);
+  }
   const fehler = !titel.trim()
     ? "Titel fehlt"
     : !liste.length && !mitRankings
@@ -763,14 +805,8 @@ function UmfrageEditor({
         <textarea className="block w-full resize-none bg-transparent px-4 py-3 text-[15px] outline-none placeholder:text-tinte-leise" rows={3} maxLength={400} placeholder="Kurze Erklärung (optional)" value={text} onChange={(e) => setText(e.target.value)} />
       </Gruppe>
       <Gruppe titel="Einstellungen">
-        <Zeile label="Für wen">
-          <ZeileAuswahl label="Für wen" value={ziel} onChange={(x) => setZiel(x as Zielgruppe)}>
-            {(Object.keys(ZIEL_NAME) as Zielgruppe[]).map((z) => (
-              <option key={z} value={z}>
-                {ZIEL_NAME[z]}
-              </option>
-            ))}
-          </ZeileAuswahl>
+        <Zeile label="Für wen" onClick={() => setZielWahl(true)}>
+          <WertRechts>{ZIEL_NAME[ziel]}</WertRechts>
         </Zeile>
         <Zeile label="Pflicht">
           <Schalter an={pflicht} onChange={setPflicht} label="Pflicht" />
@@ -794,33 +830,28 @@ function UmfrageEditor({
         const auswahl = f.typ === "einfach" || f.typ === "mehrfach";
         const kaestchen = `h-[18px] w-[18px] shrink-0 ring-[1.5px] ring-inset ring-black/25 dark:ring-white/35 ${f.typ === "einfach" ? "rounded-full" : "rounded-[5px]"}`;
         return (
-          <Gruppe key={i} titel={`Frage ${i + 1}`} className="mt-5">
-            <div className="flex min-h-[48px] items-center gap-1 pl-4 pr-2">
-              <select
-                aria-label="Fragetyp"
-                className="min-w-0 flex-1 cursor-pointer appearance-none bg-transparent text-[15px] font-semibold text-[#5E5CE6] outline-none dark:text-[#A5A4FF]"
-                value={f.typ}
-                onChange={(e) => {
-                  const typ = e.target.value as FrageTyp;
-                  aendern(i, {
-                    typ,
-                    optionen: typ === "einfach" || typ === "mehrfach" ? (f.optionen.length ? f.optionen : ["", ""]) : typ === "skala" ? ["gar nicht", "sehr"] : typ === "text" ? ["kurz"] : [],
-                    eigene: typ === "einfach" || typ === "mehrfach" ? f.eigene : false,
-                  });
-                }}
+          <section key={i} className="mt-5">
+            {/* Kopf mit „Bearbeiten“ wie in iOS-Abschnitten: sagt, dass hinter der
+                Frage noch Typ, Reihenfolge und Entfernen liegen (die Zeile
+                „Fragetyp ›“ allein verriet das nicht) */}
+            <div className="mb-1.5 flex items-center gap-2 pl-4 pr-1">
+              <h3 className="auf-bild min-w-0 flex-1 text-[13px] font-normal uppercase tracking-[0.02em] text-tinte-leise">Frage {i + 1}</h3>
+              <button
+                type="button"
+                onClick={() => setTypWahl(i)}
+                aria-label={`Frage ${i + 1} bearbeiten: Typ, Reihenfolge, entfernen`}
+                className="-my-3 flex min-h-[44px] items-center px-3 text-[14px] font-medium text-brand-dark transition active:opacity-60 dark:text-brand"
               >
-                {(Object.keys(TYP_NAME) as FrageTyp[]).filter((t) => t !== "ranking").map((t) => (
-                  <option key={t} value={t}>
-                    {TYP_NAME[t]}
-                  </option>
-                ))}
-              </select>
-              <button aria-label="Nach oben" disabled={i === 0} className="flex h-9 w-9 items-center justify-center rounded-full text-[13px] text-tinte-leise disabled:opacity-25" onClick={() => setListe((l) => { const n = [...l]; [n[i - 1], n[i]] = [n[i], n[i - 1]]; return n; })}>▲</button>
-              <button aria-label="Nach unten" disabled={i === liste.length - 1} className="flex h-9 w-9 items-center justify-center rounded-full text-[13px] text-tinte-leise disabled:opacity-25" onClick={() => setListe((l) => { const n = [...l]; [n[i + 1], n[i]] = [n[i], n[i + 1]]; return n; })}>▼</button>
-              <button aria-label="Frage entfernen" className="flex h-9 w-9 items-center justify-center rounded-full text-tinte-leise" onClick={() => setListe((l) => l.filter((_, n) => n !== i))}>
-                <Icon name="muell" size={16} />
+                Bearbeiten
               </button>
             </div>
+            <div className="gruppe-zellen">
+            {/* EINE Zeile (Design-Regeln 2/3): vorher Typ, ▲, ▼ und Mülleimer
+                nebeneinander. Fragetyp, Reihenfolge und Entfernen liegen jetzt
+                auf der Unterseite „Frage n“ – Entfernen unten, mit Rückfrage. */}
+            <Zeile label="Fragetyp" onClick={() => setTypWahl(i)}>
+              <WertRechts>{TYP_NAME[f.typ]}</WertRechts>
+            </Zeile>
             <input className="block w-full bg-transparent px-4 py-3 text-[16px] font-semibold outline-none placeholder:text-tinte-leise" placeholder="Frage" maxLength={160} value={f.titel} onChange={(e) => aendern(i, { titel: e.target.value })} />
             {auswahl &&
               f.optionen.map((o, n) => (
@@ -877,7 +908,8 @@ function UmfrageEditor({
             <Zeile label="Muss beantwortet werden">
               <Schalter an={f.pflicht} onChange={(x) => aendern(i, { pflicht: x })} label="Muss beantwortet werden" />
             </Zeile>
-          </Gruppe>
+            </div>
+          </section>
         );
       })}
       <Gruppe className="mt-5" fuss={liste.some((f) => mitEigener(f)) ? "„Eigene Antwort“ ist wie „Sonstiges: ____“: wer sie wählt, schreibt kurz dazu. Gleiche Texte werden in der Auswertung zusammengezählt." : undefined}>
@@ -915,6 +947,73 @@ function UmfrageEditor({
           />
         </Gruppe>
       )}
+
+      {/* Unterseiten („‹ Neue Umfrage“): Auswahl mit Häkchen, ein Tipp wählt und geht zurück */}
+      <Sheet open={open && zielWahl} onClose={() => setZielWahl(false)}>
+        <SheetKopf titel="Für wen" onClose={() => setZielWahl(false)} />
+        <Gruppe className="mt-1" fuss="Sie sehen die Umfrage als Pop-up beim nächsten Öffnen der App.">
+          {(Object.keys(ZIEL_NAME) as Zielgruppe[]).map((z) => (
+            <ZeileHaken
+              key={z}
+              label={ZIEL_NAME[z]}
+              gewaehlt={ziel === z}
+              onClick={() => {
+                setZiel(z);
+                setZielWahl(false);
+              }}
+            />
+          ))}
+        </Gruppe>
+      </Sheet>
+      <Sheet open={open && typWahl !== null} onClose={() => setTypWahl(null)}>
+        <SheetKopf titel={typWahl !== null ? `Frage ${typWahl + 1}` : "Frage"} unter={typWahl !== null ? liste[typWahl]?.titel.trim() || undefined : undefined} onClose={() => setTypWahl(null)} />
+        <Gruppe className="mt-1" titel="Wie wird geantwortet?">
+          {(Object.keys(TYP_NAME) as FrageTyp[])
+            .filter((t) => t !== "ranking")
+            .map((typ) => {
+              const f = typWahl !== null ? liste[typWahl] : undefined;
+              return (
+                <ZeileHaken
+                  key={typ}
+                  label={TYP_NAME[typ]}
+                  gewaehlt={f?.typ === typ}
+                  onClick={() => {
+                    if (f && typWahl !== null && f.typ !== typ)
+                      aendern(typWahl, {
+                        typ,
+                        optionen: typ === "einfach" || typ === "mehrfach" ? (f.optionen.length ? f.optionen : ["", ""]) : typ === "skala" ? ["gar nicht", "sehr"] : typ === "text" ? ["kurz"] : [],
+                        eigene: typ === "einfach" || typ === "mehrfach" ? f.eigene : false,
+                      });
+                    setTypWahl(null);
+                  }}
+                />
+              );
+            })}
+        </Gruppe>
+        {typWahl !== null && liste.length > 1 && (
+          <Gruppe titel="Reihenfolge" className="mt-6">
+            {/* Die Unterseite bleibt offen und wandert mit der Frage mit */}
+            <Zeile label="Nach oben" blau disabled={typWahl === 0} onClick={() => verschieben(typWahl, -1)} />
+            <Zeile label="Nach unten" blau disabled={typWahl === liste.length - 1} onClick={() => verschieben(typWahl, 1)} />
+          </Gruppe>
+        )}
+        {typWahl !== null && (
+          <Gruppe className="mt-6">
+            <Zeile
+              label="Frage entfernen"
+              rot
+              onClick={async () => {
+                const i = typWahl;
+                const f = liste[i];
+                // Mit Text: erst fragen – sonst ist Getipptes mit einem Tipp weg
+                if (f && (f.titel.trim() || f.optionen.some((o) => o.trim())) && !(await fragen_(`Frage ${i + 1} entfernen?`, "Entfernen", true))) return;
+                setTypWahl(null);
+                setListe((l) => l.filter((_, n) => n !== i));
+              }}
+            />
+          </Gruppe>
+        )}
+      </Sheet>
 
       {/* Fußleiste bleibt unten im Blatt sichtbar: Hinweis, was noch fehlt, und die beiden Knöpfe */}
       <BlattFuss>
@@ -1161,7 +1260,7 @@ function ErgebnisZeile({ label, n, pct, vorne, kursiv }: { label: string; n: num
       <span className={`relative min-w-0 flex-1 truncate text-[14.5px] ${vorne ? "font-bold" : "font-medium"} ${kursiv ? "italic" : ""}`}>{label}</span>
       <span className="relative shrink-0 text-right leading-none">
         <span className={`zahl block text-[14px] font-bold ${vorne ? "text-brand-dark dark:text-brand" : ""}`}>{pct} %</span>
-        <span className="zahl mt-0.5 block text-[11px] text-tinte-leise">{n}×</span>
+        <span className="zahl mt-0.5 block text-[12px] text-tinte-leise">{n}×</span>
       </span>
     </div>
   );

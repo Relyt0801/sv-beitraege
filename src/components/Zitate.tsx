@@ -219,7 +219,7 @@ function ZitateSheet({
 
   return (
     <>
-      <Sheet open={ansicht !== null} onClose={schliessen}>
+      <Sheet hoch open={ansicht !== null} onClose={schliessen}>
         {ansicht === "neu" ? (
           <Einreichen wand={wand} teil={teil} setTeil={setTeil} fertig={() => setAnsicht("wand")} schliessen={schliessen} />
         ) : (
@@ -363,9 +363,11 @@ function Wand({ wand, teil, gw, v, einreichen }: { wand: Zitatwand; teil: Teil; 
 
   return (
     <>
-      {/* Bei schmalen Handys umbrechen statt „Schüle/r“ */}
+      {/* Filter und Sortierung in EINER Zeile (13,5 + 6 rem passt ab 320 px
+          Inhaltsbreite); bei großer Systemschrift bricht es weiter um statt
+          „Schüle/r“ zu zeigen */}
       <div className="mb-3 flex flex-wrap items-center gap-2">
-        <div className="seg min-w-[15rem] flex-1">
+        <div className="seg min-w-[13.5rem] flex-1">
           {(
             [
               ["alle", "Alle"],
@@ -373,14 +375,14 @@ function Wand({ wand, teil, gw, v, einreichen }: { wand: Zitatwand; teil: Teil; 
               ["schueler", "Schüler"],
             ] as const
           ).map(([k, l]) => (
-            <button key={k} className={`seg-item whitespace-nowrap ${filter === k ? "seg-aktiv" : ""}`} onClick={() => setFilter(k)}>
+            <button key={k} className={`seg-item whitespace-nowrap !px-1.5 ${filter === k ? "seg-aktiv" : ""}`} onClick={() => setFilter(k)}>
               {l}
             </button>
           ))}
         </div>
         {wand.zahlenSichtbar && (
           // Segment statt eines Chips, der nur den Zustand zeigte (Tippen schaltete heimlich um)
-          <div className="seg w-[116px] shrink-0" role="radiogroup" aria-label="Sortieren">
+          <div className="seg w-[96px] shrink-0" role="radiogroup" aria-label="Sortieren">
             {(["top", "neu"] as const).map((k) => (
               <button key={k} type="button" role="radio" aria-checked={sort === k} onClick={() => setSort(k)} className={`seg-item !px-2 ${sort === k ? "seg-aktiv" : ""}`}>
                 {k === "top" ? "Top" : "Neu"}
@@ -530,7 +532,7 @@ function ZitatZeile({ z, platz, wand, v, marken }: { z: Zitat; platz: number; wa
                 <GewinnerMarke key={m} art={m} />
               ))}
               {platz > 0 && platz <= 3 && n > 0 && (
-                <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-[#9A7410] dark:text-[#E9C460]">Platz {platz}</span>
+                <span className="text-[12px] font-bold uppercase tracking-[0.06em] text-[#9A7410] dark:text-[#E9C460]">Platz {platz}</span>
               )}
             </div>
           )}
@@ -750,7 +752,7 @@ function Einreichen({ wand, teil, setTeil, fertig, schliessen }: { wand: Zitatwa
 
   return (
     <div className="animate-fadeIn">
-      <SheetKopf titel="Zitat einreichen" onClose={schliessen} />
+      <SheetKopf titel="Zitat einreichen" zurueck={{ text: "Zitatwand", onClick: fertig }} onClose={schliessen} />
       {/* Wohin? Standard ist der Teil, der gerade offen war */}
       <TeilUmschalter teil={teil} setTeil={setTeil} className="mb-4" />
       {/* Vorschau wie gedruckt */}

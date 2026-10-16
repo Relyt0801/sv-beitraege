@@ -1,19 +1,20 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { committeeLabel } from "../lib/committees";
 import {
   KASSEN_FARBEN, centAus, euro, euroKurz, farbHex, postenFarbe, schuljahrVon, useGeplant,
-  type FinanzPosten, type FinanzUebersicht, type FinanzenValue, type KassenGeplant, type PostenRef, type Quelle,
+  type Buchung, type FinanzPosten, type FinanzUebersicht, type FinanzenValue, type KassenGeplant, type PostenRef, type Quelle,
 } from "../lib/finanzen";
 import { useDunkel } from "../lib/dunkel";
-import { frage, meldeFehler } from "../lib/melder";
+import { frage, melde, meldeFehler } from "../lib/melder";
 import { Sheet, SheetKopf } from "./Sheet";
 import { Icon } from "./Icon";
+import { Gruppe, Zeile } from "./Liste";
 
 /**
  * Finanzen unter dem Kontostand:
  *  1. „Aktionen, Beiträge und Sonstiges“ – alles, was Geld bewegt: Elternbeiträge
  *     (blau), jede Aktion/Kategorie in ihrer Farbe mit ihren Ausgaben verrechnet,
- *     Komitees, Spenden, Sonstiges (grau). Jede Zeile antippbar (ⓘ).
+ *     Komitees, Spenden, Sonstiges (grau). Jede Zeile antippbar („›“, vorher ⓘ).
  *  2. „Geplante Aktionen“ – was noch ansteht, mit Tag, Infos und Erwartung.
  *
  * Mit `fin` (Kassenwart/Admin, „Kassenbuch führen“) wird gebucht, gelöscht,
@@ -44,7 +45,25 @@ export function mitVorzeichen(cent: number, kurz = false): string {
   return cent > 0 ? `+${f(cent)}` : cent < 0 ? `−${f(-cent)}` : f(0);
 }
 
-export function PostenBereiche({ d, fin }: { d: FinanzUebersicht; fin?: FinanzenValue | null }) {
+/**
+ * `listeKlasse` / `geplantKlasse` setzen die beiden Karten im Raster der
+ * Seite an ihren Platz (z. B. am Laptop links/rechts oder am Handy in eine
+ * andere Reihenfolge) – PostenBereiche liefert sie ohne eigene Hülle.
+ */
+export function PostenBereiche({
+  d, fin, listeKlasse = "", geplantKlasse = "", onBuchung,
+}: {
+  d: FinanzUebersicht;
+  fin?: FinanzenValue | null;
+  listeKlasse?: string;
+  geplantKlasse?: string;
+  /**
+   * Eine einzelne Buchung eines Postens öffnen – dieselbe Detailseite wie
+   * in der Buchungsliste (FinanzenTab). Sie geht als Unterseite über dem
+   * Posten auf („‹ Waffelverkauf“), weil dessen Blatt offen bleibt.
+   */
+  onBuchung?: (b: Buchung) => void;
+}) {
   const dunkel = useDunkel();
   const [auswahl, setAuswahl] = useState<Auswahl>(null);
   const [neu, setNeu] = useState(false);
@@ -55,10 +74,15 @@ export function PostenBereiche({ d, fin }: { d: FinanzUebersicht; fin?: Finanzen
     (a, b) => REIHENFOLGE[a.art] - REIHENFOLGE[b.art] || Math.abs(b.ein_cent - b.aus_cent) - Math.abs(a.ein_cent - a.aus_cent),
   );
   const gewaehlt = auswahl?.typ === "posten" ? d.posten.find((p) => postenKey(p) === auswahl.key) ?? null : null;
+  // Am Handy/iPad zuerst die Elternbeiträge und die KURZ_POSTEN größten Posten
+  // (dieselben Kategorien stehen schon in der Legende am Kreis darüber); der
+  // Rest hinter „Alle … anzeigen“. Am Laptop alles (nur CSS, wie die Buchungen).
+  const [alle, setAlle] = useState(false);
+  const kuerzen = !alle && liste.length > KURZ_POSTEN + 1;
 
   return (
     <>
-      <section className="card p-5">
+      <section className={`card min-w-0 p-5 ${listeKlasse}`}>
         <BereichKopf titel="Aktionen, Beiträge und Sonstiges" onNeu={fin ? () => setNeu(true) : undefined} neuText="Kategorie" />
         <ul className="divide-y divide-papier-linie dark:divide-slate-800">
           <PostenZeile
@@ -68,7 +92,7 @@ export function PostenBereiche({ d, fin }: { d: FinanzUebersicht; fin?: Finanzen
             betrag={beitraegeSumme}
             onClick={() => setAuswahl({ typ: "beitraege" })}
           />
-          {liste.map((p) => (
+          {liste.map((p, i) => (
             <PostenZeile
               key={postenKey(p)}
               hex={farbHex(postenFarbe(p), dunkel)}
@@ -76,12 +100,29 @@ export function PostenBereiche({ d, fin }: { d: FinanzUebersicht; fin?: Finanzen
               unter={unterzeile(p)}
               betrag={p.ein_cent - p.aus_cent}
               onClick={() => setAuswahl({ typ: "posten", key: postenKey(p) })}
+              klasse={kuerzen && i >= KURZ_POSTEN ? "max-lg:hidden" : undefined}
             />
           ))}
+          {kuerzen && (
+            <li className="lg:hidden">
+              <button
+                type="button"
+                onClick={(e) => {
+                  // Fokus auf den ersten neu sichtbaren Posten (Kind 0 = Elternbeiträge)
+                  const ul = e.currentTarget.closest("ul");
+                  setAlle(true);
+                  requestAnimationFrame(() => ul?.children[KURZ_POSTEN + 1]?.querySelector<HTMLElement>("button")?.focus());
+                }}
+                className="flex min-h-[48px] w-full items-center text-left text-[15px] font-medium text-brand-dark transition active:opacity-60 dark:text-brand"
+              >
+                Alle {liste.length + 1} anzeigen
+              </button>
+            </li>
+          )}
         </ul>
       </section>
 
-      <GeplantKarte darf={Boolean(fin)} fin={fin ?? null} />
+      <GeplantKarte darf={Boolean(fin)} fin={fin ?? null} className={geplantKlasse} />
 
       <BeitraegeDetail open={auswahl?.typ === "beitraege"} d={d} onClose={() => setAuswahl(null)} />
       <PostenDetail
@@ -89,10 +130,12 @@ export function PostenBereiche({ d, fin }: { d: FinanzUebersicht; fin?: Finanzen
         fin={fin ?? null}
         onClose={() => setAuswahl(null)}
         onUmgezogen={(key) => setAuswahl({ typ: "posten", key })}
-        onBuchen={(start) => {
-          setAuswahl(null);
-          setBuchung(start);
-        }}
+        // Buchen aus einer Kategorie: die Kategorie bleibt offen, das
+        // Buchungsblatt geht als Unterseite darüber auf („‹ Waffelverkauf“,
+        // gleiche Höhe) – vorher ging sie zu und ein neues Blatt fuhr von unten
+        // herein (Kopf sprang um 180 px)
+        onBuchen={(start) => setBuchung(start)}
+        onBuchung={onBuchung}
       />
       {fin && (
         <>
@@ -108,11 +151,7 @@ export function PostenBereiche({ d, fin }: { d: FinanzUebersicht; fin?: Finanzen
           <BuchungSheet
             start={buchung}
             fin={fin}
-            onClose={() => {
-              const zurueck = buchung?.zurueck;
-              setBuchung(null);
-              if (zurueck) setAuswahl({ typ: "posten", key: zurueck });
-            }}
+            onClose={() => setBuchung(null)}
           />
         </>
       )}
@@ -156,17 +195,20 @@ function Betrag({ cent, className = "", warnen }: { cent: number; className?: st
   return <span className={`zahl ${warnen && cent < 0 ? "text-red-600 dark:text-red-400" : ""} ${className}`}>{mitVorzeichen(cent)}</span>;
 }
 
+const KURZ_POSTEN = 4;
+
 function PostenZeile({
-  hex, name, unter, betrag, onClick,
+  hex, name, unter, betrag, onClick, klasse,
 }: {
   hex: string;
   name: string;
   unter?: string;
   betrag: number;
   onClick: () => void;
+  klasse?: string;
 }) {
   return (
-    <li>
+    <li className={klasse}>
       <button
         type="button"
         onClick={onClick}
@@ -174,12 +216,13 @@ function PostenZeile({
       >
         <Punkt hex={hex} />
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-[14px] font-semibold">{name}</span>
+          {/* Höchstens zwei Zeilen statt abgeschnitten („Waffelstand Elternspr…“ am schmalen Handy) */}
+          <span className="line-clamp-2 block text-[14px] font-semibold leading-snug [overflow-wrap:anywhere]">{name}</span>
           {unter && <span className="zahl block truncate text-[12px] text-tinte-leise">{unter}</span>}
         </span>
         <Betrag cent={betrag} className="shrink-0 text-[15px] font-bold" />
         <span className="shrink-0 text-tinte-leise" aria-hidden>
-          <Icon name="info" size={17} />
+          <Icon name="chevron" size={14} strich={2.4} />
         </span>
       </button>
     </li>
@@ -191,6 +234,9 @@ function PostenZeile({
 function Kopf({ hex, titel, onClose, rechts }: { hex: string; titel: string; onClose: () => void; rechts?: ReactNode }) {
   return (
     <SheetKopf
+      // Der Titel ist kein reiner Text (Punkt + „Ändern“) – Kurzname für
+      // „‹ Waffelverkauf“ auf der Unterseite (vorher „‹ Zurück“)
+      name={titel}
       titel={
         <span className="flex items-center gap-2.5">
           <Punkt hex={hex} gross />
@@ -247,13 +293,14 @@ const tagKurz = (d: string) =>
   new Date(d + "T12:00:00").toLocaleDateString("de-DE", { weekday: "short", day: "2-digit", month: "2-digit", year: "2-digit" });
 
 function PostenDetail({
-  p, fin, onClose, onUmgezogen, onBuchen,
+  p, fin, onClose, onUmgezogen, onBuchen, onBuchung,
 }: {
   p: FinanzPosten | null;
   fin: FinanzenValue | null;
   onClose: () => void;
   onUmgezogen: (key: string) => void;
   onBuchen: (start: BuchungStart) => void;
+  onBuchung?: (b: Buchung) => void;
 }) {
   const dunkel = useDunkel();
   const [bearbeiten, setBearbeiten] = useState(false);
@@ -273,7 +320,11 @@ function PostenDetail({
   const start = (typ: "ein" | "aus") => onBuchen({ typ, ref: x.ref, name: anzeigeName(x), zurueck: postenKey(x) });
 
   return (
-    <Sheet open={p !== null} onClose={onClose}>
+    // Mit einzelnen Buchungen (Kassenwart) hat das Blatt Unterseiten – am
+    // Handy dann gleich volle Höhe, damit der Kopf beim Umblättern stehen
+    // bleibt. Auch ein noch leerer Posten: „Ändern“ klappt darin auf, und
+    // der Kopf soll dabei nicht nach oben springen.
+    <Sheet open={p !== null} onClose={onClose} hoch={Boolean(darf && onBuchung)}>
       <Kopf
         hex={hex}
         titel={anzeigeName(x)}
@@ -333,7 +384,7 @@ function PostenDetail({
         </div>
       )}
 
-      <Unterpunkte p={x} fin={darf ? fin : null} />
+      <Unterpunkte p={x} fin={darf ? fin : null} onBuchung={onBuchung} />
     </Sheet>
   );
 }
@@ -353,10 +404,13 @@ function Balken({ ein, aus, hex }: { ein: number; aus: number; hex: string }) {
 
 /**
  * Die Unterpunkte eines Postens (Bezeichnung, Tag, Betrag). Alle sehen die
- * Summen je Tag und Bezeichnung; der Kassenwart sieht jede Buchung einzeln und
- * kann sie löschen.
+ * Summen je Tag und Bezeichnung; der Kassenwart sieht jede Buchung einzeln.
+ * Jede Buchung ist antippbar („›“) und öffnet DIESELBE Detailseite wie in
+ * der Buchungsliste (Status, Art, Erfasst von/am, Buchungs-Nr., Kategorie,
+ * Löschen ganz unten) – vorher ein abgespecktes Extra-Blatt nur mit Betrag
+ * und „Buchung löschen“.
  */
-function Unterpunkte({ p, fin }: { p: FinanzPosten; fin: FinanzenValue | null }) {
+function Unterpunkte({ p, fin, onBuchung }: { p: FinanzPosten; fin: FinanzenValue | null; onBuchung?: (b: Buchung) => void }) {
   const dunkel = useDunkel();
   const einzeln = fin && p.buchungen
     ? [...p.buchungen]
@@ -370,30 +424,37 @@ function Unterpunkte({ p, fin }: { p: FinanzPosten; fin: FinanzenValue | null })
         {einzeln.length === 1 ? "Eintrag" : `${einzeln.length} Einträge`}
       </h3>
       <ul className="divide-y divide-papier-linie dark:divide-slate-800">
-        {einzeln.map((e) => (
-          <li key={e.key} className="flex items-center gap-2.5 py-2">
-            {e.farbe && <Punkt hex={farbHex(e.farbe, dunkel)} />}
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-[14px] font-semibold">{e.titel}</span>
-              <span className="block text-[12px] text-tinte-leise">{tagKurz(e.datum)}</span>
-            </span>
-            <Betrag cent={e.cent} className="shrink-0 text-[14px] font-bold" />
-            {fin && e.buchung && !e.buchung.automatisch && e.buchung.quelle !== "abgleich" && (
-              <button
-                type="button"
-                aria-label="Eintrag löschen"
-                onClick={async () => {
-                  if (!(await frage(`„${e.titel}“ (${mitVorzeichen(e.cent)}) löschen?`, "Löschen", true))) return;
-                  const f = await fin.loeschen(e.buchung!.id);
-                  if (f) meldeFehler("Löschen hat nicht geklappt: " + f);
-                }}
-                className="-mr-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-tinte-leise active:bg-papier-matt dark:active:bg-slate-800"
-              >
-                <Icon name="muell" size={16} />
-              </button>
-            )}
-          </li>
-        ))}
+        {einzeln.map((e) => {
+          const b = e.buchung;
+          const inhalt = (
+            <>
+              {e.farbe && <Punkt hex={farbHex(e.farbe, dunkel)} />}
+              <span className="min-w-0 flex-1">
+                <span className="line-clamp-2 block text-[14px] font-semibold leading-snug [overflow-wrap:anywhere]">{e.titel}</span>
+                <span className="block text-[12px] text-tinte-leise">{tagKurz(e.datum)}</span>
+              </span>
+              <Betrag cent={e.cent} className="shrink-0 text-[14px] font-bold" />
+            </>
+          );
+          return (
+            <li key={e.key}>
+              {b && onBuchung ? (
+                <button
+                  type="button"
+                  onClick={() => onBuchung(b)}
+                  className="flex min-h-[44px] w-full items-center gap-2.5 py-2 text-left transition active:opacity-60"
+                >
+                  {inhalt}
+                  <span aria-hidden className="shrink-0 text-tinte-leise">
+                    <Icon name="chevron" size={14} strich={2.4} />
+                  </span>
+                </button>
+              ) : (
+                <div className="flex items-center gap-2.5 py-2">{inhalt}</div>
+              )}
+            </li>
+          );
+        })}
       </ul>
     </>
   );
@@ -448,22 +509,22 @@ function Bearbeiten({
         <button type="button" onClick={onFertig} className="btn-grau flex-1">
           Abbrechen
         </button>
-        {r.typ === "kategorie" && (
-          <button
-            type="button"
-            aria-label="Kategorie löschen"
-            onClick={async () => {
-              if (!(await frage(`„${p.titel}“ löschen? Die Einträge bleiben im Kassenbuch, nur ohne Kategorie.`, "Löschen", true))) return;
-              const f = await fin.kategorieLoeschen(r.id);
-              if (f) return meldeFehler("Löschen hat nicht geklappt: " + f);
-              onGeloescht();
-            }}
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-red-600 dark:text-red-400"
-          >
-            <Icon name="muell" size={18} />
-          </button>
-        )}
       </div>
+      {/* Löschen als eigene rote Zeile mit Rückfrage statt Mülleimer neben den Knöpfen */}
+      {r.typ === "kategorie" && (
+        <button
+          type="button"
+          onClick={async () => {
+            if (!(await frage(`„${p.titel}“ löschen? Die Einträge bleiben im Kassenbuch, nur ohne Kategorie.`, "Löschen", true))) return;
+            const f = await fin.kategorieLoeschen(r.id);
+            if (f) return meldeFehler("Löschen hat nicht geklappt: " + f);
+            onGeloescht();
+          }}
+          className="mt-2 flex min-h-[44px] w-full items-center justify-center rounded-full text-[15px] font-semibold text-red-600 transition active:opacity-60 dark:text-red-400"
+        >
+          Kategorie löschen
+        </button>
+      )}
     </div>
   );
 }
@@ -536,8 +597,16 @@ export function BuchungSheet({ start, fin, onClose }: { start: BuchungStart | nu
   const [busy, setBusy] = useState(false);
   const [fehler, setFehler] = useState("");
 
-  useEffect(() => {
-    if (!start) return;
+  // Nur beim ÖFFNEN leeren – nicht bei jedem neuen Start-Objekt. Vorher
+  // leerte jedes Neuzeichnen der Seite (App-Timer, Realtime, Drehen über die
+  // lg-Grenze) Betrag und Bezeichnung, während man tippte. Layout-Effekt:
+  // das Blatt zeigt nie kurz die Eingaben vom letzten Mal.
+  const warOffen = useRef(false);
+  useLayoutEffect(() => {
+    const offen = start !== null;
+    const neu = offen && !warOffen.current;
+    warOffen.current = offen;
+    if (!neu || !start) return;
     setTyp(start.typ);
     setBetrag("");
     setTitel("");
@@ -589,6 +658,8 @@ export function BuchungSheet({ start, fin, onClose }: { start: BuchungStart | nu
     const f = await fin.buchen(b);
     setBusy(false);
     if (f) return setFehler("Hat nicht geklappt: " + f);
+    // Rückmeldung: die neue Buchung steht oft außer Sicht
+    melde(`${typ === "aus" ? "Ausgabe" : "Einnahme"} gebucht`, "erfolg");
     onClose();
   }
 
@@ -729,7 +800,7 @@ export function FarbWahl({ wert, setzen }: { wert: string; setzen: (f: string) =
 
 const heuteKey = () => new Date().toISOString().slice(0, 10);
 
-function GeplantKarte({ darf, fin }: { darf: boolean; fin: FinanzenValue | null }) {
+function GeplantKarte({ darf, fin, className = "" }: { darf: boolean; fin: FinanzenValue | null; className?: string }) {
   const dunkel = useDunkel();
   const { liste, speichern, loeschen } = useGeplant(true);
   const [offen, setOffen] = useState<KassenGeplant | "neu" | null>(null);
@@ -739,7 +810,7 @@ function GeplantKarte({ darf, fin }: { darf: boolean; fin: FinanzenValue | null 
   const katFarbe = (id: string | null) => fin?.kategorien.find((k) => k.id === id)?.farbe ?? null;
 
   return (
-    <section className="card p-5">
+    <section className={`card min-w-0 p-5 ${className}`}>
       <BereichKopf titel="Geplante Aktionen" onNeu={darf ? () => setOffen("neu") : undefined} />
       {sichtbar.length === 0 ? (
         <p className="text-[13px] text-tinte-leise">Gerade ist nichts geplant.</p>
@@ -763,9 +834,9 @@ function GeplantKarte({ darf, fin }: { darf: boolean; fin: FinanzenValue | null 
                     <span className="zahl mt-0.5 text-[17px] font-bold">{d ? d.getDate() : "?"}</span>
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="flex items-center gap-1.5">
+                    <span className="flex items-baseline gap-1.5">
                       {f && <Punkt hex={farbHex(f, dunkel)} />}
-                      <span className="truncate text-[14px] font-semibold">{g.titel}</span>
+                      <span className="line-clamp-2 min-w-0 text-[14px] font-semibold leading-snug [overflow-wrap:anywhere]">{g.titel}</span>
                     </span>
                     <span className="block truncate text-[12px] text-tinte-leise">
                       {[
@@ -776,7 +847,7 @@ function GeplantKarte({ darf, fin }: { darf: boolean; fin: FinanzenValue | null 
                     </span>
                   </span>
                   <span className="shrink-0 text-tinte-leise" aria-hidden>
-                    <Icon name="info" size={17} />
+                    <Icon name="chevron" size={14} strich={2.4} />
                   </span>
                 </button>
               </li>
@@ -920,26 +991,24 @@ function GeplantSheet({
           </div>
         </>
       )}
-      <div className="mt-4 flex items-center gap-2">
-        <button disabled={busy || !titel.trim()} onClick={() => void speichern()} className="btn-primary disabled:opacity-40">
-          {busy ? "…" : "Speichern"}
-        </button>
-        {bestehend && (
-          <button
-            type="button"
-            aria-label="Geplante Aktion löschen"
+      <button disabled={busy || !titel.trim()} onClick={() => void speichern()} className="btn-primary mt-4 disabled:opacity-40">
+        {busy ? "…" : "Speichern"}
+      </button>
+      {/* Löschen ganz unten als eigene Gruppe mit Rückfrage (Design-Regeln §2) */}
+      {bestehend && (
+        <Gruppe className="mt-6">
+          <Zeile
+            label="Aus der Planung löschen"
+            rot
             onClick={async () => {
               if (!(await frage(`„${bestehend.titel}“ aus der Planung löschen?`, "Löschen", true))) return;
               const f = await onLoeschen(bestehend.id);
               if (f) return meldeFehler("Löschen hat nicht geklappt: " + f);
               onClose();
             }}
-            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-red-600 dark:text-red-400"
-          >
-            <Icon name="muell" size={19} />
-          </button>
-        )}
-      </div>
+          />
+        </Gruppe>
+      )}
     </Sheet>
   );
 }
@@ -951,11 +1020,13 @@ function GeplantSheet({
  * Zeile für die offenen Elternbeiträge.
  */
 export function Kennzahlen({
-  ein, aus, offen,
+  ein, aus, offen, offenTitel,
 }: {
   ein: number;
   aus: number;
   offen?: { cent: number; personen?: number; halbjahr: string } | null;
+  /** Bezeichnung der Offen-Zeile – Eltern lesen „Offene Elternbeiträge“ sonst als eigene Schuld */
+  offenTitel?: string;
 }) {
   return (
     <div className="mt-4 grid gap-2">
@@ -969,7 +1040,10 @@ export function Kennzahlen({
             <Icon name="kalender" size={16} />
           </span>
           <span className="min-w-0 flex-1">
-            <span className="block truncate text-[14px] font-semibold">Offene Elternbeiträge</span>
+            {/* Darf umbrechen: „Noch offen in der ganzen Stufe“ (Eltern) wurde am
+                iPhone SE sonst zu „Noch offen in der ganze…“ – ausgerechnet
+                „Stufe“ fiel weg, das die Zahl von der eigenen Schuld trennt. */}
+            <span className="block text-[14px] font-semibold leading-snug">{offenTitel ?? "Offene Elternbeiträge"}</span>
             <span className="block truncate text-[12px] text-tinte-leise">
               fällig bis {offen.halbjahr} · {schuljahrVon(offen.halbjahr)}
               {offen.personen != null ? ` · ${offen.personen} Pers.` : ""}

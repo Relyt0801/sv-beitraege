@@ -13,7 +13,7 @@ import { WerHatGestimmt } from "./WerHatGestimmt";
 import { DEMO_ANTWORTEN_LS, useTopics, type TopicItem } from "../topics-store";
 
 /**
- * Abstimmungen im Chat (Übersicht eines Komitee-Chats) und freie Antworten.
+ * Abstimmungen im Chat (Pinnwand eines Komitee-Chats) und freie Antworten.
  *
  * Eine Abstimmung hat entweder
  *   a) Auswahl-Möglichkeiten (topic_items.options, Stimmen in topic_votes) –
@@ -58,7 +58,7 @@ export function ZahlenAuswertung({ werte }: { werte: number[] }) {
     <li className="grid grid-cols-4 gap-1.5">
       {felder.map(([t, n]) => (
         <span key={t} className="rounded-xl bg-brand/10 px-2 py-2 text-center">
-          <span className="block text-[11px] font-semibold uppercase tracking-[0.04em] text-tinte-leise">{t}</span>
+          <span className="block text-[12px] font-semibold uppercase tracking-[0.04em] text-tinte-leise">{t}</span>
           <span className="zahl block text-[16px] font-bold">{zahlText(n)}</span>
         </span>
       ))}
@@ -116,6 +116,7 @@ export function TextGruppen({
   max = 3,
   zahl = false,
   leer,
+  onEigene,
 }: {
   gruppen: TextGruppe[];
   zeigeNamen?: boolean;
@@ -126,6 +127,8 @@ export function TextGruppen({
   zahl?: boolean;
   /** Text, wenn es noch keine Antwort gibt (sonst nichts zeigen) */
   leer?: string;
+  /** Die Gruppe mit der eigenen Antwort ist antippbar („Ändern“) */
+  onEigene?: () => void;
 }) {
   const [alle, setAlle] = useState(false);
   if (!gruppen.length) return leer ? <p className="px-1 text-[13px] text-tinte-leise">{leer}</p> : null;
@@ -139,8 +142,8 @@ export function TextGruppen({
         {sichtbar.map((g) => {
           const meins = Boolean(ich && g.leute.includes(ich));
           const z = zahl ? alsZahl(g.text) : null;
-          return (
-            <li key={g.text} className="flex items-start gap-2.5 rounded-xl zelle px-3 py-2">
+          const innen = (
+            <>
               <span className="min-w-0 flex-1">
                 <span className={`block whitespace-pre-wrap break-words text-[14.5px] leading-snug ${zahl ? "zahl font-semibold" : ""}`}>
                   {z !== null ? zahlText(z) : g.text}
@@ -148,18 +151,34 @@ export function TextGruppen({
                 {zeigeNamen && g.leute.length > 0 && (
                   <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">
                     {g.leute.slice(0, 4).map((u) => (
-                      <PersonName key={u} userId={u} className="text-[11.5px] font-semibold" />
+                      <PersonName key={u} userId={u} className="text-[12px] font-semibold" />
                     ))}
-                    {g.leute.length > 4 && <span className="text-[11.5px] text-tinte-leise">+{g.leute.length - 4}</span>}
+                    {g.leute.length > 4 && <span className="text-[12px] text-tinte-leise">+{g.leute.length - 4}</span>}
                   </span>
                 )}
               </span>
-              {meins && <span className="mt-0.5 shrink-0 text-[11.5px] font-semibold text-brand">du</span>}
+              {meins && <span className="mt-0.5 shrink-0 text-[12px] font-semibold text-brand-dark dark:text-brand">du</span>}
               {g.n > 1 && (
-                <span className="zahl mt-px shrink-0 rounded-full bg-brand/15 px-2 py-0.5 text-[12px] font-bold text-brand-dark dark:bg-brand/20 dark:text-brand">
+                <span className="zahl mt-px shrink-0 rounded-full bg-brand/15 px-2 py-0.5 text-[12px] font-bold text-brand-dark dark:bg-brand/20 dark:text-brand-dark">
                   ×{g.n}
                 </span>
               )}
+              {meins && onEigene && <span className="mt-0.5 shrink-0 text-[13px] font-semibold text-brand-dark dark:text-brand">Ändern</span>}
+            </>
+          );
+          return meins && onEigene ? (
+            <li key={g.text}>
+              <button
+                type="button"
+                onClick={onEigene}
+                className="flex min-h-[44px] w-full items-start gap-2.5 rounded-xl zelle px-3 py-2 text-left transition active:scale-[.99]"
+              >
+                {innen}
+              </button>
+            </li>
+          ) : (
+            <li key={g.text} className="flex items-start gap-2.5 rounded-xl zelle px-3 py-2">
+              {innen}
             </li>
           );
         })}
@@ -332,7 +351,7 @@ export function FreiAntworten({ item, abgelaufen }: { item: TopicItem; abgelaufe
                 Zurückziehen
               </button>
             )}
-            {art === "kurz" && <span className="ml-auto text-[11.5px] text-tinte-leise">{text.length} / 120</span>}
+            {art === "kurz" && <span className="ml-auto text-[12px] text-tinte-leise">{text.length} / 120</span>}
           </div>
         </div>
       )}
@@ -360,9 +379,21 @@ const fristText = (iso: string) =>
  * Eine Abstimmung: Frage, Möglichkeiten mit Ergebnis (Prozent + Anzahl,
  * führende Möglichkeit hervorgehoben) und – falls erlaubt – „Eigene Antwort“
  * mit Textfeld und den gruppierten Texten darunter.
+ *
+ * kompakt: Ist die Abstimmung beendet, zeigt die Karte nur Frage und Ergebnis
+ * (eine Zeile) – ein Tipp klappt sie auf. Vorher stand eine beendete
+ * Abstimmung mit allen Balken ganz oben auf der Pinnwand.
+ *
+ * Löschen steht nicht mehr als Mülleimer an jeder Karte, sondern hinter „…“
+ * in einem Blatt (ganz unten, rot, mit Rückfrage).
  */
-export function AbstimmungKarte({ item, kannLoeschen, onDelete }: { item: TopicItem; kannLoeschen: boolean; onDelete: () => void }) {
+export function AbstimmungKarte({
+  item, kannLoeschen, onDelete, kompakt = false,
+}: { item: TopicItem; kannLoeschen: boolean; onDelete: () => void; kompakt?: boolean }) {
   const abgelaufen = item.poll_deadline ? new Date(item.poll_deadline) < new Date() : false;
+  const [auf, setAuf] = useState(false);
+  const [mehr, setMehr] = useState(false);
+  const zu = kompakt && abgelaufen && !auf;
   const art = item.antwort_art
     ? `Freie Antwort · ${ANTWORT_ART_NAME[item.antwort_art]}`
     : item.poll_multi
@@ -375,11 +406,9 @@ export function AbstimmungKarte({ item, kannLoeschen, onDelete }: { item: TopicI
         <div className="min-w-0 flex-1">
           <div className="text-[16px] font-semibold leading-snug [overflow-wrap:anywhere]">{item.body}</div>
           <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[12px] text-tinte-leise">
-            {/* Name höchstens 60 % breit – sonst bleibt der Rest auf schmalen Handys zu eng */}
-            <span className="flex min-w-0 max-w-[60%] items-center gap-1">
-              <Avatar userId={item.created_by} name={item.author} size={16} />
-              <PersonName userId={item.created_by} name={item.author} role={item.author_role} koms={item.author_koms} className="min-w-0 truncate font-semibold" />
-            </span>
+            {/* Name höchstens 60 % breit – sonst bleibt der Rest auf schmalen Handys zu eng.
+                Kein Mini-Kreis mehr davor: dessen Initialen waren 6 px klein und der Name steht ja da. */}
+            <PersonName userId={item.created_by} name={item.author} role={item.author_role} koms={item.author_koms} className="min-w-0 max-w-[60%] truncate font-semibold" />
             <span aria-hidden>·</span>
             <span>{art}</span>
             <span aria-hidden>·</span>
@@ -396,18 +425,80 @@ export function AbstimmungKarte({ item, kannLoeschen, onDelete }: { item: TopicI
         </div>
         {kannLoeschen && (
           <button
-            onClick={() => void frage("Abstimmung löschen?", "Löschen", true).then((ok) => { if (ok) void onDelete(); })}
-            className="-m-1.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-tinte-leise transition active:scale-90"
-            aria-label="Abstimmung löschen"
-            title="Abstimmung löschen"
+            type="button"
+            onClick={() => setMehr(true)}
+            className="-m-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-tinte-leise transition active:scale-90 active:bg-black/[0.05] dark:active:bg-white/[0.08]"
+            aria-label="Mehr zu dieser Abstimmung"
+            title="Mehr"
           >
-            <Icon name="muell" size={16} />
+            <Icon name="mehr" size={20} strich={2.4} />
           </button>
         )}
       </div>
 
-      {item.antwort_art ? <FreiAntworten item={item} abgelaufen={abgelaufen} /> : <AuswahlAbstimmung item={item} abgelaufen={abgelaufen} />}
+      {zu ? (
+        <ErgebnisKurz item={item} onAuf={() => setAuf(true)} />
+      ) : item.antwort_art ? (
+        <FreiAntworten item={item} abgelaufen={abgelaufen} />
+      ) : (
+        <AuswahlAbstimmung item={item} abgelaufen={abgelaufen} />
+      )}
+      {kompakt && abgelaufen && auf && (
+        <button type="button" onClick={() => setAuf(false)} className="mt-1 min-h-[44px] px-1 text-[13px] font-semibold text-brand-dark dark:text-brand">
+          Zuklappen
+        </button>
+      )}
+
+      <Sheet open={mehr} onClose={() => setMehr(false)}>
+        <SheetKopf titel="Abstimmung" unter={item.body} onClose={() => setMehr(false)} />
+        <Gruppe className="mt-0" fuss="Die Abstimmung verschwindet mit allen Stimmen und Antworten.">
+          <Zeile
+            label="Abstimmung löschen"
+            rot
+            onClick={() =>
+              void frage("Abstimmung löschen?", "Löschen", true).then((ok) => {
+                if (!ok) return;
+                setMehr(false);
+                void onDelete();
+              })
+            }
+          />
+        </Gruppe>
+      </Sheet>
     </div>
+  );
+}
+
+/** Beendete Abstimmung zugeklappt: nur das Ergebnis in einer Zeile, Tipp klappt auf. */
+function ErgebnisKurz({ item, onAuf }: { item: TopicItem; onAuf: () => void }) {
+  const { voteCounts } = useTopics();
+  let text = "Antworten ansehen";
+  let pct: number | null = null;
+  if (!item.antwort_art) {
+    const optionen = Array.isArray(item.options) ? item.options : [];
+    const counts = voteCounts[item.id] || {};
+    const gesamt = optionen.reduce((s, o) => s + (counts[o.id] || 0), 0);
+    const max = Math.max(0, ...optionen.map((o) => counts[o.id] || 0));
+    const sieger = max > 0 ? optionen.filter((o) => (counts[o.id] || 0) === max) : [];
+    if (sieger.length) {
+      text = `${sieger.length > 1 ? "Gleichstand: " : "Ergebnis: "}${sieger.map((o) => o.label).join(", ")}`;
+      pct = gesamt ? Math.round((max / gesamt) * 100) : null;
+    } else text = "Keine Stimmen";
+  }
+  return (
+    <button
+      type="button"
+      onClick={onAuf}
+      aria-expanded={false}
+      className="mt-3 flex min-h-[44px] w-full items-center gap-2 rounded-xl bg-brand/10 px-3 py-2 text-left text-[14px] transition active:scale-[.99] dark:bg-brand/15"
+    >
+      <span className="shrink-0 text-brand-dark dark:text-brand">
+        <Icon name="pokal" size={16} />
+      </span>
+      <span className="min-w-0 flex-1 truncate font-semibold">{text}</span>
+      {pct !== null && <span className="zahl shrink-0 font-bold text-brand-dark dark:text-brand">{pct} %</span>}
+      <span aria-hidden className="shrink-0 text-[17px] leading-none text-tinte-leise">›</span>
+    </button>
   );
 }
 
@@ -428,6 +519,17 @@ function AuswahlAbstimmung({ item, abgelaufen }: { item: TopicItem; abgelaufen: 
   // Texte zur freien Möglichkeit – nur laden, wenn es sie gibt
   const texte = useAntworten(frei ? item.id : "", uid);
   const meinText = frei ? texte.liste.find((a) => a.user_id === uid) : undefined;
+  // Eigener Text: gesichert steht er nur noch einmal (in der Liste, mit „du“) –
+  // antippen holt das Feld zum Ändern zurück
+  const [bearbeiten, setBearbeiten] = useState(false);
+  const speichern = useCallback(
+    async (t: string) => {
+      const ok = await texte.speichern(t);
+      if (ok) setBearbeiten(false);
+      return ok;
+    },
+    [texte],
+  );
   const freiGewaehlt = Boolean(frei && meine.includes(frei.id));
   const gruppen = useMemo(() => gruppiereTexte(texte.liste.map((a) => ({ text: a.wert, user_id: a.user_id }))), [texte.liste]);
 
@@ -502,15 +604,28 @@ function AuswahlAbstimmung({ item, abgelaufen }: { item: TopicItem; abgelaufen: 
                 )}
                 <span className="relative shrink-0 text-right leading-none">
                   <span className={`zahl block text-[14px] font-bold ${vorne ? "text-brand-dark dark:text-brand" : ""}`}>{pct} %</span>
-                  <span className="zahl mt-0.5 block text-[11px] text-tinte-leise">{n === 1 ? "1 Stimme" : `${n} Stimmen`}</span>
+                  <span className="zahl mt-0.5 block text-[12px] text-tinte-leise">{n === 1 ? "1 Stimme" : `${n} Stimmen`}</span>
                 </span>
               </button>
               {o.frei && (freiGewaehlt && !gesperrt ? true : gruppen.length > 0) && (
                 <div className="pl-7">
-                  {freiGewaehlt && !gesperrt && <EigeneEingabe key={meinText?.wert ?? ""} start={meinText?.wert ?? ""} speichern={texte.speichern} />}
+                  {freiGewaehlt && !gesperrt && (!meinText || bearbeiten) && (
+                    <EigeneEingabe
+                      key={meinText?.wert ?? ""}
+                      start={meinText?.wert ?? ""}
+                      speichern={speichern}
+                      aendern={bearbeiten}
+                      onFertig={() => setBearbeiten(false)}
+                    />
+                  )}
                   {gruppen.length > 0 && (
                     <div className="mt-1.5">
-                      <TextGruppen gruppen={gruppen} zeigeNamen={zeigeWaehler} ich={uid} />
+                      <TextGruppen
+                        gruppen={gruppen}
+                        zeigeNamen={zeigeWaehler}
+                        ich={uid}
+                        onEigene={freiGewaehlt && !gesperrt && !bearbeiten ? () => setBearbeiten(true) : undefined}
+                      />
                     </div>
                   )}
                 </div>
@@ -529,7 +644,15 @@ function AuswahlAbstimmung({ item, abgelaufen }: { item: TopicItem; abgelaufen: 
 }
 
 /** Textfeld unter „Eigene Antwort“ – speichert mit „Sichern“ oder Enter */
-function EigeneEingabe({ start, speichern }: { start: string; speichern: (t: string) => Promise<boolean> }) {
+function EigeneEingabe({
+  start, speichern, aendern = false, onFertig,
+}: {
+  start: string;
+  speichern: (t: string) => Promise<boolean>;
+  /** Über „Ändern“ geöffnet: Feld bekommt den Fokus, „Fertig“ klappt es ohne Änderung wieder zu */
+  aendern?: boolean;
+  onFertig?: () => void;
+}) {
   const [text, setText] = useState(start);
   const [busy, setBusy] = useState(false);
   const geaendert = text.trim() !== start.trim();
@@ -543,7 +666,7 @@ function EigeneEingabe({ start, speichern }: { start: string; speichern: (t: str
     <div className="mt-1.5 flex animate-fadeIn items-center gap-2">
       <input
         className="field min-w-0 flex-1 !py-2 text-[15px]"
-        autoFocus={!start}
+        autoFocus={!start || aendern}
         maxLength={120}
         placeholder="Deine Antwort …"
         value={text}
@@ -554,6 +677,10 @@ function EigeneEingabe({ start, speichern }: { start: string; speichern: (t: str
       {geaendert || !start ? (
         <button className="btn-klein shrink-0" disabled={busy || !text.trim()} onClick={() => void sichern()}>
           Sichern
+        </button>
+      ) : aendern && onFertig ? (
+        <button type="button" className="btn-klein-grau shrink-0" onClick={onFertig}>
+          Fertig
         </button>
       ) : (
         <span className="flex shrink-0 items-center gap-1 px-1 text-[12.5px] font-semibold text-[#1E7B34] dark:text-[#30D158]">

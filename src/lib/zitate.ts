@@ -158,7 +158,10 @@ export function useZitate(aktiv: boolean, uid: string | null) {
         .neq("status", "abgelehnt")
         .order("created_at", { ascending: false })
         .limit(1000),
-      supabase!.from("zitat_stimmen").select("zitat_id, user_id").eq("an", true),
+      // Nur die eigenen: gezählt wird über useStimmenZahlen. Das Prüf-Komitee
+      // darf alle Stimmen lesen (über 1000) – die Datenbank liefert höchstens
+      // 1000 Zeilen, eigene Stimmen fehlten dann und ließen sich nicht zurücknehmen.
+      supabase!.from("zitat_stimmen").select("zitat_id, user_id").eq("an", true).eq("user_id", me),
       supabase!.rpc("meine_eintraege"),
     ]);
     if (!z.error) setZitate((z.data as Zitat[]) || []);

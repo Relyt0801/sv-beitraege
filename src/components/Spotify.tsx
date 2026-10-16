@@ -123,7 +123,7 @@ export function SpotifyKarte({ wert, fallbackTitel }: { wert: string; fallbackTi
         <div className="min-w-0 flex-1">
           <div className="truncate text-[15px] font-semibold leading-tight">{info === undefined ? "Lädt …" : titel}</div>
           {kuenstler && <div className="truncate text-[13px] text-white/65">{kuenstler}</div>}
-          <div className="mt-1 flex items-center gap-1 text-[11px] font-semibold text-[#1ED760]">
+          <div className="mt-1 flex items-center gap-1 text-[12px] font-semibold text-[#1ED760]">
             {spielt ? (
               <span className="flex items-end gap-[2px]" aria-hidden>
                 {[0, 1, 2].map((i) => (
@@ -341,7 +341,7 @@ export function LiedSuche({ wert, setzen }: { wert: string; setzen: (v: string) 
       {fehler && <span className="block px-4 pt-2 text-[12.5px] text-red-600 dark:text-red-400">{fehler}</span>}
 
       <span className="mt-1 flex flex-wrap items-center gap-2 border-t border-black/[0.06] px-3 py-2.5 dark:border-white/[0.08]">
-        <span className="w-full text-[11.5px] leading-snug text-tinte-leise">
+        <span className="w-full text-[12px] leading-snug text-tinte-leise">
           {perApp === false
             ? "Öffnet Spotify mit deiner Suche. Beim Lied auf Teilen → Link kopieren, dann hier einfügen."
             : "Nicht dabei? In Spotify suchen, Link kopieren und hier einfügen."}

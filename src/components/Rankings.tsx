@@ -1,6 +1,8 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Sheet, SheetKopf } from "./Sheet";
-import { Gruppe, Wert, Zeile } from "./Liste";
+import { Gruppe, Wert, Zeile, ZeileEingabe, ZeileHaken, ZeileMitSchalter } from "./Liste";
+import { Suchfeld } from "./KontoZeile";
+import { FussLeiste as FussLeisteBlatt } from "./FussLeiste";
 import { Schalter } from "./Schalter";
 import { AusHinweis } from "./Funktionen";
 import { useRole } from "../auth/RoleProvider";
@@ -27,7 +29,7 @@ import { TEIL_NAME, useGewinner, useTeil, useVerschiebungen, type GewinnerArt, t
 import { TEIL_FARBE, TeilMarke, TeilUmschalter, TeilWischer, useVerschiebenRueckfrage } from "./TeilUmschalter";
 import { GewinnerBuehne, KuerenBlatt, type Kandidat as KuerKandidat } from "./Gewinner";
 import { KachelVerwaltung } from "./KachelVerwaltung";
-import { FussLeiste, KARTE_KLICK_KLASSE, VerwaltetVon, karteKlick } from "./Kachel";
+import { KARTE_KLICK_KLASSE, VerwaltetVon, karteKlick } from "./Kachel";
 
 /**
  * Abi-Rankings: „Wird am ehesten berühmt“ & Co. – je Kategorie eine geheime
@@ -115,10 +117,21 @@ export function RankingKarten({ className = "" }: { className?: string }) {
   const [offen, setOffen] = useState<RankingArt | null>(null);
   const r = useRankings(darf, uid, offen !== null);
   const runden = useRunden("rankings", darf, uid, can("rankings.runden"));
+  // Noch etwas abzustimmen? Dann im Regal der Startseite (Handy) ganz vorn
+  // statt als vierte Karte hinter Album, Motto und Zitaten.
+  const offenGesamt = r.kategorien.filter((k) => k.aktiv && !(k.id in r.meine)).length + runden.offene.length;
+  const wurzel = useRef<HTMLDivElement>(null);
+  // Die Rankings laden nach dem ersten Zeichnen; rückt die Karte dann nach
+  // vorn, rastet das Regal (snap) sonst wieder auf dem Album ein und die
+  // Rankings lägen links außerhalb. Darum einmal an den Anfang.
+  useLayoutEffect(() => {
+    const regal = wurzel.current?.parentElement;
+    if (offenGesamt > 0 && regal && regal.scrollWidth > regal.clientWidth) regal.scrollLeft = 0;
+  }, [offenGesamt > 0]); // eslint-disable-line react-hooks/exhaustive-deps
   if (!darf) return null;
 
   return (
-    <div className={`flex flex-col ${className}`}>
+    <div ref={wurzel} className={`flex flex-col ${offenGesamt ? "max-sm:-order-1" : ""} ${className}`}>
       <AusHinweis funktion="rankings" className="mb-1.5 px-1" />
       <div className="grid flex-1 grid-cols-2 gap-3">
         {(["schueler", "lehrer"] as RankingArt[]).map((art) => {
@@ -129,21 +142,26 @@ export function RankingKarten({ className = "" }: { className?: string }) {
           return (
             <section
               key={art}
-              // Ganze Karte antippbar (öffnet das Blatt); der Knopf unten bleibt als Hinweis
-              {...karteKlick(() => setOffen(art), `${ART_STIL[art].titel} öffnen`)}
+              // Ganze Karte antippbar (öffnet das Blatt). Nur für Finger/Maus: der
+              // Knopf unten tut dasselbe und ist für Tastatur/Vorlesen der Weg
+              // (sonst Knopf im Knopf, axe „nested-interactive“)
+              {...karteKlick(() => setOffen(art), undefined, true)}
               className={`relative flex min-h-[164px] flex-col overflow-hidden rounded-[1.4rem] bg-gradient-to-br p-3.5 text-white sm:p-5 ${KARTE_KLICK_KLASSE} ${stil.verlauf} ${stil.schatten}`}
             >
-              {/* Kleines Siegertreppchen oben rechts */}
-              <div aria-hidden className="pointer-events-none absolute right-3.5 top-3.5 flex items-end gap-[2px] opacity-90 sm:right-5 sm:top-5">
+              {/* Kleines Siegertreppchen oben rechts – am Handy nicht: im Regal ist
+                  die Kachel ~150 px breit, „ABI-RANKING“ lief in das Treppchen */}
+              <div aria-hidden className="pointer-events-none absolute right-3.5 top-3.5 flex items-end gap-[2px] opacity-90 max-sm:hidden sm:right-5 sm:top-5">
                 {[
                   { h: 15, f: MEDAILLE[1], n: 2 },
                   { h: 22, f: MEDAILLE[0], n: 1 },
                   { h: 10, f: MEDAILLE[2], n: 3 },
                 ].map((x) => (
-                  <span key={x.n} className="w-[14px] rounded-t-[3px] sm:w-5" style={{ height: x.h, background: x.f }} />
+                  <span key={x.n} className="w-[13px] rounded-t-[3px] sm:w-4" style={{ height: x.h, background: x.f }} />
                 ))}
               </div>
-              <div className="pr-14 text-[11px] font-semibold uppercase tracking-[0.12em] text-white/80">Abi-Ranking</div>
+              {/* Platz für das Treppchen (Handy 43 px, ab sm 52 px) plus Luft – sonst läuft der Text hinein.
+                  Einzeilig: an Android 360 und iPad hoch brach „Abi-Ranking“ um und schob die Kachel 18 px tiefer */}
+              <div className="whitespace-nowrap text-[12px] font-semibold uppercase tracking-[0.02em] text-white/80 sm:pr-14">Abi-Ranking</div>
               <div className="mt-0.5 text-[1.2rem] font-bold leading-tight">{ART_STIL[art].kurz}</div>
               <div className="mt-1 text-[12.5px] leading-snug text-white/80">
                 {wahlen
@@ -154,11 +172,19 @@ export function RankingKarten({ className = "" }: { className?: string }) {
                       : `Alle ${aktive.length} abgestimmt`
                     : "Noch keine Kategorien"}
               </div>
+              {/* Fortschritt wie beim Steckbrief – füllt die Kachel im Regal mit
+                  etwas Nützlichem statt leerer Fläche über dem Knopf */}
+              {aktive.length > 0 && !wahlen && (
+                <div aria-hidden className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/25">
+                  <div className="h-full rounded-full bg-white transition-[width] duration-500" style={{ width: `${Math.round(((aktive.length - offenAnzahl) / aktive.length) * 100)}%` }} />
+                </div>
+              )}
               <button
                 onClick={(e) => {
                   e.stopPropagation();
                   setOffen(art);
                 }}
+                aria-label={`${ART_STIL[art].titel}: ${offenAnzahl > 0 || wahlen ? "Abstimmen" : "Ergebnisse"}`}
                 className={`mt-auto inline-flex min-h-[44px] items-center self-start rounded-full bg-white px-4 text-[13.5px] font-semibold shadow-sm transition active:scale-95 ${stil.text}`}
               >
                 {offenAnzahl > 0 || wahlen ? "Abstimmen" : "Ergebnisse"}
@@ -209,11 +235,44 @@ function RankingSheet({ art, onClose, r, runden }: { art: RankingArt | null; onC
   const q = suche.trim().toLowerCase();
   const gefiltert = q ? imTeil.filter((k) => k.titel.toLowerCase().includes(q)) : imTeil;
   const offenAnzahl = imTeil.filter((k) => !(k.id in r.meine)).length;
+  // Die Kachel zählt beide Teile („Noch 8 von 8 offen“) – das Blatt zeigt einen
+  // Teil. Was im anderen Teil noch offen ist, steht darum in der Stand-Karte.
+  const andererTeil: Teil = teil === "offiziell" ? "inoffiziell" : "offiziell";
+  const offenAnders = alleArt.filter((k) => k.bereich === andererTeil && !(k.id in r.meine)).length;
+  // Beim Öffnen: ist im gemerkten Teil alles erledigt, im anderen aber nicht,
+  // gleich dorthin (nur einmal je Öffnen, nie mitten im Abstimmen).
+  const teilGeprueft = useRef(false);
+  // vor dem Zeichnen, damit nicht kurz der erledigte Teil aufblitzt
+  useLayoutEffect(() => {
+    if (!open) {
+      teilGeprueft.current = false;
+      return;
+    }
+    if (teilGeprueft.current || !r.bereit || alleArt.length === 0) return;
+    teilGeprueft.current = true;
+    if (offenAnzahl === 0 && offenAnders > 0) setTeil(andererTeil);
+  }, [open, r.bereit, alleArt.length, offenAnzahl, offenAnders, andererTeil, setTeil]);
   // Ohne eigene Wahl: gibt es noch Offenes, zuerst „Abstimmen“, sonst „Ergebnisse“
   const ansicht: Ansicht = ansichtWahl ?? (offenAnzahl > 0 || imTeil.some((k) => runden.offeneVon(k.id)) ? "abstimmen" : "ergebnisse");
   const wahl = wahlId ? r.kategorien.find((k) => k.id === wahlId) || null : null;
 
+  // Wie in iOS: „‹ Schüler-Ranking“ kommt an derselben Stelle der Übersicht
+  // heraus, von der aus man die Kategorie geöffnet hat (die Kategorie selbst
+  // beginnt oben und ist mit langer Namensliste viel höher als die Übersicht)
+  const marke = useRef<HTMLSpanElement>(null);
+  const uebersichtY = useRef(0);
+  const oeffnen = (k: RankingKategorie) => {
+    uebersichtY.current = scrollBereich(marke.current)?.scrollTop ?? 0;
+    setWahlId(k.id);
+  };
+  useLayoutEffect(() => {
+    if (wahlId || fertig) return;
+    const p = scrollBereich(marke.current);
+    if (p) p.scrollTop = uebersichtY.current;
+  }, [wahlId, fertig]);
+
   const schliessen = () => {
+    uebersichtY.current = 0;
     setWahlId(null);
     setSuche("");
     setAnsicht(null);
@@ -237,7 +296,8 @@ function RankingSheet({ art, onClose, r, runden }: { art: RankingArt | null; onC
   const nachStimme = (k: RankingKategorie) => {
     const n = naechsteOffene(k.id);
     if (n) {
-      melde(`Gespeichert – weiter mit „${n.titel}“`, "erfolg");
+      // Keine Meldung: sie lag über der letzten Personenreihe. Rückmeldung ist
+      // der neue Titel, der von rechts hereingleitet.
       setWahlId(n.id);
     } else {
       melde("Gespeichert", "erfolg");
@@ -247,7 +307,8 @@ function RankingSheet({ art, onClose, r, runden }: { art: RankingArt | null; onC
   };
   return (
     <>
-      <Sheet open={open && !einstellungen && !kueren} onClose={schliessen}>
+      {/* Bleibt offen unter Einstellungen/Küren: die stehen als Unterseite an seiner Stelle („‹ …“) */}
+      <Sheet hoch open={open} onClose={schliessen}>
         {wahl ? (
           <Abstimmen
             key={wahl.id}
@@ -276,6 +337,7 @@ function RankingSheet({ art, onClose, r, runden }: { art: RankingArt | null; onC
           />
         ) : (
           <>
+            <span ref={marke} hidden />
             <SheetKopf
               titel={ART_STIL[zuletzt].titel}
               unter="Geheim: gezählt wird nur, wie oft jemand gewählt wurde."
@@ -309,7 +371,15 @@ function RankingSheet({ art, onClose, r, runden }: { art: RankingArt | null; onC
               className="mb-4"
             />
             <TeilWischer teil={teil} setTeil={setTeil}>
-              <StandKarte art={zuletzt} teil={teil} kategorien={imTeil} r={r} runden={runden} onOeffnen={(k) => setWahlId(k.id)} />
+              <StandKarte
+                art={zuletzt}
+                teil={teil}
+                kategorien={imTeil}
+                r={r}
+                runden={runden}
+                onOeffnen={oeffnen}
+                anders={offenAnders > 0 ? { anzahl: offenAnders, teil: andererTeil, wechseln: () => (setTeil(andererTeil), setSuche("")) } : undefined}
+              />
 
               {/* Ein Weg zu den Ergebnissen: dieses Segment (die Karte oben hat keinen zweiten Knopf mehr) */}
               {imTeil.length > 0 && (
@@ -336,9 +406,9 @@ function RankingSheet({ art, onClose, r, runden }: { art: RankingArt | null; onC
               ) : gefiltert.length === 0 ? (
                 <p className="py-6 text-center text-[14px] text-tinte-leise">Keine Kategorie mit „{suche.trim()}“.</p>
               ) : ansicht === "abstimmen" ? (
-                <AbstimmListe kategorien={gefiltert} r={r} runden={runden} name={name} topSichtbar={topSichtbar} onOeffnen={(k) => setWahlId(k.id)} />
+                <AbstimmListe kategorien={gefiltert} r={r} runden={runden} name={name} topSichtbar={topSichtbar} onOeffnen={oeffnen} />
               ) : (
-                <ErgebnisKacheln kategorien={gefiltert} r={r} name={name} topSichtbar={topSichtbar} gewinner={gewinner} onOeffnen={(k) => setWahlId(k.id)} />
+                <ErgebnisKacheln kategorien={gefiltert} r={r} name={name} topSichtbar={topSichtbar} gewinner={gewinner} onOeffnen={oeffnen} />
               )}
             </TeilWischer>
             <VerwaltetVon bereich="Die Rankings" komitee="Abizeitung" darf={darfEinstellungen} />
@@ -347,7 +417,7 @@ function RankingSheet({ art, onClose, r, runden }: { art: RankingArt | null; onC
       </Sheet>
       <KategorieNeuSheet open={open && neuOffen} onClose={() => setNeuOffen(false)} r={r} art={zuletzt} startTeil={teil} />
       <RankingEinstellungen
-        open={open && einstellungen && !kueren}
+        open={open && einstellungen}
         onClose={() => setEinstellungen(false)}
         r={r}
         runden={runden}
@@ -429,6 +499,7 @@ function StandKarte({
   r,
   runden,
   onOeffnen,
+  anders,
 }: {
   art: RankingArt;
   teil: Teil;
@@ -436,6 +507,8 @@ function StandKarte({
   r: Rankings;
   runden: RundenStand;
   onOeffnen: (k: RankingKategorie) => void;
+  /** Offenes im anderen Teil – mit Sprung dorthin */
+  anders?: { anzahl: number; teil: Teil; wechseln: () => void };
 }) {
   if (!kategorien.length) return null;
   const stil = KARTEN_STIL[art];
@@ -454,6 +527,16 @@ function StandKarte({
       <div className="relative mt-2 text-[1.25rem] font-bold leading-tight tracking-[-0.01em]">
         {offen.length ? `Noch ${offen.length} ${offen.length === 1 ? "Kategorie" : "Kategorien"} offen` : "Alles abgestimmt"}
       </div>
+      {anders && (
+        <button
+          type="button"
+          onClick={anders.wechseln}
+          className="relative -my-1.5 flex min-h-[44px] items-center gap-1 text-left text-[13px] font-semibold text-white/90 transition active:opacity-60"
+        >
+          + {anders.anzahl} offen in „{TEIL_NAME[anders.teil]}“
+          <span aria-hidden className="text-[15px] leading-none">›</span>
+        </button>
+      )}
       <div className="relative mt-2 h-1.5 overflow-hidden rounded-full bg-white/25" aria-hidden>
         <div className="h-full rounded-full bg-white transition-[width] duration-700 ease-ios" style={{ width: `${Math.round((fertig / kategorien.length) * 100)}%` }} />
       </div>
@@ -608,13 +691,13 @@ function ErgebnisKacheln({
               {(g || h) && (
                 <span className="mt-1.5 flex flex-col gap-0.5">
                   {g && (
-                    <span className="flex items-center gap-1 truncate rounded-full bg-[#F5B53F]/20 px-2 py-0.5 text-[11.5px] font-bold text-[#9A5B00] dark:text-[#FFD66B]">
+                    <span className="flex items-center gap-1 truncate rounded-full bg-[#F5B53F]/20 px-2 py-0.5 text-[12px] font-bold text-[#9A5B00] dark:text-[#FFD66B]">
                       <Krone /> <span className="truncate">{g.label}</span>
                     </span>
                   )}
                   {h && (
-                    <span className="flex items-center gap-1 truncate rounded-full bg-[#FF4F7B]/15 px-2 py-0.5 text-[11.5px] font-bold text-[#C2185B] dark:text-[#FF8FB1]">
-                      ♥ <span className="truncate">{h.label}</span>
+                    <span className="flex items-center gap-1 truncate rounded-full bg-[#FF4F7B]/15 px-2 py-0.5 text-[12px] font-bold text-[#C2185B] dark:text-[#FF8FB1]">
+                      <Icon name="herz" size={12} strich={2.4} /> <span className="truncate">{h.label}</span>
                     </span>
                   )}
                 </span>
@@ -625,11 +708,11 @@ function ErgebnisKacheln({
                     const t = st?.top[i];
                     return (
                       <li key={i} className="flex items-center gap-1.5 text-[12.5px]">
-                        <span className="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full text-[10.5px] font-bold text-[#1C1C1E]" style={{ background: MEDAILLE[i] }}>
+                        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[12px] font-bold leading-none text-[#1C1C1E]" style={{ background: MEDAILLE[i] }}>
                           {i + 1}
                         </span>
                         <span className={`min-w-0 flex-1 truncate ${t ? "font-medium" : "text-tinte-leise"}`}>{t ? name(t.ziel) : "–"}</span>
-                        {t && <span className="zahl shrink-0 text-[11.5px] font-semibold text-tinte-leise">{t.n}</span>}
+                        {t && <span className="zahl shrink-0 text-[12px] font-semibold text-tinte-leise">{t.n}</span>}
                       </li>
                     );
                   })}
@@ -745,45 +828,43 @@ function Abstimmen({
   const g = gewinner.von(k.id, "gewinner");
   const h = gewinner.von(k.id, "herzen");
   const aktiveLehrer = lehrer.filter((l) => l.aktiv);
+  // Neue Kategorie (auch nach dem Weiterspringen): oben anfangen – die Liste
+  // darunter ist lang, sonst stünde man mitten in den Namen der nächsten
+  const wurzel = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => nachObenScrollen(wurzel.current), []);
+  const stimmenText = st?.stimmen ? `${st.stimmen} ${st.stimmen === 1 ? "Stimme" : "Stimmen"}` : "Noch keine Stimmen";
   return (
-    <div className="animate-vonRechts">
-      <div className="mb-3 flex items-center justify-between">
-        <button onClick={zurueck} className="py-1 text-[16px] font-semibold text-brand">
-          ‹ {ART_STIL[k.art].titel}
-        </button>
-        <button onClick={onClose} aria-label="Schließen" className="flex h-[30px] w-[30px] items-center justify-center rounded-full bg-[rgb(118_118_128/0.12)] text-[13px] font-bold text-tinte-leise dark:bg-[rgb(118_118_128/0.24)]">
-          ✕
-        </button>
-      </div>
+    <div ref={wurzel} className="animate-vonRechts">
+      {/* Derselbe klebende Kopf wie überall: „‹ Schüler-Ranking“, Titel, ✕ */}
+      <SheetKopf titel={k.titel} zurueck={{ text: ART_STIL[k.art].titel, onClick: zurueck }} onClose={onClose} />
 
-      {/* Kopf: Teil, Titel, Podest – das Wichtigste ohne Scrollen */}
-      <div className="feld-grau p-4 shadow-[0_1px_3px_rgba(0,0,0,.05)]">
+      {/* Teil, Art, kleines Podest – knapp, damit die Wahl darunter gleich
+          sichtbar ist (vorher 139 px hoher Kasten mit 50 px hohen Balken) */}
+      <div className="feld-grau mt-1 px-4 py-3 shadow-[0_1px_3px_rgba(0,0,0,.05)]">
         <div className="flex items-center gap-2">
           <TeilMarke teil={k.bereich} />
           <span className="text-[12px] font-semibold uppercase tracking-[0.06em] text-tinte-leise">{ART_STIL[k.art].kurz}</span>
+          <span className="zahl ml-auto text-[12.5px] text-tinte-leise">{stimmenText}</span>
         </div>
-        <h2 className="mt-1.5 text-[1.3rem] font-bold leading-snug tracking-[-0.01em]">{k.titel}</h2>
         {topSichtbar ? (
-          <div className="mt-3 flex items-end justify-center gap-2">
-            {[1, 0, 2].map((i) => {
-              const t = st?.top[i];
-              return (
-                <div key={i} className="flex w-1/3 flex-col items-center">
-                  <span className="mb-1 w-full truncate text-center text-[12.5px] font-semibold">{t ? name(t.ziel) : "–"}</span>
-                  <span
-                    className="flex w-full items-start justify-center rounded-t-xl pt-1 text-[13px] font-bold text-[#1C1C1E]"
-                    style={{ height: [50, 36, 26][i], background: MEDAILLE[i] }}
-                  >
-                    {t ? t.n : ""}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
+          st?.top.length ? (
+            <div className="mt-2.5 flex items-end gap-2">
+              {[1, 0, 2].map((i) => {
+                const t = st.top[i];
+                return (
+                  <div key={i} className="flex w-1/3 min-w-0 flex-col">
+                    <span className="mb-1 flex min-w-0 items-baseline justify-center gap-1 text-[12.5px]">
+                      <span className={`truncate ${t ? "font-semibold" : "text-tinte-leise"}`}>{t ? name(t.ziel) : "–"}</span>
+                      {t && <span className="zahl shrink-0 font-semibold text-tinte-leise">{t.n}</span>}
+                    </span>
+                    <span aria-hidden className="w-full rounded-t-lg" style={{ height: [20, 14, 9][i], background: MEDAILLE[i] }} />
+                  </div>
+                );
+              })}
+            </div>
+          ) : null
         ) : (
-          <p className="mt-1 text-[13px] text-tinte-leise">
-            {st?.stimmen ? `${st.stimmen} ${st.stimmen === 1 ? "Stimme" : "Stimmen"} bisher` : "Noch keine Stimmen"} · Plätze gibt das Komitee frei.
-          </p>
+          <p className="mt-1 text-[13px] text-tinte-leise">Die Plätze gibt das Komitee frei.</p>
         )}
         {onKueren && (
           <div className="mt-3 flex gap-2">
@@ -833,11 +914,9 @@ function Abstimmen({
       </div>
 
       {!stichwahl && (
-        <>
-          <p className="mb-2 px-1 text-[13px] text-tinte-leise">
-            {k.id in r.meine ? `Deine Stimme: ${r.meine[k.id] ? name(r.meine[k.id]) : "Weiß nicht"} – du kannst sie ändern.` : "Wähle aus:"}
-          </p>
+        <div className="mt-4">
           <ZielWahl
+            hinweis={k.id in r.meine ? `Deine Stimme: ${r.meine[k.id] ? name(r.meine[k.id]) : "Weiß nicht"} – du kannst sie ändern.` : "Wähle aus:"}
             art={k.art}
             personen={personen}
             lehrer={aktiveLehrer}
@@ -854,13 +933,34 @@ function Abstimmen({
               timer.current = window.setTimeout(() => gestimmtRef.current?.(), 450);
             }}
           />
-        </>
+        </div>
       )}
     </div>
   );
 }
 
-/** Auswahl einer Person der Stufe oder einer Lehrkraft (auch in Pop-up-Umfragen) */
+/** Nächster Scrollbereich darüber (Blatt, Pop-up) */
+function scrollBereich(el: HTMLElement | null): HTMLElement | null {
+  for (let p = el?.parentElement; p; p = p.parentElement) {
+    const o = getComputedStyle(p).overflowY;
+    if (o === "auto" || o === "scroll") return p;
+  }
+  return null;
+}
+function nachObenScrollen(el: HTMLElement | null) {
+  const p = scrollBereich(el);
+  if (p) p.scrollTop = 0;
+}
+
+/**
+ * Auswahl einer Person der Stufe oder einer Lehrkraft (auch in Pop-up-Umfragen).
+ *
+ * Eine iOS-Gruppe aus Zeilen: kleiner Namenskreis, Name, Haken rechts – oben
+ * „Weiß nicht“, darüber die Suche. Kein eigener Scrollbereich: es scrollt nur
+ * das Blatt. Vorher ein Raster aus 3–4 Karten je Reihe mit max-h 46dvh, das
+ * am SE schon bei 8 Personen in sich scrollte (Scrollen im Scrollen), und
+ * „Weiß nicht“ als 41 px hoher Knopf ganz unten.
+ */
 export function ZielWahl({
   art,
   personen,
@@ -868,6 +968,7 @@ export function ZielWahl({
   wert,
   gewaehlt,
   setzen,
+  hinweis,
 }: {
   art: RankingArt;
   personen: StufenPerson[];
@@ -876,49 +977,74 @@ export function ZielWahl({
   /** true: es gibt schon eine Antwort (auch „weiß nicht“) */
   gewaehlt: boolean;
   setzen: (ziel: string | null) => void;
+  /** Kleine Zeile über der Liste („Wähle aus:“, „Deine Stimme: …“) */
+  hinweis?: string;
 }) {
   const [suche, setSuche] = useState("");
+  const wurzel = useRef<HTMLDivElement>(null);
+  // Neue Frage (Pop-up-Umfrage): oben anfangen, nicht mitten in der langen Liste
+  useLayoutEffect(() => nachObenScrollen(wurzel.current), []);
   const q = suche.trim().toLowerCase();
-  const liste =
+  const alle =
     art === "schueler"
-      ? personen.filter((p) => !q || `${p.vorname} ${p.nachname}`.toLowerCase().includes(q)).map((p) => ({ id: p.id, oben: p.vorname, unten: p.nachname, kuerzel: `${p.vorname[0] || ""}${p.nachname[0] || ""}` }))
-      : lehrer.filter((l) => !q || `${l.name} ${l.faecher}`.toLowerCase().includes(q)).map((l) => ({ id: l.id, oben: l.name, unten: l.faecher, kuerzel: l.name.replace(/^(Frau|Herr|Fr\.|Hr\.)\s+/i, "").slice(0, 2).toUpperCase() }));
+      ? personen.map((p) => ({
+          id: p.id,
+          label: `${p.vorname} ${p.nachname}`.trim(),
+          unter: undefined as string | undefined,
+          such: `${p.vorname} ${p.nachname}`.toLowerCase(),
+          kuerzel: `${p.vorname[0] || ""}${p.nachname[0] || ""}`,
+        }))
+      : lehrer.map((l) => ({
+          id: l.id,
+          label: l.name,
+          unter: l.faecher || undefined,
+          such: `${l.name} ${l.faecher}`.toLowerCase(),
+          kuerzel: l.name.replace(/^(Frau|Herr|Fr\.|Hr\.)\s+/i, "").slice(0, 2).toUpperCase(),
+        }));
+  const liste = q ? alle.filter((p) => p.such.includes(q)) : alle;
+  const weissNicht = gewaehlt && !wert;
 
   return (
-    <>
-      <input className="field mb-2" placeholder={art === "schueler" ? "Name suchen" : "Lehrkraft suchen"} value={suche} onChange={(e) => setSuche(e.target.value)} />
-      <div className="-mx-1 grid max-h-[46dvh] grid-cols-3 gap-2 overflow-y-auto p-1 sm:grid-cols-4">
-        {liste.map((p) => {
-          const an = wert === p.id;
-          return (
-            <button
-              key={p.id}
-              onClick={() => setzen(p.id)}
-              className={`flex flex-col items-center gap-1 rounded-2xl px-1 pb-2 pt-2.5 transition active:scale-95 ${
-                an ? "bg-[#E9C460]/20 ring-2 ring-[#C99A1E]" : "zelle"
-              }`}
-            >
-              <span className={`flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br text-[14px] font-bold text-white ${personVerlauf(p.id)}`}>
+    <div ref={wurzel}>
+      {/* Suche erst bei längeren Listen (wie bei den Kategorien) */}
+      {(alle.length > 6 || q) && <Suchfeld wert={suche} onChange={setSuche} platzhalter={art === "schueler" ? "Name suchen" : "Lehrkraft suchen"} />}
+      {hinweis && <p className="mb-1.5 px-4 text-[13px] leading-snug text-tinte-leise">{hinweis}</p>}
+      {/* Im weißen Pop-up (Umfragen) wäre die weiße Gruppe unsichtbar: dort ein feiner Rand */}
+      <Gruppe className="[.bg-white_&]:rounded-[0.875rem] [.bg-white_&]:ring-1 [.bg-white_&]:ring-black/[0.08] dark:[.bg-white_&]:ring-white/10">
+        {/* „Weiß nicht“ oben – bei 100 Namen läge es sonst ganz unten */}
+        {!q && (
+          <ZeileHaken
+            label="Weiß nicht"
+            gewaehlt={weissNicht}
+            onClick={() => setzen(null)}
+            symbol={
+              <span aria-hidden className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[rgb(118_118_128/0.16)] text-[15px] font-bold text-tinte-leise dark:bg-[rgb(118_118_128/0.3)]">
+                ?
+              </span>
+            }
+          />
+        )}
+        {liste.map((p) => (
+          <ZeileHaken
+            key={p.id}
+            label={p.label}
+            unter={p.unter}
+            gewaehlt={wert === p.id}
+            onClick={() => setzen(p.id)}
+            symbol={
+              <span aria-hidden className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br text-[12px] font-bold text-white ${personVerlauf(p.id)}`}>
                 {p.kuerzel}
               </span>
-              <span className="w-full truncate text-center text-[12.5px] font-semibold">{p.oben}</span>
-              {p.unten && <span className="-mt-1 w-full truncate text-center text-[11px] text-tinte-leise">{p.unten}</span>}
-            </button>
-          );
-        })}
-      </div>
-      {liste.length === 0 && (
-        <p className="py-6 text-center text-[13.5px] text-tinte-leise">{art === "lehrer" ? "Noch keine Lehrkräfte eingetragen." : "Niemand gefunden."}</p>
-      )}
-      <button
-        onClick={() => setzen(null)}
-        className={`mt-3 w-full rounded-full py-2.5 text-[14px] font-semibold transition ${
-          gewaehlt && !wert ? "bg-[rgb(118_118_128/0.2)]" : "bg-[rgb(118_118_128/0.1)] text-tinte-matt dark:text-slate-300"
-        }`}
-      >
-        {gewaehlt && !wert ? "✓ Weiß nicht" : "Weiß nicht"}
-      </button>
-    </>
+            }
+          />
+        ))}
+        {liste.length === 0 && (
+          <div className="px-4 py-5 text-center text-[14px] text-tinte-leise">
+            {q ? `Niemand mit „${suche.trim()}“.` : art === "lehrer" ? "Noch keine Lehrkräfte eingetragen." : "Noch niemand in der Stufe."}
+          </div>
+        )}
+      </Gruppe>
+    </div>
   );
 }
 
@@ -963,8 +1089,10 @@ export function RankingVerwaltungSheet({ open, onClose }: { open: boolean; onClo
   const name = useNamen(personen, lehrer);
   return (
     <>
+      {/* Bleibt offen unter „Küren“ – das steht als Unterseite an seiner Stelle */}
       <RankingEinstellungen
-        open={open && !kueren}
+        titel="Rankings verwalten"
+        open={open}
         onClose={onClose}
         r={r}
         runden={runden}
@@ -984,6 +1112,7 @@ export function RankingVerwaltungSheet({ open, onClose }: { open: boolean; onClo
  * der Reihenfolge der Spec; jede nur, wenn man sie darf.
  */
 function RankingEinstellungen({
+  titel = "Einstellungen",
   open,
   onClose,
   r,
@@ -1003,6 +1132,8 @@ function RankingEinstellungen({
   setTeil: (t: Teil) => void;
   onKueren: (k: RankingKategorie) => void;
   gewinner: ReturnType<typeof useGewinner>;
+  /** Kopf des Blatts: „Einstellungen“ (Zahnrad) bzw. „Rankings verwalten“ (Profil → Funktionen, wie die angetippte Zeile) */
+  titel?: string;
 }) {
   const { can } = useRole();
   const [artWahl, setArt] = useState<RankingArt | null>(null);
@@ -1033,8 +1164,13 @@ function RankingEinstellungen({
 
   return (
     <>
-      <Sheet open={open && !lehrerOffen && !stichwahlWahl && !startK} onClose={schliessen}>
-        <SheetKopf titel="Einstellungen" unter="Rankings – gilt für den gewählten Teil und die gewählte Art." onClose={schliessen} />
+      {/* Bleibt offen unter Lehrkräfte/Runde starten (Unterseiten, Stapel in Sheet.tsx) */}
+      <Sheet open={open} onClose={schliessen}>
+        <SheetKopf
+          titel={titel}
+          unter={titel === "Einstellungen" ? "Rankings – gilt für den gewählten Teil und die gewählte Art." : "Gilt für den gewählten Teil und die gewählte Art."}
+          onClose={schliessen}
+        />
         <TeilUmschalter teil={teil} setTeil={setTeil} className="mb-3" />
         <div className="seg mb-1" role="tablist" aria-label="Art">
           {(["schueler", "lehrer"] as RankingArt[]).map((a) => (
@@ -1230,110 +1366,165 @@ function RankingSichtbarkeit() {
   );
 }
 
-/** Kategorien des gewählten Teils und der gewählten Art: umbenennen, an/aus, verschieben, löschen, neu */
+/**
+ * Kategorien des gewählten Teils und der gewählten Art – iOS-Liste wie bei
+ * den Lehrkräften: je Kategorie eine Zeile mit „›“, alles Weitere
+ * (umbenennen, an/aus, verschieben, löschen) im Blatt darüber („‹ Einstellungen“).
+ * „Neue Kategorie“ ist die letzte Zeile in Blau (Design-Regeln 2).
+ */
 function KategorienListe({ r, art, teil, v }: { r: Rankings; art: RankingArt; teil: Teil; v: ReturnType<typeof useVerschiebungen> }) {
-  const verschiebenFrage = useVerschiebenRueckfrage();
-  const [neu, setNeu] = useState("");
-  const [bearbeite, setBearbeite] = useState<string | null>(null);
-  const [titel, setTitel] = useState("");
+  const [blatt, setBlatt] = useState<string | null>(null);
+  const [neuOffen, setNeuOffen] = useState(false);
   const liste = r.kategorien.filter((k) => k.art === art && k.bereich === teil);
-  const anderer: Teil = teil === "offiziell" ? "inoffiziell" : "offiziell";
-
-  const anlegen = async () => {
-    if (!neu.trim()) return;
-    const f = await r.kategorieSpeichern({ titel: neu, art, bereich: teil });
-    if (f) return meldeFehler(f);
-    setNeu("");
-  };
 
   return (
     <>
-      <Gruppe titel={`Kategorien · ${TEIL_NAME[teil]} · ${liste.length}`} fuss="Titel antippen zum Umbenennen. Schalter aus: ausgeblendet, Stimmen bleiben.">
+      <Gruppe
+        titel={`Kategorien · ${TEIL_NAME[teil]} · ${liste.length}`}
+        fuss="Aus: ausgeblendet, die Stimmen bleiben. Tipp: per Umfrage sammeln und im Ergebnis mit einem Tipp übernehmen."
+      >
         {liste.map((k) => {
           const antrag = v.antragZu(k.id);
-          return bearbeite === k.id ? (
-            <div key={k.id} className="flex gap-2 px-3 py-2.5">
-              <input className="field" value={titel} maxLength={120} onChange={(e) => setTitel(e.target.value)} autoFocus />
-              <button
-                className="btn-primary !min-h-[44px] !w-auto shrink-0 px-4 !text-[15px]"
-                onClick={async () => {
-                  const f = await r.kategorieSpeichern({ ...k, titel });
-                  if (f) return meldeFehler(f);
-                  setBearbeite(null);
-                }}
-              >
-                Sichern
-              </button>
-            </div>
-          ) : (
-            <div key={k.id} className={`${k.aktiv ? "" : "opacity-50"}`}>
-              {/* Zeile 1: Titel (antippen = umbenennen) und Schalter */}
-              <div className="flex min-h-[52px] items-center gap-3 pl-4 pr-3">
-                <button
-                  className="min-w-0 flex-1 py-2 text-left"
-                  onClick={() => {
-                    setBearbeite(k.id);
-                    setTitel(k.titel);
-                  }}
-                >
-                  <span className="block text-[15px] leading-snug">{k.titel}</span>
-                  {antrag && (
-                    <span className="block text-[12px] font-semibold text-tinte-leise">
-                      Antrag nach {TEIL_NAME[antrag.nach]} · {antrag.stimmen}/{antrag.noetig}
-                    </span>
-                  )}
-                </button>
-                <Schalter an={k.aktiv} label={`${k.titel} anzeigen`} onChange={(val) => void r.kategorieSpeichern({ ...k, aktiv: val })} />
-              </div>
-              {/* Zeile 2: Verschieben als Textlink, Löschen getrennt am rechten Rand (rot, mit Rückfrage) */}
-              <div className="flex min-h-[44px] items-center gap-3 pl-4 pr-2">
-                <button
-                  disabled={!!antrag}
-                  className={`min-h-[44px] pr-2 text-left text-[13.5px] font-semibold transition active:opacity-60 disabled:opacity-40 ${TEIL_FARBE[anderer].text}`}
-                  onClick={() =>
-                    void verschiebenFrage(anderer, k.titel).then(async (ok) => {
-                      if (!ok) return;
-                      if (await v.beantragen(k.id, anderer)) await r.nachVerschieben(k.id, anderer);
-                    })
-                  }
-                >
-                  Nach {TEIL_NAME[anderer]} verschieben
-                </button>
-                <span className="flex-1" />
-                <LoeschKnopf label={k.titel} text={`„${k.titel}“ samt allen Stimmen löschen? Das lässt sich nicht rückgängig machen.`} loeschen={() => r.kategorieLoeschen(k.id)} />
-              </div>
-            </div>
+          const stimmen = r.stand.find((x) => x.kategorie_id === k.id)?.stimmen ?? 0;
+          // Zweite Zeile immer (Stimmen, ggf. Antrag): so darf auch ein langer Titel umbrechen
+          const unter = [stimmen ? `${stimmen} ${stimmen === 1 ? "Stimme" : "Stimmen"}` : "Noch keine Stimmen", antrag ? `Antrag nach ${TEIL_NAME[antrag.nach]} ${antrag.stimmen}/${antrag.noetig}` : ""]
+            .filter(Boolean)
+            .join(" · ");
+          return (
+            <Zeile key={k.id} label={k.titel} unter={unter} onClick={() => setBlatt(k.id)}>
+              {!k.aktiv && <Wert>Aus</Wert>}
+            </Zeile>
           );
         })}
         {liste.length === 0 && <p className="px-4 py-3 text-[14px] text-tinte-leise">Hier noch keine.</p>}
+        <Zeile label="Neue Kategorie" blau onClick={() => setNeuOffen(true)} />
       </Gruppe>
-      <div className="mt-2 flex gap-2">
-        <input
-          className="field"
-          maxLength={120}
-          placeholder="z. B. Wird am ehesten berühmt"
-          value={neu}
-          onChange={(e) => setNeu(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") void anlegen();
-          }}
-        />
-        <button className="btn-primary !min-h-[44px] !w-auto shrink-0 px-4 !text-[15px]" disabled={!neu.trim()} onClick={() => void anlegen()}>
-          Anlegen
-        </button>
-      </div>
-      <p className="mt-1.5 px-4 text-[13px] leading-snug text-tinte-leise">
-        Neue Kategorien landen in <span className={`font-semibold ${TEIL_FARBE[teil].text}`}>{TEIL_NAME[teil]}</span> · {ART_STIL[art].titel}. Tipp: per Umfrage sammeln
-        und im Ergebnis mit einem Tipp übernehmen.
-      </p>
+      <RankingKategorieBlatt k={blatt ? r.kategorien.find((k) => k.id === blatt) ?? null : null} r={r} v={v} onClose={() => setBlatt(null)} />
+      <KategorieNeuSheet open={neuOffen} onClose={() => setNeuOffen(false)} r={r} art={art} startTeil={teil} />
     </>
   );
 }
 
+/** Eine Ranking-Kategorie bearbeiten: Titel, an/aus, in den anderen Teil verschieben, löschen */
+function RankingKategorieBlatt({
+  k,
+  r,
+  v,
+  onClose,
+}: {
+  k: RankingKategorie | null;
+  r: Rankings;
+  v: ReturnType<typeof useVerschiebungen>;
+  onClose: () => void;
+}) {
+  const verschiebenFrage = useVerschiebenRueckfrage();
+  const [titel, setTitel] = useState("");
+  const [an, setAn] = useState(true);
+  const [busy, setBusy] = useState(false);
+
+  // Beim Öffnen die Werte der gewählten Kategorie übernehmen
+  const kennung = k?.id ?? null;
+  useEffect(() => {
+    if (!k) return;
+    setTitel(k.titel);
+    setAn(k.aktiv);
+    setBusy(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [kennung]);
+
+  const antrag = k ? v.antragZu(k.id) : null;
+  const anderer: Teil = k?.bereich === "offiziell" ? "inoffiziell" : "offiziell";
+
+  async function sichern() {
+    if (!k || !titel.trim() || busy) return;
+    setBusy(true);
+    const f = await r.kategorieSpeichern({ ...k, titel: titel.trim(), aktiv: an });
+    setBusy(false);
+    if (f) return meldeFehler("Ging nicht: " + f);
+    onClose();
+  }
+
+  return (
+    <Sheet open={k !== null} onClose={onClose}>
+      {k && (
+        <>
+          <SheetKopf titel={k.titel} unter={`${ART_STIL[k.art].titel} · ${TEIL_NAME[k.bereich]}`} onClose={onClose} />
+          {/* Titel als mehrzeiliges Feld – Ranking-Titel sind oft lang */}
+          <Gruppe titel="Titel" className="mt-1">
+            <textarea
+              rows={2}
+              maxLength={120}
+              value={titel}
+              onChange={(e) => setTitel(e.target.value.replace(/\n/g, " "))}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  void sichern();
+                }
+              }}
+              aria-label="Titel"
+              className="block w-full resize-none bg-transparent px-4 py-3 text-[16px] leading-snug outline-none placeholder:text-tinte-leise"
+            />
+          </Gruppe>
+          <Gruppe fuss="Aus: Die Kategorie ist ausgeblendet, die Stimmen bleiben.">
+            <ZeileMitSchalter label="Zum Abstimmen zeigen">
+              <Schalter an={an} onChange={setAn} label="Zum Abstimmen zeigen" />
+            </ZeileMitSchalter>
+          </Gruppe>
+          <Gruppe
+            fuss={
+              antrag
+                ? `Antrag nach ${TEIL_NAME[antrag.nach]} läuft: ${antrag.stimmen} von ${antrag.noetig} Zustimmungen.`
+                : anderer === "offiziell"
+                  ? "Offiziell kommt ins Abibuch."
+                  : "Inoffiziell bleibt in der Stufe."
+            }
+          >
+            <Zeile
+              label={`Nach ${TEIL_NAME[anderer]} verschieben`}
+              blau
+              disabled={Boolean(antrag)}
+              onClick={() =>
+                void verschiebenFrage(anderer, k.titel).then(async (ok) => {
+                  if (!ok) return;
+                  if (await v.beantragen(k.id, anderer)) {
+                    await r.nachVerschieben(k.id, anderer);
+                    onClose();
+                  }
+                })
+              }
+            />
+          </Gruppe>
+          <Gruppe>
+            <Zeile
+              label="Kategorie löschen"
+              rot
+              onClick={() =>
+                void frage(`„${k.titel}“ samt allen Stimmen löschen? Das lässt sich nicht rückgängig machen.`, "Löschen", true).then(async (ok) => {
+                  if (!ok) return;
+                  const f = await r.kategorieLoeschen(k.id);
+                  if (f) return meldeFehler("Ging nicht: " + f);
+                  onClose();
+                })
+              }
+            />
+          </Gruppe>
+          <FussLeisteBlatt>
+            <button type="button" className="btn-primary w-full disabled:opacity-40" disabled={!titel.trim() || busy} onClick={() => void sichern()}>
+              {busy ? "…" : "Sichern"}
+            </button>
+          </FussLeisteBlatt>
+        </>
+      )}
+    </Sheet>
+  );
+}
+
 /**
- * „+“ im Blattkopf: neue Kategorie anlegen – wie bei Motto und Zitaten ein
- * kleines eigenes Blatt. Der Teil (Offiziell | Inoffiziell) startet mit dem,
- * was gerade im Blatt offen ist; die Art (Schüler | Lehrer) kommt vom Blatt.
+ * „+“ im Blattkopf oder „Neue Kategorie“ in den Einstellungen: neue Kategorie
+ * anlegen – wie bei Motto und Zitaten ein kleines eigenes Blatt. Der Teil
+ * (Offiziell | Inoffiziell) startet mit dem, was gerade offen ist; die Art
+ * (Schüler | Lehrer) kommt vom Blatt.
  */
 function KategorieNeuSheet({ open, onClose, r, art, startTeil }: { open: boolean; onClose: () => void; r: Rankings; art: RankingArt; startTeil: Teil }) {
   const [titel, setTitel] = useState("");
@@ -1360,106 +1551,121 @@ function KategorieNeuSheet({ open, onClose, r, art, startTeil }: { open: boolean
   return (
     <Sheet open={open} onClose={onClose}>
       <SheetKopf titel="Neue Kategorie" unter={`${ART_STIL[art].titel} – darüber wird abgestimmt.`} onClose={onClose} />
-      <input
-        className="field"
-        maxLength={120}
-        autoFocus
-        placeholder="z. B. Wird am ehesten berühmt"
-        value={titel}
-        onChange={(e) => setTitel(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") void anlegen();
-        }}
-      />
-      <TeilUmschalter teil={teil} setTeil={setTeil} className="mt-3" />
-      <button type="button" className="btn-primary mt-4" disabled={!titel.trim() || busy} onClick={() => void anlegen()}>
-        {busy ? "…" : `In ${TEIL_NAME[teil]} anlegen`}
-      </button>
+      <Gruppe className="mt-1">
+        <ZeileEingabe label="Titel" value={titel} onChange={setTitel} placeholder="z. B. Wird am ehesten berühmt" maxLength={120} autoFocus onEnter={() => void anlegen()} />
+      </Gruppe>
+      <TeilUmschalter teil={teil} setTeil={setTeil} className="mt-4" />
+      <FussLeisteBlatt>
+        <button type="button" className="btn-primary w-full disabled:opacity-40" disabled={!titel.trim() || busy} onClick={() => void anlegen()}>
+          {busy ? "…" : `In ${TEIL_NAME[teil]} anlegen`}
+        </button>
+      </FussLeisteBlatt>
     </Sheet>
   );
 }
 
 /** Lehrkräfte pflegen – auch aus der Zitatwand erreichbar */
+/**
+ * Lehrkräfte pflegen – iOS-Liste: je Lehrkraft eine Zeile mit „›“, alles
+ * Weitere (Name, Fächer, auswählbar, löschen) im Blatt darüber. „Neue
+ * Lehrkraft“ ist die letzte Zeile in Blau (Design-Regeln 2: ein
+ * Bedienelement je Zeile, kein Mülleimer in der Liste).
+ */
 export function LehrerListe({ aktiv }: { aktiv: boolean }) {
   const l = useLehrer(aktiv);
-  const [name, setName] = useState("");
-  const [faecher, setFaecher] = useState("");
-  const [bearbeite, setBearbeite] = useState<Lehrer | null>(null);
+  // null = zu, "neu" = anlegen, sonst die Lehrkraft
+  const [blatt, setBlatt] = useState<Lehrer | "neu" | null>(null);
 
   return (
     <>
-      <Gruppe titel={`Lehrkräfte (${l.lehrer.length})`} className="mt-0">
-        {l.lehrer.map((x) =>
-          bearbeite?.id === x.id ? (
-            <div key={x.id} className="space-y-2 px-3 py-2.5">
-              <input className="field" value={bearbeite.name} maxLength={60} onChange={(e) => setBearbeite({ ...bearbeite, name: e.target.value })} />
-              <input className="field" value={bearbeite.faecher} maxLength={60} placeholder="Fächer (optional)" onChange={(e) => setBearbeite({ ...bearbeite, faecher: e.target.value })} />
-              <div className="flex gap-2">
-                <button className="btn-grau flex-1 !min-h-[40px] !text-[15px]" onClick={() => setBearbeite(null)}>
-                  Abbrechen
-                </button>
-                <button
-                  className="btn-primary flex-1 !min-h-[40px] !text-[15px]"
-                  onClick={async () => {
-                    const f = await l.speichern(bearbeite);
-                    if (f) return meldeFehler(f);
-                    setBearbeite(null);
-                  }}
-                >
-                  Sichern
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div key={x.id} className={`flex min-h-[52px] items-center gap-2 px-4 ${x.aktiv ? "" : "opacity-50"}`}>
-              <button className="min-w-0 flex-1 py-2 text-left" onClick={() => setBearbeite(x)}>
-                <span className="block truncate text-[15px]">{x.name}</span>
-                {x.faecher && <span className="block truncate text-[12px] text-tinte-leise">{x.faecher}</span>}
-              </button>
-              <Schalter an={x.aktiv} label={`${x.name} auswählbar`} onChange={(v) => void l.speichern({ ...x, aktiv: v })} />
-              <LoeschKnopf label={x.name} text={`${x.name} aus der Liste löschen? Stimmen für diese Lehrkraft gehen verloren.`} loeschen={() => l.loeschen(x.id)} />
-            </div>
-          ),
-        )}
+      <Gruppe titel={`Lehrkräfte (${l.lehrer.length})`} className="mt-0" fuss="Ausgeschaltet: bleibt gespeichert, ist aber nicht mehr auswählbar.">
         {l.lehrer.length === 0 && <p className="px-4 py-3 text-[13px] text-tinte-leise">Noch niemand eingetragen.</p>}
+        {l.lehrer.map((x) => (
+          <Zeile key={x.id} label={x.name} unter={x.faecher || undefined} onClick={() => setBlatt(x)}>
+            {!x.aktiv && <Wert>aus</Wert>}
+          </Zeile>
+        ))}
+        <Zeile label="Neue Lehrkraft" blau onClick={() => setBlatt("neu")} />
       </Gruppe>
-      <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
-        <input className="field" maxLength={60} placeholder="Name, z. B. Frau …" value={name} onChange={(e) => setName(e.target.value)} />
-        <input className="field" maxLength={60} placeholder="Fächer (optional)" value={faecher} onChange={(e) => setFaecher(e.target.value)} />
-        <button
-          className="btn-primary !min-h-[44px] px-4 !text-[15px] sm:!w-auto"
-          disabled={!name.trim()}
-          onClick={async () => {
-            const f = await l.speichern({ name, faecher });
-            if (f) return meldeFehler(f);
-            setName("");
-            setFaecher("");
-          }}
-        >
-          Hinzufügen
-        </button>
-      </div>
-      <p className="mt-2 px-1 text-[12px] text-tinte-leise">Schalter aus: bleibt gespeichert, ist aber nicht mehr auswählbar.</p>
+      <LehrerBlatt lehrer={blatt} onClose={() => setBlatt(null)} speichern={l.speichern} loeschen={l.loeschen} />
     </>
   );
 }
 
-function LoeschKnopf({ label, text, loeschen }: { label: string; text: string; loeschen: () => Promise<string | null> }) {
+/** Eine Lehrkraft anlegen oder ändern (Unterseite der Liste, „‹ Lehrkräfte“) */
+function LehrerBlatt({
+  lehrer,
+  onClose,
+  speichern,
+  loeschen,
+}: {
+  lehrer: Lehrer | "neu" | null;
+  onClose: () => void;
+  speichern: (l: Partial<Lehrer> & { name: string }) => Promise<string | null>;
+  loeschen: (id: string) => Promise<string | null>;
+}) {
+  const offen = lehrer !== null;
+  const x = lehrer && lehrer !== "neu" ? lehrer : null;
+  const [name, setName] = useState("");
+  const [faecher, setFaecher] = useState("");
+  const [an, setAn] = useState(true);
+  const [busy, setBusy] = useState(false);
+
+  // Beim Öffnen die Werte der gewählten Lehrkraft übernehmen
+  const kennung = x?.id ?? (offen ? "neu" : null);
+  useEffect(() => {
+    if (!kennung) return;
+    setName(x?.name ?? "");
+    setFaecher(x?.faecher ?? "");
+    setAn(x?.aktiv ?? true);
+    setBusy(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [kennung]);
+
+  async function sichern() {
+    if (!name.trim() || busy) return;
+    setBusy(true);
+    const f = await speichern({ id: x?.id, name, faecher, aktiv: an });
+    setBusy(false);
+    if (f) return meldeFehler(f);
+    onClose();
+  }
+
   return (
-    <button
-      aria-label={`${label} löschen`}
-      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-red-500 transition active:scale-90 active:bg-red-500/10"
-      onClick={() =>
-        void frage(text, "Löschen", true).then(async (ok) => {
-          if (!ok) return;
-          const f = await loeschen();
-          if (f) meldeFehler("Ging nicht: " + f);
-        })
-      }
-    >
-      <svg viewBox="0 0 24 24" className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-        <path d="M4 7h16M10 11v6M14 11v6M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-12M9 7V4h6v3" />
-      </svg>
-    </button>
+    <Sheet open={offen} onClose={onClose}>
+      <SheetKopf titel={x ? x.name : "Neue Lehrkraft"} onClose={onClose} />
+      <Gruppe>
+        <ZeileEingabe label="Name" value={name} onChange={setName} placeholder="z. B. Frau …" maxLength={60} autoFocus={!x} onEnter={() => void sichern()} />
+        <ZeileEingabe label="Fächer" value={faecher} onChange={setFaecher} placeholder="optional" maxLength={60} onEnter={() => void sichern()} />
+      </Gruppe>
+      {x && (
+        <Gruppe fuss="Aus: bleibt gespeichert, ist aber bei Zitaten und im Lehrer-Ranking nicht mehr auswählbar.">
+          <ZeileMitSchalter label="Auswählbar">
+            <Schalter an={an} onChange={setAn} label="Auswählbar" />
+          </ZeileMitSchalter>
+        </Gruppe>
+      )}
+      {x && (
+        <Gruppe>
+          <Zeile
+            label="Lehrkraft löschen"
+            rot
+            onClick={() =>
+              void frage(`${x.name} aus der Liste löschen? Stimmen für diese Lehrkraft gehen verloren.`, "Löschen", true).then(async (ok) => {
+                if (!ok) return;
+                const f = await loeschen(x.id);
+                if (f) return meldeFehler("Ging nicht: " + f);
+                onClose();
+              })
+            }
+          />
+        </Gruppe>
+      )}
+      <FussLeisteBlatt>
+        <button type="button" className="btn-primary w-full disabled:opacity-40" disabled={!name.trim() || busy} onClick={() => void sichern()}>
+          {busy ? "…" : x ? "Sichern" : "Hinzufügen"}
+        </button>
+      </FussLeisteBlatt>
+    </Sheet>
   );
 }

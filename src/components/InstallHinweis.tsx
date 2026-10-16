@@ -73,8 +73,12 @@ function Schritte({ sie }: { sie: boolean }) {
   );
 }
 
-/** Die Karte auf der Startseite. */
-export function InstallKarte() {
+/**
+ * Die Karte auf der Startseite. `className` = Abstand nach außen (Standard
+ * mt-2.5). In einem Raster mit gap (Eltern-Übersicht) leer lassen – dann
+ * sorgt das Raster für denselben Abstand wie zwischen den anderen Karten.
+ */
+export function InstallKarte({ className = "mt-2.5" }: { className?: string } = {}) {
   const inst = useInstall();
   // Auch auf der Anmeldeseite (ohne RoleProvider) – dann ohne Rolle
   const role = useRoleOptional()?.role ?? null;
@@ -83,50 +87,54 @@ export function InstallKarte() {
 
   if (!inst.zeigen) return null;
 
+  // Deckende Karte mit blauem Rand (vorher bg-brand/7 %: auf dem eigenen
+  // Hintergrundbild schien das Foto durch). Ab Tablet-Breite eine Zeile:
+  // Symbol, Text, Knöpfe – statt eines halben Bildschirms am Laptop.
   return (
-    <div className="mt-2.5 rounded-[1.25rem] bg-brand/[0.07] p-4 ring-1 ring-brand/25">
-      <div className="flex items-start gap-3">
+    <div className={`card ${className} !border-brand/30 p-3.5 sm:p-4`}>
+      <div className="flex flex-wrap items-start gap-x-3 gap-y-2.5 sm:items-center">
         <span aria-hidden className="symbol bg-brand">
           <Icon name="haus" size={17} strich={2.2} />
         </span>
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 basis-[12rem]">
           <div className="text-[16px] font-semibold">Stufenkasse als App</div>
-          <p className="mt-0.5 text-[14px] leading-relaxed text-tinte-matt dark:text-slate-300">
+          <p className="mt-0.5 text-[14px] leading-snug text-tinte-matt dark:text-slate-300">
             Dann startet sie mit einem Tipp vom Home-Bildschirm, ohne Adressleiste – und Benachrichtigungen
             kommen zuverlässiger an.
           </p>
         </div>
+        {/* ✕ wie in iOS oben rechts; am Handy stehen die Knöpfe darunter,
+            ab Tablet-Breite in derselben Zeile vor dem ✕ */}
         <button
           onClick={inst.erledigen}
           aria-label="Hinweis ausblenden"
-          className="-mr-2 -mt-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-tinte-leise transition active:scale-90"
+          className="-mr-1.5 -mt-1.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-tinte-leise transition active:scale-90 sm:order-last sm:mt-0"
         >
           <Icon name="x" size={16} strich={2.4} />
         </button>
+        <div className="flex basis-full flex-wrap items-center gap-2 pl-[42px] sm:basis-auto sm:pl-0">
+          {inst.weg === "dialog" ? (
+            <button onClick={() => void inst.installieren()} className="btn-klein">
+              App installieren
+            </button>
+          ) : (
+            <button onClick={() => setOffen((v) => !v)} className="btn-klein">
+              {offen ? "Anleitung zuklappen" : "So geht's"}
+            </button>
+          )}
+          {inst.weg !== "dialog" && offen && (
+            <button onClick={inst.erledigen} className="btn-klein-grau">
+              Hab ich gemacht
+            </button>
+          )}
+        </div>
       </div>
 
       {offen && (
-        <div className="mt-3 rounded-2xl bg-[rgb(var(--karte))] p-3.5">
+        <div className="feld-grau mt-3 p-3.5">
           <Schritte sie={sie} />
         </div>
       )}
-
-      <div className="mt-3 flex flex-wrap gap-2">
-        {inst.weg === "dialog" ? (
-          <button onClick={() => void inst.installieren()} className="btn-klein">
-            App installieren
-          </button>
-        ) : (
-          <button onClick={() => setOffen((v) => !v)} className="btn-klein">
-            {offen ? "Anleitung zuklappen" : "So geht's"}
-          </button>
-        )}
-        {inst.weg !== "dialog" && offen && (
-          <button onClick={inst.erledigen} className="btn-klein-grau">
-            Hab ich gemacht
-          </button>
-        )}
-      </div>
     </div>
   );
 }

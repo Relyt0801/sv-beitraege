@@ -10,7 +10,7 @@ import { useRole } from "../auth/RoleProvider";
 import { hasSupabase, supabase } from "../lib/supabase";
 import { farbwert, lesbarerName, namensfarbe, speichereProfil, waehlbareFarben } from "../lib/profil";
 import { passwortProblem } from "../lib/passwort";
-import { SELECTABLE_COMMITTEES, committeeIcon, rolleUndKomitees } from "../lib/committees";
+import { SELECTABLE_COMMITTEES, rolleUndKomitees } from "../lib/committees";
 import { ladeKomiteeAntraege, stelleKomiteeAntrag } from "../lib/komitee-antrag";
 import { useTheme, type Modus } from "../lib/theme";
 import { fehlerText } from "../lib/netz";
@@ -21,7 +21,8 @@ import { FunktionenSheet } from "./FunktionenSheet";
 import { WortfilterSheet } from "./Melden";
 import { FreigabenSheet } from "./FreigabenSheet";
 import { Schalter } from "./Schalter";
-import { Gruppe, Symbol, Wert, Zeile, ZeileAuswahl, ZeileMitSchalter } from "./Liste";
+import { Gruppe, Symbol, Wert, Zeile, ZeileHaken, ZeileMitSchalter } from "./Liste";
+import { FussLeiste } from "./FussLeiste";
 import { Icon, type IconName } from "./Icon";
 import { darfSchalten } from "../lib/funktionen";
 import { hintergrundEntfernen, hintergrundSetzen, useHintergrund } from "../lib/hintergrund";
@@ -38,7 +39,7 @@ export function ProfilSheet({
   onClose: () => void;
   /** Fehlt in der Elternansicht – dort gibt es keine Einführung. */
   onTutorial?: () => void;
-  /** „Was ist neu“ – öffnet die Patch-Notes wieder (fehlt bei Eltern). */
+  /** „Was ist neu“ – öffnet die Patch-Notes wieder (Eltern sehen nur ihre Einträge). */
   onNeu?: () => void;
 }) {
   const { mein, uid, aktualisiere, neuLaden } = useProfiles();
@@ -53,6 +54,7 @@ export function ProfilSheet({
   const [antragOffen, setAntragOffen] = useState(false);
   const [farbFehler, setFarbFehler] = useState("");
   const [hatAntrag, setHatAntrag] = useState(false);
+  const [antragBusy, setAntragBusy] = useState(false);
   // Passwort ändern direkt im Sheet – prompt() blockieren manche Browser
   const [pwOffen, setPwOffen] = useState(false);
   const [pw1, setPw1] = useState("");
@@ -120,7 +122,9 @@ export function ProfilSheet({
   const darfWortfilter = hasSupabase && can("wortfilter.verwalten");
   const verwaltung = darfFunktionen || darfFreigaben || darfWortfilter;
   const darfLoeschfristen = hasSupabase && (istAdmin || can("perms.manage"));
-  const daten = hasSupabase && (istAdmin || istKassenwart || can("perms.manage"));
+  // Demo (ohne Datenbank): nur das Protokoll mit erfundenen Einträgen zum Ansehen
+  // (lib/protokoll.ts) – Speicher, Löschfristen und Update brauchen die Datenbank.
+  const daten = hasSupabase ? istAdmin || istKassenwart || can("perms.manage") : istAdmin;
   const pushText = !pushConfigured() ? "Nicht eingerichtet" : perm === "granted" ? "An" : perm === "denied" ? "Blockiert" : "Aus";
 
   return (
@@ -147,6 +151,41 @@ export function ProfilSheet({
       </div>
 
       {farbFehler && <div className="mt-3 rounded-xl bg-red-500/10 px-3 py-2 text-[13px] font-semibold text-fehler">{farbFehler}</div>}
+
+      {/* ------------------------------------------------ Verwaltung
+          Gleich unter dem eigenen Konto: Wer verwalten darf, braucht das
+          öfter als Darstellung und Mitteilungen (einmal eingestellt) – vorher
+          standen Funktionen, Freigaben und Protokoll unter dem Rand. */}
+      {verwaltung && (
+        <Gruppe titel="Verwaltung">
+          {darfFunktionen && <Zeile label="Funktionen" symbol={<Sym icon="auswahl" farbe="bg-brand" />} onClick={() => setFunktionenOffen(true)} />}
+          {darfFreigaben && <Zeile label="Freigaben" symbol={<Sym icon="stimme" farbe="bg-[#34C759]" />} onClick={() => setFreigabenOffen(true)} />}
+          {darfWortfilter && <Zeile label="Wortfilter" symbol={<Sym icon="schild" farbe="bg-[#FF3B30]" />} onClick={() => setWortfilterOffen(true)} />}
+        </Gruppe>
+      )}
+
+      {/* ------------------------------------------------ Daten (Admin, Kassenwart) */}
+      {daten && (
+        <Gruppe titel="Daten">
+          {istAdmin && <Zeile label="Protokoll & Sicherung" symbol={<Sym icon="beitraege" farbe="bg-[#8E8E93]" />} onClick={() => setProtokollOffen(true)} />}
+          {istKassenwart && <Zeile label="Sicherheitskopie" symbol={<Sym icon="beitraege" farbe="bg-[#8E8E93]" />} onClick={() => setProtokollOffen(true)} />}
+          {darfLoeschfristen && <Zeile label="Speicher & Löschen" symbol={<Sym icon="muell" farbe="bg-[#FF9500]" />} onClick={() => setLoeschOffen(true)} />}
+          {darfLoeschfristen && (
+            <Zeile
+              label="Update bei allen erzwingen"
+              symbol={<Sym icon="pfeile" farbe="bg-[#32ADE6]" />}
+              onClick={() =>
+                void frage("Alle offenen Apps jetzt neu laden?\n\nWer gerade tippt, wird erst danach neu geladen.", "Neu laden").then(async (ok) => {
+                  if (!ok) return;
+                  const f = await neuLadenErzwingen();
+                  if (f) meldeFehler("Ging nicht: " + f);
+                  else melde("Alle Apps laden jetzt neu");
+                })
+              }
+            />
+          )}
+        </Gruppe>
+      )}
 
       {/* ------------------------------------------------ Darstellung */}
       <Gruppe
@@ -313,81 +352,15 @@ export function ProfilSheet({
               <Zeile label={pwBusy ? "Wird gespeichert …" : "Passwort speichern"} blau disabled={pwBusy || !pw1} onClick={() => void passwortSpeichern()} />
             </>
           )}
+          {/* Komitee-Wunsch: Unterseite „‹ Mein Profil“ mit Häkchen-Liste (unten) */}
           {!isStaff && !istEltern && (
-            <AufZeile
+            <Zeile
               symbol={<Sym icon="rollen" farbe="bg-[#32ADE6]" />}
               label={meine.length ? "Komitee wechseln" : "Komitee wählen"}
-              auf={antragOffen}
-              onClick={() => !hatAntrag && setAntragOffen((o) => !o)}
-              wert={hatAntrag ? "Angefragt" : undefined}
-              ohnePfeil={hatAntrag}
-            />
-          )}
-          {!isStaff && !istEltern && antragOffen && !hatAntrag && (
-            <>
-              <Zeile label="Wunsch">
-                <ZeileAuswahl label="Wunsch-Komitee" value={wunsch} onChange={setWunsch}>
-                  <option value="">Auswählen</option>
-                  {SELECTABLE_COMMITTEES.filter((c) => !meine.includes(c.slug)).map((c) => (
-                    <option key={c.slug} value={c.slug}>
-                      {committeeIcon(c.slug)} {c.label}
-                    </option>
-                  ))}
-                </ZeileAuswahl>
-              </Zeile>
-              <textarea
-                rows={2}
-                maxLength={300}
-                className={`${EINGABE} resize-none py-3`}
-                placeholder="Warum? Ein Satz reicht"
-                value={grund}
-                onChange={(e) => setGrund(e.target.value)}
-              />
-              <Zeile
-                label="Antrag senden"
-                blau
-                disabled={!wunsch}
-                onClick={async () => {
-                  const r = await stelleKomiteeAntrag(wunsch, grund);
-                  if (r.ok) {
-                    setHatAntrag(true);
-                    setAntragOffen(false);
-                  } else meldeFehler(r.error || "Das hat nicht geklappt.");
-                }}
-              />
-            </>
-          )}
-        </Gruppe>
-      )}
-
-      {/* ------------------------------------------------ Verwaltung */}
-      {verwaltung && (
-        <Gruppe titel="Verwaltung">
-          {darfFunktionen && <Zeile label="Funktionen" symbol={<Sym icon="auswahl" farbe="bg-brand" />} onClick={() => setFunktionenOffen(true)} />}
-          {darfFreigaben && <Zeile label="Freigaben" symbol={<Sym icon="stimme" farbe="bg-[#34C759]" />} onClick={() => setFreigabenOffen(true)} />}
-          {darfWortfilter && <Zeile label="Wortfilter" symbol={<Sym icon="schild" farbe="bg-[#FF3B30]" />} onClick={() => setWortfilterOffen(true)} />}
-        </Gruppe>
-      )}
-
-      {/* ------------------------------------------------ Daten (Admin, Kassenwart) */}
-      {daten && (
-        <Gruppe titel="Daten">
-          {istAdmin && <Zeile label="Protokoll & Sicherung" symbol={<Sym icon="beitraege" farbe="bg-[#8E8E93]" />} onClick={() => setProtokollOffen(true)} />}
-          {istKassenwart && <Zeile label="Sicherheitskopie" symbol={<Sym icon="beitraege" farbe="bg-[#8E8E93]" />} onClick={() => setProtokollOffen(true)} />}
-          {darfLoeschfristen && <Zeile label="Speicher & Löschen" symbol={<Sym icon="muell" farbe="bg-[#FF9500]" />} onClick={() => setLoeschOffen(true)} />}
-          {darfLoeschfristen && (
-            <Zeile
-              label="Update bei allen erzwingen"
-              symbol={<Sym icon="pfeile" farbe="bg-[#32ADE6]" />}
-              onClick={() =>
-                void frage("Alle offenen Apps jetzt neu laden?\n\nWer gerade tippt, wird erst danach neu geladen.", "Neu laden").then(async (ok) => {
-                  if (!ok) return;
-                  const f = await neuLadenErzwingen();
-                  if (f) meldeFehler("Ging nicht: " + f);
-                  else melde("Alle Apps laden jetzt neu");
-                })
-              }
-            />
+              onClick={hatAntrag ? undefined : () => setAntragOffen(true)}
+            >
+              {hatAntrag && <Wert>Angefragt</Wert>}
+            </Zeile>
           )}
         </Gruppe>
       )}
@@ -420,6 +393,49 @@ export function ProfilSheet({
         <RechtLinks />
       </div>
 
+      {!isStaff && !istEltern && (
+        <Sheet open={open && antragOffen && !hatAntrag} onClose={() => setAntragOffen(false)}>
+          <SheetKopf
+            titel={meine.length ? "Komitee wechseln" : "Komitee wählen"}
+            unter="Das Stufenteam entscheidet über deinen Wunsch."
+            onClose={() => setAntragOffen(false)}
+          />
+          <Gruppe titel="Wunsch-Komitee" className="mt-1">
+            {SELECTABLE_COMMITTEES.filter((c) => !meine.includes(c.slug)).map((c) => (
+              <ZeileHaken key={c.slug} label={c.label} gewaehlt={wunsch === c.slug} onClick={() => setWunsch(c.slug)} />
+            ))}
+          </Gruppe>
+          <Gruppe titel="Begründung" fuss="Optional – ein Satz reicht.">
+            <textarea
+              rows={2}
+              maxLength={300}
+              className={`${EINGABE} resize-none py-3`}
+              placeholder="Warum?"
+              value={grund}
+              onChange={(e) => setGrund(e.target.value)}
+            />
+          </Gruppe>
+          <FussLeiste>
+            <button
+              type="button"
+              className="btn-primary w-full disabled:opacity-40"
+              disabled={!wunsch || antragBusy}
+              onClick={async () => {
+                setAntragBusy(true);
+                const r = await stelleKomiteeAntrag(wunsch, grund);
+                setAntragBusy(false);
+                if (r.ok) {
+                  setHatAntrag(true);
+                  setAntragOffen(false);
+                  melde("Antrag gesendet – das Stufenteam entscheidet", "erfolg");
+                } else meldeFehler(r.error || "Das hat nicht geklappt.");
+              }}
+            >
+              {antragBusy ? "…" : "Antrag senden"}
+            </button>
+          </FussLeiste>
+        </Sheet>
+      )}
       <LoeschfristenSheet open={loeschOffen} onClose={() => setLoeschOffen(false)} />
       <FunktionenSheet open={funktionenOffen} onClose={() => setFunktionenOffen(false)} />
       <WortfilterSheet open={wortfilterOffen} onClose={() => setWortfilterOffen(false)} />

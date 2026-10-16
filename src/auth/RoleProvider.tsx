@@ -81,7 +81,7 @@ export function RoleProvider({ children }: { children: ReactNode }) {
   // Lokaler Modus (ohne Supabase): voller Zugriff zum Entwickeln/Testen –
   // oder die Rolle aus ?rolle=… (Demo-Modus, siehe src/lib/demo.ts).
   const [demo] = useState(() => demoRolle());
-  const { students } = useStore();
+  const { students, ready: personenBereit } = useStore();
   const [role, setRoleState] = useState<Role>(hasSupabase ? "schueler" : demoRolleAlsRolle(demo) ?? "admin");
   const [ready, setReady] = useState(!hasSupabase);
   const [profiles, setProfiles] = useState<Profile[]>([]);
@@ -351,9 +351,17 @@ export function RoleProvider({ children }: { children: ReactNode }) {
       userByStudent[p.student_id] = p.user_id;
     }
 
+  // Demo (?rolle=…): erst „bereit“, wenn auch die eigene Kennung und Person
+  // feststehen – so wie mit Datenbank (dort kommt studentId vor setReady).
+  // Vorher war die Demo sofort bereit, die eigene Person kam erst einen Takt
+  // später: Der Start-Reiter wurde ohne „Übersicht“ gewählt (Team landete in
+  // der Kasse), und der Reiter „Übersicht“ tauchte nachträglich in der Leiste
+  // auf – alle Reiter rutschten. Ohne Personen (leere Demo) nicht ewig warten.
+  const demoBereit = !demo || uid !== null || (personenBereit && students.length === 0);
+
   const value: RoleCtx = {
     role,
-    ready,
+    ready: hasSupabase ? ready : ready && demoBereit,
     isAdmin,
     isStaff,
     isEltern,

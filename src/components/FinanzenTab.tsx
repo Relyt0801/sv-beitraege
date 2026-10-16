@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { hinScrollen, useSprungziel } from "../lib/sprung";
 import { SkelettKarten } from "./Skelett";
 import { useStore } from "../store";
@@ -7,17 +7,19 @@ import { useTermine } from "../termine-store";
 import { useProfiles } from "../profiles-store";
 import { basisOffen } from "../lib/logic";
 import { FinanzStandard } from "./FinanzStandard";
-import { BuchungSheet, FarbWahl, Kennzahlen, PostenBereiche } from "./FinanzBereiche";
+import { BuchungSheet, FarbWahl, Kennzahlen, PostenBereiche, type BuchungStart } from "./FinanzBereiche";
 import { committeeLabel } from "../lib/committees";
 import {
-  EINNAHME_QUELLEN, QUELLE_NAME, STANDARD_FARBE, buchungFarbe, centAus, euro, euroKurz, farbHex,
+  EINNAHME_QUELLEN, KASSEN_FARBEN, QUELLE_NAME, STANDARD_FARBE, buchungFarbe, centAus, euro, euroKurz, farbHex,
   uebersichtAus, useFinanzen,
   type Buchung, type FinanzenValue, type KassenKategorie,
 } from "../lib/finanzen";
 import type { KostenAnfrage, KostenValue } from "../lib/kosten";
 import { Sheet, SheetKopf } from "./Sheet";
+import { InKopf } from "./InKopf";
 import { Icon, type IconName } from "./Icon";
-import { Gruppe, Symbol, Wert, Zeile, ZeileEingabe, ZeileHaken } from "./Liste";
+import { Gruppe, Wert, Zeile, ZeileEingabe, ZeileHaken } from "./Liste";
+import { FussLeiste } from "./FussLeiste";
 
 import { frage, meldeFehler } from "../lib/melder";
 import { useDunkel } from "../lib/dunkel";
@@ -49,8 +51,14 @@ export function FinanzenTab({ kosten }: { kosten: KostenValue }) {
   const fin = useFinanzen(darfSehen);
   const { students, settings } = useStore();
   const { aktionen, meineVorsitze } = useTermine();
-  const [buchen, setBuchen] = useState<"ein" | "aus" | null>(null);
+  // Das Start-Objekt steht im State: ein bei jedem Zeichnen neu gebautes
+  // `{ typ }` setzte das Blatt bei jedem Neuzeichnen der Seite zurück
+  // (Rollen-Prüfung Okt. 2026: getippter Betrag nach ~3 s wieder leer)
+  const [buchen, setBuchen] = useState<BuchungStart | null>(null);
   const [einstellungen, setEinstellungen] = useState(false);
+  // Eine Buchung aus „Aktionen, Beiträge und Sonstiges“ → Posten → Eintrag:
+  // dieselbe Detailseite wie aus der Buchungsliste
+  const [buchungAuf, setBuchungAuf] = useState<Buchung | null>(null);
   const darfStandard = can("finanzen.basis");
   // Wer alles sieht, kann zur Kontrolle auf die Ansicht für alle umschalten.
   const [ansicht, setAnsicht] = useState<"standard" | "erweitert">("erweitert");
@@ -126,11 +134,44 @@ export function FinanzenTab({ kosten }: { kosten: KostenValue }) {
     [fin.buchungen, fin.ziel, fin.kategorien, offen, settings.aktuelles_halbjahr, aktionen], // eslint-disable-line react-hooks/exhaustive-deps
   );
 
+  // Laptop: geteilte Ansicht wie in Mail – beide Spalten genau so hoch wie der
+  // Platz unter Kopfzeile und Knöpfen, jede scrollt nur in sich, die Seite
+  // selbst gar nicht. Vorher scrollte die Seite und die rechte Spalte klebte:
+  // am Ende der Buchungen lief das Scrollen an die Seite weiter, und beim
+  // Scrollen links rutschte die rechte Spalte mit, bis sie klebte.
+  // Gemessen wird der Abstand vom Seitenanfang bis zu den Spalten (Kopfzeile,
+  // Reiter und die Zeile mit Einnahme/Ausgabe sind unterschiedlich hoch).
+  const spalten = useRef<HTMLDivElement>(null);
+  const [spaltenOben, setSpaltenOben] = useState<number | null>(null);
+  useLayoutEffect(() => {
+    const el = spalten.current;
+    if (!el) return;
+    const messen = () => {
+      const r = el.getBoundingClientRect();
+      // Am Handy ist die linke Spalte „contents“ (keine eigene Box) – nichts zu tun
+      if (!r.width && !r.height) return;
+      setSpaltenOben(Math.round(r.top + window.scrollY));
+    };
+    messen();
+    const ro = new ResizeObserver(messen);
+    ro.observe(document.body);
+    window.addEventListener("resize", messen);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", messen);
+    };
+  }, [fin.bereit, ansicht]);
+
   // Standard-Ansicht: Summen ohne Namen (Schüler, Eltern – oder zur Kontrolle)
   if ((!darfSehen && darfStandard) || (darfSehen && ansicht === "standard")) {
     return (
       <div className="grid grid-cols-[minmax(0,1fr)] gap-3">
-        {darfSehen && <AnsichtWahl ansicht={ansicht} setAnsicht={setAnsicht} />}
+        {darfSehen && (
+          <InKopf>
+            <AnsichtWahl ansicht={ansicht} setAnsicht={setAnsicht} />
+          </InKopf>
+        )}
+        {darfSehen && <p className="auf-bild hidden px-1 text-[13px] leading-snug text-tinte-leise lg:block">{ANSICHT_TEXT.standard}</p>}
         <FinanzStandard aktionName={aktionName} />
         {!darfSehen && meineVorsitze.length > 0 && (
           <KostenKarte kosten={kosten} darfEntscheiden={false} vorsitze={meineVorsitze} />
@@ -171,9 +212,45 @@ export function FinanzenTab({ kosten }: { kosten: KostenValue }) {
   );
 
   return (
-    <div className="grid grid-cols-[minmax(0,1fr)] gap-3 pb-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-start">
-      <div className="lg:col-span-2">
+    // lg:pb-0/-mb-20: am Laptop hebt das die Seitenränder darunter auf (pb-4
+    // an <main>, lg:pb-16 in App.tsx) – sonst ließe sich die Seite um diesen
+    // Rand scrollen und beide Spalten wanderten mit.
+    <div
+      style={spaltenOben ? ({ "--finanz-oben": `${spaltenOben}px` } as CSSProperties) : undefined}
+      className="grid grid-cols-[minmax(0,1fr)] gap-3 pb-6 lg:-mb-20 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-start lg:pb-0"
+    >
+      {/* Oben, was der Kassenwart am häufigsten tut: Einnahme / Ausgabe buchen.
+          Vorher standen die Knöpfe unter Kontostand und Kreis – am Handy erst
+          nach gut einer Bildschirmhöhe. Die Ansicht-Wahl steht am Rechner in
+          der Kopfzeile (InKopf), die Knöpfe am Anfang der Seite. */}
+      <InKopf className="lg:col-span-2">
         <AnsichtWahl ansicht={ansicht} setAnsicht={setAnsicht} />
+      </InKopf>
+      {/* Am Rechner: links in einem Satz, was man gerade sieht, rechts Einnahme/
+          Ausgabe – nicht mehr oben neben „Nachtragen“ (zwei grüne Knöpfe
+          nebeneinander, Rückmeldung 15.10.). Am Handy direkt unter der Wahl. */}
+      <div className="flex flex-col gap-3 empty:hidden lg:col-span-2 lg:flex-row lg:items-center">
+        <p className="auf-bild hidden min-w-0 flex-1 px-1 text-[13px] leading-snug text-tinte-leise lg:block">{ANSICHT_TEXT[ansicht]}</p>
+        {darfBuchen && (
+          // Echte, volle Knöpfe (vorher blasse Pastell-Flächen, die wie
+          // abgeschaltet wirkten): grün = Einnahme, rot = Ausgabe, weiße Schrift.
+          <div className="grid grid-cols-2 gap-2 lg:flex">
+            <button
+              onClick={() => setBuchen({ typ: "ein" })}
+              className="flex min-h-[3rem] items-center justify-center gap-1.5 rounded-full bg-[#1E7B34] text-[16px] font-semibold text-white transition duration-200 ease-ios active:scale-[.97] lg:min-h-[2.5rem] lg:px-4 lg:text-[15px]"
+            >
+              <Icon name="plus" size={17} strich={2.4} />
+              Einnahme
+            </button>
+            <button
+              onClick={() => setBuchen({ typ: "aus" })}
+              className="flex min-h-[3rem] items-center justify-center gap-1.5 rounded-full bg-red-600 text-[16px] font-semibold text-white transition duration-200 ease-ios active:scale-[.97] lg:min-h-[2.5rem] lg:px-4 lg:text-[15px]"
+            >
+              <span className="text-[20px] leading-none">−</span>
+              Ausgabe
+            </button>
+          </div>
+        )}
       </div>
       {nurLesen && (
         <div className="flex items-center gap-2 rounded-2xl zelle px-4 py-2.5 text-[14px] text-tinte-matt dark:text-slate-300 lg:col-span-2">
@@ -182,46 +259,43 @@ export function FinanzenTab({ kosten }: { kosten: KostenValue }) {
         </div>
       )}
 
-      {/* ================================================ Übersicht */}
-      <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-3">
-        <UebersichtKarte
-          zahlen={zahlen}
-          offen={isStaff ? offen : null}
-          halbjahr={settings.aktuelles_halbjahr}
-          ziel={fin.ziel}
-          darf={darfBuchen}
-          onEinstellungen={() => setEinstellungen(true)}
+      {/* Aufteilung: Am Laptop links Kontostand, Aktionen, Geplantes und
+          Kostenanfragen untereinander, rechts von Anfang an die Buchungen –
+          sie bleiben beim Scrollen stehen und scrollen in sich (wie die
+          Liste in Mail). Vorher standen sie über die volle Breite erst unter
+          dem Falz. Am Handy (die linke Spalte ist dann „contents“) folgen
+          auf den Kontostand direkt die Buchungen, danach der Rest. */}
+      <div
+        ref={spalten}
+        className="contents lg:-mx-2 lg:flex lg:h-[calc(100dvh-var(--finanz-oben,14rem)-1rem)] lg:min-w-0 lg:flex-col lg:gap-3 lg:overflow-y-auto lg:overscroll-contain lg:px-2 lg:pb-3"
+      >
+        {/* ================================================ Übersicht */}
+        <div className="min-w-0 max-lg:order-1">
+          <UebersichtKarte
+            zahlen={zahlen}
+            offen={isStaff ? offen : null}
+            halbjahr={settings.aktuelles_halbjahr}
+            ziel={fin.ziel}
+            darf={darfBuchen}
+            onEinstellungen={() => setEinstellungen(true)}
+          />
+        </div>
+
+        {/* ================================================ Kostenanfragen (oben, wenn etwas ansteht) */}
+        {kostenOben && <div className="min-w-0 max-lg:order-1">{kostenKarte}</div>}
+
+        {/* ================================================ Aktionen, Beiträge, Ausgaben */}
+        <PostenBereiche
+          d={postenDaten}
+          fin={darfBuchen ? fin : null}
+          listeKlasse="max-lg:order-3"
+          geplantKlasse="max-lg:order-3"
+          onBuchung={darfBuchen ? setBuchungAuf : undefined}
         />
-        {darfBuchen && (
-          // Echte, volle Knöpfe (vorher blasse Pastell-Flächen, die wie
-          // abgeschaltet wirkten): grün = Einnahme, rot = Ausgabe, weiße Schrift.
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              onClick={() => setBuchen("ein")}
-              className="flex min-h-[3.125rem] items-center justify-center gap-1.5 rounded-full bg-[#1E7B34] text-[16px] font-semibold text-white transition duration-200 ease-ios active:scale-[.97]"
-            >
-              <Icon name="plus" size={17} strich={2.4} />
-              Einnahme
-            </button>
-            <button
-              onClick={() => setBuchen("aus")}
-              className="flex min-h-[3.125rem] items-center justify-center gap-1.5 rounded-full bg-red-600 text-[16px] font-semibold text-white transition duration-200 ease-ios active:scale-[.97]"
-            >
-              <span className="text-[20px] leading-none">−</span>
-              Ausgabe
-            </button>
-          </div>
-        )}
+
+        {/* ================================================ Kostenanfragen (sonst hier) */}
+        {zeigeAnfragen && !kostenOben && <div className="min-w-0 max-lg:order-3">{kostenKarte}</div>}
       </div>
-
-      {/* ================================================ Kostenanfragen (oben, wenn etwas ansteht) */}
-      {kostenOben && kostenKarte}
-
-      {/* ================================================ Aktionen, Beiträge, Ausgaben */}
-      <PostenBereiche d={postenDaten} fin={darfBuchen ? fin : null} />
-
-      {/* ================================================ Kostenanfragen (sonst hier) */}
-      {zeigeAnfragen && !kostenOben && kostenKarte}
 
       {/* ================================================ Verlauf */}
       <VerlaufKarte
@@ -235,7 +309,16 @@ export function FinanzenTab({ kosten }: { kosten: KostenValue }) {
 
       {darfBuchen && (
         <>
-          <BuchungSheet start={buchen ? { typ: buchen } : null} fin={fin} onClose={() => setBuchen(null)} />
+          <BuchungSheet start={buchen} fin={fin} onClose={() => setBuchen(null)} />
+          <BuchungDetail
+            buchung={buchungAuf ? fin.buchungen.find((x) => x.id === buchungAuf.id) ?? null : null}
+            kategorien={fin.kategorien}
+            onClose={() => setBuchungAuf(null)}
+            darf={darfBuchen}
+            onLoeschen={fin.loeschen}
+            onKategorie={fin.buchungKategorie}
+            aktionName={aktionName}
+          />
           <EinstellungenSheet
             open={einstellungen}
             onClose={() => setEinstellungen(false)}
@@ -255,9 +338,19 @@ export function FinanzenTab({ kosten }: { kosten: KostenValue }) {
  * oder „Alle Buchungen“ (das ganze Kassenbuch mit Namen) – nur für wer alles
  * sieht. Vorher „Standard – wie alle“ / „Erweitert“: unverständlich.
  */
+const ANSICHT_TEXT = {
+  standard: "So sehen es Schüler und Eltern: nur Summen, keine Namen.",
+  erweitert: "Das ganze Kassenbuch mit jeder Buchung – nur für dich und die Kasse.",
+} as const;
+
 function AnsichtWahl({ ansicht, setAnsicht }: { ansicht: "standard" | "erweitert"; setAnsicht: (a: "standard" | "erweitert") => void }) {
   return (
-    <div>
+    // Am Rechner steht die Wahl in der Kopfzeile (InKopf) – dort feste Breite;
+    // die Erklärung steht dann am Anfang der Seite (FinanzenTab), nicht als
+    // Hinweis beim Darüberfahren (der legte sich über die Reiterleiste)
+    // 19rem wie „Personen | Beiträge & Abiball“ (Kasse) und „Personen | Rechte
+    // je Rolle“ (Rollen) – sonst sprang der Umschalter je Reiter waagerecht.
+    <div className="lg:w-[19rem]">
       <div className="seg" role="tablist" aria-label="Ansicht der Finanzen">
         {([["standard", "Für alle sichtbar"], ["erweitert", "Alle Buchungen"]] as const).map(([k, label]) => (
           <button
@@ -265,17 +358,13 @@ function AnsichtWahl({ ansicht, setAnsicht }: { ansicht: "standard" | "erweitert
             role="tab"
             aria-selected={ansicht === k}
             onClick={() => setAnsicht(k)}
-            className={`seg-item !py-2 !text-[14px] ${ansicht === k ? "seg-aktiv" : ""}`}
+            className={`seg-item whitespace-nowrap !py-2 !text-[14px] lg:!py-1.5 lg:!text-[13px] ${ansicht === k ? "seg-aktiv" : ""}`}
           >
             {label}
           </button>
         ))}
       </div>
-      <p className="mt-1.5 px-3 text-[13px] leading-snug text-tinte-leise">
-        {ansicht === "standard"
-          ? "So sehen es Schüler und Eltern: nur Summen, keine Namen."
-          : "Das ganze Kassenbuch mit jeder Buchung – nur für dich und die Kasse."}
-      </p>
+      <p className="auf-bild mt-1.5 px-3 text-[13px] leading-snug text-tinte-leise lg:hidden">{ANSICHT_TEXT[ansicht]}</p>
     </div>
   );
 }
@@ -306,6 +395,43 @@ function UebersichtKarte({
   const ganz =
     ziel.ziel_cent > 0 && stand > 0 && stand < ziel.ziel_cent ? (summe * ziel.ziel_cent) / stand : summe;
   const prozent = ziel.ziel_cent > 0 ? Math.round((stand / ziel.ziel_cent) * 100) : null;
+  const zielTitel = ziel.ziel_cent > 0 ? `Ziel ${ziel.ziel_titel}: ${euroKurz(ziel.ziel_cent)}` : "Woher das Geld kommt";
+  const [kreisOffen, setKreisOffen] = useState(false);
+  /** Kreis + Legende – ab 640 px in der Karte, am Handy im Blatt (dort ohne eigene Überschrift) */
+  const kreisUndLegende = (imBlatt: boolean) => (
+    <>
+      <Kreis teile={teile} ganz={ganz} prozent={prozent} summe={summe} dunkel={dunkel} />
+      <div className="min-w-0 flex-1">
+        {!imBlatt && <div className="mb-1.5 text-[13px] font-bold">{zielTitel}</div>}
+        <ul className="grid grid-cols-[minmax(0,1fr)] gap-1.5">
+          {teile.map((t) => (
+            <li key={t.key} className="flex items-center gap-2.5 text-[13px]">
+              <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: t.farbe }} />
+              <span className="min-w-0 flex-1 truncate font-semibold">{t.label}</span>
+              <span className="zahl shrink-0 font-bold">{euroKurz(t.cent)}</span>
+            </li>
+          ))}
+          {zahlen.aus > 0 && (
+            <li className="flex items-center gap-2.5 text-[13px] text-tinte-leise">
+              <span className="h-3 w-3 shrink-0" />
+              <span className="min-w-0 flex-1 truncate">
+                <span className="sm:hidden">Ausgaben</span>
+                <span className="max-sm:hidden">abzüglich Ausgaben</span>
+              </span>
+              <span className="zahl shrink-0 font-bold">−{euroKurz(zahlen.aus)}</span>
+            </li>
+          )}
+          {ziel.ziel_cent > stand && (
+            <li className="flex items-center gap-2.5 text-[13px] text-tinte-leise">
+              <span className="h-3 w-3 shrink-0 rounded-full bg-papier-linie dark:bg-slate-700" />
+              <span className="min-w-0 flex-1 truncate">Fehlt noch</span>
+              <span className="zahl shrink-0 font-bold">{euroKurz(ziel.ziel_cent - stand)}</span>
+            </li>
+          )}
+        </ul>
+      </div>
+    </>
+  );
 
   return (
     <section className="card p-5">
@@ -334,38 +460,39 @@ function UebersichtKarte({
 
       <Kennzahlen ein={zahlen.ein} aus={zahlen.aus} offen={offen ? { ...offen, halbjahr } : null} />
 
-      {/* Kreis + Legende */}
-      <div className="mt-4 flex flex-col items-center gap-4 border-t border-papier-linie pt-4 dark:border-slate-800 sm:flex-row">
-        <Kreis teile={teile} ganz={ganz} prozent={prozent} summe={summe} dunkel={dunkel} />
-        <div className="w-full min-w-0 sm:flex-1">
-          <div className="mb-1.5 text-[13px] font-bold">
-            {ziel.ziel_cent > 0 ? `Ziel ${ziel.ziel_titel}: ${euroKurz(ziel.ziel_cent)}` : "Woher das Geld kommt"}
-          </div>
-          <ul className="grid grid-cols-[minmax(0,1fr)] gap-1.5">
-            {teile.map((t) => (
-              <li key={t.key} className="flex items-center gap-2.5 text-[13px]">
-                <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: t.farbe }} />
-                <span className="min-w-0 flex-1 truncate font-semibold">{t.label}</span>
-                <span className="zahl shrink-0 font-bold">{euroKurz(t.cent)}</span>
-              </li>
-            ))}
-            {zahlen.aus > 0 && (
-              <li className="flex items-center gap-2.5 text-[13px] text-tinte-leise">
-                <span className="h-3 w-3 shrink-0" />
-                <span className="min-w-0 flex-1 truncate">abzüglich Ausgaben</span>
-                <span className="zahl shrink-0 font-bold">−{euroKurz(zahlen.aus)}</span>
-              </li>
-            )}
-            {ziel.ziel_cent > stand && (
-              <li className="flex items-center gap-2.5 text-[13px] text-tinte-leise">
-                <span className="h-3 w-3 shrink-0 rounded-full bg-papier-linie dark:bg-slate-700" />
-                <span className="min-w-0 flex-1 truncate">Fehlt noch</span>
-                <span className="zahl shrink-0 font-bold">{euroKurz(ziel.ziel_cent - stand)}</span>
-              </li>
-            )}
-          </ul>
-        </div>
+      {/* Am Handy EINE Zeile mit Balken (wie die Zusammenfassungen in Health):
+          Ziel, Prozent, was fehlt – ein Tipp zeigt Kreis und ganze Legende im
+          Blatt. Kreis + acht Legendenzeilen waren am Handy ~200 px hoch.
+          Ab 640 px stehen Kreis und Legende wie bisher in der Karte. */}
+      <button
+        type="button"
+        onClick={() => setKreisOffen(true)}
+        className="mt-4 flex w-full items-center gap-3 border-t border-papier-linie pt-4 text-left transition active:opacity-60 dark:border-slate-800 sm:hidden"
+      >
+        <span className="min-w-0 flex-1">
+          <span className="flex items-baseline justify-between gap-2 text-[13px]">
+            <span className="min-w-0 truncate font-bold">{zielTitel}</span>
+            {prozent !== null && <span className="zahl shrink-0 font-bold">{prozent} %</span>}
+          </span>
+          <span aria-hidden className="mt-1.5 flex h-2 overflow-hidden rounded-full bg-papier-linie dark:bg-slate-700">
+            {ganz > 0 && teile.map((t) => <span key={t.key} className="h-full" style={{ width: `${(t.cent / ganz) * 100}%`, background: t.farbe }} />)}
+          </span>
+          <span className="mt-1 block text-[12px] text-tinte-leise">
+            {ziel.ziel_cent > stand ? `Fehlt noch ${euroKurz(ziel.ziel_cent - stand)} · ` : ""}
+            {teile.length} {teile.length === 1 ? "Quelle" : "Quellen"}
+          </span>
+        </span>
+        <span aria-hidden className="shrink-0 text-tinte-leise">
+          <Icon name="chevron" size={14} strich={2.4} />
+        </span>
+      </button>
+      <div className="mt-4 flex items-start gap-3.5 border-t border-papier-linie pt-4 dark:border-slate-800 max-sm:hidden sm:items-center sm:gap-4">
+        {kreisUndLegende(false)}
       </div>
+      <Sheet open={kreisOffen} onClose={() => setKreisOffen(false)}>
+        <SheetKopf titel={zielTitel} onClose={() => setKreisOffen(false)} />
+        <div className="card flex items-center gap-4 p-4">{kreisUndLegende(true)}</div>
+      </Sheet>
     </section>
   );
 }
@@ -384,7 +511,7 @@ function KategorieWahl({
       <button
         type="button"
         onClick={() => setzen(null)}
-        className={`rounded-full border px-3 py-1.5 text-[13px] font-semibold ${
+        className={`min-h-[44px] rounded-full border px-3 py-1.5 text-[13px] font-semibold ${
           wert === null ? "border-brand text-brand" : "border-papier-linie text-tinte-leise dark:border-slate-700"
         }`}
       >
@@ -395,7 +522,7 @@ function KategorieWahl({
           type="button"
           key={k.id}
           onClick={() => setzen(k.id)}
-          className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[13px] font-semibold ${
+          className={`flex min-h-[44px] items-center gap-1.5 rounded-full border px-3 py-1.5 text-[13px] font-semibold ${
             wert === k.id ? "border-brand bg-brand/10" : "border-papier-linie dark:border-slate-700"
           }`}
         >
@@ -422,19 +549,37 @@ function EinstellungenSheet({
   const [betrag, setBetrag] = useState("");
   const [bank, setBank] = useState("");
   const [busy, setBusy] = useState(false);
+  // Eine Kategorie bearbeiten/anlegen: Unterseite im selben Blatt (wie in
+  // den iOS-Einstellungen), mit „‹ Einstellungen“ zurück
+  const [kat, setKat] = useState<KassenKategorie | "neu" | null>(null);
 
+  // Nur beim Öffnen (bzw. wenn sich das Ziel wirklich ändert) vorbelegen –
+  // ein Neuladen mit denselben Werten leert nichts, was man gerade tippt
+  const { ziel_titel, ziel_cent } = fin.ziel;
   useEffect(() => {
     if (!open) return;
-    setTitel(fin.ziel.ziel_titel);
-    setBetrag(fin.ziel.ziel_cent ? String(fin.ziel.ziel_cent / 100).replace(".", ",") : "");
+    setTitel(ziel_titel);
+    setBetrag(ziel_cent ? String(ziel_cent / 100).replace(".", ",") : "");
+  }, [open, ziel_titel, ziel_cent]);
+  useEffect(() => {
+    if (!open) return;
     setBank("");
-  }, [open, fin.ziel]);
+    setKat(null);
+  }, [open]);
 
   const c = centAus(bank);
   const diff = c === null ? null : c - stand;
 
+  if (kat)
+    return (
+      <Sheet open={open} onClose={onClose} hoch>
+        <KategorieSeite key={kat === "neu" ? "neu" : kat.id} k={kat} fin={fin} onZurueck={() => setKat(null)} onClose={onClose} />
+      </Sheet>
+    );
+
   return (
-    <Sheet open={open} onClose={onClose}>
+    // Unterseite „Kategorie“ im selben Blatt → am Handy volle Höhe
+    <Sheet open={open} onClose={onClose} hoch>
       <SheetKopf titel="Ziel, Kategorien & Bank" onClose={onClose} />
 
       <Gruppe titel="Sparziel" className="">
@@ -484,54 +629,25 @@ function EinstellungenSheet({
         Abgleichen
       </button>
 
-      <KategorienVerwalten fin={fin} />
+      <KategorienListe fin={fin} onWahl={setKat} />
     </Sheet>
   );
 }
 
-function KategorienVerwalten({ fin }: { fin: FinanzenValue }) {
+const ART_TEXT: Record<KassenKategorie["art"], string> = {
+  beide: "Einnahmen und Ausgaben",
+  ein: "Nur Einnahmen",
+  aus: "Nur Ausgaben",
+};
+
+/**
+ * Kategorien als iOS-Liste: je Kategorie EINE Zeile (Farbe, Name, wofür) mit
+ * „›“ – Bearbeiten und Löschen auf der Unterseite. Vorher standen in jeder
+ * Zeile „Ändern“ und ein roter Mülleimer, das Formular klappte mitten in der
+ * Gruppe auf.
+ */
+function KategorienListe({ fin, onWahl }: { fin: FinanzenValue; onWahl: (k: KassenKategorie | "neu") => void }) {
   const dunkel = useDunkel();
-  const [offen, setOffen] = useState<string | null>(null);
-  const [name, setName] = useState("");
-  const [farbe, setFarbe] = useState("blau");
-  const [artWahl, setArtWahl] = useState<KassenKategorie["art"]>("beide");
-
-  function bearbeiten(k: KassenKategorie | null) {
-    setOffen(k ? k.id : "neu");
-    setName(k?.name ?? "");
-    setFarbe(k?.farbe ?? "blau");
-    setArtWahl(k?.art ?? "beide");
-  }
-
-  async function speichern() {
-    const f = await fin.kategorieSpeichern({ id: offen === "neu" ? undefined : offen ?? undefined, name, farbe, art: artWahl });
-    if (f) meldeFehler("Hat nicht geklappt: " + f);
-    else setOffen(null);
-  }
-
-  // Formular als weiße Zelle (kein Kasten mit Rand), Knöpfe wie überall
-  const formular = (
-    <div className="px-4 py-3">
-      <input className="field" placeholder="Name der Kategorie" maxLength={40} value={name} onChange={(e) => setName(e.target.value)} />
-      <FarbWahl wert={farbe} setzen={setFarbe} />
-      <div className="seg mt-3" role="radiogroup" aria-label="Für welche Buchungen">
-        {([["beide", "Beides"], ["ein", "Einnahmen"], ["aus", "Ausgaben"]] as const).map(([k, l]) => (
-          <button key={k} type="button" role="radio" aria-checked={artWahl === k} onClick={() => setArtWahl(k)} className={`seg-item ${artWahl === k ? "seg-aktiv" : ""}`}>
-            {l}
-          </button>
-        ))}
-      </div>
-      <div className="mt-3 flex gap-2">
-        <button type="button" onClick={() => void speichern()} className="btn-klein flex-1">
-          Speichern
-        </button>
-        <button type="button" onClick={() => setOffen(null)} className="btn-klein-grau">
-          Abbrechen
-        </button>
-      </div>
-    </div>
-  );
-
   return (
     <Gruppe
       titel="Kategorien"
@@ -539,47 +655,83 @@ function KategorienVerwalten({ fin }: { fin: FinanzenValue }) {
       fuss="Die Farbe steht im Kreis, im Balken der Übersicht und als Punkt an jeder Zeile. Mehrere Kategorien dürfen dieselbe Farbe haben."
     >
       {fin.kategorien.map((k) => (
-        <div key={k.id}>
-          <div className="flex min-h-[52px] items-center gap-3 px-4 py-1.5">
-            <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: farbHex(k.farbe, dunkel) }} />
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-[15px] font-semibold">{k.name}</span>
-              <span className="block text-[12.5px] text-tinte-leise">{k.art === "ein" ? "Einnahmen" : k.art === "aus" ? "Ausgaben" : "Einnahmen und Ausgaben"}</span>
-            </span>
-            <button type="button" onClick={() => (offen === k.id ? setOffen(null) : bearbeiten(k))} className="flex min-h-[44px] shrink-0 items-center px-1 text-[15px] font-medium text-brand-dark dark:text-brand">
-              {offen === k.id ? "Zu" : "Ändern"}
-            </button>
-            <button
-              type="button"
-              onClick={async () => {
-                if (!(await frage(`Kategorie „${k.name}“ löschen? Die Buchungen bleiben, sie verlieren nur die Farbe.`, "Löschen", true))) return;
-                const f = await fin.kategorieLoeschen(k.id);
-                if (f) meldeFehler("Löschen hat nicht geklappt: " + f);
-              }}
-              className="-mr-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-red-600 transition active:scale-90 active:bg-red-500/10 dark:text-red-400"
-              aria-label={`${k.name} löschen`}
-            >
-              <Icon name="muell" size={18} />
-            </button>
-          </div>
-          {offen === k.id && formular}
-        </div>
-      ))}
-      {offen === "neu" ? (
-        formular
-      ) : (
         <Zeile
-          label="Kategorie anlegen"
-          blau
-          onClick={() => bearbeiten(null)}
-          symbol={
-            <span aria-hidden className="flex h-[30px] w-[30px] items-center justify-center rounded-full bg-brand text-white">
-              <Icon name="plus" size={16} strich={2.6} />
-            </span>
-          }
+          key={k.id}
+          label={k.name}
+          unter={ART_TEXT[k.art]}
+          onClick={() => onWahl(k)}
+          symbol={<span aria-hidden className="h-3 w-3 shrink-0 rounded-full" style={{ background: farbHex(k.farbe, dunkel) }} />}
         />
-      )}
+      ))}
+      <Zeile label="Neue Kategorie" blau onClick={() => onWahl("neu")} />
     </Gruppe>
+  );
+}
+
+/** Unterseite „Kategorie“: Name, Farbe, wofür – Sichern unten, Löschen ganz unten mit Rückfrage. */
+function KategorieSeite({
+  k, fin, onZurueck, onClose,
+}: {
+  k: KassenKategorie | "neu";
+  fin: FinanzenValue;
+  onZurueck: () => void;
+  onClose: () => void;
+}) {
+  const neu = k === "neu";
+  const [name, setName] = useState(neu ? "" : k.name);
+  const [farbe, setFarbe] = useState(() => {
+    if (!neu) return k.farbe;
+    const belegt = new Set(fin.kategorien.map((x) => x.farbe));
+    return KASSEN_FARBEN.find((f) => !["blau", "grau"].includes(f.key) && !belegt.has(f.key))?.key ?? "orange";
+  });
+  const [art, setArt] = useState<KassenKategorie["art"]>(neu ? "beide" : k.art);
+  const [busy, setBusy] = useState(false);
+
+  async function speichern() {
+    if (!name.trim() || busy) return;
+    setBusy(true);
+    const f = await fin.kategorieSpeichern({ id: neu ? undefined : k.id, name: name.trim(), farbe, art });
+    setBusy(false);
+    if (f) meldeFehler("Hat nicht geklappt: " + f);
+    else onZurueck();
+  }
+
+  return (
+    <>
+      <SheetKopf titel={neu ? "Neue Kategorie" : "Kategorie"} zurueck={{ text: "Einstellungen", onClick: onZurueck }} onClose={onClose} />
+      <Gruppe className="">
+        <ZeileEingabe label="Name" value={name} onChange={setName} placeholder="z. B. Lehrerkarten" maxLength={40} autoFocus={neu} onEnter={() => void speichern()} />
+      </Gruppe>
+      <Gruppe titel="Farbe">
+        <div className="px-4 pb-3 pt-0.5">
+          <FarbWahl wert={farbe} setzen={setFarbe} />
+        </div>
+      </Gruppe>
+      <Gruppe titel="Für welche Buchungen">
+        {(["beide", "ein", "aus"] as const).map((a) => (
+          <ZeileHaken key={a} label={ART_TEXT[a]} gewaehlt={art === a} onClick={() => setArt(a)} />
+        ))}
+      </Gruppe>
+      {!neu && (
+        <Gruppe className="mt-6">
+          <Zeile
+            label="Kategorie löschen"
+            rot
+            onClick={async () => {
+              if (!(await frage(`Kategorie „${k.name}“ löschen? Die Buchungen bleiben, sie verlieren nur die Farbe.`, "Löschen", true))) return;
+              const f = await fin.kategorieLoeschen(k.id);
+              if (f) meldeFehler("Löschen hat nicht geklappt: " + f);
+              else onZurueck();
+            }}
+          />
+        </Gruppe>
+      )}
+      <FussLeiste>
+        <button type="button" disabled={busy || !name.trim()} onClick={() => void speichern()} className="btn-primary">
+          {busy ? "…" : neu ? "Anlegen" : "Sichern"}
+        </button>
+      </FussLeiste>
+    </>
   );
 }
 
@@ -616,7 +768,7 @@ function KostenKarte({
   return (
     <section id="sprung-kosten" className="min-w-0">
       <div className="mb-1.5 flex items-center gap-3 px-4">
-        <h2 className="min-w-0 flex-1 text-[13px] font-semibold uppercase tracking-[0.02em] text-tinte-leise">
+        <h2 className="auf-bild min-w-0 flex-1 text-[13px] font-semibold uppercase tracking-[0.02em] text-tinte-leise">
           Kostenanfragen{offene.length > 0 ? ` · ${offene.length} offen` : ""}
         </h2>
         {vorsitze.length > 0 && (
@@ -630,7 +782,8 @@ function KostenKarte({
       {!kosten.bereit ? (
         <div className="gruppe-zellen px-4 py-5 text-center text-[14px] text-tinte-leise">Lädt …</div>
       ) : kosten.anfragen.length === 0 ? (
-        <div className="gruppe-zellen px-4 py-5 text-center text-[14px] text-tinte-leise">Keine Kostenanfragen.</div>
+        // Eine Zeile wie in den iOS-Einstellungen statt eines hohen, zentrierten Kastens
+        <div className="gruppe-zellen flex min-h-[44px] items-center px-4 text-[15px] text-tinte-leise">Keine Anfragen</div>
       ) : (
         <div className="gruppe-zellen">
           {[...offene, ...sichtbarErledigt].map((a) => (
@@ -658,7 +811,7 @@ function KostenKarte({
           ))}
         </div>
       )}
-      <p className="mt-1.5 px-4 text-[13px] leading-snug text-tinte-leise">
+      <p className="auf-bild mt-1.5 px-4 text-[13px] leading-snug text-tinte-leise">
         {vorsitze.length > 0
           ? "Du brauchst Geld fürs Komitee? Hier anfragen – der Kassenwart entscheidet."
           : darfEntscheiden
@@ -700,15 +853,21 @@ function KostenAnfrageSheet({
   const [fehler, setFehler] = useState("");
   const [busy, setBusy] = useState(false);
 
+  // Nur beim Öffnen leeren – ein Neuladen der Vorsitze (neues Array) darf
+  // die angefangene Anfrage nicht löschen
   useEffect(() => {
     if (!open) return;
-    setTag(vorsitze[0] || "");
     setTitel("");
     setBetrag("");
     setBis("");
     setNachricht("");
     setFehler("");
-  }, [open, vorsitze]);
+  }, [open]);
+  const erstesKomitee = vorsitze[0] || "";
+  const komiteeGueltig = vorsitze.includes(tag);
+  useEffect(() => {
+    if (open && !komiteeGueltig) setTag(erstesKomitee);
+  }, [open, komiteeGueltig, erstesKomitee]);
 
   async function senden() {
     setFehler("");
@@ -907,6 +1066,9 @@ function art(b: Buchung, kategorien: KassenKategorie[] = []): { farbe: string; i
 const monatName = (m: string) =>
   new Date(m + "-01T12:00:00").toLocaleDateString("de-DE", { month: "long", year: "numeric" });
 
+/** So viele neueste Buchungen zeigt die Vorschau am Handy/iPad hoch */
+const VORSCHAU = 4;
+
 function VerlaufKarte({
   buchungen, kategorien, darf, onLoeschen, onKategorie, aktionName,
 }: {
@@ -920,6 +1082,8 @@ function VerlaufKarte({
   const [filter, setFilter] = useState<Filter>("alle");
   const [q, setQ] = useState("");
   const [auswahl, setAuswahl] = useState<Buchung | null>(null);
+  // Handy/iPad hoch: alle Buchungen (Filter, Suche, Monate) im Blatt
+  const [alleOffen, setAlleOffen] = useState(false);
 
   const liste = useMemo(() => {
     const n = q.trim().toLowerCase();
@@ -930,6 +1094,7 @@ function VerlaufKarte({
       return true;
     });
   }, [buchungen, filter, q, aktionName]);
+  const neueste = useMemo(() => [...buchungen].sort((x, y) => y.datum.localeCompare(x.datum)).slice(0, VORSCHAU), [buchungen]);
 
   // Nach Monaten gruppiert, jeder Monat klappt auf. Offen ist zuerst nur der
   // neueste; beim Suchen sind alle Treffer-Monate offen.
@@ -958,30 +1123,32 @@ function VerlaufKarte({
     ["aus", "Ausgaben"],
   ];
 
-  return (
-    <section className="min-w-0 lg:col-span-2">
-      <div className="mb-2 flex flex-wrap items-center gap-3 px-1 pt-2">
-        <h2 className="mr-auto text-[1.375rem] font-bold tracking-[-0.02em]">Buchungen</h2>
+  /** Filter, Suche und Monate – am Laptop in der Spalte, am Handy im Blatt */
+  const ganzeListe = (imBlatt: boolean) => (
+    <>
+      <div className="mb-2 flex flex-wrap items-center gap-3 px-1 pt-2 lg:shrink-0 lg:pt-0">
+        {!imBlatt && <h2 className="auf-bild mr-auto text-[1.375rem] font-bold tracking-[-0.02em]">Buchungen</h2>}
         <div className="seg w-full sm:w-80" role="radiogroup" aria-label="Buchungen filtern">
           {FILTER.map(([k, label]) => (
-            <button key={k} role="radio" aria-checked={filter === k} onClick={() => setFilter(k)} className={`seg-item ${filter === k ? "seg-aktiv" : ""}`}>
+            <button key={k} role="radio" aria-checked={filter === k} onClick={() => setFilter(k)} className={`seg-item whitespace-nowrap ${filter === k ? "seg-aktiv" : ""}`}>
               {label}
             </button>
           ))}
         </div>
       </div>
-      <div className="mb-4 flex h-11 items-center gap-2 rounded-xl bg-[rgb(118_118_128/0.12)] px-3 dark:bg-[rgb(118_118_128/0.24)]">
+      <div className="feld-auf-bild mb-4 flex h-11 items-center gap-2 rounded-xl bg-[rgb(118_118_128/0.12)] px-3 dark:bg-[rgb(118_118_128/0.24)] lg:mb-3 lg:shrink-0">
         <span className="text-tinte-leise">
           <Icon name="lupe" size={17} />
         </span>
         <input
           className="min-w-0 flex-1 bg-transparent text-base outline-none placeholder:text-tinte-leise"
           placeholder="Suchen, z. B. Waffel oder Abiball"
+          aria-label="Buchungen durchsuchen"
           value={q}
           onChange={(e) => setQ(e.target.value)}
         />
         {q && (
-          <button onClick={() => setQ("")} aria-label="Suche leeren" className="px-1 text-tinte-leise">
+          <button onClick={() => setQ("")} aria-label="Suche leeren" className="-mr-3 flex h-11 w-11 shrink-0 items-center justify-center text-tinte-leise">
             ✕
           </button>
         )}
@@ -990,13 +1157,21 @@ function VerlaufKarte({
       {liste.length === 0 ? (
         <div className="card py-10 text-center text-[14px] text-tinte-leise">Keine Buchungen.</div>
       ) : (
+        // Eigene Scroll-Fläche nur am Laptop; das Raster darin behält seine
+        // volle Höhe (in einem Raster mit fester Höhe würden die Monate gestaucht)
+        <div className="lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:overscroll-contain lg:rounded-[1.25rem]">
         <div className="grid grid-cols-[minmax(0,1fr)] gap-2.5">
           {gruppen.map(([monat, zeilen]) => {
             const summe = zeilen.reduce((n, b) => n + (b.quelle === "abgleich" ? 0 : b.cent), 0);
             const auf = istOffen(monat);
             return (
-              <ul key={monat} className="liste border border-black/[0.04] dark:border-white/[0.06]">
-                <li>
+              // Am Laptop scrollt die Spalte in sich: der Monatskopf klebt
+              // dann oben (wie die Abschnittsköpfe in Mail), statt beim
+              // ersten Mausrad-Ruck angeschnitten zu verschwinden. „clip“
+              // statt „hidden“: schneidet die runden Ecken weiter ab, macht
+              // die Liste aber nicht selbst zur Scrollfläche (sonst klebt nichts).
+              <ul key={monat} className="liste border border-black/[0.04] dark:border-white/[0.06] lg:!overflow-clip">
+                <li className="lg:sticky lg:top-0 lg:z-[1] lg:bg-[rgb(var(--zelle))]">
                 <button
                   onClick={() => umschalten(monat)}
                   aria-expanded={auf}
@@ -1027,7 +1202,54 @@ function VerlaufKarte({
             );
           })}
         </div>
+        </div>
       )}
+    </>
+  );
+
+  return (
+    // Am Laptop die rechte Spalte der geteilten Ansicht: so hoch wie der Platz
+    // (siehe spaltenOben in FinanzenTab), Filter und Suche bleiben stehen, nur
+    // die Monate scrollen – overscroll-contain: am Listenende läuft das
+    // Scrollen nicht an die linke Spalte oder die Seite weiter.
+    <section className="min-w-0 max-lg:order-2 lg:flex lg:h-[calc(100dvh-var(--finanz-oben,14rem)-1rem)] lg:flex-col">
+      {/* Handy/iPad hoch: wie „Letzte Transaktionen“ in Wallet – die neuesten
+          Buchungen und „Alle Buchungen ›“; Filter, Suche und Monate im Blatt.
+          Vorher standen Filter, Suche und alle Monate auf der Seite (gut ein
+          Bildschirm). */}
+      <div className="lg:hidden">
+        <div className="mb-2 px-1 pt-2">
+          <h2 className="auf-bild text-[1.375rem] font-bold tracking-[-0.02em]">Buchungen</h2>
+        </div>
+        {buchungen.length === 0 ? (
+          <div className="card py-10 text-center text-[14px] text-tinte-leise">Keine Buchungen.</div>
+        ) : (
+          <ul className="liste border border-black/[0.04] dark:border-white/[0.06]">
+            {neueste.map((b) => (
+              <BuchungsZeile key={b.id} b={b} kategorien={kategorien} aktionName={aktionName} onOeffnen={() => setAuswahl(b)} />
+            ))}
+            <li>
+              <button
+                onClick={() => setAlleOffen(true)}
+                className="flex min-h-[48px] w-full items-center gap-2 px-4 text-left transition active:bg-black/[0.04] dark:active:bg-white/[0.06]"
+              >
+                <span className="min-w-0 flex-1 text-[15px] font-medium text-brand-dark dark:text-brand">Alle {buchungen.length} Buchungen</span>
+                <span className="shrink-0 text-[13px] text-tinte-leise">suchen, filtern</span>
+                <span aria-hidden className="shrink-0 text-tinte-leise">
+                  <Icon name="chevron" size={14} strich={2.4} />
+                </span>
+              </button>
+            </li>
+          </ul>
+        )}
+      </div>
+      {/* Laptop/iPad quer: die ganze Liste in der Spalte (contents: die Teile
+          bleiben Kinder der Flex-Spalte, sonst scrollt die Liste nicht in sich) */}
+      <div className="max-lg:hidden lg:contents">{ganzeListe(false)}</div>
+      <Sheet open={alleOffen} onClose={() => setAlleOffen(false)}>
+        <SheetKopf titel="Buchungen" onClose={() => setAlleOffen(false)} />
+        {ganzeListe(true)}
+      </Sheet>
 
       <BuchungDetail
         buchung={auswahl ? buchungen.find((x) => x.id === auswahl.id) ?? auswahl : null}
@@ -1086,7 +1308,8 @@ function BuchungsZeile({
       >
         <Kachel b={b} kategorien={kategorien} />
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-[15px] font-medium">{b.titel || zu}</span>
+          {/* Zwei Zeilen statt abgeschnitten: am Ende steht oft der Name („… – Bauer, Lena“) */}
+          <span className="line-clamp-2 text-[15px] font-medium leading-snug [overflow-wrap:anywhere]">{b.titel || zu}</span>
           <span className="block truncate text-[13px] text-tinte-leise">
             {zu !== b.titel ? `${zu} · ` : ""}
             {new Date(b.datum + "T12:00:00").toLocaleDateString("de-DE", { day: "numeric", month: "short" })}
@@ -1147,28 +1370,19 @@ function BuchungDetail({
 
   return (
     <Sheet open onClose={onClose}>
-      <div className="flex justify-end">
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Schließen"
-          className="-m-1.5 flex h-11 w-11 items-center justify-center rounded-full transition active:scale-90"
-        >
-          <span className="flex h-[30px] w-[30px] items-center justify-center rounded-full bg-[rgb(118_118_128/0.12)] text-[13px] font-bold text-tinte-leise dark:bg-[rgb(118_118_128/0.24)]">
-            ✕
-          </span>
-        </button>
-      </div>
+      {/* Derselbe klebende Kopf wie in allen Blättern (Titel links, ✕ rechts) –
+          vorher ein eigener Kopf, dessen ✕ beim Scrollen verschwand. */}
+      <SheetKopf
+        titel={b.titel || zuweisungText(b, aktionName)}
+        unter={new Date(b.datum + "T12:00:00").toLocaleDateString("de-DE", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
+        onClose={onClose}
+      />
 
-      {/* Kopf: Kachel, Betrag, Titel, Datum */}
-      <div className="flex flex-col items-center px-2 pb-5 pt-1 text-center">
+      {/* Kachel und Betrag mittig – wie eine Buchung in Wallet */}
+      <div className="flex flex-col items-center px-2 pb-5 pt-2 text-center">
         <Kachel b={b} gross kategorien={kategorien} />
-        <div className="mt-4">
+        <div className="mt-3">
           <Betrag b={b} gross />
-        </div>
-        <div className="mt-2 text-[17px] font-semibold leading-snug">{b.titel || zuweisungText(b, aktionName)}</div>
-        <div className="mt-0.5 text-[14px] text-tinte-leise">
-          {new Date(b.datum + "T12:00:00").toLocaleDateString("de-DE", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
         </div>
       </div>
 
@@ -1201,22 +1415,23 @@ function BuchungDetail({
         </p>
       )}
 
+      {/* Löschen ganz unten als eigene Gruppe, mit Rückfrage (Design-Regeln §2) */}
       {darf && !b.automatisch && (
-        <button
-          disabled={busy}
-          onClick={async () => {
-            if (!(await frage(`Buchung „${b.titel}“ über ${euro(Math.abs(b.cent))} löschen?`, "Löschen", true))) return;
-            setBusy(true);
-            const f = await onLoeschen(b.id);
-            setBusy(false);
-            if (f) meldeFehler("Löschen hat nicht geklappt: " + f);
-            else onClose();
-          }}
-          className="mt-4 flex min-h-[2.75rem] w-full items-center justify-center gap-2 rounded-[1.25rem] bg-papier text-[16px] font-medium text-red-600 transition active:scale-[.99] disabled:opacity-50 dark:bg-slate-800/60 dark:text-red-400"
-        >
-          <Icon name="muell" size={18} />
-          Buchung löschen
-        </button>
+        <Gruppe className="mt-6">
+          <Zeile
+            label="Buchung löschen"
+            rot
+            disabled={busy}
+            onClick={async () => {
+              if (!(await frage(`Buchung „${b.titel}“ über ${euro(Math.abs(b.cent))} löschen?`, "Löschen", true))) return;
+              setBusy(true);
+              const f = await onLoeschen(b.id);
+              setBusy(false);
+              if (f) meldeFehler("Löschen hat nicht geklappt: " + f);
+              else onClose();
+            }}
+          />
+        </Gruppe>
       )}
     </Sheet>
   );
@@ -1253,8 +1468,9 @@ function Kreis({
   const hervor = aktiv ? sichtbare.find((t) => t.key === aktiv) : null;
 
   return (
-    <div className="relative shrink-0" style={{ width: G, height: G }}>
-      <svg width={G} height={G} viewBox={`0 0 ${G} ${G}`} className="-rotate-90" role="img" aria-label="Einnahmen nach Quelle">
+    // Am Handy 120 px statt 176 px – das SVG skaliert mit (viewBox bleibt)
+    <div className="relative h-[120px] w-[120px] shrink-0 sm:h-[176px] sm:w-[176px]">
+      <svg viewBox={`0 0 ${G} ${G}`} className="h-full w-full -rotate-90" role="img" aria-label="Einnahmen nach Quelle">
         <circle cx={G / 2} cy={G / 2} r={r} fill="none" strokeWidth={dicke} stroke={dunkel ? "#3A3A3C" : "#E5E5EA"} />
         {boegen.map((b) => (
           <circle
@@ -1276,20 +1492,20 @@ function Kreis({
           </circle>
         ))}
       </svg>
-      <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center px-6 text-center leading-tight">
+      <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center px-4 text-center leading-tight sm:px-6">
         {hervor ? (
           <>
-            <span className="text-[12px] font-semibold text-tinte-leise">{hervor.label}</span>
-            <span className="zahl text-[1.15rem] font-extrabold">{euroKurz(hervor.cent)}</span>
+            <span className="max-w-full truncate text-[12px] font-semibold text-tinte-leise">{hervor.label}</span>
+            <span className="zahl text-[1rem] font-extrabold sm:text-[1.15rem]">{euroKurz(hervor.cent)}</span>
           </>
         ) : prozent !== null ? (
           <>
-            <span className="zahl text-[1.7rem] font-extrabold">{prozent} %</span>
+            <span className="zahl text-[1.35rem] font-extrabold sm:text-[1.7rem]">{prozent} %</span>
             <span className="text-[12px] text-tinte-leise">vom Ziel</span>
           </>
         ) : (
           <>
-            <span className="zahl text-[1.15rem] font-extrabold">{euroKurz(summe)}</span>
+            <span className="zahl text-[1rem] font-extrabold sm:text-[1.15rem]">{euroKurz(summe)}</span>
             <span className="text-[12px] text-tinte-leise">eingenommen</span>
           </>
         )}

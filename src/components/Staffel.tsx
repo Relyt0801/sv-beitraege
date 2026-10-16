@@ -22,52 +22,101 @@ export function StaffelRing({ pct, settings }: { pct: number; settings: Settings
   );
 }
 
-/** Die Staffel zum Nachsehen: ab wie viel Prozent kostet das erste Ticket wie viel extra. */
-export function StaffelKacheln({ pct, settings }: { pct: number; settings: Settings }) {
-  const aktuell = aktuelleStufe(pct, settings);
+/**
+ * Die Staffel zum Nachsehen: ab wie viel Prozent kostet das erste Ticket wie
+ * viel extra.
+ *
+ * Als Skala (dünner Balken mit Stufenmarken, darunter Prozent und Aufschlag),
+ * nicht als Kacheln: Fünf abgerundete Flächen, eine davon voll blau, sahen
+ * aus wie eine Auswahl zum Antippen – es ist aber reine Anzeige (Prüfung
+ * Okt. 2026). Erreichte Stufen sind blass blau, die geltende kräftig.
+ *
+ * `kinder` (Eltern mit Geschwistern): EINE Staffel für alle – unter der
+ * Stufe, in der ein Kind gerade steht, steht sein Vorname. Vorher stand die
+ * ganze Reihe bei jedem Kind einzeln.
+ */
+export function StaffelKacheln({
+  pct,
+  settings,
+  kinder,
+  className = "mt-4",
+}: {
+  pct: number;
+  settings: Settings;
+  kinder?: { name: string; pct: number }[];
+  className?: string;
+}) {
   const a = abiballVon(settings);
-  const imBonus = a.ueber100 && pct > 100;
   const stufen = staffelVon(settings);
-  const rabatt = ticketPreise(pct, settings).rabatt;
   const grenze = bonusGrenze(a);
+  // Wo steht wer? Ohne `kinder` nur die eine Person (pct).
+  const stufeVon = (x: number): number | "bonus" | null => (a.ueber100 && x > 100 ? "bonus" : aktuelleStufe(x, settings));
+  const leute = kinder ?? [{ name: "", pct }];
+  const hier = (s: number | "bonus") => leute.some((k) => stufeVon(k.pct) === s);
+  const namen = (s: number | "bonus") => (kinder ? kinder.filter((k) => stufeVon(k.pct) === s).map((k) => k.name) : []);
+  // Bei einer Person zeigt der Balken den Weg bis hierher (erreichte Stufen blass)
+  const erreicht = (ab: number) => !kinder && pct >= ab;
+  const imBonus = hier("bonus");
+  const rabatt = ticketPreise(pct, settings).rabatt;
+
+  const namensZeile = (s: number | "bonus") =>
+    namen(s).length > 0 && (
+      <div className="mt-1 grid text-[12px] font-semibold leading-tight text-brand-dark dark:text-brand">
+        {namen(s).map((n) => (
+          <span key={n} className="truncate">
+            {n}
+          </span>
+        ))}
+      </div>
+    );
+
   return (
-    <div className="mt-4">
-      <div className="mb-1.5 text-[12px] text-tinte-leise">Aufschlag aufs 1. Ticket – je mehr Mithilfe, desto weniger</div>
-      <div className={`grid gap-1 ${a.ueber100 ? "grid-cols-6" : "grid-cols-5"}`}>
+    <div className={className}>
+      <div className="mb-2 text-[12px] text-tinte-leise">Aufschlag aufs 1. Ticket – je mehr Mithilfe, desto weniger</div>
+      <ol className={`grid gap-1 ${a.ueber100 ? "grid-cols-6" : "grid-cols-5"}`} aria-label="Staffel: Aufschlag je nach Mithilfe">
         {stufen.map((stufe) => {
-          const erreicht = pct >= stufe.ab;
+          const jetzt = hier(stufe.ab);
+          const weg = erreicht(stufe.ab);
           return (
-            <div
-              key={stufe.ab}
-              className={`rounded-xl px-1 py-2 text-center transition ${
-                aktuell === stufe.ab && !imBonus
-                  ? "bg-brand text-white"
-                  : erreicht
-                    ? "bg-brand/[0.12] text-brand-dark dark:text-brand"
-                    : "bg-[rgb(118_118_128/0.1)] text-tinte-leise"
-              }`}
-            >
-              <div className="zahl text-[13px] font-bold leading-none">{stufe.ab} %</div>
-              <div className="zahl mt-1 text-[12px] font-medium leading-none">+{stufe.betrag} €</div>
-            </div>
+            <li key={stufe.ab} className="min-w-0 text-center" aria-current={jetzt ? "step" : undefined}>
+              <span
+                aria-hidden
+                className={`block h-1 rounded-full ${jetzt ? "bg-brand" : weg ? "bg-brand/35" : "bg-[rgb(118_118_128/0.18)]"}`}
+              />
+              <div
+                className={`zahl mt-1.5 text-[13px] leading-none ${
+                  jetzt ? "font-bold text-brand-dark dark:text-brand" : weg ? "font-semibold text-tinte-matt dark:text-slate-300" : "font-semibold text-tinte-leise"
+                }`}
+              >
+                {stufe.ab} %
+              </div>
+              <div className={`zahl mt-1 text-[12px] leading-none ${jetzt ? "font-semibold text-brand-dark dark:text-brand" : "text-tinte-leise"}`}>
+                +{stufe.betrag} €
+              </div>
+              {namensZeile(stufe.ab)}
+            </li>
           );
         })}
         {a.ueber100 && (
-          <div
-            className={`rounded-xl px-1 py-2 text-center transition ${
-              imBonus
-                ? "bg-gradient-to-br from-[#F6DD8B] via-[#D9A92B] to-[#A87A0C] text-[#3D2B00] shadow-[0_2px_10px_rgba(217,169,43,.35)]"
-                : "bg-[#D9A92B]/[0.12] text-[#8A650A] dark:text-[#E9C460]"
-            }`}
+          <li
+            className="min-w-0 text-center"
+            aria-current={imBonus ? "step" : undefined}
             title={`Alle ${a.bonusSchritt} % über 100: −${a.bonusProSchritt} €, höchstens −${a.bonusMax} €`}
           >
-            <div className="zahl text-[13px] font-bold leading-none">✦{grenze}</div>
-            <div className="zahl mt-1 text-[12px] font-medium leading-none">
-              −{imBonus ? rabatt : a.bonusMax} €
+            <span
+              aria-hidden
+              className={`block h-1 rounded-full ${imBonus ? "bg-gradient-to-r from-[#F6DD8B] via-[#D9A92B] to-[#A87A0C]" : "bg-[#D9A92B]/30"}`}
+            />
+            <div className={`zahl mt-1.5 text-[13px] leading-none text-[#8A650A] dark:text-[#E9C460] ${imBonus ? "font-bold" : "font-semibold"}`}>
+              ✦{grenze}
             </div>
-          </div>
+            <div className="zahl mt-1 text-[12px] leading-none text-[#8A650A] dark:text-[#E9C460]">
+              −{imBonus && !kinder ? rabatt : a.bonusMax} €
+            </div>
+            {namensZeile("bonus")}
+          </li>
         )}
-      </div>
+      </ol>
       {a.ueber100 && (
         <div className="mt-1.5 text-[12px] text-tinte-leise">
           ✦ Über 100 %: alle {a.bonusSchritt} % <b className="text-[#8A650A] dark:text-[#E9C460]">−{a.bonusProSchritt} €</b>, höchstens −{a.bonusMax} €

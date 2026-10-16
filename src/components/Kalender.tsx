@@ -7,9 +7,12 @@ import {
   MONATE, WOCHENTAGE, anTag, ausKey, betrifftMich, farbeVon, freiAn, heuteKey, istKlausur, laeuftAn, monatLang,
   montagVon, plusTage, tagKey, tagLang, uhr, umfangText, zeitText, type SchichtStatus, type Termin,
 } from "../lib/termine";
-import { KuerzelLeiste, SchichtLegende, SchichtSchild, Zeichen, chipKlasse, schichtRahmen, schichtVorzeichen } from "./TerminZeichen";
+import { KuerzelLeiste, SchichtLegende, SchichtSchild, Zeichen, chipKlasse, punktKlasse, schichtRahmen, schichtVorzeichen } from "./TerminZeichen";
 import { Icon } from "./Icon";
 import { TerminZeile } from "./Wochenstreifen";
+import { ChatEbene, ChatKopf } from "./ChatBlasen";
+import { useEscapeSchliesst } from "./Sheet";
+import { useBreit } from "../lib/gescrollt";
 
 import { usePrivatTermine, useKalenderDemo } from "../lib/kalender-sync";
 import { KalenderSyncSheet } from "./KalenderSyncSheet";
@@ -18,11 +21,6 @@ type Ansicht = "monat" | "woche" | "tag";
 /** Was auf dem Umschalter steht und was die Pfeile bewegen. */
 const ANSICHT_NAME: Record<Ansicht, string> = { monat: "Monat", woche: "Woche", tag: "Tag" };
 const SCHRITT: Record<Ansicht, string> = { monat: "Monat", woche: "Woche", tag: "Tag" };
-const ANSICHT_LANG: Record<Ansicht, string> = {
-  monat: "Monatsansicht",
-  woche: "Wochenansicht",
-  tag: "Tagesansicht",
-};
 
 /**
  * Der große Kalender.
@@ -83,12 +81,16 @@ export function Kalender({
     }
   }
 
-  // Escape schliesst den Kalender – wie jedes andere Fenster
-  useEffect(() => {
-    const taste = (e: KeyboardEvent) => e.key === "Escape" && onSchliessen();
-    window.addEventListener("keydown", taste);
-    return () => window.removeEventListener("keydown", taste);
-  }, [onSchliessen]);
+  // Escape schliesst den Kalender – aber nur, wenn darüber kein Blatt offen ist
+  // (gemeinsamer Stapel aus Sheet.tsx; vorher schloss ein Escape im Termin-Blatt
+  // Blatt UND Kalender).
+  useEscapeSchliesst(true, onSchliessen);
+
+  // Ab 640 px öffnet ein Tag im Monat die Tagesansicht; am Handy wird er nur
+  // gewählt und steht unter dem Raster als Liste (wie im iOS-Kalender).
+  const abSm = useAbSm();
+  // Am Laptop/iPad quer steht der Kopf in der Kopfzeile der App (ChatEbene).
+  const breit = useBreit();
 
   // Nach links wischen = weiter, nach rechts = zurück (Monat, Woche, Tag)
   const { handler: wischen, zug } = useWischen(weiter);
@@ -107,80 +109,139 @@ export function Kalender({
         ? wochenTitel(ausKey(montagVon(anker)))
         : tagLang(anker);
 
-  return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-papier dark:bg-slate-950">
-      {/* ------------------------------------------------ Kopfzeile */}
-      <header className="shrink-0 border-b border-black/[0.08] bg-[rgb(var(--zelle))] px-3 pt-[calc(env(safe-area-inset-top)+0.6rem)] dark:border-white/[0.1] sm:px-5">
-        <div className="mx-auto flex max-w-5xl items-center gap-2 pb-2.5">
-          <button className="iconbtn shrink-0" onClick={onSchliessen} aria-label="Kalender schließen">
-            ✕
-          </button>
-          <div className="min-w-0 flex-1">
-            <div className="truncate font-zahl text-[1.25rem] font-extrabold tracking-[-0.02em]">{titel}</div>
-            <div className="truncate text-[12px] text-tinte-leise">{ANSICHT_LANG[ansicht]} · Termine der Stufe</div>
-          </div>
-          <button
-            onClick={() => weiter(-1)}
-            className="iconbtn shrink-0"
-            aria-label={`Vorheriger ${SCHRITT[ansicht]}`}
-            title={`Vorheriger ${SCHRITT[ansicht]}`}
-          >
-            ‹
-          </button>
-          <button
-            onClick={() => weiter(1)}
-            className="iconbtn shrink-0"
-            aria-label={`Nächster ${SCHRITT[ansicht]}`}
-            title={`Nächster ${SCHRITT[ansicht]}`}
-          >
-            ›
-          </button>
-        </div>
+  /** Zu einem Tag springen – gleitet nur, wenn sich dabei der Monat ändert. */
+  function springe(k: string) {
+    setRichtung(k.slice(0, 7) === anker.slice(0, 7) ? 0 : k < anker ? -1 : 1);
+    setAnker(k);
+  }
 
-        <div className="mx-auto flex max-w-5xl items-center gap-2 pb-2.5">
-          {/* Sichtbarer Umschalter mit Rahmen: so erkennt man, dass es drei
-              Ansichten gibt und welche gerade laeuft. */}
-          <div className="seg shrink-0">
-            {(["monat", "woche", "tag"] as Ansicht[]).map((a) => (
-              <button
-                key={a}
-                onClick={() => setAnsicht(a)}
-                aria-pressed={ansicht === a}
-                className={`seg-item !flex-none whitespace-nowrap !px-2.5 min-[380px]:!px-3.5 ${ansicht === a ? "seg-aktiv" : ""}`}
-              >
-                {ANSICHT_NAME[a]}
-              </button>
-            ))}
-          </div>
-          <button
-            onClick={() => setAnker(heute)}
-            className="btn-klein-grau ml-auto shrink-0 !px-3"
-          >
-            Heute
-          </button>
-          {darfAnlegen && (
-            <button
-              onClick={() => onNeu!(anker)}
-              aria-label="Termin eintragen"
-              className="btn-klein shrink-0 gap-1 whitespace-nowrap !px-3"
-            >
-              {/* Beschriftung bleibt auch auf schmalen Handys – ein „＋“ allein
-                  sagt nicht, was es tut. Dafür sind die Abstände knapp. */}
-              <Icon name="plus" size={14} strich={2.6} />
-              Termin
-            </button>
-          )}
-        </div>
-      </header>
-
-      {/* ------------------------------------------------ Inhalt */}
-      <div
-        className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-3 py-3 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] sm:px-5"
-        {...wischen}
+  // ---------------------------------------------------------- Kopf
+  // Wie ein geöffneter Chat (ChatEbene + ChatKopf): am Handy eigene Kopfzeile,
+  // am Laptop/iPad quer in der EINEN Kopfzeile der App – App-Knöpfe und
+  // Reiterleiste bleiben sichtbar (Design-Regeln 3).
+  // Zurück ist beschriftet („‹ Events“), die Pfeile zum Blättern sind blau und
+  // ohne Kreis wie bei „Diese Woche“ (Wochenstreifen) – vorher waren Zurück
+  // und „Vorheriger Monat“ zwei gleiche graue Kreise mit demselben „‹“.
+  // Am Laptop stehen sie direkt auf dem Hintergrundbild: dort mit Lichthof wie
+  // auf-bild (am Handy liegt der Kopf auf deckendem Glas – kein Lichthof).
+  // 44 × 44 px Trefferfläche (Design-Regel 5) – das Paar rückt nur über die
+  // Pfeil-Zeichen zusammen, nicht über kleinere Knöpfe
+  const pfeil = `flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-brand-dark transition active:scale-90 active:bg-black/[0.04] dark:text-brand dark:active:bg-white/[0.06] ${
+    breit ? "[.mit-hintergrund_&]:[filter:drop-shadow(0_0_2px_rgb(var(--papier)))_drop-shadow(0_0_6px_rgb(var(--papier)))]" : ""
+  }`;
+  // Eng beieinander (ein Paar wie „Diese Woche ‹ ›“), deutlich getrennt vom Zurück links
+  const blaettern = (
+    <div className="flex shrink-0 items-center">
+      <button
+        onClick={() => weiter(-1)}
+        className={pfeil}
+        aria-label={`Vorheriger ${SCHRITT[ansicht]}`}
+        title={`Vorheriger ${SCHRITT[ansicht]}`}
       >
+        <span className="block rotate-180">
+          <Icon name="chevron" size={22} strich={2.6} />
+        </span>
+      </button>
+      <button
+        onClick={() => weiter(1)}
+        className={pfeil}
+        aria-label={`Nächster ${SCHRITT[ansicht]}`}
+        title={`Nächster ${SCHRITT[ansicht]}`}
+      >
+        <Icon name="chevron" size={22} strich={2.6} />
+      </button>
+    </div>
+  );
+  // Sichtbarer Umschalter mit Rahmen: so erkennt man, dass es drei Ansichten
+  // gibt und welche gerade läuft. Am Laptop füllt er die Breite, die ChatKopf
+  // dem Umschalter gibt (17rem).
+  const segment = (
+    <div className={`seg ${breit ? "" : "shrink-0"}`} role="tablist" aria-label="Ansicht">
+      {(["monat", "woche", "tag"] as Ansicht[]).map((a) => (
+        <button
+          key={a}
+          role="tab"
+          onClick={() => setAnsicht(a)}
+          aria-selected={ansicht === a}
+          className={`seg-item whitespace-nowrap ${breit ? "" : "!flex-none !px-2.5 min-[380px]:!px-3.5"} ${ansicht === a ? "seg-aktiv" : ""}`}
+        >
+          {ANSICHT_NAME[a]}
+        </button>
+      ))}
+    </div>
+  );
+  // In der App-Kopfzeile (Laptop) liegt „Heute“ direkt auf dem Hintergrundbild:
+  // dort deckend wie das Segment (sonst grau-durchsichtig auf dem Foto).
+  const heuteKnopf = (
+    <button
+      onClick={() => springe(heute)}
+      className={`btn-klein-grau shrink-0 !px-3 ${
+        breit ? "[.mit-hintergrund_&]:!bg-[rgb(227_227_232)] [.dark.mit-hintergrund_&]:!bg-[rgb(var(--glas))]" : ""
+      }`}
+    >
+      Heute
+    </button>
+  );
+  const terminKnopf = darfAnlegen && (
+    <button
+      onClick={() => onNeu!(anker)}
+      aria-label="Termin eintragen"
+      className="btn-klein shrink-0 gap-1 whitespace-nowrap !px-3"
+    >
+      {/* Beschriftung bleibt auch auf schmalen Handys – ein „＋“ allein
+          sagt nicht, was es tut. Dafür sind die Abstände knapp. */}
+      <Icon name="plus" size={14} strich={2.6} />
+      Termin
+    </button>
+  );
+  const kopf = (
+    <ChatKopf
+      onBack={onSchliessen}
+      zurueckText="Events"
+      titel={<span className="font-zahl">{titel}</span>}
+      // Am Handy keine zweite Zeile: die Ansicht zeigt der Umschalter darunter,
+      // und ChatKopf setzt sie dort in 11,5 px (unter der 12-px-Grenze).
+      unter={breit ? "Kalender der Stufe" : undefined}
+      rechts={
+        breit ? (
+          <>
+            {/* Schmaler als die 17rem, die ChatKopf einem Umschalter gibt –
+                sonst bleibt am iPad quer vom Monatsnamen nur „Oktober 2…“.
+                12,5rem: „‹ Events“ und die 44-px-Pfeile brauchen mehr Platz
+                als der alte runde Zurück-Knopf (iPad quer: „30. Aug. – 5. Sep.“) */}
+            <div className="w-[12.5rem]">{segment}</div>
+            {blaettern}
+            {heuteKnopf}
+            {terminKnopf}
+          </>
+        ) : (
+          blaettern
+        )
+      }
+    >
+      {breit ? null : (
+        <div className="flex items-center gap-2">
+          {segment}
+          <div className="ml-auto flex items-center gap-2">
+            {heuteKnopf}
+            {terminKnopf}
+          </div>
+        </div>
+      )}
+    </ChatKopf>
+  );
+
+  // Im Monat bleibt der Inhalt beim Antippen eines Tages stehen (nur die Wahl
+  // wandert); er gleitet erst, wenn ein anderer Monat dran ist.
+  const inhaltSchluessel = `${ansicht}-${ansicht === "monat" ? anker.slice(0, 7) : anker}`;
+
+  return (
+    <ChatEbene label="Kalender" start="oben" kopf={kopf}>
+      {/* ------------------------------------------------ Inhalt */}
+      <div className="overflow-x-hidden pb-2 pt-2" {...wischen}>
         <div
-          key={`${ansicht}-${anker}`}
-          className={`mx-auto max-w-5xl ${richtung > 0 ? "animate-vonRechts" : richtung < 0 ? "animate-vonLinks" : ""}`}
+          key={inhaltSchluessel}
+          className={richtung > 0 ? "animate-vonRechts" : richtung < 0 ? "animate-vonLinks" : ""}
           style={zug ? { transform: `translateX(${zug}px)`, transition: "none" } : undefined}
         >
           {/* Testphase: Kalender-Verbindung, nur für die Testkonten – zurzeit
@@ -188,7 +249,7 @@ export function Kalender({
           {kalenderDemo && (
             <button
               onClick={() => setSyncOffen(true)}
-              className="mb-2.5 flex min-h-[44px] w-full items-center gap-2 rounded-xl bg-brand/10 px-3 py-2 text-left text-[13px] font-semibold text-brand-dark transition active:scale-[0.99] dark:bg-brand/20 dark:text-brand-soft"
+              className="mb-2.5 flex min-h-[44px] w-full items-center gap-2 rounded-xl bg-brand/10 px-3 py-2 text-left text-[13px] font-semibold text-brand-dark transition active:scale-[0.99] dark:bg-brand/20 dark:text-brand-dark"
             >
               <span aria-hidden>📱⇄</span>
               <span className="min-w-0 flex-1 truncate">
@@ -208,9 +269,12 @@ export function Kalender({
               meins={meins}
               st={st}
               onTag={(k) => {
-                setAnker(k);
-                setAnsicht("tag");
+                if (abSm) {
+                  setAnker(k);
+                  setAnsicht("tag");
+                } else springe(k);
               }}
+              onOeffnen={onOeffnen}
             />
           )}
           {ansicht === "woche" && (
@@ -233,14 +297,37 @@ export function Kalender({
         </div>
       </div>
       {kalenderDemo && <KalenderSyncSheet open={syncOffen} onClose={() => setSyncOffen(false)} />}
-    </div>
+    </ChatEbene>
   );
+}
+
+/** Mindestens 640 px breit (Tailwind „sm“)? Folgt dem Drehen des Geräts. */
+function useAbSm(): boolean {
+  const abfrage = "(min-width: 640px)";
+  const [ab, setAb] = useState(() => typeof window !== "undefined" && !!window.matchMedia?.(abfrage).matches);
+  useEffect(() => {
+    const mq = window.matchMedia?.(abfrage);
+    if (!mq) return;
+    const neu = () => setAb(mq.matches);
+    neu();
+    mq.addEventListener("change", neu);
+    return () => mq.removeEventListener("change", neu);
+  }, []);
+  return ab;
 }
 
 // ================================================================ Monat
 
+/**
+ * Monat: am Handy wie im iOS-Kalender – die Zahl, darunter farbige Punkte
+ * (vorher Schilder mit „Waf“, „Kuc“, „Stufen“ – unlesbar), der gewählte Tag
+ * als gefüllter Kreis und unter dem Raster dessen Termine als Liste. So füllt
+ * der Monat den Bildschirm, ohne dass man ihn verlassen muss. Ab 640 px stehen
+ * die Termine als Schilder in den Feldern, ein Tipp öffnet die Tagesansicht.
+ * `anker` ist zugleich der gewählte Tag.
+ */
 function MonatsAnsicht({
-  anker, termine, heute, meins, st, onTag,
+  anker, termine, heute, meins, st, onTag, onOeffnen,
 }: {
   anker: string;
   termine: Termin[];
@@ -248,6 +335,7 @@ function MonatsAnsicht({
   meins: (t: Termin) => boolean;
   st: (t: Termin) => SchichtStatus;
   onTag: (k: string) => void;
+  onOeffnen: (t: Termin) => void;
 }) {
   const d = ausKey(anker);
   const monat = d.getMonth();
@@ -267,9 +355,13 @@ function MonatsAnsicht({
     return alle;
   }, [start, monat, d]);
 
+  const desTages = anTag(termine, anker);
+
+  // Ab 640 px wachsen die Felder mit der Höhe des Bildschirms (iPad hoch: der
+  // Monat füllt die Seite statt unten ein Drittel frei zu lassen), nie unter 7.5rem.
   return (
     <div>
-      <div className="mb-1 grid grid-cols-7 gap-1 sm:gap-1.5">
+      <div className="auf-bild mb-1 grid grid-cols-7 gap-1 sm:gap-1.5">
         {WOCHENTAGE.map((w) => (
           <div key={w} className="text-center text-[12px] font-bold uppercase tracking-[0.04em] text-tinte-leise">
             {w}
@@ -290,47 +382,60 @@ function MonatsAnsicht({
               const platz = klausuren.length ? 2 : 3;
               const imMonat = ausKey(k).getMonth() === monat;
               const istHeute = k === heute;
+              const gewaehlt = k === anker;
               const band = ferien ? farbeVon(ferien)?.band ?? "bg-emerald-200/60 dark:bg-emerald-500/20" : "";
               // Name der Ferien am ersten Tag und am Wochenanfang
               const ferienName = ferien && (k === ferien.datum || spalte === 0) ? ferien.titel : "";
+              // Ab 640 px stehen die Termine als Schilder im Feld – ein Tipp auf
+              // ein Schild öffnet den Termin direkt (wie in der Woche), ein Tipp
+              // auf die Zahl oder die freie Fläche den Tag. Deshalb ist das Feld
+              // kein <button> (keine Knöpfe in Knöpfen), sondern ein Bereich mit
+              // Knopf-Rolle.
               return (
-                <button
+                <div
                   key={k}
+                  role="button"
+                  tabIndex={0}
                   onClick={() => onTag(k)}
+                  onKeyDown={(e) => {
+                    if (e.target !== e.currentTarget || (e.key !== "Enter" && e.key !== " ")) return;
+                    e.preventDefault();
+                    onTag(k);
+                  }}
                   aria-label={`${tagLang(k)}${ferien ? `, ${ferien.titel}` : ""}${alle.length ? `, ${alle.length} Termine` : ""}`}
-                  className={`flex min-h-[5rem] min-w-0 flex-col gap-0.5 rounded-xl p-1 text-left transition active:scale-[.98] sm:min-h-[7.5rem] sm:p-2 ${
-                    istHeute
-                      ? `ring-2 ring-inset ring-brand ${ferien ? band : "zelle"}`
-                      : ferien
-                        ? band
-                        : "zelle"
-                  } ${imMonat ? "" : "opacity-40"}`}
+                  aria-pressed={gewaehlt}
+                  className={`flex min-h-[3.25rem] cursor-pointer select-none min-w-0 flex-col items-center gap-1 rounded-xl px-0.5 py-1 text-left transition active:scale-[.98] sm:min-h-[max(7.5rem,calc((100dvh_-_16rem)/5.5))] sm:items-stretch sm:gap-0.5 sm:p-2 ${
+                    istHeute ? "sm:ring-2 sm:ring-inset sm:ring-brand" : ""
+                  } ${ferien ? band : "zelle"} ${imMonat ? "" : "opacity-40"}`}
                 >
+                  {/* Handy: Zahl mittig, gewählter Tag als gefüllter Kreis (heute blau) */}
                   <span
-                    className={`zahl text-[13px] font-bold leading-none sm:text-[14px] ${
-                      istHeute ? "text-brand" : ""
+                    className={`zahl flex h-7 w-7 items-center justify-center rounded-full text-[15px] font-semibold leading-none sm:hidden ${
+                      gewaehlt
+                        ? istHeute
+                          ? "bg-brand text-white"
+                          : "bg-tinte text-white dark:bg-slate-100 dark:text-black"
+                        : istHeute
+                          ? "font-bold text-brand"
+                          : ""
                     }`}
                   >
                     {ausKey(k).getDate()}
                   </span>
-                  {/* Handy: statt bloßer Punkte kleine Schilder in der Farbe des
-                      Termins – mit Bildzeichen und Anfang des Titels, Klausuren
-                      als Kürzel. So sieht man grob, was an dem Tag ist. */}
-                  <span className="mt-0.5 flex min-w-0 flex-col gap-[2px] sm:hidden" aria-hidden>
+                  <span
+                    className={`zahl hidden text-[14px] font-bold leading-none sm:block ${istHeute ? "text-brand" : ""}`}
+                  >
+                    {ausKey(k).getDate()}
+                  </span>
+                  {/* Handy: Klausur-Kürzel und bis zu drei Punkte in der Farbe
+                      der Termine – was genau, steht in der Liste darunter. */}
+                  <span className="flex min-w-0 flex-col items-center gap-[3px] sm:hidden" aria-hidden>
                     {klausuren.length > 0 && <MiniKuerzel liste={klausuren} />}
-                    {liste.slice(0, klausuren.length ? 1 : 2).map((t) => (
-                      <span
-                        key={t.id}
-                        className={`block min-w-0 overflow-hidden whitespace-nowrap rounded-[4px] px-[3px] py-[2px] text-[12px] font-semibold leading-[1.1] ${chipKlasse(t, meins(t), st(t))}`}
-                      >
-                        {st(t) === "eingeteilt" && <span className="mr-[1px] font-extrabold">✓</span>}
-                        {t.icon && <span className="mr-[1px]">{t.icon}</span>}
-                        {t.titel}
-                      </span>
-                    ))}
-                    {liste.length > (klausuren.length ? 1 : 2) && (
-                      <span className="px-[2px] text-[12px] font-bold leading-none text-tinte-leise">
-                        +{liste.length - (klausuren.length ? 1 : 2)}
+                    {liste.length > 0 && (
+                      <span className="flex h-1.5 items-center gap-[3px]">
+                        {liste.slice(0, 3).map((t) => (
+                          <span key={t.id} className={`h-1.5 w-1.5 rounded-full ${punktKlasse(t, meins(t), st(t))}`} />
+                        ))}
                       </span>
                     )}
                   </span>
@@ -343,14 +448,22 @@ function MonatsAnsicht({
                     )}
                     {klausuren.length > 0 && <KuerzelLeiste liste={klausuren} klein max={3} />}
                     {liste.slice(0, platz).map((t) => (
-                      <span
+                      <button
                         key={t.id}
-                        className={`truncate rounded px-1 py-0.5 text-[12px] font-semibold leading-tight ${chipKlasse(t, meins(t), st(t))}`}
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onOeffnen(t);
+                        }}
+                        aria-label={`${t.titel}${t.von ? `, ${uhr(t.von)}` : ""} öffnen`}
+                        // Bis zu zwei Einträge dürfen zweizeilig sein – die Zellen sind
+                        // am Laptop hoch genug; vorher blieb nur ein Wort („Waf…“)
+                        className={`min-w-0 rounded px-1 py-0.5 text-left text-[12px] font-semibold leading-tight transition hover:brightness-95 active:scale-[.97] ${liste.length <= 2 ? "line-clamp-2 break-words" : "block truncate"} ${chipKlasse(t, meins(t), st(t))}`}
                       >
                         {schichtVorzeichen(st(t))}
                         {t.icon ? `${t.icon} ` : t.von ? `${uhr(t.von)} ` : ""}
                         {t.titel}
-                      </span>
+                      </button>
                     ))}
                     {liste.length > platz && (
                       <span className="px-1 text-[12px] font-semibold text-tinte-leise">
@@ -358,12 +471,30 @@ function MonatsAnsicht({
                       </span>
                     )}
                   </span>
-                </button>
+                </div>
               );
             })}
           </div>
         ))}
       </div>
+
+      {/* Handy: die Termine des gewählten Tages direkt unter dem Monat */}
+      <section className="mt-4 sm:hidden">
+        <h3 className="auf-bild mb-1.5 px-4 text-[13px] uppercase tracking-[0.02em] text-tinte-leise">
+          {anker === heute ? `Heute · ${tagLang(anker)}` : tagLang(anker)}
+        </h3>
+        <div className="card px-2 py-1">
+          {desTages.length === 0 ? (
+            <p className="px-1 py-3 text-[14px] text-tinte-leise">Nichts eingetragen.</p>
+          ) : (
+            <ul className="grid">
+              {desTages.map((t) => (
+                <TerminZeile key={t.id} t={t} meins={meins(t)} status={st(t)} onClick={() => onOeffnen(t)} />
+              ))}
+            </ul>
+          )}
+        </div>
+      </section>
     </div>
   );
 }
@@ -405,7 +536,9 @@ function WochenAnsicht({
 
   // Auf dem Handy stehen die Tage als flache Zeilen untereinander: sieben
   // hohe Karten mit "–" drin sind viel Platz fuer nichts. Erst ab lg wird
-  // daraus das klassische Sieben-Spalten-Raster.
+  // daraus das klassische Sieben-Spalten-Raster – dann so hoch wie der
+  // Bildschirm (wie ein Wochenplaner), statt eines flachen Streifens mit
+  // einer leeren Fläche darunter.
   return (
     <div className="grid gap-1.5 lg:grid-cols-7">
       {tage.map((k) => {
@@ -418,7 +551,7 @@ function WochenAnsicht({
         return (
           <div
             key={k}
-            className={`flex min-w-0 gap-2 rounded-xl p-2 lg:flex-col ${
+            className={`flex min-w-0 gap-2 rounded-xl p-2 lg:min-h-[max(12rem,calc(100dvh_-_14.5rem))] lg:flex-col ${
               istHeute
                 ? `ring-2 ring-inset ring-brand ${ferien ? farbeVon(ferien)?.band ?? "bg-emerald-200/60 dark:bg-emerald-500/20" : "zelle"}`
                 : ferien
@@ -460,13 +593,14 @@ function WochenAnsicht({
                     onClick={() => onOeffnen(t)}
                     className={`min-h-[44px] min-w-0 rounded-lg px-2 py-1.5 text-left transition active:scale-[.98] ${chipKlasse(t, meins(t), st(t))}`}
                   >
-                    <span className="block truncate text-[13px] font-bold leading-tight">
+                    {/* Woche: Spalten sind schmal, aber hoch – Titel darf zweizeilig sein */}
+                    <span className="line-clamp-2 break-words text-[13px] font-bold leading-tight">
                       {schichtVorzeichen(st(t))}
                       {t.privat ? "📱 " : <Zeichen icon={t.icon} auf={meins(t) || st(t) === "eingeteilt"} klein />}
                       {t.titel}
                     </span>
                     <span
-                      className={`block truncate text-[12px] ${
+                      className={`line-clamp-2 break-words text-[12px] ${
                         (meins(t) && st(t) !== "nicht") || st(t) === "eingeteilt" ? "text-white" : "opacity-80"
                       }`}
                     >
@@ -501,10 +635,12 @@ function TagesAnsicht({
   const liste = anTag(termine, anker);
   const mehrtaegig = liste.filter((t) => !laeuftAn(t, anker) || (t.bis_datum && t.bis_datum !== t.datum));
 
+  // Volle Spaltenbreite wie Monat, Woche und Legende (Design-Regel 1) – vorher
+  // eine schmale Karte mitten am Laptop, darunter alles leer.
   return (
-    <div className="mx-auto max-w-2xl">
+    <div>
       {mehrtaegig.length > 0 && (
-        <p className="mb-2 text-[12px] text-tinte-leise">
+        <p className="auf-bild mb-2 px-1 text-[12px] text-tinte-leise">
           Mehrtägige Termine stehen an jedem Tag, an dem sie laufen.
         </p>
       )}
@@ -584,7 +720,7 @@ function TagesAnsicht({
                   )}
                 </span>
                 {!st(t) && meins(t) && (
-                  <span className="shrink-0 rounded-full bg-brand/10 px-2 py-0.5 text-[12px] font-bold text-brand-dark dark:bg-brand/20 dark:text-brand">
+                  <span className="shrink-0 rounded-full bg-brand/10 px-2 py-0.5 text-[12px] font-bold text-brand-dark dark:bg-brand/20 dark:text-brand-dark">
                     für dich
                   </span>
                 )}

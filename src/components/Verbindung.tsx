@@ -28,6 +28,13 @@ export function useUnterkante(aktiv: boolean): string {
         const fuss = parseFloat(getComputedStyle(el).paddingBottom) || 0;
         wert = Math.max(0, window.innerHeight - r.bottom) + fuss;
       });
+      // Eine Leiste, die selbst unten liegt (Auswahl-Leiste der Kasse):
+      // Meldungen stehen darüber, nicht auf den Namen, die man prüfen will
+      document.querySelectorAll<HTMLElement>("[data-unterkante]").forEach((el) => {
+        if (!el.getClientRects().length) return;
+        const kind = (el.firstElementChild as HTMLElement | null) ?? el;
+        wert = Math.max(wert ?? 0, window.innerHeight - kind.getBoundingClientRect().top);
+      });
       setPx(wert);
     };
     messen();

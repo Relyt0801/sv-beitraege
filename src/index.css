@@ -40,7 +40,10 @@
      (weiß auf #0A84FF = 3,6:1, auf #0071E3 = 4,7:1). */
   --brand-fuell: 0 113 227;    /* #0071E3 */
   --brand-soft: 64 156 255;
-  --brand-dark: 100 170 255;
+  /* Blaue Schrift auf blau getöntem Grund (bg-brand/20): #78B6FF – 5,6:1 auf
+     Karten (#1C1C1E), 4,9:1 in Blättern (#2C2C2E). #64AAFF schaffte in
+     Blättern nur 4,27:1 (Zähler-Chip „×3“ in den Umfrage-Ergebnissen). */
+  --brand-dark: 120 182 255;
   --papier: 0 0 0;
   --karte: 28 28 30;
   --linie: 56 56 58;
@@ -92,6 +95,16 @@ html, body, #root {
 }
 @media (min-width: 1024px) {
   :root { --leiste: 0px; }
+}
+
+/* Breite der App-Spalte (max-w-5xl, tailwind.config.js): am Laptop 64rem,
+   auf großen Bildschirmen breiter – sonst bleibt die Hälfte leer. */
+:root { --spalte: 64rem; }
+@media (min-width: 1400px) {
+  :root { --spalte: 74rem; }
+}
+@media (min-width: 1700px) {
+  :root { --spalte: 84rem; }
 }
 
 /* iPhone, App vom Home-Bildschirm (Statusleiste "black-translucent"):
@@ -270,8 +283,13 @@ button:not(:disabled) {
     @apply flex rounded-[0.6rem] bg-[rgb(118_118_128/0.12)] p-[2px] dark:bg-[rgb(118_118_128/0.24)];
   }
   .seg-item {
-    @apply min-w-0 flex-1 rounded-[0.5rem] px-3 py-1.5 text-center text-[13px] font-semibold text-tinte
+    @apply relative min-w-0 flex-1 rounded-[0.5rem] px-3 py-1.5 text-center text-[13px] font-semibold text-tinte
            transition duration-200 ease-ios dark:text-slate-100;
+  }
+  /* Tippfläche 44 px hoch, auch wenn das Segment schmal aussieht (wie iOS) */
+  .seg-item::after {
+    content: "";
+    @apply absolute inset-x-0 -inset-y-1.5;
   }
   .seg-aktiv {
     @apply bg-white shadow-[0_3px_8px_rgba(0,0,0,.12),0_3px_1px_rgba(0,0,0,.04)] dark:bg-slate-600;
@@ -403,6 +421,22 @@ html.mit-hintergrund {
 html.mit-hintergrund .kopf-grund {
   background-color: transparent;
 }
+/* Kopfzeile (App.tsx): Platz für den Kopf eines geöffneten Chats. Nur am
+   Rechner/iPad quer – dort steht Zurück + Name genau da, wo sonst der
+   Seitentitel steht, statt als zweites Band darunter. Solange ein Chat
+   offen ist, treten Seitentitel und Seiten-Knöpfe zurück. */
+.kopf-ebene {
+  display: none;
+}
+@media (min-width: 1024px) {
+  .kopf-ebene:not(:empty) {
+    display: flex;
+  }
+  .kopf-zeile:has(> .kopf-ebene:not(:empty)) > .kopf-eigen {
+    display: none;
+  }
+}
+
 /* Kopfleiste beim Scrollen: Glas über die GANZE Breite (vorher nur so breit
    wie der Inhalt – am Laptop sah das Hintergrundbild abgeschnitten aus). */
 .kopf-band {
@@ -415,26 +449,15 @@ html.mit-hintergrund .kopf-grund {
   width: 100vw;
   transform: translateX(-50%);
   z-index: -1;
-  background-color: rgb(var(--glas) / 0.88);
-  -webkit-backdrop-filter: blur(40px) saturate(1.8);
-  backdrop-filter: blur(40px) saturate(1.8);
+  /* DECKEND (K4): Mit 0.95 und Weichzeichner stand Inhalt („ABI-ALBUM“,
+     „Jetzt ausfüllen“) scharf lesbar hinter dem kleinen Titel – der
+     Weichzeichner wirkt am ::before eines klebenden Kopfs nicht zuverlässig.
+     Design-Regel 3: nie lesbar durchscheinen. */
+  background-color: rgb(var(--glas));
   box-shadow: 0 0.5px 0 rgba(0, 0, 0, 0.18);
-}
-@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .kopf-band::before {
-    background-color: rgb(var(--glas) / 0.97);
-  }
 }
 .dark .kopf-band::before {
   box-shadow: 0 0.5px 0 rgba(255, 255, 255, 0.15);
-}
-/* Mit eigenem Hintergrundbild: ruhige, fast deckende Leiste ohne Weichzeichner
-   und ohne Farbschein aus dem Bild */
-html.mit-hintergrund .kopf-band::before {
-  /* DECKEND: mit 0.94 schimmerte der große Titel/Inhalt als Geist durch */
-  background-color: rgb(var(--glas));
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
 }
 /* Text, der direkt auf dem Hintergrundbild steht (Abschnittstitel, Fußnoten
    von Gruppen, großer Seitentitel): kräftigere Farbe + Lichthof in der
@@ -475,14 +498,33 @@ html.mit-hintergrund .ebene-grund {
    wird unlesbar. In Blättern bleiben sie wie gehabt. */
 html.mit-hintergrund main .seg,
 html.mit-hintergrund .ebene-grund .seg,
+html.mit-hintergrund header .seg,
+html.mit-hintergrund .in-kopf .seg,
 html.mit-hintergrund .feld-auf-bild {
   background-color: rgb(227 227 232);
   box-shadow: 0 0 0 0.5px rgb(0 0 0 / 0.08);
 }
 html.dark.mit-hintergrund main .seg,
 html.dark.mit-hintergrund .ebene-grund .seg,
+html.dark.mit-hintergrund header .seg,
+html.dark.mit-hintergrund .in-kopf .seg,
 html.dark.mit-hintergrund .feld-auf-bild {
   background-color: rgb(var(--glas));
+}
+/* Dunkel + Bild, gescrollt: Die Kopfzeile ist dann deckend in --glas – eine
+   Bahn in derselben Farbe war unsichtbar („Personen“ stand als loser Text da).
+   Ungescrollt (ohne kopf-band) bleibt die deckende Bahn auf dem Foto. */
+html.dark.mit-hintergrund header.kopf-band .seg {
+  background-color: rgb(118 118 128 / 0.24);
+}
+/* Segment IN einer Karte (z. B. „Alle | Nur offene“ in der Kassenliste) steht
+   nicht auf dem Foto: normale Bahn – sonst war sie im Dunkeln unsichtbar */
+html.mit-hintergrund .card .seg {
+  background-color: rgb(118 118 128 / 0.12);
+  box-shadow: none;
+}
+html.dark.mit-hintergrund .card .seg {
+  background-color: rgb(118 118 128 / 0.24);
 }
 html.mit-hintergrund .blatt .seg,
 html.mit-hintergrund .blatt .feld-auf-bild {

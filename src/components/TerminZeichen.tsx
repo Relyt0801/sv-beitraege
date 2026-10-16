@@ -120,15 +120,17 @@ function Haken() {
 /** Kleine Erklärung im Kalender – nur, wenn man überhaupt Schichten hat. */
 export function SchichtLegende() {
   return (
-    <div className="mb-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-tinte-matt dark:text-slate-300">
+    <div className="auf-bild mb-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 px-1 text-[12px] text-tinte-matt dark:text-slate-300">
       <span className="inline-flex items-center gap-1.5">
         <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-emerald-500/30" aria-hidden /> Eingeteilt
       </span>
       <span className="inline-flex items-center gap-1.5">
         <span className="h-2.5 w-2.5 rounded-full ring-1 ring-inset ring-brand" aria-hidden /> angemeldet, wartet
       </span>
-      <span className="inline-flex items-center gap-1.5 opacity-70">
-        <span className="h-2.5 w-2.5 rounded-full border border-dashed border-tinte-leise" aria-hidden /> nicht bekommen
+      {/* Blass nur das Zeichen – der Text bleibt so lesbar wie die anderen
+          (auf dem Hintergrundbild verblasste sonst auch der Lichthof von auf-bild) */}
+      <span className="inline-flex items-center gap-1.5">
+        <span className="h-2.5 w-2.5 rounded-full border border-dashed border-tinte-leise opacity-70" aria-hidden /> nicht bekommen
       </span>
     </div>
   );

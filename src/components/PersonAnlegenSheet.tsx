@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import { hasSupabase, supabase } from "../lib/supabase";
-import { HY } from "../lib/types";
+import { HY, type Halbjahr } from "../lib/types";
+import { useStore } from "../store";
 import { Sheet, SheetKopf } from "./Sheet";
-import { Gruppe, Zeile, ZeileAuswahl, ZeileEingabe, ZeileMitSchalter } from "./Liste";
+import { Gruppe, Zeile, ZeileEingabe, ZeileMitSchalter, ZeileSegmente } from "./Liste";
 import { Schalter } from "./Schalter";
 import { Icon } from "./Icon";
+import { FussLeiste } from "./FussLeiste";
 
 import { hinweis } from "../lib/melder";
 /**
@@ -14,11 +16,35 @@ import { hinweis } from "../lib/melder";
  *
  * Das Startpasswort wird genau EINMAL angezeigt und nirgends gespeichert.
  * Beim ersten Login muss die Person es ändern.
+ *
+ * Prüfung Okt. 2026: „Dabei ab“ stand fest auf Q1.1 (in der EF zählten so die
+ * EF-Beiträge nicht) und war wie „Rolle“ ein natives Auswahlfeld. Jetzt
+ * beginnt „Dabei ab“ beim laufenden Halbjahr, beides sind Segmente wie im
+ * Kassen-Blatt, und der Knopf klebt unten (FussLeiste).
  */
-export function PersonAnlegenSheet({ open, onClose, onFertig }: { open: boolean; onClose: () => void; onFertig: () => void }) {
+const ROLLEN = [
+  { key: "schueler", text: "Schüler" },
+  { key: "stufenteam", text: "Stufenteam" },
+  { key: "kassenwart", text: "Kassenwart" },
+] as const;
+
+export function PersonAnlegenSheet({
+  open,
+  onClose,
+  onFertig,
+  onNurListe,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onFertig: () => void;
+  /** Optional (Kasse): stattdessen nur einen Listeneintrag ohne Login anlegen */
+  onNurListe?: () => void;
+}) {
+  const { settings } = useStore();
+  const laeuft = settings.aktuelles_halbjahr;
   const [vorname, setVorname] = useState("");
   const [nachname, setNachname] = useState("");
-  const [ab, setAb] = useState<string>("Q1.1");
+  const [ab, setAb] = useState<Halbjahr>(laeuft);
   const [rolle, setRolle] = useState("schueler");
   const [mitEltern, setMitEltern] = useState(true);
   const [pw, setPw] = useState("");
@@ -39,13 +65,14 @@ export function PersonAnlegenSheet({ open, onClose, onFertig }: { open: boolean;
     if (!open) return;
     setVorname("");
     setNachname("");
+    setAb(laeuft);
     setPw("");
     setElternPw("");
     setFehler("");
     setDoppelt(false);
     setErgebnis(null);
     setKopiert(false);
-  }, [open]);
+  }, [open, laeuft]);
 
   async function anlegen(trotzdem = false) {
     setFehler("");
@@ -95,27 +122,34 @@ export function PersonAnlegenSheet({ open, onClose, onFertig }: { open: boolean;
         <>
           <SheetKopf titel="Person hinzufügen" unter="Legt den Eintrag in der Liste und den Login an. Das Startpasswort legst du selbst fest." onClose={onClose} />
 
-          {/* Name, Beitritt und Rolle als Gruppe wie in den iOS-Einstellungen –
-              vorher native Auswahlfelder und ein natives Kästchen */}
+          {/* Name, Beitritt und Rolle wie in den iOS-Einstellungen – Auswahl als
+              Segment, keine nativen Auswahlfelder */}
           <Gruppe titel="Person" className="">
             <ZeileEingabe label="Vorname" value={vorname} onChange={setVorname} placeholder="Pflicht" autoFocus />
             <ZeileEingabe label="Nachname" value={nachname} onChange={setNachname} placeholder="Pflicht" />
-            <Zeile label="Dabei ab">
-              <ZeileAuswahl label="Dabei ab" value={ab} onChange={setAb}>
-                {HY.map((h) => (
-                  <option key={h} value={h}>
-                    {h}
-                  </option>
+          </Gruppe>
+
+          <Gruppe titel="Dabei ab" fuss="Halbjahre davor zählen nicht zum Beitrag.">
+            <ZeileSegmente werte={HY} wert={ab} onWahl={setAb} />
+          </Gruppe>
+
+          <Gruppe titel="Rolle">
+            <div className="px-3 py-2.5">
+              <div className="seg" role="radiogroup" aria-label="Rolle">
+                {ROLLEN.map((r) => (
+                  <button
+                    key={r.key}
+                    type="button"
+                    role="radio"
+                    aria-checked={rolle === r.key}
+                    onClick={() => setRolle(r.key)}
+                    className={`seg-item px-1 ${rolle === r.key ? "seg-aktiv" : ""}`}
+                  >
+                    {r.text}
+                  </button>
                 ))}
-              </ZeileAuswahl>
-            </Zeile>
-            <Zeile label="Rolle">
-              <ZeileAuswahl label="Rolle" value={rolle} onChange={setRolle}>
-                <option value="schueler">Schüler</option>
-                <option value="stufenteam">Stufenteam</option>
-                <option value="kassenwart">Kassenwart</option>
-              </ZeileAuswahl>
-            </Zeile>
+              </div>
+            </div>
           </Gruppe>
 
           <Gruppe titel="Zugang" fuss="Mindestens 8 Zeichen. „Vorschlag“ erzeugt ein Passwort ohne Verwechsler wie 0/O oder 1/l.">
@@ -126,16 +160,24 @@ export function PersonAnlegenSheet({ open, onClose, onFertig }: { open: boolean;
             {mitEltern && <PwZeile label="Passwort Eltern" wert={elternPw} setzen={setElternPw} />}
           </Gruppe>
 
-          {fehler && <p className="mt-3 px-4 text-[13px] font-semibold text-amber-700 dark:text-amber-400">{fehler}</p>}
-          {doppelt ? (
-            <button disabled={busy} onClick={() => void anlegen(true)} className="btn-primary mt-4 disabled:opacity-50">
-              {busy ? "…" : "Trotzdem neu anlegen"}
-            </button>
-          ) : (
-            <button disabled={busy} onClick={() => void anlegen()} className="btn-primary mt-4 disabled:opacity-50">
-              {busy ? "Wird angelegt …" : "Anlegen"}
-            </button>
+          {onNurListe && (
+            <Gruppe fuss="Für jemanden, der die App nicht nutzt – steht nur in der Kassenliste.">
+              <Zeile label="Nur Listeneintrag ohne Login" onClick={onNurListe} />
+            </Gruppe>
           )}
+
+          <FussLeiste>
+            {fehler && <p className="mb-2.5 px-1 text-[13px] font-semibold text-amber-700 dark:text-amber-400">{fehler}</p>}
+            {doppelt ? (
+              <button disabled={busy} onClick={() => void anlegen(true)} className="btn-primary disabled:opacity-50">
+                {busy ? "…" : "Trotzdem neu anlegen"}
+              </button>
+            ) : (
+              <button disabled={busy} onClick={() => void anlegen()} className="btn-primary disabled:opacity-50">
+                {busy ? "Wird angelegt …" : "Anlegen"}
+              </button>
+            )}
+          </FussLeiste>
         </>
       ) : (
         <>

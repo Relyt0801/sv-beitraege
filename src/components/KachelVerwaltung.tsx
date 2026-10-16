@@ -9,16 +9,17 @@ import { COMMITTEES } from "../lib/committees";
 import { ALL_PERMS, KOMITEE_PERMS, PERM_CATEGORIES, PERM_ROLES, ROLE_DEFAULTS, rollenDerZeile, type PermDef, type PermKey } from "../lib/permissions";
 
 /**
- * „Wer darf hier was?“ – direkt in der Kachel statt im Rechte-Reiter.
+ * „Wer darf hier was?“ – direkt in der Kachel statt unter Rollen → Rechte je Rolle.
  *
  * Zeigt für die Rechte eines Bereichs (z. B. motto.verwalten, motto.runden,
  * funktion.motto), welche Rollen und Komitees sie haben, und lässt sie
- * umschalten. Gleiche Tabellen wie der Rechte-Reiter (role_permissions,
+ * umschalten. Gleiche Tabellen wie „Rechte je Rolle“ (role_permissions,
  * komitee_rechte) – nur nach Kachel sortiert. Sichtbar für Admins und wer
  * „Berechtigungen vergeben“ darf.
  *
- * Die Rechte, die hier stehen, blendet der Rechte-Reiter aus (KACHEL_PERMS),
- * damit er übersichtlich bleibt.
+ * Die Rechte der Kacheln, die „Wer darf was?“ wirklich eingebaut haben
+ * (IN_KACHEL_EINSTELLBAR), blendet „Rechte je Rolle“ aus, damit es
+ * übersichtlich bleibt.
  */
 export const KACHEL_PERMS: Record<string, PermKey[]> = {
   motto: ["motto.nutzen", "motto.verwalten", "motto.runden", "funktion.motto"],
@@ -28,6 +29,15 @@ export const KACHEL_PERMS: Record<string, PermKey[]> = {
   umfragen: ["umfragen.verwalten", "umfragen.ergebnisse", "umfragen.runden", "funktion.umfragen"],
 };
 export const ALLE_KACHEL_PERMS = new Set<PermKey>(Object.values(KACHEL_PERMS).flat());
+
+/**
+ * Nur diese Kacheln haben „Wer darf was?“ wirklich eingebaut (Motto.tsx,
+ * Zitate.tsx, Rankings.tsx). Album und Umfragen (noch) nicht – ihre Rechte
+ * bleiben deshalb unter „Rechte je Rolle“, in den Komitee-Rechten und bei
+ * den Ausnahmen je Person. Kommt <KachelVerwaltung kachel="album" /> bzw.
+ * "umfragen" dazu, die Kachel hier ergänzen.
+ */
+export const IN_KACHEL_EINSTELLBAR = new Set<PermKey>([...KACHEL_PERMS.motto, ...KACHEL_PERMS.zitate, ...KACHEL_PERMS.rankings]);
 
 const ROLLEN = PERM_ROLES.filter((r) => r.key !== "admin");
 const DEFS = new Map<PermKey, PermDef>(PERM_CATEGORIES.flatMap((c) => c.perms.map((p) => [p.key, p] as const)));
@@ -106,7 +116,7 @@ export function KachelVerwaltung({ kachel, titel = "Wer darf was?" }: { kachel: 
   const def = auf ? DEFS.get(auf) : null;
   return (
     <>
-      <Gruppe titel={titel} fuss="Admins dürfen immer alles. Ausnahmen für einzelne Personen: Rollen → Person antippen.">
+      <Gruppe titel={titel} fuss="Admins dürfen immer alles. Ausnahmen für einzelne Personen: Rollen → Personen → Person antippen.">
         {perms.map((p) => (
           <button
             key={p}
@@ -139,7 +149,6 @@ export function KachelVerwaltung({ kachel, titel = "Wer darf was?" }: { kachel: 
               <Gruppe titel="Komitees" fuss="Wer im Komitee ist, hat das Recht sofort.">
                 {COMMITTEES.filter((c) => !c.teamOnly).map((c) => (
                   <label key={c.slug} className="flex min-h-[48px] items-center gap-3 px-4 py-2">
-                    <span aria-hidden className="text-[18px]">{c.icon}</span>
                     <span className="flex-1 text-[15px]">{c.label}</span>
                     <Schalter an={!!stand?.komitees[c.slug]?.has(auf)} onChange={(v) => void setzeKomitee(c.slug, auf, v)} label={c.label} />
                   </label>

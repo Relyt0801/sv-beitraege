@@ -41,7 +41,7 @@ export function TeilSymbol({ teil, size }: { teil: Teil; size?: number }) {
 export function TeilMarke({ teil, hell }: { teil: Teil; hell?: boolean }) {
   return (
     <span
-      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11.5px] font-semibold ${
+      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[12px] font-semibold ${
         hell ? "bg-white/20 text-white" : `${TEIL_FARBE[teil].grund} ${TEIL_FARBE[teil].text}`
       }`}
     >

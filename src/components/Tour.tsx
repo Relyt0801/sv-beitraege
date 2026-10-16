@@ -212,6 +212,12 @@ export function Tour({
       : { top: rect.top + rect.height + PAD + 12, left: links, width: w };
   }
 
+  // Das Loch nie über den oberen Rand: Der Profil-Knopf (44 px bei y = 8)
+  // ergab top = 0 – Ring und obere Rundung lagen außerhalb des Bildes.
+  // 4 px lassen Platz für den 2,5-px-Ring.
+  const lochOben = rect ? Math.max(4, rect.top - PAD) : 0;
+  const lochHoehe = rect ? rect.top + rect.height + PAD - lochOben : 0;
+
   return (
     <div className="fixed inset-0 z-[100]" role="dialog" aria-modal="true" aria-label="Einführung">
       {/* Abdunkeln mit Loch um das Element */}
@@ -220,16 +226,16 @@ export function Tour({
           <div
             className="pointer-events-none absolute rounded-[1.25rem] transition-all duration-300 ease-ios"
             style={{
-              top: rect.top - PAD,
+              top: lochOben,
               left: rect.left - PAD,
               width: rect.width + PAD * 2,
-              height: rect.height + PAD * 2,
+              height: lochHoehe,
               boxShadow: "0 0 0 9999px rgba(0,0,0,.66)",
             }}
           />
           <div
             className="pointer-events-none absolute animate-puls rounded-[1.25rem] ring-[2.5px] ring-brand transition-all duration-300 ease-ios"
-            style={{ top: rect.top - PAD, left: rect.left - PAD, width: rect.width + PAD * 2, height: rect.height + PAD * 2 }}
+            style={{ top: lochOben, left: rect.left - PAD, width: rect.width + PAD * 2, height: lochHoehe }}
           />
         </>
       ) : (
@@ -332,7 +338,7 @@ export function schuelerSchritte(staffel: Staffel, o: { nachtragen?: boolean; fi
       tab: "kasse",
       anchor: "meine-halbjahre",
       title: "Deine sechs Halbjahre",
-      text: "Jede Kachel ist ein Halbjahr: Haken = bezahlt, € = offen, Schrägstrich = erlassen. Blau umrandet ist das laufende, graue sind noch nicht fällig.",
+      text: "Jede Kachel ist ein Halbjahr: Haken = bezahlt, € = offen, Schrägstrich = erlassen. Blau umrandet ist das laufende, graue kommen später.",
     },
     {
       tab: "kasse",
@@ -371,7 +377,7 @@ export function teamSchritte(o: {
   finanzen: boolean;
   rollen: boolean;
   rechte: boolean;
-  /** Team mit eigener Person: Reiter Profil mit den Kacheln der Abizeitung */
+  /** Team mit eigener Person: Reiter Übersicht mit den Kacheln der Abizeitung */
   profilReiter?: boolean;
   /** Der Nachtragen-Knopf im Kopf (nur mit eigener Person) */
   nachtragen?: boolean;
@@ -396,7 +402,7 @@ export function teamSchritte(o: {
       anchor: "person",
       title: "Eine Person",
       text: o.kasseBearbeiten
-        ? "Ein Tipp auf ein Halbjahr schaltet zwischen offen, bezahlt und erlassen. Ein Tipp auf den Namen öffnet alle Details und die Mithilfe."
+        ? "Ein Tipp auf ein Halbjahr schaltet zwischen offen und bezahlt. Ein Tipp auf den Namen öffnet alle Details und die Mithilfe – dort kannst du ein Halbjahr auch erlassen."
         : "Ein Tipp auf den Namen öffnet alle Details – dort trägst du auch ein, wobei jemand geholfen hat.",
     },
   );
@@ -414,11 +420,11 @@ export function teamSchritte(o: {
     { tab: "themen", anchor: "tab-themen", title: "Chats", text: "Alle Komitee-Chats, der Stufenteam-Chat, die Fragen der Eltern und die Anfragen an einem Ort." },
   );
   if (o.beitraege)
-    s.push({ tab: "beitraege", anchor: "tab-beitraege", title: "Beiträge & Abiball", text: "Was jedes Halbjahr kostet, die Prozent-Staffel fürs Ticket und die Vorlagen für Mithilfe." });
+    s.push({ tab: "beitraege", anchor: "tab-beitraege", title: "Beiträge & Abiball", text: "Oben in der Kasse umschalten: was jedes Halbjahr kostet, die Prozent-Staffel fürs Ticket und die Vorlagen für Mithilfe." });
   if (o.finanzen)
     s.push({ tab: "finanzen", anchor: "tab-finanzen", title: "Finanzen", text: "Das Kassenbuch: Kontostand, Einnahmen und Ausgaben. Ein Tipp auf eine Buchung zeigt alle Details." });
   if (o.rollen || o.rechte)
-    s.push({ tab: "rollen", anchor: "tab-rollen", title: "Rollen & Rechte", text: "Oben umschalten: „Rollen“ zeigt alle Personen – Person antippen für ihre einzelnen Rechte. „Rechte“ legt fest, was jede Rolle darf." });
+    s.push({ tab: "rollen", anchor: "tab-rollen", title: "Rollen", text: "Oben umschalten: „Personen“ zeigt alle – Person antippen für ihre Rolle und einzelnen Rechte. „Rechte je Rolle“ legt fest, was jede Rolle darf." });
   s.push({
     tab: "kasse",
     anchor: "profil",
@@ -448,7 +454,7 @@ export function elternSchritte(o: { mehrereKinder: boolean }): TourStep[] {
       tab: "uebersicht",
       anchor: "kind-halbjahre",
       title: "Sechs Halbjahre",
-      text: "✓ bezahlt, € offen, / erlassen. Blau umrandet ist das laufende Halbjahr, graue sind noch nicht fällig. EF ist die 11, Q1 und Q2 die 12 und 13.",
+      text: "✓ bezahlt, € offen, / erlassen. Blau umrandet ist das laufende Halbjahr, graue kommen später. EF ist die 11, Q1 und Q2 die 12 und 13.",
     },
     {
       tab: "uebersicht",

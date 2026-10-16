@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { SkelettKarten, SkelettZeilen } from "./components/Skelett";
-import { HY, type Halbjahr, type Status } from "./lib/types";
+import type { Halbjahr, Status } from "./lib/types";
 import { normalize, offenGesamt, offenStufe, sortStudents, staffelVon } from "./lib/logic";
 import { neuLadenBeobachten } from "./lib/neuladen";
 import { MyKasse } from "./components/MyKasse";
@@ -8,8 +8,8 @@ import { Avatar } from "./components/Avatar";
 import { Tour, schuelerSchritte, teamSchritte, useTourOffen } from "./components/Tour";
 import { useTheme } from "./lib/theme";
 import { useVerzoegert } from "./lib/entwurf";
-import { hasSupabase, supabase } from "./lib/supabase";
-import { abmelden, appZaehler } from "./lib/push";
+import { appZaehler } from "./lib/push";
+import { rolleName } from "./lib/permissions";
 import { PushHinweis, usePushAuffrischen } from "./components/PushHinweis";
 import { useStore } from "./store";
 import { AuthGate, Splash } from "./auth/AuthGate";
@@ -18,8 +18,9 @@ import { RoleProvider, useRole } from "./auth/RoleProvider";
 import { ProfilesProvider, useProfiles } from "./profiles-store";
 import { EventsProvider, useEvents } from "./events-store";
 import { TermineProvider, useTermine } from "./termine-store";
-import { TopicsProvider } from "./topics-store";
-import { StudentCard, nextStatus } from "./components/StudentCard";
+import { TopicsProvider, useTopics } from "./topics-store";
+import { SPALTE_HALBJAHRE, SPALTE_MITHILFE, SPALTE_OFFEN, SPALTE_PERSON, StudentCard } from "./components/StudentCard";
+import { Gruppe, Zeile } from "./components/Liste";
 import { useKostenAnfragen } from "./lib/kosten";
 import { SPRUNG_TAB, sprungAusHash } from "./lib/sprung";
 import { MeldenWurzel } from "./components/Melden";
@@ -27,14 +28,16 @@ import { KassenKopf } from "./components/KassenKopf";
 import { SchichtAbschluss } from "./components/SchichtAbschluss";
 import { useChatZaehler } from "./lib/chat-zaehler";
 import { PatchNotes } from "./components/PatchNotes";
-import { PATCH, PATCH_MERKER } from "./lib/patchnotes";
+import { PATCH, PATCH_MERKER, type PatchGruppe } from "./lib/patchnotes";
 import { ElternProvider, useEltern } from "./eltern-store";
 import { Icon, type IconName } from "./components/Icon";
 import { HintergrundEbene } from "./components/HintergrundEbene";
 import { InstallKarte, InstallOverlay } from "./components/InstallHinweis";
-import { useGescrollt, useHoeheAlsVariable, useReiter } from "./lib/gescrollt";
+import { ZuErledigen } from "./components/ZuErledigen";
+import { TeamAufgabenQuelle, useFuerMichOffen, useTeamAufgaben, type TeamArt } from "./lib/offen";
+import { useBreit, useGescrollt, useHoeheAlsVariable, useReiter } from "./lib/gescrollt";
 import { GlasLeiste } from "./components/GlasLeiste";
-import { Schalter } from "./components/Schalter";
+import { InKopf } from "./components/InKopf";
 import { AlbumProvider } from "./components/Album";
 import { FunktionenProvider } from "./lib/funktionen";
 import { FaulGrenze, allesVorladen, faul } from "./components/FaulLaden";
@@ -125,7 +128,9 @@ function NachRolle() {
             <ElternProvider>
               <AlbumProvider>
                 <HintergrundEbene />
-                <Main />
+                <TeamAufgabenQuelle>
+                  <Main />
+                </TeamAufgabenQuelle>
                 <MeldenWurzel />
               </AlbumProvider>
             </ElternProvider>
@@ -148,6 +153,15 @@ function tabAusAdresse(entfernen = true): Tab | null {
   const h = window.location.hash.replace("#", "");
   // Ein bestimmter Chat (#chat-<id>): Reiter Chats, den Chat öffnet ChatsTab
   if (h.startsWith("chat-")) return "themen";
+  // Adresse mit Unterziel („#events/<ziel>“, „#chats/<ziel>“): nur den Reiter
+  // öffnen. Die Marke bleibt stehen – der Reiter liest „<ziel>“ selbst und
+  // räumt danach per history.replaceState auf.
+  const unterziel = h.match(/^(events|chats)\/(.*)$/);
+  if (unterziel) {
+    // Ohne Ziel („#events/“) wie „#events“: Reiter öffnen, Marke weg
+    if (!unterziel[2] && entfernen) history.replaceState(null, "", window.location.pathname + window.location.search);
+    return unterziel[1] === "events" ? "events" : "themen";
+  }
   const t: Tab | null =
     h === "events" ? "events" : h === "chats" ? "themen" : h === "kasse" ? "kasse" : h === "finanzen" ? "finanzen" : h === "profil" ? "profil" : null;
   if (t && entfernen) history.replaceState(null, "", window.location.pathname + window.location.search);
@@ -156,19 +170,63 @@ function tabAusAdresse(entfernen = true): Tab | null {
 
 const NACHTRAG_HINWEIS = "sv:hinweis:nachtragen";
 
+/**
+ * Zuletzt benutzter Reiter (je Gerät) – wie iOS-Apps, die dort weitermachen,
+ * wo man aufgehört hat. Der Kassenwart landet so in Finanzen, wer im Komitee
+ * arbeitet, in den Chats. Ein Sprung aus einer Mitteilung geht vor.
+ */
+const LETZTER_REITER = "sv:reiter";
+const REITER: Tab[] = ["profil", "kasse", "events", "themen", "beitraege", "finanzen", "rollen"];
+function letzterReiter(): Tab | null {
+  try {
+    const t = localStorage.getItem(LETZTER_REITER) as Tab | null;
+    // „Beiträge“ ist seit dem Umbau ein Teil der Kasse
+    if (t === "beitraege") return "kasse";
+    return t && REITER.includes(t) ? t : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Wie viele Personenzeilen auf einmal dazukommen. */
 const SCHRITT_LISTE = 40;
 
-/** Was oben im Kopf steht – je Reiter eine kurze Überschrift. */
+/** Was oben im Kopf steht – je Reiter eine kurze Überschrift, gleich dem
+ *  Namen des Reiters (vorher „Stufenkasse“ unter dem Reiter „Kasse“). */
 const REITER_TITEL: Record<Tab, string> = {
-  profil: "Mein Profil",
-  kasse: "Stufenkasse",
+  // Die eigene Startseite (eigener Betrag, Abizeitung, Ticket) heißt für alle
+  // gleich – vorher „Mein Profil“ beim Team (wie das Profil-Blatt hinter dem
+  // eigenen Bild) und „Kasse“ bei Schülern (obwohl dort vor allem die
+  // Abizeitung steht).
+  profil: "Übersicht",
+  kasse: "Kasse",
   events: "Events",
   themen: "Chats",
   beitraege: "Beiträge & Abiball",
   finanzen: "Finanzen",
-  rollen: "Rollen & Rechte",
+  rollen: "Rollen",
 };
+
+/**
+ * Reihenfolge der Reiter nach Rolle (Rollen-Prüfung Okt. 2026): Wer etwas
+ * täglich braucht, findet es weiter vorne – am Handy direkt neben dem
+ * Daumen. Stufenteam und Sprecher organisieren Events und Chats (Kasse und
+ * Finanzen schauen sie nur an), der Kassenwart arbeitet in Kasse und Finanzen.
+ * Admin und Schüler behalten die Grundordnung. Jede Person hat eine Rolle –
+ * für sie steht jeder Reiter also immer an derselben Stelle.
+ */
+const REITER_REIHENFOLGE: Partial<Record<string, Tab[]>> = {
+  kassenwart: ["profil", "kasse", "finanzen", "events", "themen", "rollen"],
+  stufenteam: ["profil", "events", "themen", "kasse", "finanzen", "rollen"],
+  sprecher: ["profil", "events", "themen", "kasse", "finanzen", "rollen"],
+  stv_sprecher: ["profil", "events", "themen", "kasse", "finanzen", "rollen"],
+};
+function reiterOrdnen<R extends { key: Tab }>(role: string | null | undefined, liste: R[]): R[] {
+  const ordnung = REITER_REIHENFOLGE[role ?? ""];
+  if (!ordnung) return liste;
+  const platz = (k: Tab) => (ordnung.includes(k) ? ordnung.indexOf(k) : ordnung.length);
+  return [...liste].sort((a, b) => platz(a.key) - platz(b.key));
+}
 
 function Main() {
   const { students, punkte, settings, ready, mode, reload, setTerm, setSettings, exportData, importData } = useStore();
@@ -177,6 +235,17 @@ function Main() {
   // Kennung fürs eigene Namensbild aus dem Profil-Speicher – im Themen-Speicher
   // liegt sie in einer Referenz und ist beim ersten Zeichnen noch leer.
   const { uid } = useProfiles();
+  // „Was ist neu“ nach Rollen: Komitee-Mitglieder bekommen die Erklärung zu
+  // offiziell/inoffiziell, die Kasse ihre Finanz-Neuerungen, Admins die Verwaltung
+  const { committeesOf } = useTopics();
+  const patchGruppen = useMemo<PatchGruppe[]>(() => {
+    const g: PatchGruppe[] = [];
+    if (isStaff) g.push("team", "komitee");
+    else if (uid && committeesOf(uid).length) g.push("komitee");
+    if (can("finanzen.manage")) g.push("kasse");
+    if (role === "admin") g.push("admin");
+    return g;
+  }, [isStaff, uid, committeesOf, can, role]);
   const { theme, toggle } = useTheme();
 
   const showTopicsTab = true;
@@ -212,7 +281,7 @@ function Main() {
   }, [roleReady, ready, isStaff, tourResetAt]);
 
   // Rote Zahlen auf den Reitern: alles, was dort auf einen wartet.
-  const { neueTermine, anfragen, meineVorsitze } = useTermine();
+  const { neueTermine, anfragen, meineVorsitze, ready: termineBereit } = useTermine();
   const { ungelesen: elternUngelesen } = useEltern();
   const offeneAnfragen = isStaff || can("termine.manage") ? anfragen.filter((a) => a.status === "offen").length : 0;
   const unread = allEvents.filter((e) => !reads.has(e.id)).length + neueTermine.size + offeneAnfragen;
@@ -231,10 +300,91 @@ function Main() {
   // Nur lesen – React ruft den Startwert im Entwicklungsmodus zweimal auf.
   // useReiter springt vor dem Wechsel nach oben – sonst federt auf iOS die
   // Tab-Leiste, wenn der neue Reiter kürzer ist als die alte Scrollposition.
-  const [tab, setTab] = useReiter<Tab>(() => tabAusAdresse(false) || "kasse");
+  // Vor dem ersten Speichern merken, ob es schon einen gemerkten Reiter gab
+  const hatteGemerkt = useRef(letzterReiter() !== null);
   // Team mit eigenem Eintrag startet – wie alle Schüler – auf der eigenen
   // Ansicht (Reiter Profil). Nur beim Öffnen, nicht bei jedem Rollenwechsel.
   const hatProfilReiter = isStaff && Boolean(studentId);
+  // Der GEWÄHLTE Reiter (gemerkt, aus der Adresse, angetippt). Gezeigt wird
+  // er nur, wenn man ihn sehen darf – sonst die Kasse (siehe `tab` unten).
+  // Main wird erst gezeichnet, wenn die Rolle feststeht (NachRolle) – der
+  // Start-Reiter stimmt deshalb gleich beim ersten Bild. Vorher kam
+  // „Übersicht“ erst per Effekt danach: Kasse blitzte auf, die Linse flog.
+  const [gewaehlt, setTab] = useReiter<Tab>(
+    () => tabAusAdresse(false) || letzterReiter() || (roleReady && hatProfilReiter ? "profil" : "kasse"),
+  );
+  // Kasse: Personen oder (wer darf) Beiträge & Abiball – früher ein eigener Reiter
+  // Gewählter Teil der Kasse bleibt beim Reiterwechsel (pro Sitzung) –
+  // vorher sprang „Beiträge & Abiball“ immer zurück auf „Personen“
+  const [kasseTeil, setKasseTeilRoh] = useState<"personen" | "beitraege">(() => {
+    try {
+      return sessionStorage.getItem("sv:kasse-teil") === "beitraege" ? "beitraege" : "personen";
+    } catch {
+      return "personen";
+    }
+  });
+  const setKasseTeil = useCallback((t: "personen" | "beitraege") => {
+    setKasseTeilRoh(t);
+    try {
+      sessionStorage.setItem("sv:kasse-teil", t);
+    } catch {
+      /* egal */
+    }
+  }, []);
+  // Prüfaufgaben des Teams („Zu erledigen“: Schichten bestätigen, Zitate,
+  // Nachträge …) als Zahl an dem Reiter, auf dem die Liste steht – vorher wies
+  // nichts darauf hin, wer zuletzt in Kasse, Rollen oder Events war. Was schon
+  // an einem anderen Reiter zählt, zählt hier nicht noch einmal:
+  // Kostenanfragen (Finanzen) und Terminanfragen (Events).
+  // Dazu, was unter „Für dich offen“ steht (offene Abstimmungen, ungelesene
+  // wichtige Infos) – so passt die Zahl immer zur Liste darunter (Rollen-
+  // Prüfung: Reiter zeigte 2, die Liste 4 Einträge).
+  const teamAufgaben = useTeamAufgaben();
+  const fuerMich = useFuerMichOffen();
+  const aufgabenZahl =
+    (Object.entries(teamAufgaben) as [TeamArt, number][]).reduce(
+      (summe, [art, n]) => summe + (art === "kosten" || art === "termin" ? 0 : n),
+      0,
+    ) +
+    fuerMich.abstimmungen.length +
+    fuerMich.wichtig.length;
+
+  /*
+   * Darf man den gewählten Reiter sehen? Vorher leitete ein Effekt sofort zur
+   * Kasse um und speicherte „kasse“ dauerhaft – auch wenn das Recht nur noch
+   * nicht geladen war (Aufsichtsrat und Komitee-Vorsitz kommen erst nach dem
+   * Start: Kostenanfragen, Termine). So landeten sie bei jedem Öffnen in der
+   * Kasse. Jetzt wird nichts überschrieben: Gezeigt wird die Kasse nur, solange
+   * das Recht fehlt; gemerkt wird nur ein erlaubter Reiter. Wartet Finanzen
+   * noch auf seine Quellen, steht dort kurz ein Platzhalter (höchstens 5 s –
+   * schlägt das Laden fehl, geht es zur Kasse).
+   */
+  const rollenReiter = canManageRoles || can("perms.manage");
+  const darfReiter = (t: Tab) =>
+    t === "profil" ? hatProfilReiter : t === "finanzen" ? showFinanzen : t === "rollen" ? rollenReiter : true;
+  const [wartenVorbei, setWartenVorbei] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setWartenVorbei(true), 5000);
+    return () => clearTimeout(t);
+  }, []);
+  const gewaehltErlaubt = darfReiter(gewaehlt);
+  const finanzenWartet = gewaehlt === "finanzen" && !gewaehltErlaubt && !wartenVorbei && !(kosten.bereit && termineBereit);
+  const tab: Tab = gewaehltErlaubt || finanzenWartet ? gewaehlt : "kasse";
+  // Nach der Wartezeit endgültig entscheiden: Fehlt das Recht dann immer noch,
+  // gilt die Kasse als gewählt. Sonst sprang die Ansicht später plötzlich in
+  // den alten Reiter, sobald das Recht doch noch ankam (langsames Netz) –
+  // mitten in die Arbeit in der Kasse.
+  useEffect(() => {
+    if (wartenVorbei && !gewaehltErlaubt) setTab("kasse");
+  }, [wartenVorbei, gewaehltErlaubt, setTab]);
+  useEffect(() => {
+    if (!gewaehltErlaubt) return;
+    try {
+      localStorage.setItem(LETZTER_REITER, gewaehlt);
+    } catch {
+      /* privater Modus */
+    }
+  }, [gewaehlt, gewaehltErlaubt]);
   const startGewaehlt = useRef(Boolean(tabAusAdresse(false)));
   useEffect(() => {
     if (!roleReady || startGewaehlt.current) return;
@@ -242,7 +392,7 @@ function Main() {
     // Kommt man aus einer Anfrage-Benachrichtigung, bleibt deren Reiter
     const sprung = sprungAusHash(window.location.hash);
     if (sprung) setTab(SPRUNG_TAB[sprung]);
-    else if (hatProfilReiter) setTab("profil");
+    else if (hatProfilReiter && !hatteGemerkt.current) setTab("profil");
   }, [roleReady, hatProfilReiter, setTab]);
   useEffect(() => {
     // Start aus einer Anfrage-Benachrichtigung: gleich in den richtigen Reiter
@@ -351,7 +501,14 @@ function Main() {
       setShowFilter(false);
     }
   }, [tab]);
+  // Auswahl und Filter gehören zur Personenliste – nicht zu „Beiträge & Abiball“
+  useEffect(() => {
+    if (kasseTeil === "personen") return;
+    setMassMode(false);
+    setShowFilter(false);
+  }, [kasseTeil]);
 
+  const breit = useBreit();
   const gescrollt = useGescrollt(4);
   // Kopf und Tab-Leiste messen: danach richten sich Chat-Eingabe,
   // Komitee-Leiste und die Zwischenüberschriften (siehe index.css).
@@ -375,8 +532,18 @@ function Main() {
   // „lädt weitere …“ für immer da (iPhone, 28.09.).
   const [nachschub, setNachschub] = useState<HTMLElement | null>(null);
 
+  // Nicht beim Reiterwechsel zurücksetzen: sonst wäre die Liste beim
+  // Zurückkommen wieder kurz und die gemerkte Stelle (ab Person 40) weg
   useEffect(() => {
     setSichtbar(SCHRITT_LISTE);
+  }, [suche, min, max, onlyOpen]);
+
+  // In „Nur offene“ bleibt, wer gerade abgehakt wurde, stehen (mit Haken),
+  // bis Filter, Suche oder Reiter wechseln – sonst verschwand die Zeile beim
+  // Tipp, und ein Fehltipp war an der Stelle nicht zurückzunehmen.
+  const [geradeGeaendert, setGeradeGeaendert] = useState<Set<string>>(() => new Set());
+  useEffect(() => {
+    setGeradeGeaendert(new Set());
   }, [suche, min, max, onlyOpen, tab]);
 
 
@@ -393,19 +560,39 @@ function Main() {
       const p = punkte[st.id] || 0;
       if (mn !== null && p < mn) return false;
       if (mx !== null && p > mx) return false;
-      if (onlyOpen && offenGesamt(st, settings, p) === 0) return false;
+      if (onlyOpen && offenGesamt(st, settings, p) === 0 && !geradeGeaendert.has(st.id)) return false;
       return true;
     });
-  }, [students, suche, min, max, onlyOpen, settings, punkte]);
+  }, [students, suche, min, max, onlyOpen, settings, punkte, geradeGeaendert]);
+
+  const halbjahrSetzen = useCallback(
+    async (h: Halbjahr) => {
+      if (await frage(`Laufendes Halbjahr für die ganze Stufe auf ${h} umstellen?`, "Umstellen")) setSettings({ aktuelles_halbjahr: h });
+    },
+    [setSettings],
+  );
 
   // Diese drei Funktionen werden einmal erzeugt und nicht bei jedem Zeichnen
   // neu. Sonst haelt React jede Zeile fuer veraendert und baut sie neu auf.
   const oeffnePerson = useCallback((id: string) => setOpenId(id), []);
   const waehleAus = useCallback((id: string) => toggleSelect(id), []);
+  // Ein Tipp in der Liste schaltet nur zwischen offen und bezahlt – vorher
+  // erließ der zweite Tipp den Beitrag ohne Hinweis. Erlassen geht im Blatt
+  // der Person (mit Erklärung); ein erlassenes Halbjahr öffnet dieses Blatt.
+  // Die kurze Meldung sagt, bei WEM sich was geändert hat (lange Liste).
   const schalteHalbjahr = useCallback(
     (id: string, h: Halbjahr) => {
       const st = studentsRef.current.find((x) => x.id === id);
-      if (st) setTerm(id, h, nextStatus(st.terms[h].status) as Status);
+      if (!st) return;
+      const alt = st.terms[h].status;
+      if (alt === "erlassen") {
+        setOpenId(id);
+        return;
+      }
+      const neu: Status = alt === "offen" ? "bezahlt" : "offen";
+      setGeradeGeaendert((s) => (s.has(id) ? s : new Set(s).add(id)));
+      setTerm(id, h, neu);
+      melde(`${st.vorname} ${st.nachname}: ${h} ${neu === "bezahlt" ? "bezahlt" : "wieder offen"}`, neu === "bezahlt" ? "erfolg" : "info");
     },
     [setTerm],
   );
@@ -447,7 +634,9 @@ function Main() {
       return n;
     });
   }
-  function onImport() {
+  async function onImport() {
+    // Ein Import ersetzt alle Personen und Halbjahre – deshalb erst fragen
+    if (!(await frage("Der Import ersetzt alle Personen, Halbjahre und Einstellungen durch die Datei. Fortfahren?", "Datei wählen", true))) return;
     const inp = document.createElement("input");
     inp.type = "file";
     inp.accept = "application/json";
@@ -458,37 +647,115 @@ function Main() {
     inp.click();
   }
 
-  /**
-   * Passwort ändern läuft über das Profil, nicht über prompt().
-   * Installierte Apps blockieren prompt(), dann passierte hier gar nichts.
-   */
-  function changePassword() {
-    setShowSettings(true);
-  }
-
+  // Prozent-Felder im Filter: 44 px hoch, 16 px Schrift (sonst zoomt iOS),
+  // ohne die Pfeilchen des Browsers (am Laptop sonst ein Windows-Drehfeld)
   const numField =
-    "w-16 rounded-lg bg-[rgb(118_118_128/0.12)] px-2.5 py-2 text-center outline-none focus:ring-2 focus:ring-brand/30 dark:bg-[rgb(118_118_128/0.24)]";
-  // Kleine graue Kapselknoepfe in der Filterkarte
-  const klein =
-    "rounded-full bg-[rgb(118_118_128/0.12)] px-3.5 py-1.5 text-[14px] font-semibold text-brand-dark transition active:scale-95 dark:bg-[rgb(118_118_128/0.24)] dark:text-brand";
+    "h-11 w-[4.5rem] appearance-none rounded-lg bg-[rgb(118_118_128/0.12)] px-2.5 text-center text-base outline-none [-moz-appearance:textfield] focus:ring-2 focus:ring-brand/30 dark:bg-[rgb(118_118_128/0.24)] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none";
+  // Ein echter Filter ist gesetzt (Mithilfe von–bis)?
+  const filterAktiv = min !== "" || max !== "";
+  // Kurz in Worten: „ab 10 %“, „bis 50 %“ oder „10–50 %“ (vorher „10–… %“)
+  const filterText = min !== "" && max !== "" ? `${min}–${max} %` : min !== "" ? `ab ${min} %` : `bis ${max} %`;
+  const filterLeeren = () => {
+    setMin("");
+    setMax("");
+  };
 
-  const navItems: { key: Tab; icon: IconName; label: string; badge?: number; show: boolean }[] = [
-    // Team mit eigenem Eintrag: die eigene Ansicht wie bei den Schülern
-    { key: "profil", icon: "person", label: "Profil", show: hatProfilReiter },
-    { key: "kasse", icon: "kasse", label: "Kasse", show: true },
+  const navItems: { key: Tab; icon: IconName; label: string; badge?: number; show: boolean }[] = reiterOrdnen(role, [
+    // Team mit eigenem Eintrag: die eigene Ansicht wie bei den Schülern.
+    // Schüler sehen sie im Reiter „kasse“ – beides heißt „Übersicht“.
+    // Die Zahl der Prüfaufgaben steht dort, wo „Zu erledigen“ steht: auf der
+    // eigenen Übersicht – Team ohne eigene Person (und Schüler) hat die Liste
+    // über der Kasse bzw. auf seiner Übersicht im Reiter „kasse“.
+    { key: "profil", icon: "haus", label: "Übersicht", badge: aufgabenZahl, show: hatProfilReiter },
+    { key: "kasse", icon: teamView ? "kasse" : "haus", label: teamView ? "Kasse" : "Übersicht", badge: hatProfilReiter ? 0 : aufgabenZahl, show: true },
     { key: "events", icon: "events", label: "Events", badge: unread, show: true },
     { key: "themen", icon: "chats", label: "Chats", badge: topicsUnread, show: showTopicsTab },
-    { key: "beitraege", icon: "beitraege", label: "Beiträge", show: can("beitraege.manage") },
+    // „Beiträge & Abiball“ ist kein eigener Reiter mehr, sondern ein Teil der
+    // Kasse (Umschalter oben) – Einstellungen, die man selten braucht. So hat
+    // der Kassenwart 5 Reiter statt 6 (Apple: höchstens 5 am iPhone).
     { key: "finanzen", icon: "finanzen", label: "Finanzen", badge: offeneKosten, show: showFinanzen },
-    { key: "rollen", icon: "rollen", label: "Rollen", show: canManageRoles || can("perms.manage") },
-  ];
+    { key: "rollen", icon: "rollen", label: "Rollen", show: rollenReiter },
+  ]);
+  // Über eine Adresse wie #finanzen kommt niemand in einen Reiter, der für ihn
+  // nicht vorgesehen ist – `tab` zeigt dann die Kasse (siehe darfReiter oben).
 
-  // Über eine Adresse wie #finanzen darf niemand in einen Reiter, der für ihn
-  // nicht vorgesehen ist – dann zurück zur Kasse.
-  const reiterErlaubt = navItems.find((n) => n.key === tab)?.show ?? true;
-  useEffect(() => {
-    if (roleReady && !reiterErlaubt) setTab("kasse");
-  }, [roleReady, reiterErlaubt, setTab]);
+  // Schüler: im Reiter „kasse“ steht ihre eigene Übersicht
+  const titel = tab === "kasse" && !teamView ? "Übersicht" : REITER_TITEL[tab];
+  const darfBeitraege = can("beitraege.manage");
+  const kasseBeitraege = tab === "kasse" && teamView && darfBeitraege && kasseTeil === "beitraege";
+  const kassePersonen = tab === "kasse" && teamView && !kasseBeitraege;
+  // Handy/iPad hoch: Sobald im Suchfeld etwas steht, treten Kennzahlen und
+  // Hinweise zurück – sonst stand der Treffer 460 px unter dem Feld, mit
+  // offener Tastatur unsichtbar. Bewusst an der Eingabe festgemacht, nicht am
+  // Fokus: sonst tauchte der Kopf beim Antippen eines Treffers (blur vor
+  // click) wieder auf, die Liste rutschte und der Tipp landete daneben.
+  const sucheAktiv = !breit && kassePersonen && query.trim() !== "";
+  // Umschalter „Personen | Beiträge & Abiball“: am Handy unter dem Titel, am
+  // Rechner in der Kopfzeile (InKopf) – wie „Chat | Pinnwand“ in einem Chat.
+  const kasseUmschalter =
+    tab === "kasse" && teamView && darfBeitraege ? (
+      <div className="seg w-full" role="tablist" aria-label="Kasse">
+        {(
+          [
+            ["personen", "Personen"],
+            ["beitraege", "Beiträge & Abiball"],
+          ] as const
+        ).map(([k, label]) => (
+          <button
+            key={k}
+            role="tab"
+            aria-selected={kasseTeil === k}
+            data-tour={k === "beitraege" ? "tab-beitraege" : undefined}
+            onClick={() => setKasseTeil(k)}
+            className={`seg-item ${kasseTeil === k ? "seg-aktiv" : ""}`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+    ) : null;
+
+  // Werkzeuge der Personenliste (Filter, Mehrere auswählen): auf JEDEM Gerät
+  // in der Kopfzeile der Liste – dort, wo man mit der Liste arbeitet. Vorher
+  // standen sie am Handy oben in der App-Kopfzeile (5 Knöpfe, Titel „S..“)
+  // und am Laptop in der Liste. Der Filter öffnet direkt darunter.
+  const listenWerkzeuge =
+    kassePersonen && teamView ? (
+      <>
+        <button
+          data-tour="einstellungen"
+          className={`iconbtn ${showFilter || filterAktiv ? "iconbtn-active" : ""}`}
+          onClick={() => setShowFilter((v) => !v)}
+          aria-label="Filter"
+          aria-expanded={showFilter}
+          title="Filter"
+        >
+          <Icon name="regler" size={19} />
+        </button>
+        {(canEditData || canEditHilfen) && (
+          <button
+            data-tour="massen"
+            className={`iconbtn ${massMode ? "iconbtn-active" : ""}`}
+            onClick={() => {
+              setMassMode((v) => !v);
+              setSelected(new Set());
+            }}
+            aria-label="Mehrere auswählen"
+            title="Mehrere auswählen"
+          >
+            <Icon name="auswahl" size={20} />
+          </button>
+        )}
+        {/* Handy: „Person hinzufügen“ hier in der Listenzeile statt als
+            schwebender Knopf – der lag sonst auf „Offen“ und den Halbjahren
+            der untersten Personen (ab iPad steht er im Kopf) */}
+        {canEditData && (
+          <button className="iconbtn md:hidden" onClick={() => setShowAdd(true)} aria-label="Person hinzufügen" title="Person hinzufügen">
+            <Icon name="plus" size={20} strich={2.4} />
+          </button>
+        )}
+      </>
+    ) : null;
 
   // „Neu“-Knopf je Reiter (Update 1.4, U3): Kasse → Person hinzufügen, Events →
   // Event erstellen. Auf dem Handy schwebt er als beschriftete Kapsel unten
@@ -496,12 +763,18 @@ function Main() {
   // Neu); ab iPad-Breite sitzt er stattdessen im Kopf – ein schwebender Knopf
   // am Rechner stand mitten im Leeren und deckte am iPad die letzte Spalte.
   const neuKnopf =
-    tab === "kasse" && teamView && canEditData
+    tab === "kasse" && teamView && canEditData && !kasseBeitraege
       ? { text: "Person", label: "Person hinzufügen", los: () => setShowAdd(true) }
       : tab === "events" && isStaff
         ? { text: "Neu", label: "Event erstellen", los: () => setShowComposer(true) }
         : null;
   const anzahlReiter = navItems.filter((n) => n.show).length;
+  // Alte Sprungziele/Einführung auf „beitraege“ landen in der Kasse
+  useEffect(() => {
+    if (tab !== "beitraege") return;
+    setKasseTeil("beitraege");
+    setTab("kasse");
+  }, [tab, setTab]);
 
   // Im Auswahl-Modus ist die Leiste unten höher (Namen der Ausgewählten) –
   // sonst verdeckt sie die letzten Personen der Liste. Mit schwebendem Knopf
@@ -510,7 +783,7 @@ function Main() {
     <div
       className={`mx-auto max-w-5xl px-3 sm:px-5 ${
         massMode
-          ? "pb-72"
+          ? "pb-[calc(var(--massleiste,18rem)+1.5rem)]"
           : neuKnopf
             ? "pb-[calc(var(--leiste)+6.5rem)] md:pb-[calc(var(--leiste)+2.5rem)] lg:pb-16"
             : "pb-[calc(var(--leiste)+2.5rem)] lg:pb-16"
@@ -518,60 +791,55 @@ function Main() {
     >
       {/* Kopf wie eine iOS-Navigationsleiste: oben die Knöpfe, darunter der
           große Titel. Scrollt der Titel weg, erscheint er klein in der nun
-          milchigen Leiste (Glas). */}
+          milchigen Leiste (Glas). Am Rechner/iPad quer steht der Titel fest
+          in der Kopfzeile und darunter die Reiterleiste – ein großer Titel
+          im Inhalt kostete dort nur Platz. */}
       <header
         ref={kopfRef}
         className={`sticky top-0 z-20 -mx-3 px-3 pb-2 pt-[calc(env(safe-area-inset-top)+0.5rem)] transition-[background-color,box-shadow] duration-300 sm:-mx-5 sm:px-5 ${
           gescrollt ? "kopf-band" : "kopf-grund bg-papier dark:bg-slate-950"
         }`}
       >
-        <div className="mx-auto flex max-w-5xl items-center gap-2.5">
-          <div
-            aria-hidden={!titelWeg}
-            className={`min-w-0 flex-1 truncate text-[17px] font-semibold tracking-[-0.01em] transition duration-300 ease-ios ${
-              titelWeg ? "translate-y-0 opacity-100" : "translate-y-1 opacity-0"
-            }`}
-          >
-            {REITER_TITEL[tab]}
+        {/* EINE Kopfzeile auf jedem Gerät: links wo man ist (Titel – am
+            Rechner immer sichtbar, am Handy erst nach dem Scrollen), rechts
+            die Knöpfe. Ein geöffneter Chat legt am Rechner seinen Kopf
+            (Zurück, Name, Chat | Pinnwand) in #kopf-ebene; dann treten
+            Titel und Seiten-Knöpfe zurück (index.css, .kopf-zeile). */}
+        <div className="kopf-zeile mx-auto flex min-h-11 max-w-5xl items-center gap-2.5">
+          <div id="kopf-ebene" className="kopf-ebene min-w-0 flex-1" />
+          <div className="kopf-eigen flex min-w-0 flex-1 items-center gap-2.5">
+            {/* Am Laptop ist dieser Titel die einzige Seitenüberschrift (h1 für
+                Bildschirmleser), am Handy nur die kleine Wiederholung des großen
+                Titels im Inhalt – dort für Bildschirmleser ausgeblendet. */}
+            <div
+              role={breit ? "heading" : undefined}
+              aria-level={breit ? 1 : undefined}
+              aria-hidden={breit ? undefined : true}
+              className={`min-w-0 flex-1 truncate text-[17px] font-semibold tracking-[-0.01em] transition-[opacity,transform,visibility] duration-300 ease-ios lg:visible lg:translate-y-0 lg:font-zahl lg:text-[1.625rem] lg:font-bold lg:tracking-[-0.025em] lg:opacity-100 ${
+                titelWeg ? "visible translate-y-0 opacity-100" : "invisible translate-y-1 opacity-0"
+              } ${gescrollt ? "" : "auf-bild"}`}
+            >
+              {titel}
+            </div>
+
+            <div className="ml-auto flex shrink-0 items-center gap-2 max-[379px]:gap-1.5">
+              {/* Ab iPad-Breite: „Person“ / „Neu“ im Kopf statt schwebend – VOR
+                  den Seiten-Umschaltern, damit jeder Umschalter (Kasse, Rollen,
+                  Finanzen) direkt links neben den App-Knöpfen endet und nicht je
+                  Reiter waagerecht springt (K3) */}
+              {neuKnopf && (
+                <button data-tour="neu" onClick={neuKnopf.los} className="btn-klein hidden md:inline-flex" aria-label={neuKnopf.label}>
+                  <Icon name="plus" size={16} strich={2.6} />
+                  {neuKnopf.text}
+                </button>
+              )}
+              {/* Umschalter/Knöpfe der Seite (InKopf.tsx) – am Rechner hier */}
+              <div id="kopf-aktionen" className="contents" />
+            </div>
           </div>
 
-          <div className="ml-auto flex shrink-0 items-center gap-2 max-[379px]:gap-1.5">
-            {tab === "kasse" && (
-              <>
-                {teamView && (
-                  <button
-                    data-tour="einstellungen"
-                    className={`iconbtn ${showFilter ? "iconbtn-active" : ""}`}
-                    onClick={() => setShowFilter((v) => !v)}
-                    aria-label="Filter & Einstellungen"
-                    title="Filter & Einstellungen"
-                  >
-                    <Icon name="regler" size={19} />
-                  </button>
-                )}
-                {teamView && (canEditData || canEditHilfen) && (
-                  <button
-                    data-tour="massen"
-                    className={`iconbtn ${massMode ? "iconbtn-active" : ""}`}
-                    onClick={() => {
-                      setMassMode((v) => !v);
-                      setSelected(new Set());
-                    }}
-                    aria-label="Mehrere auswählen"
-                    title="Mehrere auswählen"
-                  >
-                    <Icon name="auswahl" size={20} />
-                  </button>
-                )}
-              </>
-            )}
-            {/* Ab iPad-Breite: „Person“ / „Neu“ im Kopf statt schwebend */}
-            {neuKnopf && (
-              <button data-tour="neu" onClick={neuKnopf.los} className="btn-klein hidden md:inline-flex" aria-label={neuKnopf.label}>
-                <Icon name="plus" size={16} strich={2.6} />
-                {neuKnopf.text}
-              </button>
-            )}
+          {/* Knöpfe für die ganze App – stehen immer an derselben Stelle */}
+          <div className="flex shrink-0 items-center gap-2 max-[379px]:gap-1.5">
             <button className="iconbtn" onClick={toggle} aria-label={theme === "dark" ? "Helles Design" : "Dunkles Design"} title="Hell/Dunkel">
               <Icon name={theme === "dark" ? "sonne" : "mond"} size={19} />
             </button>
@@ -605,7 +873,7 @@ function Main() {
 
         {/* Am Rechner und iPad quer: schwebende Reiterleiste oben in der Mitte
             (wie iPadOS). Auf dem Handy steht sie unten. */}
-        <nav className="mx-auto mt-3 hidden w-fit max-w-full rounded-full border border-black/[0.06] p-1 shadow-glas glas dark:border-white/10 lg:flex">
+        <nav className="mx-auto mt-2 hidden w-fit max-w-full rounded-full border border-black/[0.06] p-1 shadow-glas glas dark:border-white/10 lg:flex">
           <GlasLeiste
             variante="oben"
             aktiv={tab}
@@ -615,19 +883,28 @@ function Main() {
         </nav>
       </header>
 
-      {/* Großer Titel – läuft beim Scrollen einfach mit weg */}
-      <div className="auf-bild mx-auto max-w-5xl px-1 pb-1 pt-1">
-        <h1 className="font-zahl text-[2.125rem] font-bold leading-tight tracking-[-0.025em]">{REITER_TITEL[tab]}</h1>
-        <p className="text-[13px] text-tinte-leise">{isStaff ? "Stufenteam" : "Mein Zugang"} · Abi 28</p>
+      {/* Großer Titel – läuft beim Scrollen einfach mit weg (nur Handy/iPad hoch) */}
+      <div className="auf-bild mx-auto max-w-5xl px-1 pb-1 pt-1 lg:hidden">
+        <h1 className="font-zahl text-[2.125rem] font-bold leading-tight tracking-[-0.025em]">{titel}</h1>
+        {/* Nur fürs Team: in welcher Rolle man gerade arbeitet (vorher stand bei
+            Admin und Kassenwart „Stufenteam“, bei Schülern „Mein Zugang“ –
+            eine Zeile, die nichts sagte) */}
+        {isStaff && <p className="text-[13px] text-tinte-leise">{rolleName(role)} · Abi 28</p>}
       </div>
+      {kasseUmschalter && (
+        <InKopf className="mx-auto mb-2 mt-1 max-w-5xl" kopfClassName="w-[19rem]">
+          {kasseUmschalter}
+        </InKopf>
+      )}
 
       {/* Suche, Kennzahlen und Halbjahr laufen mit – nur die Titelzeile bleibt
           oben kleben. Sonst verdeckt der Kopf auf dem Handy die halbe Liste. */}
       <div>
-        {tab === "kasse" && teamView && (
+        {kassePersonen && (
           // Dasselbe Suchfeld wie überall (.field: weiße Zelle mit Haarlinie, 16 px) –
           // vorher war es hier grau gefüllt, im Album und bei Rollen weiß.
-          <div className="relative mx-auto mt-1 max-w-5xl">
+          // Am Rechner steht die Suche in der Kopfzeile der Liste (spart eine Zeile)
+          <div className="relative mx-auto mt-1 max-w-5xl lg:hidden">
             <input
               type="text"
               enterKeyHint="search"
@@ -652,110 +929,37 @@ function Main() {
         {/* Zum Home-Bildschirm hinzufügen. Verschwindet von selbst, sobald die
             App installiert ist – und auf iPhone/iPad, sobald jemand bestätigt,
             dass er es gemacht hat (mehr dazu in src/lib/install.ts). */}
-        {tab === "kasse" && (
+        {/* Nur auf der eigenen Übersicht (Startseite) – nicht über der
+            Kassenliste oder den Beiträgen, wo gearbeitet wird. Team ohne
+            eigene Person hat keine Übersicht: dann über der Kasse. */}
+        {(hatProfilReiter ? tab === "profil" : tab === "kasse" && !kasseBeitraege) && !sucheAktiv && (
           <div className="mx-auto max-w-5xl">
             <InstallKarte />
           </div>
         )}
 
+        {/* Team ohne eigene Person hat keine Übersicht – „Zu erledigen“
+            (Schichten bestätigen, Anfragen, Zitate prüfen …) steht dann über
+            der Kasse. Ist nichts offen, zeigt die Gruppe nichts. */}
+        {!hatProfilReiter && teamView && kassePersonen && !sucheAktiv && (
+          <ZuErledigen className="mx-auto mt-3 max-w-5xl" />
+        )}
+
         {/* Erst die Lage der Kasse, dann die Liste – nicht umgekehrt. */}
-        {tab === "kasse" && teamView && <KassenKopf students={students} settings={settings} punkte={punkte} />}
-
-        {tab === "kasse" && teamView && canEditData && (
-          <details className="group mx-auto mt-2 max-w-5xl">
-            {/* Selten gebraucht – deshalb zugeklappt statt dauerhaft als Leiste */}
-            <summary className="flex min-h-[40px] cursor-pointer list-none items-center gap-1.5 px-1 text-[13px] text-tinte-leise [&::-webkit-details-marker]:hidden">
-              Laufendes Halbjahr: <b className="font-semibold text-tinte dark:text-slate-100">{settings.aktuelles_halbjahr}</b>
-              <span className="font-semibold text-brand-dark dark:text-brand">· ändern</span>
-              <span className="transition group-open:rotate-90" aria-hidden>
-                <Icon name="chevron" size={13} />
-              </span>
-            </summary>
-            <div className="pb-1">
-              <div className="seg min-w-0 flex-1" role="radiogroup" aria-label="Laufendes Halbjahr">
-                {HY.map((h) => (
-                  <button
-                    key={h}
-                    role="radio"
-                    aria-checked={h === settings.aktuelles_halbjahr}
-                    onClick={async () => {
-                      if (h === settings.aktuelles_halbjahr) return;
-                      if (await frage(`Laufendes Halbjahr für die ganze Stufe auf ${h} umstellen?`, "Umstellen")) setSettings({ aktuelles_halbjahr: h });
-                    }}
-                    className={`seg-item !px-1 !text-[12px] ${h === settings.aktuelles_halbjahr ? "seg-aktiv" : ""}`}
-                  >
-                    {h}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </details>
-        )}
-
-        {tab === "kasse" && teamView && showFilter && (
-          <div className="mx-auto mt-3 max-w-5xl animate-aufsteigen">
-            <div className="card grid grid-cols-2 gap-x-5 gap-y-4 p-4 sm:grid-cols-4">
-              <label className="flex flex-col gap-1.5 text-xs font-semibold uppercase tracking-wide text-tinte-leise">
-                Prozent
-                <div className="flex items-center gap-1.5 text-tinte dark:text-slate-200">
-                  <input type="number" className={numField} placeholder="min" value={min} onChange={(e) => setMin(e.target.value)} />
-                  <span className="text-tinte-leise">–</span>
-                  <input type="number" className={numField} placeholder="max" value={max} onChange={(e) => setMax(e.target.value)} />
-                </div>
-              </label>
-
-              <div className="flex flex-col gap-1.5 text-xs font-semibold uppercase tracking-wide text-tinte-leise">
-                Anzeige
-                <label className="flex h-10 items-center justify-between gap-2 normal-case">
-                  <span className="text-[14px] font-medium text-tinte dark:text-slate-100">nur offene</span>
-                  <Schalter an={onlyOpen} onChange={setOnlyOpen} />
-                </label>
-              </div>
-
-              {can("beitraege.manage") && (
-                <div className="col-span-2 flex items-center gap-2 text-[12px] text-tinte-leise sm:col-span-4">
-                  Abiball-Staffel und Prozent-Möglichkeiten stehen im Reiter{" "}
-                  <button onClick={() => setTab("beitraege")} className="font-semibold text-brand">
-                    Beiträge
-                  </button>
-                </div>
-              )}
-
-              <div className="col-span-2 flex flex-wrap items-center gap-2 border-t border-papier-linie pt-3 dark:border-slate-800 sm:col-span-4">
-                <span className="mr-1 text-xs font-semibold uppercase tracking-wide text-tinte-leise">Daten</span>
-                {canEditData && (
-                  <>
-                    <button onClick={exportData} className={klein}>
-                      Export
-                    </button>
-                    <button onClick={onImport} className={klein}>
-                      Import
-                    </button>
-                  </>
-                )}
-                <button onClick={() => setShowTour(true)} className={klein}>
-                  Einführung
-                </button>
-                {hasSupabase && (
-                  <>
-                    <button onClick={changePassword} className={`${klein} ml-auto`}>
-                      Passwort ändern
-                    </button>
-                    <button onClick={() => void abmelden()} className={`${klein} !text-red-600 dark:!text-red-400`}>
-                      Abmelden
-                    </button>
-                  </>
-                )}
-              </div>
-
-            </div>
-          </div>
+        {/* Das laufende Halbjahr stellt man im Kopf der Halbjahre um (vorher
+            eine eigene, zugeklappte Zeile darunter). Beim Suchen (Handy)
+            treten die Kennzahlen zurück: die Treffer stehen direkt unter dem
+            Suchfeld – wie die Suche in iOS. */}
+        {kassePersonen && !sucheAktiv && (
+          <KassenKopf students={students} settings={settings} punkte={punkte} halbjahrSetzen={canEditData ? halbjahrSetzen : undefined} />
         )}
       </div>
 
-      <div className="mt-3">
-        <PushHinweis />
-      </div>
+      {!sucheAktiv && (
+        <div className="mt-3">
+          <PushHinweis />
+        </div>
+      )}
 
       {tab === "rollen" ? (
         <main key={tab} className="animate-fadeIn mt-3 pb-4">
@@ -786,11 +990,16 @@ function Main() {
         </main>
       ) : tab === "finanzen" ? (
         <main key={tab} className="animate-fadeIn mt-3 pb-4">
-          <FaulGrenze fallback={<SkelettKarten n={3} />}>
-            <FinanzenTab kosten={kosten} />
-          </FaulGrenze>
+          {/* Recht noch nicht geladen (Aufsichtsrat, Vorsitz): kurz Platzhalter */}
+          {showFinanzen ? (
+            <FaulGrenze fallback={<SkelettKarten n={3} />}>
+              <FinanzenTab kosten={kosten} />
+            </FaulGrenze>
+          ) : (
+            <SkelettKarten n={3} />
+          )}
         </main>
-      ) : tab === "beitraege" ? (
+      ) : kasseBeitraege ? (
         <main key={tab} className="animate-fadeIn mt-3 pb-4">
           <FaulGrenze fallback={<SkelettKarten n={3} />}>
             <BeitraegeTab />
@@ -805,7 +1014,7 @@ function Main() {
             ready={ready && roleReady}
           />
           {mode === "local" && ready && (
-            <p className="pt-3 text-center text-[11px] text-tinte-leise">Testbetrieb. Die Daten liegen nur auf diesem Gerät.</p>
+            <p className="auf-bild pt-3 text-center text-[12px] text-tinte-leise">Testbetrieb. Die Daten liegen nur auf diesem Gerät.</p>
           )}
         </main>
       ) : (
@@ -813,6 +1022,99 @@ function Main() {
           {!ready && (
             <SkelettZeilen n={8} />
           )}
+          {ready && (
+            <div className="flex flex-wrap items-center gap-3 border-b border-papier-linie px-3.5 py-2.5 dark:border-slate-800 sm:px-4">
+              {/* Handy: Segment füllt die Zeile neben Filter und Auswahl; ab sm feste Breite */}
+              <div className="seg min-w-0 flex-1 sm:w-52 sm:flex-none" role="radiogroup" aria-label="Anzeige">
+                <button role="radio" aria-checked={!onlyOpen} onClick={() => setOnlyOpen(false)} className={`seg-item ${!onlyOpen ? "seg-aktiv" : ""}`}>
+                  Alle
+                </button>
+                <button role="radio" aria-checked={onlyOpen} onClick={() => setOnlyOpen(true)} className={`seg-item whitespace-nowrap ${onlyOpen ? "seg-aktiv" : ""}`}>
+                  {/* Kurz wie „Alle | Ungelesen“ in Mail – passt am SE neben drei Knöpfe */}
+                  Offene
+                </button>
+              </div>
+              {/* Suche am Rechner: hier statt als eigene Zeile über den Kennzahlen */}
+              <div className="relative hidden min-w-0 max-w-sm flex-1 lg:block">
+                <input
+                  type="text"
+                  enterKeyHint="search"
+                  aria-label="Name suchen"
+                  className="field !py-2 pr-11"
+                  placeholder="Name suchen"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                />
+                {query && (
+                  <button
+                    onClick={() => setQuery("")}
+                    aria-label="Suche leeren"
+                    className="absolute right-0 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center text-tinte-leise"
+                  >
+                    <Icon name="x" size={15} strich={2.4} />
+                  </button>
+                )}
+              </div>
+              <span className="zahl ml-auto hidden text-[13px] text-tinte-leise sm:inline">
+                {filtered.length} von {students.length}
+              </span>
+              {listenWerkzeuge && <div className="flex shrink-0 items-center gap-2">{listenWerkzeuge}</div>}
+            </div>
+          )}
+
+          {/* Filter: öffnet direkt unter seinem Knopf, in der Liste – Knopf und
+              Liste bleiben stehen. Nur echte Filter; Export/Import stehen unten
+              unter „Daten“, Einführung, Passwort und Abmelden im Profil, „nur
+              offene“ ist das Segment oben links. */}
+          {ready && showFilter && (
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-papier-linie px-3.5 py-2 animate-aufsteigen dark:border-slate-800 sm:px-4">
+              <span className="text-[15px]">Mithilfe</span>
+              <div className="flex items-center gap-1.5">
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  aria-label="Mithilfe ab Prozent"
+                  className={numField}
+                  placeholder="von"
+                  value={min}
+                  onChange={(e) => setMin(e.target.value)}
+                />
+                <span className="text-tinte-leise">–</span>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  aria-label="Mithilfe bis Prozent"
+                  className={numField}
+                  placeholder="bis"
+                  value={max}
+                  onChange={(e) => setMax(e.target.value)}
+                />
+                <span className="text-[15px] text-tinte-leise">%</span>
+              </div>
+              {filterAktiv && (
+                <button onClick={filterLeeren} className="ml-auto flex min-h-11 items-center px-1 text-[15px] font-medium text-brand-dark dark:text-brand">
+                  Zurücksetzen
+                </button>
+              )}
+            </div>
+          )}
+          {/* Zugeklappt, aber gesetzt: kurz sagen, dass gefiltert wird */}
+          {ready && !showFilter && filterAktiv && (
+            <div className="flex items-center gap-3 border-b border-papier-linie bg-brand/[0.06] px-3.5 py-1 dark:border-slate-800 sm:px-4">
+              <span className="min-w-0 flex-1 truncate text-[14px]">
+                Mithilfe {filterText}
+                {/* Die Zahl steht ab sm schon oben in der Kopfzeile der Liste */}
+                <span className="sm:hidden">
+                  {" "}
+                  · <span className="zahl">{filtered.length}</span> von {students.length}
+                </span>
+              </span>
+              <button onClick={filterLeeren} className="flex min-h-11 shrink-0 items-center text-[15px] font-medium text-brand-dark dark:text-brand">
+                Aufheben
+              </button>
+            </div>
+          )}
+
           {ready && filtered.length === 0 && (
             <div className="py-16 text-center text-sm text-tinte-leise">
               Keine Treffer.{" "}
@@ -829,34 +1131,22 @@ function Main() {
               </button>
             </div>
           )}
-          {ready && (
-            <div className="flex flex-wrap items-center gap-3 border-b border-papier-linie px-3.5 py-2.5 dark:border-slate-800 sm:px-4">
-              <div className="seg w-52" role="radiogroup" aria-label="Anzeige">
-                <button role="radio" aria-checked={!onlyOpen} onClick={() => setOnlyOpen(false)} className={`seg-item ${!onlyOpen ? "seg-aktiv" : ""}`}>
-                  Alle
-                </button>
-                <button role="radio" aria-checked={onlyOpen} onClick={() => setOnlyOpen(true)} className={`seg-item ${onlyOpen ? "seg-aktiv" : ""}`}>
-                  Nur offene
-                </button>
-              </div>
-              <span className="zahl ml-auto text-[13px] text-tinte-leise">
-                {filtered.length} von {students.length}
-              </span>
-            </div>
-          )}
-
           {ready && filtered.length > 0 && (
-            <div className="hidden items-center gap-x-3 bg-papier-matt px-4 py-2 dark:bg-slate-800/50 sm:flex">
-              <span className="flex-1 basis-[13rem] text-[10px] font-bold uppercase tracking-[0.05em] text-tinte-leise">
+            // Spaltenköpfe: dieselben Breiten wie die Zeilen (StudentCard.tsx) –
+            // vorher standen „Offen“ und „Halbjahre“ 40 px neben ihren Werten.
+            // Im Auswahl-Modus rückt der Kopf um das Auswahl-Kästchen ein.
+            <div className="hidden items-center gap-x-3 bg-papier-matt px-4 py-2 dark:bg-slate-800/50 md:flex">
+              {massMode && <span aria-hidden className="-ml-2 w-11 shrink-0" />}
+              <span className={`min-w-0 flex-1 text-[12px] font-semibold uppercase tracking-[0.04em] text-tinte-leise ${SPALTE_PERSON}`}>
                 Person
               </span>
-              <span className="w-16 text-right text-[10px] font-bold uppercase tracking-[0.05em] text-tinte-leise">
+              <span className={`shrink-0 text-right text-[12px] font-semibold uppercase tracking-[0.04em] text-tinte-leise ${SPALTE_OFFEN}`}>
                 Offen
               </span>
-              <span className="max-w-[13rem] flex-1 text-[10px] font-bold uppercase tracking-[0.05em] text-tinte-leise">
+              <span className={`text-[12px] font-semibold uppercase tracking-[0.04em] text-tinte-leise ${SPALTE_HALBJAHRE}`}>
                 Halbjahre
               </span>
-              <span className="w-[5.4rem] text-right text-[10px] font-bold uppercase tracking-[0.05em] text-tinte-leise">
+              <span className={`shrink-0 text-right text-[12px] font-semibold uppercase tracking-[0.04em] text-tinte-leise ${SPALTE_MITHILFE}`}>
                 Mithilfe
               </span>
             </div>
@@ -892,17 +1182,26 @@ function Main() {
             </button>
           )}
           {mode === "local" && ready && (
-            <p className="col-span-full pt-2 text-center text-[11px] text-tinte-leise">
+            <p className="col-span-full py-2 text-center text-[12px] text-tinte-leise">
               Testbetrieb. Die Daten liegen nur auf diesem Gerät.
             </p>
           )}
         </main>
       )}
 
+      {/* Selten gebraucht, deshalb ganz unten (wie in den iOS-Einstellungen):
+          Sicherung der Kasse als Datei. Stand vorher im Filter. */}
+      {kassePersonen && canEditData && ready && !sucheAktiv && !massMode && (
+        <Gruppe titel="Daten" fuss="Alle Personen, Halbjahre und Einstellungen als Datei sichern – oder aus einer Sicherung zurückholen." className="mt-6">
+          <Zeile label="Exportieren" blau onClick={exportData} />
+          <Zeile label="Importieren" blau onClick={() => void onImport()} />
+        </Gruppe>
+      )}
+
       {/* Schwebender „Neu“-Knopf nur auf dem Handy (unter 768 px): beschriftete Kapsel,
           damit man die „+“ der Seite auseinanderhält. Ab iPad-Breite sitzt der
           Knopf im Kopf (siehe neuKnopf). */}
-      {neuKnopf && !massMode && (
+      {neuKnopf && !massMode && tab !== "kasse" && (
         <button
           data-tour="neu"
           onClick={neuKnopf.los}
@@ -927,8 +1226,9 @@ function Main() {
         </FaulGrenze>
       )}
 
-      {/* Tab-Leiste wie in iOS: ganz unten angedockt, über die volle Breite,
-          fast deckender Hintergrund mit Haarlinie – nichts scheint mehr durch. */}
+      {/* Tab-Leiste wie in iOS: schwebende Kapsel unten. DECKEND (K4): bei
+          0.92 stand Inhalt („Foyer“, „Eintragen“) lesbar hinter den Reitern,
+          weil der Weichzeichner dort nicht greift (Design-Regel 3). */}
       {!massMode && (
         <nav
           ref={leisteRef}
@@ -938,7 +1238,7 @@ function Main() {
           }`}
         >
           {/* Schwebende Glas-Kapsel wie in iOS 26 – die Linse gleitet zum gewählten Reiter */}
-          <div className="pointer-events-auto mx-auto max-w-md rounded-[2rem] border border-white/60 p-1 shadow-[0_8px_32px_-8px_rgba(0,0,0,.28),0_0_0_.5px_rgba(0,0,0,.08)] glas !bg-[rgb(var(--glas)/0.92)] dark:border-white/10 dark:shadow-[0_8px_32px_-8px_rgba(0,0,0,.8),0_0_0_.5px_rgba(255,255,255,.08)]">
+          <div className="pointer-events-auto mx-auto max-w-md rounded-[2rem] border border-white/60 p-1 shadow-[0_8px_32px_-8px_rgba(0,0,0,.28),0_0_0_.5px_rgba(0,0,0,.08)] glas !bg-[rgb(var(--glas))] dark:border-white/10 dark:shadow-[0_8px_32px_-8px_rgba(0,0,0,.8),0_0_0_.5px_rgba(255,255,255,.08)]">
             <GlasLeiste
               variante="unten"
               aktiv={tab}
@@ -1038,7 +1338,7 @@ function Main() {
       />
       {showPatch && !showTour && (
         <PatchNotes
-          team={isStaff}
+          gruppen={patchGruppen}
           onFertig={() => {
             setShowPatch(false);
             try {
@@ -1068,10 +1368,18 @@ function Main() {
         onTab={(t) => {
           setShowFilter(false);
           setMassMode(false);
+          // Die Kasse-Schritte zeigen auf Kennzahlen und Liste: dafür „Personen“
+          // zeigen (auch wenn vorher „Beiträge & Abiball“ offen war) und die
+          // Suche leeren (sonst sind die Kennzahlen am Handy ausgeblendet)
+          if (t === "kasse") {
+            setKasseTeil("personen");
+            setQuery("");
+          }
           setTab(t as Tab);
         }}
         onClose={() => {
           setShowTour(false);
+          setKasseTeil("personen");
           setTab(hatProfilReiter ? "profil" : "kasse");
           // Wer die Einführung gerade gesehen hat, braucht die Patch Notes nicht –
           // und den „Neu: Mithilfe nachtragen“-Hinweis auch nicht (die Einführung

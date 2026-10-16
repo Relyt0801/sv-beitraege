@@ -51,10 +51,62 @@ wieder passieren.**
 
 ## 3. Kopfleisten und Ebenen
 
-- Klebende Kopfleisten (`kopf-band`, `SheetKopf`, `ChatEbene`-Kopf) dürfen
-  Inhalt **nie lesbar durchscheinen lassen**. Mit Hintergrundbild ist der Kopf
-  deckend (`index.css`, `html.mit-hintergrund .kopf-band::before`). Keine
-  Deckkraft unter 0.94 ohne Weichzeichner.
+- **Eine Kopfzeile, immer an derselben Stelle** (Anlass Okt. 2026: am Laptop
+  stand unter der App-Leiste ein zweites Band mit Zurück, Chat-Name und
+  „Chat | Übersicht“ – „die Headbar ist nach unten verschoben“):
+  - Handy/iPad hoch: oben die Kopfzeile (kleiner Titel erst nach dem
+    Scrollen, rechts die Knöpfe), unten die Reiterleiste. Ein geöffneter Chat
+    ist eine Vollbild-Ebene mit eigener Kopfzeile oben und Eingabe unten –
+    wie in iMessage.
+  - Laptop/iPad quer (ab 1024 px): oben EINE Kopfzeile – links Titel (fest,
+    kein großer Titel im Inhalt), rechts Seiten-Knöpfe und die Knöpfe der App
+    (Hell/Dunkel, Nachtragen, Profil); darunter die Reiterleiste. Ein
+    geöffneter Chat legt seinen Kopf über `ChatEbene` → `#kopf-ebene` genau
+    in diese Zeile (Zurück + Name links, „Chat | Pinnwand“ rechts). Sind
+    mehrere Ebenen offen, legt nur die **oberste** ihren Kopf dorthin
+    (Ebenen-Stapel in `ChatBlasen.tsx`) – nie zwei Zurück-Knöpfe. Mit
+    `onSchliessen` schließt Esc die oberste Ebene (nicht, solange unten Text
+    im Eingabefeld steht). Auch der Kalender ist so eine Ebene.
+  - Umschalter und Knöpfe für eine ganze Seite (Kasse „Personen | Beiträge &
+    Abiball“, Rollen „Personen | Rechte je Rolle“, Finanzen „Für alle
+    sichtbar | Alle Buchungen“ + Einnahme/Ausgabe) in `<InKopf>` packen: am
+    Handy stehen sie über dem Inhalt, am Laptop rechts in der Kopfzeile
+    (`#kopf-aktionen`) – wie „Chat | Pinnwand“ im Chat. Jeder Umschalter
+    dort ist 19 rem breit; „+ Person/Neu“ steht links davon, damit alle
+    Umschalter auf jeder Seite an derselben Stelle enden.
+  - Zahlen an Reitern stehen nie im Textfluss (`GlasLeiste`: absolut an der
+    Ecke) – sonst rutscht die mittig gesetzte Leiste, sobald eine Zahl kommt
+    oder geht. In einem `ChatKopf` stehen Seiten-Knöpfe („+ Neu“) VOR dem
+    Umschalter. Ebenen mit eigenen Pfeilen im Kopf (Kalender) beschriften den
+    Zurück-Knopf („‹ Events“), die Pfeile sind blau ohne Kreis.
+  - Zurück-Taste (Android/Browser) und Esc schliessen immer nur die oberste
+    Ebene (`useEscapeSchliesst` in `Sheet.tsx` führt eine History-Wache);
+    jede neue Ebene meldet sich dort an.
+  - Die Reiter-Reihenfolge richtet sich nach der Rolle (`reiterOrdnen` in
+    App.tsx) – für eine Person steht jeder Reiter immer an derselben Stelle.
+    Jeder Reiter behält seine Scroll-Stelle (`useReiter`).
+  - Meldungen zu Pflichtfeldern stehen in der `FussLeiste` direkt über dem
+    Knopf (sonst wirkt der Knopf tot, wenn das Feld weit oben liegt).
+  - Reiter noch einmal antippen geht zur Wurzel zurück (wie iOS):
+    `useReiter` feuert `sv:reiter-wurzel` (detail = Reiter); wer Ebenen
+    öffnet (ChatsTab, EventsTab/Kalender), hört darauf und schließt sie.
+  - Keine zweite klebende Leiste unter der Kopfzeile. Neue Unterseiten als
+    `ChatEbene` mit `ChatKopf` oder als Blatt (`Sheet`).
+- Die Spalte (`max-w-5xl`) ist eine Variable (`--spalte`, index.css): 64rem,
+  ab 1400 px 74rem, ab 1700 px 84rem. Nie eine feste Breite dagegen setzen.
+
+- Klebende Kopfleisten (`kopf-band`, `SheetKopf`, `ChatEbene`-Kopf und -Fuß,
+  Reiterleisten, Auswahl-Leiste) dürfen Inhalt **nie durchscheinen lassen**:
+  Hintergrund `rgb(var(--glas))` ohne Alpha.
+- **Blätter** (`Sheet`): ab 640 px oben angedockt (6 % unter dem Rand), nie
+  senkrecht mittig – das ✕ steht auf jedem Blatt an derselben Stelle.
+  Ein Blatt, das über einem **noch offenen** Blatt aufgeht, ist eine
+  Unterseite: es steht an derselben Stelle, `SheetKopf` zeigt von selbst
+  „‹ <Titel davor>“, ✕ schließt den ganzen Stapel, Esc/„‹“ eine Ebene zurück.
+  Dafür das untere Blatt offen lassen – nicht `open={offen && !unterseite}`.
+  Keine eigenen Zurück-/Schließen-Knöpfe bauen: `SchliessenKnopf`,
+  `ZurueckKnopf`, `useBlattKopf` aus `Sheet.tsx`. Blätter mit eigenen
+  Unterseiten (Motto, Album …) als `<Sheet hoch>` (am Handy volle Höhe).
 - Vollbild-Ebenen tragen die Klasse `ebene-grund`, damit sie dasselbe
   Hintergrundbild zeigen wie die Seite (sonst: oben Foto, darunter schwarz).
 - Banner (Push-Hinweis, Install-Karte) stehen in derselben Spalte wie der
@@ -77,7 +129,8 @@ wieder passieren.**
   keine neuen Grautöne erfinden. Dunkelmodus immer mitdenken (`dark:`).
 - Bestehende Bausteine benutzen statt neu bauen: `Gruppe`, `Zeile`,
   `ZeileMitSchalter`, `ZeileEingabe`, `Wert`, `Schalter`, `Sheet`,
-  `SheetKopf`, `FussLeiste`, `GlasLeiste`, `TeilUmschalter`, `Suchfeld`.
+  `SheetKopf`, `FussLeiste`, `GlasLeiste`, `TeilUmschalter`, `Suchfeld`,
+  `InKopf`, `ChatEbene` + `ChatKopf`.
 
 ## 6. Prüfen, bevor etwas als fertig gilt
 

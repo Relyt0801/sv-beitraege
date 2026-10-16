@@ -112,23 +112,25 @@ export function Wochenstreifen({
         </h2>
         <button
           onClick={() => woche(-1)}
-          className="flex h-11 w-10 shrink-0 items-center justify-center rounded-full text-[22px] text-brand transition active:scale-90 active:bg-black/[0.04] dark:active:bg-white/[0.06]"
+          className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-brand transition active:scale-90 active:bg-black/[0.04] max-[379px]:w-9 max-[379px]:after:absolute max-[379px]:after:inset-y-0 max-[379px]:after:-inset-x-1 max-[379px]:after:content-[''] dark:active:bg-white/[0.06]"
           aria-label="Woche zurück"
         >
-          ‹
+          <span className="block rotate-180">
+            <Icon name="chevron" size={20} strich={2.4} />
+          </span>
         </button>
         <button
           onClick={() => woche(1)}
-          className="flex h-11 w-10 shrink-0 items-center justify-center rounded-full text-[22px] text-brand transition active:scale-90 active:bg-black/[0.04] dark:active:bg-white/[0.06]"
+          className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-brand transition active:scale-90 active:bg-black/[0.04] max-[379px]:w-9 max-[379px]:after:absolute max-[379px]:after:inset-y-0 max-[379px]:after:-inset-x-1 max-[379px]:after:content-[''] dark:active:bg-white/[0.06]"
           aria-label="Woche vor"
         >
-          ›
+          <Icon name="chevron" size={20} strich={2.4} />
         </button>
         {/* Beschriftung steht immer dabei. Ein Kalender-Icon allein sagt nicht,
             dass dahinter Monat, Woche und Tag stecken. */}
         <button
           onClick={() => onKalender(gewaehlt)}
-          className="relative flex h-10 shrink-0 items-center gap-1.5 rounded-full bg-brand/10 px-3 text-[14px] font-semibold text-brand-dark transition active:scale-95 dark:bg-brand/20 dark:text-brand"
+          className="relative flex h-10 shrink-0 items-center gap-1.5 rounded-full bg-brand/10 px-3 text-[14px] font-semibold text-brand-dark max-[379px]:gap-1 max-[379px]:px-2.5 transition active:scale-95 dark:bg-brand/20 dark:text-brand-dark"
           aria-label="Ganzen Kalender öffnen"
           title="Ganzen Kalender öffnen – Monat, Woche und Tag"
         >
@@ -147,7 +149,7 @@ export function Wochenstreifen({
       {kalenderDemo && (
         <button
           onClick={() => setSyncOffen(true)}
-          className="mb-2.5 flex w-full items-center gap-2 rounded-xl bg-brand/10 px-3 py-2 text-left text-[13px] font-semibold text-brand transition active:scale-[0.99] dark:bg-brand/20"
+          className="mb-2.5 flex w-full items-center gap-2 rounded-xl bg-brand/10 px-3 py-2 text-left text-[13px] font-semibold text-brand dark:text-brand-dark transition active:scale-[0.99] dark:bg-brand/20"
         >
           <span className="min-w-0 flex-1 truncate">
             {privat.termine.length
@@ -340,7 +342,7 @@ export function TerminZeile({
         <SchichtSchild status={status} klein />
       ) : (
         meins && (
-          <span className="shrink-0 rounded-full bg-brand/10 px-2 py-0.5 text-[12px] font-bold text-brand-dark dark:bg-brand/20 dark:text-brand">
+          <span className="shrink-0 rounded-full bg-brand/10 px-2 py-0.5 text-[12px] font-bold text-brand-dark dark:bg-brand/20 dark:text-brand-dark">
             für dich
           </span>
         )

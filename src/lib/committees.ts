@@ -1,3 +1,5 @@
+import { ROLLE_LANG } from "./permissions";
+
 // ============================================================
 // Komitees / AKs der Stufe.
 // NEUES KOMITEE HINZUFÜGEN: einfach hier eine Zeile ergänzen.
@@ -38,14 +40,15 @@ export const committeeIcon = (slug: string): string => iconBySlug.get(slug) || "
  * Emoji vor dem Namen: Rolle geht vor Komitee.
  * Beispiel: "👑 | Yula Musterfrau", "⛪ | Jonas Müller"
  */
-/** Rollenname für die Anzeige – steht vor den Komitees. */
-export const ROLE_TITEL: Record<string, string> = {
-  admin: "Admin",
-  kassenwart: "Kassenwart",
-  stufenteam: "Stufenteam",
-  sprecher: "Stufensprecher*in",
-  stv_sprecher: "Stv. Schülersprecher*in",
-};
+/**
+ * Rollenname für die Anzeige – steht vor den Komitees. Die Namen kommen aus
+ * ROLLE_LANG (permissions.ts), damit jede Rolle überall gleich heißt und ein
+ * Umbenennen nur an EINER Stelle nötig ist. Schüler und Eltern stehen nicht
+ * davor.
+ */
+export const ROLE_TITEL: Record<string, string> = Object.fromEntries(
+  ["admin", "kassenwart", "stufenteam", "sprecher", "stv_sprecher"].map((r) => [r, ROLLE_LANG[r]]),
+);
 
 /** "Stufenteam · Abiball" – Rolle zuerst, Komitees danach. */
 export function rolleUndKomitees(role?: string | null, koms?: string[] | null): string {
