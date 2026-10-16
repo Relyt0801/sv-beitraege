@@ -61,8 +61,6 @@ export function ProfilSheet({
   const [pw2, setPw2] = useState("");
   const [pwInfo, setPwInfo] = useState("");
   const [pwBusy, setPwBusy] = useState(false);
-  const [perm, setPerm] = useState(pushPermission());
-  const [pushBusy, setPushBusy] = useState(false);
   // Protokoll und Sicherung. Den ganzen Bereich gibt es NUR hier im eigenen
   // Profil – und nur beim Admin (Kassenwart: nur die Sicherheitskopie).
   const [protokollOffen, setProtokollOffen] = useState(false);
@@ -71,6 +69,7 @@ export function ProfilSheet({
   const [funktionenOffen, setFunktionenOffen] = useState(false);
   const [freigabenOffen, setFreigabenOffen] = useState(false);
   const [farbenOffen, setFarbenOffen] = useState(false);
+  const [modusOffen, setModusOffen] = useState(false);
 
   const meine = committeesOf(uid);
   const istAdmin = role === "admin";
@@ -125,29 +124,29 @@ export function ProfilSheet({
   // Demo (ohne Datenbank): nur das Protokoll mit erfundenen Einträgen zum Ansehen
   // (lib/protokoll.ts) – Speicher, Löschfristen und Update brauchen die Datenbank.
   const daten = hasSupabase ? istAdmin || istKassenwart || can("perms.manage") : istAdmin;
-  const pushText = !pushConfigured() ? "Nicht eingerichtet" : perm === "granted" ? "An" : perm === "denied" ? "Blockiert" : "Aus";
 
   return (
     <Sheet open={open} onClose={onClose}>
       <SheetKopf titel="Mein Profil" onClose={onClose} />
 
-      {/* Kopf: wie die Account-Zelle ganz oben in den iOS-Einstellungen.
+      {/* Kopf: wie die Account-Zelle ganz oben in den iOS-Einstellungen –
+          kompakt in EINER Zeile (Runde 8: vorher 60-px-Bild und Rolle als
+          zweite Zeile darunter): Bild, Name links, Rolle rechts.
           Elternzugaenge tragen kein Bild. */}
       <div className="gruppe-zellen">
-       <div className="flex items-center gap-4 px-4 py-3.5">
-        {!istEltern && <Avatar userId={uid} size={60} />}
-        <div className="min-w-0 flex-1">
-          <div
-            className="truncate text-[19px] font-semibold tracking-[-0.01em]"
+        <div className="flex min-h-[60px] items-center gap-3 px-4 py-2">
+          {!istEltern && <Avatar userId={uid} size={44} />}
+          {/* Der Name hat Vorrang (bis 65 %), die Rolle kürzt mit „…“ */}
+          <span
+            className="max-w-[65%] shrink-0 truncate text-[17px] font-semibold tracking-[-0.01em]"
             style={istEltern ? undefined : { color: namensfarbe(mein?.farbe, theme === "dark") }}
           >
             {istEltern ? mein?.anzeigename || "Ihr Zugang" : `${personIcon(role, meine)} | ${lesbarerName(mein?.anzeigename || "") || "Dein Name"}`}
-          </div>
-          <div className="mt-0.5 truncate text-[13px] text-tinte-leise">
+          </span>
+          <span className="min-w-0 flex-1 truncate text-right text-[15px] text-tinte-matt dark:text-slate-300">
             {istEltern ? "Elternzugang" : rolleUndKomitees(role, meine) || "Noch kein Komitee"}
-          </div>
+          </span>
         </div>
-       </div>
       </div>
 
       {farbFehler && <div className="mt-3 rounded-xl bg-red-500/10 px-3 py-2 text-[13px] font-semibold text-fehler">{farbFehler}</div>}
@@ -187,42 +186,45 @@ export function ProfilSheet({
         </Gruppe>
       )}
 
-      {/* ------------------------------------------------ Darstellung */}
-      <Gruppe
-        titel="Darstellung"
-        className="mt-6"
-        fuss={`„Automatisch“ folgt der Einstellung ${istEltern ? "Ihres" : "deines"} Geräts – abends also von selbst dunkel, wenn es dort so eingestellt ist.`}
-      >
-        {/* Erscheinungsbild: Hell / Dunkel / Automatisch (lib/theme.ts). Der Mond-
-            Knopf oben in der Kopfleiste bleibt als Abkürzung. */}
-        <div className="px-4 py-3">
-          <div className="mb-2.5 flex items-center gap-3">
-            <Sym icon={theme === "dark" ? "mond" : "sonne"} farbe="bg-[#5856D6]" />
-            <span className="text-[15px]">Erscheinungsbild</span>
-          </div>
-          <div className="seg" role="radiogroup" aria-label="Erscheinungsbild">
-            {([
-              ["light", "Hell"],
-              ["dark", "Dunkel"],
-              ["auto", "Automatisch"],
-            ] as [Modus, string][]).map(([wert, text]) => (
-              <button
-                key={wert}
-                type="button"
-                role="radio"
-                aria-checked={modus === wert}
-                onClick={() => setModus(wert)}
-                className={`seg-item whitespace-nowrap !px-1 !py-2 !text-[13px] ${modus === wert ? "seg-aktiv" : ""}`}
-              >
-                {text}
-              </button>
-            ))}
-          </div>
-        </div>
+      {/* ------------------------------------------------ Darstellung
+          Runde 8: jede Einstellung EINE Zeile, keine Fußnoten mehr. */}
+      <Gruppe titel="Darstellung" className="mt-6">
+        {/* Erscheinungsbild: Hell / Dunkel / Automatisch (lib/theme.ts) – wie
+            die Namensfarbe eine aufklappbare Zeile mit dem Wert rechts (vorher
+            Bezeichnung und Segment untereinander, ~90 px). Der Mond-Knopf oben
+            in der Kopfleiste bleibt als Abkürzung. */}
+        <AufZeile
+          symbol={<Sym icon={theme === "dark" ? "mond" : "sonne"} farbe="bg-[#5856D6]" />}
+          label="Erscheinungsbild"
+          wert={
+            modus === "auto" ? (
+              // Am schmalsten Handy (320 px) passt „Automatisch“ nicht neben die Bezeichnung
+              <>
+                <span className="max-[359px]:hidden">Automatisch</span>
+                <span className="min-[360px]:hidden">Auto</span>
+              </>
+            ) : (
+              MODI.find(([m]) => m === modus)?.[1]
+            )
+          }
+          auf={modusOffen}
+          onClick={() => setModusOffen((o) => !o)}
+        />
+        {modusOffen &&
+          MODI.map(([wert, text]) => (
+            <ZeileHaken
+              key={wert}
+              // eingerückt bis unter die Bezeichnung – gehört zur Zeile darüber
+              symbol={<span aria-hidden className="w-[30px] shrink-0" />}
+              label={wert === "auto" ? "Automatisch (wie Gerät)" : text}
+              gewaehlt={modus === wert}
+              onClick={() => setModus(wert)}
+            />
+          ))}
         {!istEltern && (
           <AufZeile
             symbol={<Sym icon="person" farbe="bg-[#FF9500]" />}
-            label="Farbe deines Namens"
+            label="Namensfarbe"
             auf={farbenOffen}
             onClick={() => setFarbenOffen((o) => !o)}
           >
@@ -264,18 +266,11 @@ export function ProfilSheet({
         <HintergrundZeile />
       </Gruppe>
 
-      {/* ------------------------------------------------ Mitteilungen */}
+      {/* ------------------------------------------------ Mitteilungen
+          Keine Fußnote mehr: Hinweise und „Kommt nichts an?“ klappt die
+          Zeile „Auf diesem Gerät“ auf. */}
       {(hasSupabase || !istEltern) && (
-        <Gruppe
-          titel="Mitteilungen"
-          fuss={
-            <>
-              {!istEltern && "Wichtiges – Angepinntes, Team und Events – kommt immer. "}
-              {hasSupabase && perm === "denied" && `${istEltern ? "Ihr" : "Dein"} Browser blockiert Mitteilungen – in den Browser-Einstellungen wieder erlauben. `}
-              {hasSupabase && <Pushpruefung />}
-            </>
-          }
-        >
+        <Gruppe titel="Mitteilungen">
           {!istEltern && (
             <ZeileMitSchalter label="Chats" symbol={<Sym icon="chats" farbe="bg-[#34C759]" />}>
               <Schalter
@@ -290,33 +285,14 @@ export function ProfilSheet({
               />
             </ZeileMitSchalter>
           )}
-          {hasSupabase && (
-            <Zeile label="Auf diesem Gerät" symbol={<Sym icon="info" farbe="bg-[#FF3B30]" />}>
-              {pushConfigured() && perm !== "granted" && perm !== "denied" ? (
-                <button
-                  disabled={pushBusy}
-                  onClick={async () => {
-                    setPushBusy(true);
-                    const r = await enablePush();
-                    setPushBusy(false);
-                    setPerm(pushPermission());
-                    if (!r.ok && r.error) meldeFehler("Hat nicht geklappt: " + r.error);
-                  }}
-                  className="btn-klein !px-3.5 !text-[13px]"
-                >
-                  {pushBusy ? "…" : "Anschalten"}
-                </button>
-              ) : (
-                <Wert>{pushText}</Wert>
-              )}
-            </Zeile>
-          )}
+          {hasSupabase && <PushZeile istEltern={istEltern} />}
         </Gruppe>
       )}
 
       {/* ------------------------------------------------ Konto */}
+      {/* Ohne Fußnote: „Angefragt“ steht schon rechts in der Komitee-Zeile */}
       {(hasSupabase || (!isStaff && !istEltern)) && (
-        <Gruppe titel="Konto" fuss={hatAntrag && !isStaff && !istEltern ? "Dein Komitee-Wunsch liegt beim Stufenteam." : undefined}>
+        <Gruppe titel="Konto">
           {hasSupabase && (
             <AufZeile
               symbol={<Sym icon="schluessel" farbe="bg-[#8E8E93]" />}
@@ -369,7 +345,7 @@ export function ProfilSheet({
       {(onTutorial || onNeu) && (
         <Gruppe titel="Hilfe">
           {onNeu && <Zeile label="Was ist neu" symbol={<Sym icon="funke" farbe="bg-[#FF9500]" />} onClick={onNeu} />}
-          {onTutorial && <Zeile label="Einführung noch mal ansehen" symbol={<Sym icon="info" farbe="bg-brand" />} onClick={onTutorial} />}
+          {onTutorial && <Zeile label="Einführung ansehen" symbol={<Sym icon="info" farbe="bg-brand" />} onClick={onTutorial} />}
         </Gruppe>
       )}
 
@@ -395,22 +371,18 @@ export function ProfilSheet({
 
       {!isStaff && !istEltern && (
         <Sheet open={open && antragOffen && !hatAntrag} onClose={() => setAntragOffen(false)}>
-          <SheetKopf
-            titel={meine.length ? "Komitee wechseln" : "Komitee wählen"}
-            unter="Das Stufenteam entscheidet über deinen Wunsch."
-            onClose={() => setAntragOffen(false)}
-          />
+          <SheetKopf titel={meine.length ? "Komitee wechseln" : "Komitee wählen"} onClose={() => setAntragOffen(false)} />
           <Gruppe titel="Wunsch-Komitee" className="mt-1">
             {SELECTABLE_COMMITTEES.filter((c) => !meine.includes(c.slug)).map((c) => (
               <ZeileHaken key={c.slug} label={c.label} gewaehlt={wunsch === c.slug} onClick={() => setWunsch(c.slug)} />
             ))}
           </Gruppe>
-          <Gruppe titel="Begründung" fuss="Optional – ein Satz reicht.">
+          <Gruppe titel="Begründung">
             <textarea
               rows={2}
               maxLength={300}
               className={`${EINGABE} resize-none py-3`}
-              placeholder="Warum?"
+              placeholder="Warum? (optional)"
               value={grund}
               onChange={(e) => setGrund(e.target.value)}
             />
@@ -445,6 +417,13 @@ export function ProfilSheet({
   );
 }
 
+/** Erscheinungsbild (lib/theme.ts) */
+const MODI: [Modus, string][] = [
+  ["light", "Hell"],
+  ["dark", "Dunkel"],
+  ["auto", "Automatisch"],
+];
+
 /** Eingabe als eigene Zeile in einer Gruppe (Passwort, Begründung) */
 const EINGABE = "block min-h-[48px] w-full bg-transparent px-4 text-[16px] outline-none placeholder:text-tinte-leise";
 
@@ -471,7 +450,7 @@ function AufZeile({
   label: string;
   auf: boolean;
   onClick: () => void;
-  wert?: string;
+  wert?: ReactNode;
   ohnePfeil?: boolean;
   children?: ReactNode;
 }) {
@@ -483,9 +462,15 @@ function AufZeile({
       className="flex min-h-[48px] w-full items-center gap-3 px-4 py-2 text-left transition active:bg-black/[0.04] dark:active:bg-white/[0.06]"
     >
       {symbol}
-      <span className="min-w-0 flex-1 text-[15px]">{label}</span>
+      {/* Einzeilig: Mit Wert bleibt die Bezeichnung ganz (höchstens 65 %), der
+          Wert kürzt mit „…“ – wie Zeile in Liste.tsx */}
+      <span className={`truncate text-[15px] ${wert ? "max-w-[65%] shrink-0" : "min-w-0 flex-1"}`}>{label}</span>
       {children}
-      {wert && <Wert>{wert}</Wert>}
+      {wert && (
+        <span className="flex min-w-0 flex-1 justify-end">
+          <Wert>{wert}</Wert>
+        </span>
+      )}
       {!ohnePfeil && (
         <span className={`text-tinte-leise transition duration-200 ease-ios ${auf ? "rotate-90" : ""}`} aria-hidden>
           <Icon name="chevron" size={16} />
@@ -497,17 +482,14 @@ function AufZeile({
 
 /** Eigenes Hintergrundbild: auswählen, ersetzen, entfernen */
 function HintergrundZeile() {
-  const { uid, role } = useRole();
+  const { uid } = useRole();
   const bild = useHintergrund();
   const [busy, setBusy] = useState(false);
   const ref = useRef<HTMLInputElement>(null);
   return (
     <>
-      <Zeile
-        label="Hintergrundbild"
-        unter={role === "eltern" ? "Nur für Sie sichtbar" : "Nur für dich sichtbar"}
-        symbol={<Sym icon="bild" farbe="bg-[#32ADE6]" />}
-      >
+      {/* Einzeilig (Runde 8): „Nur für dich sichtbar“ stand als zweite Zeile darunter */}
+      <Zeile label="Hintergrundbild" symbol={<Sym icon="bild" farbe="bg-[#32ADE6]" />}>
         <input
           ref={ref}
           type="file"
@@ -544,11 +526,16 @@ function HintergrundZeile() {
 }
 
 /**
- * "Kommt bei mir nichts an?" – aufklappbar, damit es niemanden stört, der kein
- * Problem hat. Bis eben verschluckte die App jeden Fehler beim Versenden (siehe
+ * „Auf diesem Gerät“: Mitteilungen anschalten bzw. ihr Zustand. Ist nichts
+ * mehr anzuschalten (an, blockiert, nicht eingerichtet), klappt die Zeile die
+ * Prüfung „Kommt bei mir nichts an?“ auf – so stört sie niemanden, der kein
+ * Problem hat. Vorher stand sie samt zwei Hinweisen als Fußtext unter der
+ * Gruppe. Bis eben verschluckte die App jeden Fehler beim Versenden (siehe
  * sendePush in src/lib/push.ts); jetzt steht hier, woran es hängt.
  */
-function Pushpruefung() {
+function PushZeile({ istEltern }: { istEltern: boolean }) {
+  const [perm, setPerm] = useState(pushPermission());
+  const [busy, setBusy] = useState(false);
   const [offen, setOffen] = useState(false);
   const [text, setText] = useState("Wird geprüft …");
 
@@ -562,12 +549,37 @@ function Pushpruefung() {
     };
   }, [offen]);
 
+  const symbol = <Sym icon="info" farbe="bg-[#FF3B30]" />;
+  if (pushConfigured() && perm !== "granted" && perm !== "denied")
+    return (
+      <Zeile label="Auf diesem Gerät" symbol={symbol}>
+        <button
+          disabled={busy}
+          onClick={async () => {
+            setBusy(true);
+            const r = await enablePush();
+            setBusy(false);
+            setPerm(pushPermission());
+            if (!r.ok && r.error) meldeFehler("Hat nicht geklappt: " + r.error);
+          }}
+          className="btn-klein !px-3.5 !text-[13px]"
+        >
+          {busy ? "…" : "Anschalten"}
+        </button>
+      </Zeile>
+    );
+
+  const zustand = !pushConfigured() ? "Nicht eingerichtet" : perm === "granted" ? "An" : "Blockiert";
   return (
     <>
-      <button onClick={() => setOffen((v) => !v)} className="font-medium text-brand-dark dark:text-brand">
-        {offen ? "Prüfung ausblenden" : "Kommt nichts an? Hier prüfen"}
-      </button>
-      {offen && <span className="mt-1.5 block leading-relaxed text-tinte-matt dark:text-slate-300">{text}</span>}
+      <AufZeile symbol={symbol} label="Auf diesem Gerät" wert={zustand} auf={offen} onClick={() => setOffen((o) => !o)} />
+      {offen && (
+        <div className="animate-fadeIn space-y-1.5 px-4 pb-3 pt-2 text-[13px] leading-relaxed text-tinte-matt dark:text-slate-300">
+          {perm === "denied" && <p>{istEltern ? "Ihr" : "Dein"} Browser blockiert Mitteilungen – in den Browser-Einstellungen wieder erlauben.</p>}
+          {!istEltern && <p>Wichtiges – Angepinntes, Team und Events – kommt immer, auch wenn Chats aus sind.</p>}
+          <p>{text}</p>
+        </div>
+      )}
     </>
   );
 }

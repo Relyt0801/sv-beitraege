@@ -19,7 +19,7 @@ import {
 import { frage, melde, meldeFehler } from "../lib/melder";
 import { useFunktionen } from "../lib/funktionen";
 import { LiedSuche, SpotifyKarte, ohneLink, spotifyAus } from "./Spotify";
-import { FarbKarte, FussLeiste, KleinerRing, KnopfGlas, KnopfHell } from "./Kachel";
+import { FarbKachel, FarbKarte, FussLeiste, KleinerRing, KnopfGlas, KnopfHell } from "./Kachel";
 import { FussLeiste as FussLeisteBlatt } from "./FussLeiste";
 import { WortfilterSchalter } from "./AutorInfo";
 import { useWfRecht } from "../lib/wortfilter-bereiche";
@@ -165,6 +165,7 @@ function vorWann(iso: string): string {
 export function AlbumKarte({ className = "" }: { className?: string }) {
   const album = useAlbumCtx();
   const { studentId, can } = useRole();
+  const { an } = useFunktionen();
   if (!album || !can("album.nutzen")) return null;
   const mein = studentId ? album.steckbriefVon(studentId) : undefined;
   const prozent = fortschritt(mein, album.kategorien);
@@ -183,9 +184,25 @@ export function AlbumKarte({ className = "" }: { className?: string }) {
   const oeffne = (detail: string | null) => window.dispatchEvent(new CustomEvent("sv:album", { detail }));
 
   return (
-    <div className={`flex flex-col ${className}`}>
-      <AusHinweis funktion="album" className="mb-1.5 px-1" />
+    // data-regal: eine Kachel im Mitmachen-Raster der Startseite (MyKasse.tsx, index.css)
+    <div data-regal="einzeln" className={`flex flex-col ${className}`}>
+      <AusHinweis funktion="album" className="mb-1.5 px-1 max-sm:hidden" />
+      {/* Handy: kleine Kachel im Raster aus zwei Spalten, ein Tipp öffnet das
+          Album (vorher die große Karte in einem seitlich wischbaren Regal) */}
+      <FarbKachel
+        className="flex-1 sm:hidden"
+        verlauf="from-[#FF375F] to-[#E0164A]"
+        schatten="shadow-[0_10px_24px_-14px_rgba(224,22,74,.8)]"
+        symbol={<Icon name="buch" size={19} strich={2.2} />}
+        titel="Abi-Album"
+        unter={prozent ? `Dein Steckbrief: ${prozent} %` : "Dein Steckbrief wartet"}
+        zahl={offeneFreigaben}
+        zahlRot
+        aus={!an.album}
+        onClick={() => oeffne(null)}
+      />
       <FarbKarte
+        className="max-sm:hidden"
         // Ganze Karte antippbar: öffnet das Album (die Knöpfe unten bleiben als Abkürzungen)
         onClick={() => oeffne(null)}
         label="Abi-Album öffnen"

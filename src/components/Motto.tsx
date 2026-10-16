@@ -13,7 +13,7 @@ import { frage, melde, meldeFehler } from "../lib/melder";
 import { useRunden, type Runde, type RundenStand, type KandidatEingabe } from "../lib/runden";
 import { RundenAbschnitt, RundenEinstellungen, RundenMarke, RundeStartenSheet, SichtbarkeitWahl } from "./Runden";
 import { useErgebnisSichtbarkeit } from "../lib/ergebnisse";
-import { FarbKarte, KnopfGlas, KnopfHell, VerwaltetVon } from "./Kachel";
+import { FarbKachel, FarbKarte, KnopfGlas, KnopfHell, VerwaltetVon } from "./Kachel";
 import { AutorInfo, WortfilterSchalter } from "./AutorInfo";
 import { Gruppe, Zeile, Wert } from "./Liste";
 import { Icon } from "./Icon";
@@ -106,7 +106,7 @@ function useMottoVerschieben(m: MottoWahl, vs: ReturnType<typeof useVerschiebung
 /* ====================================================================== */
 export function MottoKarte({ className = "" }: { className?: string }) {
   const { can, isEltern, uid, banned } = useRole();
-  const { sichtbar } = useFunktionen();
+  const { sichtbar, an } = useFunktionen();
   const darf = !isEltern && sichtbar("motto") && (can("motto.nutzen") || can("motto.verwalten"));
   const m = useMotto(darf, uid);
   const r = useRunden("motto", darf, uid, can("motto.runden"));
@@ -127,10 +127,35 @@ export function MottoKarte({ className = "" }: { className?: string }) {
     setAnsicht(a);
   };
 
+  // Handy-Kachel: eine Zeile Stand; läuft eine Runde, rot die noch offenen Stimmen
+  const kachelUnter = gewaehlt
+    ? `„${gewaehlt.text}“`
+    : runde
+      ? `Runde ${runde.nr} · ${r.meineIn(runde.id).length} von ${stimmenText(runde.stimmen)} vergeben`
+      : m.abstimmung
+        ? `Abstimmung läuft · ${vorschlaegeText(sichtbare.length)}`
+        : `${vorschlaegeText(sichtbare.length)} bisher`;
+  const offeneStimmen = runde && !gewaehlt ? Math.max(0, runde.stimmen - r.meineIn(runde.id).length) : 0;
+
   return (
-    <div className={`flex flex-col ${className}`} data-motto="karte">
-      <AusHinweis funktion="motto" className="mb-1.5 px-1" />
+    // data-regal: eine Kachel im Mitmachen-Raster der Startseite (MyKasse.tsx, index.css)
+    <div className={`flex flex-col ${className}`} data-motto="karte" data-regal="einzeln">
+      <AusHinweis funktion="motto" className="mb-1.5 px-1 max-sm:hidden" />
+      {/* Handy: kleine Kachel im Raster, ein Tipp öffnet das Blatt */}
+      <FarbKachel
+        className="flex-1 sm:hidden"
+        verlauf="from-[#FF9500] to-[#F26B00]"
+        schatten="shadow-[0_10px_24px_-14px_rgba(242,107,0,.8)]"
+        symbol={<Icon name="funke" size={19} strich={2.2} />}
+        titel="Abimotto"
+        unter={kachelUnter}
+        zahl={offeneStimmen}
+        zahlRot
+        aus={!an.motto}
+        onClick={() => oeffnen("liste")}
+      />
       <FarbKarte
+        className="max-sm:hidden"
         verlauf="from-[#FF9500] to-[#F26B00]"
         schatten="shadow-[0_12px_28px_-14px_rgba(242,107,0,.8)]"
         onClick={() => oeffnen("liste")}
@@ -180,15 +205,15 @@ export function MottoKarte({ className = "" }: { className?: string }) {
               </KnopfHell>
             ) : (
               // Kurz wie bei den Zitaten („Alle (6)“): mit „Alle ansehen“ brachen die
-              // beiden Knöpfe am Handy (Regal, 315 px) in zwei Reihen um
+              // beiden Knöpfe im früheren Handy-Regal (315 px) in zwei Reihen um
               <KnopfGlas onClick={() => oeffnen("liste")}>{sichtbare.length ? `Alle (${sichtbare.length})` : "Alle ansehen"}</KnopfGlas>
             )}
           </>
         }
       >
         {/* Ab iPad (zwei Karten nebeneinander, gleich hoch): die neuesten
-            Vorschläge statt leerer Fläche neben dem Steckbrief. Am Handy im
-            Regal nicht – die Karte soll dort nicht höher werden. */}
+            Vorschläge statt leerer Fläche neben dem Steckbrief. Am Handy steht
+            statt der Karte die Kachel oben. */}
         {!gewaehlt && sichtbare.length > 0 && (
           <div className="mt-3 flex flex-wrap gap-1.5 max-sm:hidden">
             {sichtbare.slice(0, 3).map((x) => (

@@ -11,7 +11,7 @@ import { frage, melde, meldeFehler } from "../lib/melder";
 import { useRunden, type KandidatEingabe, type Runde, type RundenStand } from "../lib/runden";
 import { RundenAbschnitt, RundenMarke, RundeStartenSheet, SichtbarkeitWahl, Stepper } from "./Runden";
 import { useErgebnisSichtbarkeit } from "../lib/ergebnisse";
-import { FarbKarte, KnopfGlas, KnopfHell, VerwaltetVon } from "./Kachel";
+import { FarbKachel, FarbKarte, KnopfGlas, KnopfHell, VerwaltetVon } from "./Kachel";
 import { AutorInfo, WortfilterSchalter } from "./AutorInfo";
 import { useZustimmungen } from "../lib/zustimmung";
 import { useLehrer, useStufePersonen } from "../lib/rankings";
@@ -63,7 +63,7 @@ const zitatUnter = (z: Zitat) => `— ${z.wer}${z.kontext ? `, ${z.kontext}` : "
  */
 export function ZitateKarte({ className = "" }: { className?: string }) {
   const { can, isEltern, uid, banned } = useRole();
-  const { sichtbar } = useFunktionen();
+  const { sichtbar, an } = useFunktionen();
   const darf = !isEltern && sichtbar("zitate") && (can("zitate.nutzen") || can("zitate.pruefen"));
   const wand = useZitate(darf, uid);
   const r = useRunden("zitate", darf, uid, can("zitate.runden"));
@@ -98,14 +98,40 @@ export function ZitateKarte({ className = "" }: { className?: string }) {
   // Gekürter Gewinner: zuerst im offenen Teil
   const sieger = gw.von(teil, "gewinner") || gw.von(ANDERER[teil], "gewinner");
 
+  // Handy-Kachel: Wer prüft, sieht rot die wartenden Zitate, sonst rot die
+  // noch offenen Stimmen einer laufenden Runde
+  const kachelUnter = runde
+    ? `Abstimmung · ${r.meineIn(runde.id).length} von ${runde.stimmen} ${runde.stimmen === 1 ? "Stimme" : "Stimmen"} vergeben`
+    : sieger
+      ? sieger.label
+      : heute
+        ? `„${zitatOhneZeichen(heute.text)}“`
+        : "Zitat einreichen";
+  const kachelZahl = darfPruefen && warten > 0 ? warten : runde ? Math.max(0, runde.stimmen - r.meineIn(runde.id).length) : 0;
+  const kachelOeffnen = () => (runde ? (setTeil(rundeTeil), setOffen("wand")) : setOffen("wand"));
+
   return (
-    <div className={`flex flex-col ${className}`}>
-      <AusHinweis funktion="zitate" className="mb-1.5 px-1" />
+    // data-regal: eine Kachel im Mitmachen-Raster der Startseite (MyKasse.tsx, index.css)
+    <div data-regal="einzeln" className={`flex flex-col ${className}`}>
+      <AusHinweis funktion="zitate" className="mb-1.5 px-1 max-sm:hidden" />
+      {/* Handy: kleine Kachel im Raster, ein Tipp öffnet die Zitatwand */}
+      <FarbKachel
+        className="flex-1 dark:ring-1 dark:ring-white/10 sm:hidden"
+        verlauf="from-[#2C2C2E] to-[#1C1C1E]"
+        schatten="shadow-[0_10px_24px_-14px_rgba(0,0,0,.75)]"
+        symbol={<Icon name="zitat" size={19} strich={2.2} />}
+        titel="Zitatwand"
+        unter={kachelUnter}
+        zahl={kachelZahl}
+        zahlRot
+        aus={!an.zitate}
+        onClick={kachelOeffnen}
+      />
       <FarbKarte
         verlauf="from-[#2C2C2E] to-[#1C1C1E]"
         schatten="shadow-[0_12px_30px_-14px_rgba(0,0,0,.75)]"
-        className="dark:ring-1 dark:ring-white/10"
-        onClick={() => (runde ? (setTeil(rundeTeil), setOffen("wand")) : setOffen("wand"))}
+        className="dark:ring-1 dark:ring-white/10 max-sm:hidden"
+        onClick={kachelOeffnen}
         label="Zitatwand öffnen"
         marke={
           runde ? (

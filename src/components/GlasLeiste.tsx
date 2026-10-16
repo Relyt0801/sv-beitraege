@@ -4,7 +4,8 @@ import { useCallback, useId, useLayoutEffect, useRef, useState, type ReactNode }
  * Reiterleiste aus Glas wie in iPadOS/iOS 26:
  *
  *   – Unter dem gewählten Reiter liegt eine gläserne „Linse“, die beim
- *     Wechseln federnd hinübergleitet und beim Drücken kurz anwächst.
+ *     Wechseln hinübergleitet (ohne Überschwingen) und beim Drücken kurz
+ *     anwächst.
  *   – Mit Maus oder Trackpad (iPad mit Zeiger, Laptop) folgt eine zweite,
  *     ganz leichte Linse dem Zeiger („Hover“).
  *
@@ -90,7 +91,18 @@ export function GlasLeiste<K extends string>({
   // wird es unleserlich), dafür weniger Innenabstand und engerer Buchstabenabstand –
   // gekürzt („Finanz…“) wird nichts mehr.
   const eng = unten && reiter.length >= 6;
-  const feder = bereit ? "transform 520ms cubic-bezier(.34,1.32,.5,1), width 520ms cubic-bezier(.34,1.32,.5,1), opacity 200ms" : "none";
+  // Gleiten OHNE Überschwingen (ease-ios). Vorher federte die Linse
+  // (cubic-bezier(.34,1.32,.5,1)) bis 103 % der Strecke über ihr Ziel – vom
+  // ersten auf den letzten Reiter ragte sie am Handy über die Kapsel, am
+  // Laptop schnitt die Leiste ihr rundes Ende gerade ab („wird eckig“).
+  // Mit derselben Kurve für Lage und Breite bleibt jede Kante immer zwischen
+  // Start und Ziel.
+  const gleit = "cubic-bezier(.32,.72,0,1)";
+  const feder = bereit ? `transform 480ms ${gleit}, width 480ms ${gleit}, opacity 200ms` : "none";
+  // Beim Drücken wächst die Linse – am ersten und letzten Reiter nur nach
+  // innen, sonst stünde sie über den Rand der Kapsel
+  const stelle = reiter.findIndex((r) => r.key === aktiv);
+  const ursprung = stelle === 0 ? "left center" : stelle === reiter.length - 1 ? "right center" : "center";
 
   return (
     <div
@@ -126,6 +138,7 @@ export function GlasLeiste<K extends string>({
           className={`glas-linse pointer-events-none absolute left-0 rounded-full ${unten ? "inset-y-0" : "inset-y-2"}`}
           style={{
             transform: `translateX(${linse.x}px) scale(${gedrueckt ? 1.08 : 1})`,
+            transformOrigin: ursprung,
             width: linse.w,
             transition: feder,
           }}
