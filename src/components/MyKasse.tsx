@@ -137,15 +137,30 @@ export function MyKasse({
       </Sheet>
 
       {/* ------------------------------------------ Abi-Album (nur mit Recht) */}
-      {/* Abizeitung & Co. als ruhige Kacheln: Handy untereinander, ab iPad zwei nebeneinander */}
+      {/* Mitmachen (Album, Motto, Zitate, Rankings): am Handy ein Regal zum
+          Wischen wie in Apple Music – die nächste Karte schaut rechts herein.
+          Vorher fünf hohe Karten untereinander (gut 800 px, die Übersicht war
+          fast drei Bildschirme lang). Ab 640 px zwei nebeneinander im Raster.
+          pb-7/-mb-7: Platz für die farbigen Schatten (overflow schneidet sonst ab). */}
       {/* data-tour: Einführung zeigt hier auf die Kacheln (Tour.tsx) */}
-      <div data-tour="kacheln" className="order-3 grid gap-3 sm:grid-cols-2 md:order-4 md:col-span-2 [&:empty]:hidden">
+      <div
+        data-tour="kacheln"
+        role="region"
+        aria-label="Mitmachen"
+        // Tastatur: die Karte mit dem Fokus ganz ins Bild holen (sonst blieb ein
+        // Knopf zu 80 % rechts außerhalb stehen)
+        onFocus={(e) => (e.target as HTMLElement).closest('[data-tour="kacheln"] > *')?.scrollIntoView({ inline: "start", block: "nearest" })}
+        className="no-scrollbar order-3 gap-3 max-sm:-mx-3 max-sm:-mb-7 max-sm:-mt-2 max-sm:flex max-sm:snap-x max-sm:snap-mandatory max-sm:scroll-px-3 max-sm:overflow-x-auto max-sm:px-3 max-sm:pb-7 max-sm:pt-2 max-sm:[&>*:only-child]:w-full max-sm:[&>*]:w-[86%] max-sm:[&>*]:shrink-0 max-sm:[&>*]:snap-start sm:grid sm:grid-cols-2 md:order-4 md:col-span-2 [&:empty]:hidden"
+      >
         <AlbumKarte />
         <MottoKarte />
         <ZitateKarte />
         <RankingKarten />
-        <UmfrageStichwahlen />
       </div>
+      {/* Stichwahlen NICHT im Regal: eine offene Abstimmung gehört sichtbar in
+          die Spalte (im Regal stand sie als 5. Karte ganz hinten und zog alle
+          Karten auf ihre Höhe) */}
+      <UmfrageStichwahlen className="order-3 md:order-4 md:col-span-2" />
 
       {/* ------------------------------------------ Halbjahre mit Preis */}
       <section className="card order-4 p-4 sm:p-5 md:order-3">

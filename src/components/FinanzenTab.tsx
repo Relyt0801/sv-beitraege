@@ -711,7 +711,8 @@ function KostenKarte({
       {!kosten.bereit ? (
         <div className="gruppe-zellen px-4 py-5 text-center text-[14px] text-tinte-leise">Lädt …</div>
       ) : kosten.anfragen.length === 0 ? (
-        <div className="gruppe-zellen px-4 py-5 text-center text-[14px] text-tinte-leise">Keine Kostenanfragen.</div>
+        // Eine Zeile wie in den iOS-Einstellungen statt eines hohen, zentrierten Kastens
+        <div className="gruppe-zellen flex min-h-[44px] items-center px-4 text-[15px] text-tinte-leise">Keine Anfragen</div>
       ) : (
         <div className="gruppe-zellen">
           {[...offene, ...sichtbarErledigt].map((a) => (
@@ -994,6 +995,8 @@ function art(b: Buchung, kategorien: KassenKategorie[] = []): { farbe: string; i
 const monatName = (m: string) =>
   new Date(m + "-01T12:00:00").toLocaleDateString("de-DE", { month: "long", year: "numeric" });
 
+const KURZ = 5;
+
 function VerlaufKarte({
   buchungen, kategorien, darf, onLoeschen, onKategorie, aktionName,
 }: {
@@ -1029,6 +1032,10 @@ function VerlaufKarte({
     return [...m.entries()];
   }, [liste]);
   const [offen, setOffen] = useState<Set<string>>(() => new Set());
+  // Am Handy/iPad zeigt ein offener Monat zuerst die neuesten KURZ Buchungen
+  // (vorher alle – die Seite war am iPhone gut drei Bildschirme lang). Am
+  // Laptop scrollt die Spalte in sich, dort bleibt alles sichtbar (nur CSS).
+  const [ganz, setGanz] = useState<Set<string>>(() => new Set());
   const neuester = gruppen[0]?.[0];
   const istOffen = (monat: string) => (q.trim() ? true : offen.has(monat) !== (monat === neuester));
   const umschalten = (monat: string) =>
@@ -1038,6 +1045,9 @@ function VerlaufKarte({
       else neu.add(monat);
       return neu;
     });
+
+  // Kürzen nur ohne Suche und erst ab KURZ + 2 (eine einzelne versteckte Zeile lohnt den Knopf nicht)
+  const gekuerzt = (monat: string, n: number) => !q.trim() && !ganz.has(monat) && n > KURZ + 1;
 
   const FILTER: [Filter, string][] = [
     ["alle", "Alle"],
@@ -1122,9 +1132,32 @@ function VerlaufKarte({
                 </button>
                 </li>
                 {auf &&
-                  zeilen.map((b) => (
-                    <BuchungsZeile key={b.id} b={b} kategorien={kategorien} aktionName={aktionName} onOeffnen={() => setAuswahl(b)} />
+                  zeilen.map((b, i) => (
+                    <BuchungsZeile
+                      key={b.id}
+                      b={b}
+                      kategorien={kategorien}
+                      aktionName={aktionName}
+                      onOeffnen={() => setAuswahl(b)}
+                      klasse={gekuerzt(monat, zeilen.length) && i >= KURZ ? "max-lg:hidden" : undefined}
+                    />
                   ))}
+                {auf && gekuerzt(monat, zeilen.length) && (
+                  <li className="lg:hidden">
+                    <button
+                      onClick={(e) => {
+                        // Der Knopf verschwindet – Fokus auf die erste neu sichtbare
+                        // Buchung (Kind 0 ist der Monatskopf), sonst fiel er auf <body>
+                        const ul = e.currentTarget.closest("ul");
+                        setGanz((alt) => new Set(alt).add(monat));
+                        requestAnimationFrame(() => ul?.children[KURZ + 1]?.querySelector<HTMLElement>("button")?.focus());
+                      }}
+                      className="flex min-h-[48px] w-full items-center px-4 text-left text-[15px] font-medium text-brand-dark transition active:bg-black/[0.04] dark:text-brand dark:active:bg-white/[0.06]"
+                    >
+                      Alle {zeilen.length} Buchungen anzeigen
+                    </button>
+                  </li>
+                )}
               </ul>
             );
           })}
@@ -1172,17 +1205,18 @@ function Betrag({ b, gross }: { b: Buchung; gross?: boolean }) {
 }
 
 function BuchungsZeile({
-  b, kategorien, aktionName, onOeffnen,
+  b, kategorien, aktionName, onOeffnen, klasse,
 }: {
   b: Buchung;
   kategorien: KassenKategorie[];
   aktionName: (id: string) => string;
   onOeffnen: () => void;
+  klasse?: string;
 }) {
   const kat = b.kategorie_id ? kategorien.find((k) => k.id === b.kategorie_id) : null;
   const zu = kat ? kat.name : zuweisungText(b, aktionName);
   return (
-    <li>
+    <li className={klasse}>
       <button
         onClick={onOeffnen}
         className="flex w-full items-center gap-3 px-4 py-2.5 text-left transition hover:bg-black/[0.02] active:bg-black/[0.05] dark:hover:bg-white/[0.03] dark:active:bg-white/[0.07]"

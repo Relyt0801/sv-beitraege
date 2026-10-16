@@ -11,6 +11,54 @@ ausführlich (auf Deutsch); hier steht der Überblick dazu.
 
 ---
 
+## Letzte Reste: Protokoll, Umfrage-Editor, Kontrast, Regal (16.10.2026)
+
+Nachmessung über alle Rollen × 5 Geräte × Reiter (Seitenhöhe, größte Lücke,
+Füllgrad des ersten Bildschirms): größte senkrechte Lücke im Inhalt überall
+≤ 69 px. Zu lang waren nur noch Übersicht und Finanzen am Handy:
+
+- **Übersicht (`MyKasse`):** Album, Motto, Zitate und Rankings am Handy als
+  Regal zum Wischen (wie Apple Music, die nächste Karte schaut herein) statt
+  fünf hoher Karten untereinander – iPhone 2294 → 1771 px. Ab 640 px
+  unverändert im Raster. Motto: Nebenknopf „Alle (7)“ wie bei den Zitaten,
+  sonst brach die Knopfreihe im Regal um.
+- **Finanzen (`FinanzenTab`):** Ein offener Monat zeigt am Handy/iPad die
+  5 neuesten Buchungen und „Alle 9 Buchungen anzeigen“ (am Laptop scrollt die
+  Spalte in sich, dort alles). Keine Kostenanfragen = eine Zeile statt eines
+  hohen Kastens. iPhone 2815 → 2585 px.
+- **Protokoll (`ProtokollSheet`):** „Ältere Stände“ je Stand eine Zeile mit
+  „›“; Herunterladen und „Diesen Stand übernehmen“ (rot, mit derselben
+  Rückfrage) auf der Unterseite – vorher zwei Knöpfe in jeder Zeile.
+- **Umfrage-Editor (`Umfragen`):** Kopf jeder Frage = Zeile „Fragetyp ›“;
+  Reihenfolge und „Frage entfernen“ (rot, unten, Rückfrage bei Text) auf der
+  Unterseite „Frage n“ – vorher Typ, ▲, ▼ und Mülleimer nebeneinander.
+- **Kontrast:** Blaue Schrift auf blau getöntem Grund nutzt im Dunkeln
+  `brand-dark`, jetzt #78B6FF (5,6:1 auf Karten, 4,9:1 in Blättern; vorher
+  #409CFF mit 4,36:1) – Wochenstreifen, Kalender, Prozent-Chips, Zähler.
+  Eltern-Avatar `bg-slate-600` statt 500 (4,14:1). axe-Kontrastfunde 28 → 0.
+- **Knopf im Knopf (axe „nested-interactive“, 50 → 0):** Bunte Karten mit
+  eigenen Knöpfen (Album, Motto, Zitate, Rankings) sind nur noch für
+  Finger/Maus als Ganzes antippbar (`karteKlick(…, nurZeiger)`); Tastatur
+  und Vorlesen nehmen den gleichwertigen Knopf in der Karte. Ranking-Knöpfe
+  heißen vorgelesen „Schüler-Ranking: Abstimmen“.
+- **Zoomen (`index.html`):** `maximum-scale=1` nur noch auf iOS (verhindert
+  dort allein das Hineinzoomen beim Antippen von Feldern, Zwei-Finger-Zoom
+  geht trotzdem). Android-Handys können wieder zoomen. axe: nichts gefunden.
+
+Nach unabhängiger Gegenprüfung (3 Blickwinkel, 9 bestätigte Funde) zusätzlich:
+
+- Protokoll-Unterseite zeigt Fehler/Erfolg selbst (lagen unsichtbar im Blatt
+  dahinter); bei Fehler bleibt die Rückfrage offen. Kassenwart (nur
+  Herunterladen): ein Tipp auf „Laden“ lädt direkt, ohne Unterseite.
+- Regal: Stichwahlen stehen als eigene Karte in der Spalte (nicht als 5.
+  Karte hinten im Regal); Rankings mit Offenem rücken nach vorn; Schatten
+  nicht mehr abgeschnitten; Tastatur-Fokus holt die Karte ins Bild;
+  Treppchen am Handy aus (lief in „ABI-RANKING“).
+- „Alle … anzeigen“ (Buchungen, Posten) setzt den Fokus auf die erste neu
+  sichtbare Zeile.
+- Umfrage-Editor: „Bearbeiten“ im Kopf jeder Frage (Typ, Reihenfolge,
+  Entfernen) – die Zeile „Fragetyp ›“ allein verriet das nicht.
+
 ## Eltern und Verwaltung: weniger Scrollen (16.10.2026)
 
 Zwei Rollen gezielt nachgeschärft, die in der zweiten Prüfung am meisten

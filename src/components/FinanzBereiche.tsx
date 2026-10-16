@@ -74,6 +74,11 @@ export function PostenBereiche({
     (a, b) => REIHENFOLGE[a.art] - REIHENFOLGE[b.art] || Math.abs(b.ein_cent - b.aus_cent) - Math.abs(a.ein_cent - a.aus_cent),
   );
   const gewaehlt = auswahl?.typ === "posten" ? d.posten.find((p) => postenKey(p) === auswahl.key) ?? null : null;
+  // Am Handy/iPad zuerst die Elternbeiträge und die KURZ_POSTEN größten Posten
+  // (dieselben Kategorien stehen schon in der Legende am Kreis darüber); der
+  // Rest hinter „Alle … anzeigen“. Am Laptop alles (nur CSS, wie die Buchungen).
+  const [alle, setAlle] = useState(false);
+  const kuerzen = !alle && liste.length > KURZ_POSTEN + 1;
 
   return (
     <>
@@ -87,7 +92,7 @@ export function PostenBereiche({
             betrag={beitraegeSumme}
             onClick={() => setAuswahl({ typ: "beitraege" })}
           />
-          {liste.map((p) => (
+          {liste.map((p, i) => (
             <PostenZeile
               key={postenKey(p)}
               hex={farbHex(postenFarbe(p), dunkel)}
@@ -95,8 +100,25 @@ export function PostenBereiche({
               unter={unterzeile(p)}
               betrag={p.ein_cent - p.aus_cent}
               onClick={() => setAuswahl({ typ: "posten", key: postenKey(p) })}
+              klasse={kuerzen && i >= KURZ_POSTEN ? "max-lg:hidden" : undefined}
             />
           ))}
+          {kuerzen && (
+            <li className="lg:hidden">
+              <button
+                type="button"
+                onClick={(e) => {
+                  // Fokus auf den ersten neu sichtbaren Posten (Kind 0 = Elternbeiträge)
+                  const ul = e.currentTarget.closest("ul");
+                  setAlle(true);
+                  requestAnimationFrame(() => ul?.children[KURZ_POSTEN + 1]?.querySelector<HTMLElement>("button")?.focus());
+                }}
+                className="flex min-h-[48px] w-full items-center text-left text-[15px] font-medium text-brand-dark transition active:opacity-60 dark:text-brand"
+              >
+                Alle {liste.length + 1} anzeigen
+              </button>
+            </li>
+          )}
         </ul>
       </section>
 
@@ -173,17 +195,20 @@ function Betrag({ cent, className = "", warnen }: { cent: number; className?: st
   return <span className={`zahl ${warnen && cent < 0 ? "text-red-600 dark:text-red-400" : ""} ${className}`}>{mitVorzeichen(cent)}</span>;
 }
 
+const KURZ_POSTEN = 4;
+
 function PostenZeile({
-  hex, name, unter, betrag, onClick,
+  hex, name, unter, betrag, onClick, klasse,
 }: {
   hex: string;
   name: string;
   unter?: string;
   betrag: number;
   onClick: () => void;
+  klasse?: string;
 }) {
   return (
-    <li>
+    <li className={klasse}>
       <button
         type="button"
         onClick={onClick}

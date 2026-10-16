@@ -117,10 +117,21 @@ export function RankingKarten({ className = "" }: { className?: string }) {
   const [offen, setOffen] = useState<RankingArt | null>(null);
   const r = useRankings(darf, uid, offen !== null);
   const runden = useRunden("rankings", darf, uid, can("rankings.runden"));
+  // Noch etwas abzustimmen? Dann im Regal der Startseite (Handy) ganz vorn
+  // statt als vierte Karte hinter Album, Motto und Zitaten.
+  const offenGesamt = r.kategorien.filter((k) => k.aktiv && !(k.id in r.meine)).length + runden.offene.length;
+  const wurzel = useRef<HTMLDivElement>(null);
+  // Die Rankings laden nach dem ersten Zeichnen; rückt die Karte dann nach
+  // vorn, rastet das Regal (snap) sonst wieder auf dem Album ein und die
+  // Rankings lägen links außerhalb. Darum einmal an den Anfang.
+  useLayoutEffect(() => {
+    const regal = wurzel.current?.parentElement;
+    if (offenGesamt > 0 && regal && regal.scrollWidth > regal.clientWidth) regal.scrollLeft = 0;
+  }, [offenGesamt > 0]); // eslint-disable-line react-hooks/exhaustive-deps
   if (!darf) return null;
 
   return (
-    <div className={`flex flex-col ${className}`}>
+    <div ref={wurzel} className={`flex flex-col ${offenGesamt ? "max-sm:-order-1" : ""} ${className}`}>
       <AusHinweis funktion="rankings" className="mb-1.5 px-1" />
       <div className="grid flex-1 grid-cols-2 gap-3">
         {(["schueler", "lehrer"] as RankingArt[]).map((art) => {
@@ -131,12 +142,15 @@ export function RankingKarten({ className = "" }: { className?: string }) {
           return (
             <section
               key={art}
-              // Ganze Karte antippbar (öffnet das Blatt); der Knopf unten bleibt als Hinweis
-              {...karteKlick(() => setOffen(art), `${ART_STIL[art].titel} öffnen`)}
+              // Ganze Karte antippbar (öffnet das Blatt). Nur für Finger/Maus: der
+              // Knopf unten tut dasselbe und ist für Tastatur/Vorlesen der Weg
+              // (sonst Knopf im Knopf, axe „nested-interactive“)
+              {...karteKlick(() => setOffen(art), undefined, true)}
               className={`relative flex min-h-[164px] flex-col overflow-hidden rounded-[1.4rem] bg-gradient-to-br p-3.5 text-white sm:p-5 ${KARTE_KLICK_KLASSE} ${stil.verlauf} ${stil.schatten}`}
             >
-              {/* Kleines Siegertreppchen oben rechts */}
-              <div aria-hidden className="pointer-events-none absolute right-3.5 top-3.5 flex items-end gap-[2px] opacity-90 sm:right-5 sm:top-5">
+              {/* Kleines Siegertreppchen oben rechts – am Handy nicht: im Regal ist
+                  die Kachel ~150 px breit, „ABI-RANKING“ lief in das Treppchen */}
+              <div aria-hidden className="pointer-events-none absolute right-3.5 top-3.5 flex items-end gap-[2px] opacity-90 max-sm:hidden sm:right-5 sm:top-5">
                 {[
                   { h: 15, f: MEDAILLE[1], n: 2 },
                   { h: 22, f: MEDAILLE[0], n: 1 },
@@ -147,7 +161,7 @@ export function RankingKarten({ className = "" }: { className?: string }) {
               </div>
               {/* Platz für das Treppchen (Handy 43 px, ab sm 52 px) plus Luft – sonst läuft der Text hinein.
                   Einzeilig: an Android 360 und iPad hoch brach „Abi-Ranking“ um und schob die Kachel 18 px tiefer */}
-              <div className="whitespace-nowrap pr-12 text-[12px] font-semibold uppercase tracking-[0.02em] text-white/80 sm:pr-14">Abi-Ranking</div>
+              <div className="whitespace-nowrap text-[12px] font-semibold uppercase tracking-[0.02em] text-white/80 sm:pr-14">Abi-Ranking</div>
               <div className="mt-0.5 text-[1.2rem] font-bold leading-tight">{ART_STIL[art].kurz}</div>
               <div className="mt-1 text-[12.5px] leading-snug text-white/80">
                 {wahlen
@@ -163,6 +177,7 @@ export function RankingKarten({ className = "" }: { className?: string }) {
                   e.stopPropagation();
                   setOffen(art);
                 }}
+                aria-label={`${ART_STIL[art].titel}: ${offenAnzahl > 0 || wahlen ? "Abstimmen" : "Ergebnisse"}`}
                 className={`mt-auto inline-flex min-h-[44px] items-center self-start rounded-full bg-white px-4 text-[13.5px] font-semibold shadow-sm transition active:scale-95 ${stil.text}`}
               >
                 {offenAnzahl > 0 || wahlen ? "Abstimmen" : "Ergebnisse"}

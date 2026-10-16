@@ -179,7 +179,9 @@ export function MottoKarte({ className = "" }: { className?: string }) {
                 {gewaehlt ? "Alle ansehen" : "Abstimmen"}
               </KnopfHell>
             ) : (
-              <KnopfGlas onClick={() => oeffnen("liste")}>Alle ansehen</KnopfGlas>
+              // Kurz wie bei den Zitaten („Alle (6)“): mit „Alle ansehen“ brachen die
+              // beiden Knöpfe am Handy (Regal, 315 px) in zwei Reihen um
+              <KnopfGlas onClick={() => oeffnen("liste")}>{sichtbare.length ? `Alle (${sichtbare.length})` : "Alle ansehen"}</KnopfGlas>
             )}
           </>
         }
