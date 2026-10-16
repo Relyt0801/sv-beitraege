@@ -82,6 +82,11 @@ wieder passieren.**
   - Zurück-Taste (Android/Browser) und Esc schliessen immer nur die oberste
     Ebene (`useEscapeSchliesst` in `Sheet.tsx` führt eine History-Wache);
     jede neue Ebene meldet sich dort an.
+  - Die Reiter-Reihenfolge richtet sich nach der Rolle (`reiterOrdnen` in
+    App.tsx) – für eine Person steht jeder Reiter immer an derselben Stelle.
+    Jeder Reiter behält seine Scroll-Stelle (`useReiter`).
+  - Meldungen zu Pflichtfeldern stehen in der `FussLeiste` direkt über dem
+    Knopf (sonst wirkt der Knopf tot, wenn das Feld weit oben liegt).
   - Reiter noch einmal antippen geht zur Wurzel zurück (wie iOS):
     `useReiter` feuert `sv:reiter-wurzel` (detail = Reiter); wer Ebenen
     öffnet (ChatsTab, EventsTab/Kalender), hört darauf und schließt sie.

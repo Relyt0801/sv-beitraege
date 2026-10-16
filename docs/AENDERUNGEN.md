@@ -11,6 +11,38 @@ ausführlich (auf Deutsch); hier steht der Überblick dazu.
 
 ---
 
+## Zweite Gesamtprüfung nach Rollen (16.10.2026)
+
+Dieselbe Prüfung noch einmal auf dem neuen Stand: keine Rolle meldete mehr
+verschobene Kopf- oder Reiterleisten. 48 Funde, 46 bestätigt – meist
+Feinschliff; behoben:
+
+- **Rückschritte:** Wichtige Infos bleiben in „Für dich offen“, bis man sie
+  öffnet (vorher reichte ein Tipp auf Events); Chats-Kachel zählt nur
+  Abstimmungen ohne eigene Stimme; „Bezeichnung“ bricht neben Eingabefeldern
+  nicht mehr um (`Zeile`); „Diese Woche“ passt am Android-Handy; Zahl an
+  „Übersicht“ = Einträge der Liste; Rolle in der Rollenliste zuerst (wird
+  nicht mehr abgeschnitten); Buchen aus einer Kategorie ist eine Unterseite.
+- **Pflichtfelder:** Die Meldung („Gib dem Termin eine Bezeichnung.“) steht
+  direkt über dem Knopf in der Fußleiste – vorher unsichtbar am Blattende.
+- **Feste Stellen:** Blattkopf am Handy springt nicht mehr, wenn die Seite
+  darunter gescrollt war (Griff klebt oben); jeder Reiter behält seine
+  Scroll-Stelle; Kasse merkt „Beiträge & Abiball“.
+- **Rollen:** Reiter-Reihenfolge je Rolle (Stufenteam/Sprecher: Events und
+  Chats vorne, Kassenwart: Kasse und Finanzen); Übersicht zeigt „Aus deinen
+  Komitees“ (offene Abstimmungen, To-dos) mit Sprung auf die Pinnwand;
+  Profil: Verwaltung und Daten gleich unter dem Konto.
+- **Kasse:** „+ Person“ am Handy in der Listenzeile statt schwebend über den
+  Beträgen; Abgehakte bleiben in „Offene“ stehen, bis der Filter wechselt;
+  Meldungen über der Auswahl-Leiste; Bestätigung nach „Person hinzufügen“ und
+  „gebucht“; Halbjahr „ändern“ ohne Höhensprung.
+- **Events/Chats:** Schicht-Blatt (eingeteilt) mit „Kann nicht? Stufenteam
+  schreiben“ (`#chats/team`); Nachricht löschen im Menü der Blase statt
+  Textlink; „Neu erstellen“ mit „Anlegen“ zuerst und Info|Abstimmung direkt
+  über den Feldern; Kalender zweizeilig; Abimotto öffnet „Offiziell“.
+- Alle Segment-Umschalter mit 44 px Tippfläche; Umschalter am Handy auf dem
+  Hintergrundbild deckend.
+
 ## Gesamtprüfung nach Rollen: 44 Funde (15.10.2026, spät)
 
 Nach dem Zusammenführen hat je ein Agent pro Rolle (Schüler, Stufenteam,
