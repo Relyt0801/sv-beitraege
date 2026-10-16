@@ -830,8 +830,15 @@ export function GeplantKarte({ darf, fin, className = "", alsZeile = false }: { 
   );
 
   if (alsZeile) {
-    const kommend = sichtbar.filter((g) => g.datum && g.datum >= h);
+    // Gezählt wird, was noch ansteht; Vergangenes (sieht nur der Kassenwart,
+    // zum Aufräumen) steht getrennt dahinter: „1 · ab 3. Nov. · 2 vorbei“
+    const anstehend = sichtbar.filter((g) => !g.datum || g.datum >= h);
+    const vorbei = sichtbar.length - anstehend.length;
+    const kommend = anstehend.filter((g) => g.datum);
     const ab = kommend[0]?.datum ? new Date(kommend[0].datum + "T12:00:00").toLocaleDateString("de-DE", { day: "numeric", month: "short" }) : null;
+    const wert = [anstehend.length === 0 ? "keine" : ab ? `${anstehend.length} · ab ${ab}` : String(anstehend.length), vorbei ? `${vorbei} vorbei` : null]
+      .filter(Boolean)
+      .join(" · ");
     return (
       <>
         <Zeile
@@ -844,7 +851,7 @@ export function GeplantKarte({ darf, fin, className = "", alsZeile = false }: { 
           onClick={() => setListeAuf(true)}
         >
           <span className="zahl truncate text-[15px] text-tinte-leise">
-            {sichtbar.length === 0 ? "keine" : ab ? `${sichtbar.length} · ab ${ab}` : sichtbar.length}
+            {wert}
           </span>
         </Zeile>
         <Sheet open={listeAuf} onClose={() => setListeAuf(false)}>

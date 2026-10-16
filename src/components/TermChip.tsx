@@ -95,7 +95,8 @@ export function TermChip({
  * („Deine Stufenkasse“, nur am Handy). Gleiche Zeichen wie die Kacheln
  * (✓ bezahlt, € offen, / erlassen, grau = später, blau umrandet = läuft),
  * nur in Farben für dunklen Grund. Reine Anzeige – der Streifen steckt in
- * einem Knopf, der die ausführliche Ansicht mit Legende öffnet.
+ * einem Knopf, der die ausführliche Ansicht mit Legende öffnet (44 px hoch:
+ * Mindestmaß für Tippflächen; Kürzel 12 px wie in den Kacheln).
  */
 export function HalbjahrStreifen({ student, current, hy }: { student: Student; current: Halbjahr; hy: readonly Halbjahr[] }) {
   return (
@@ -133,11 +134,11 @@ export function HalbjahrStreifen({ student, current, hy }: { student: Student; c
         return (
           <span
             key={h}
-            className={`flex h-10 flex-1 basis-0 flex-col items-center justify-center gap-0.5 rounded-lg font-semibold leading-none ${cls} ${
+            className={`flex h-11 flex-1 basis-0 flex-col items-center justify-center gap-0.5 rounded-lg font-semibold leading-none ${cls} ${
               h === current ? "ring-2 ring-[#0A84FF]" : ""
             }`}
           >
-            <span className="text-[11px]">{h}</span>
+            <span className="text-[12px]">{h}</span>
             <span aria-hidden className={`text-[12px] ${t.status === "erlassen" && !pre && !dead ? "font-black" : "font-bold"}`}>
               {glyph}
             </span>

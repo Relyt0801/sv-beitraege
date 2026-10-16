@@ -94,12 +94,13 @@ function StudentCardRoh({
       {/* Person */}
       <button
         onClick={() => (selectable ? onToggleSelect(student.id) : onOpen(student.id))}
-        className={`flex min-w-0 flex-1 items-center gap-2.5 text-left ${SPALTE_PERSON}`}
+        // -my/py: 44 px Tippfläche, ohne die Zeile höher zu machen
+        className={`-my-1.5 flex min-w-0 flex-1 items-center gap-2.5 py-1.5 text-left ${SPALTE_PERSON}`}
       >
         {/* Derselbe Namenskreis wie im Rollen-Reiter: Farbe der Person, nicht
             Farbe des Zahlungsstands. Der Betrag rechts sagt das ohnehin. */}
         <span className="relative shrink-0">
-          <Avatar userId={userId} name={`${student.nachname}, ${student.vorname}`} size={unter ? 36 : 30} />
+          <Avatar userId={userId} name={`${student.nachname}, ${student.vorname}`} size={32} />
           {loginState != null && (
             <span
               title={loginState ? "hat ein eigenes Passwort gesetzt" : "nutzt noch das Startpasswort"}

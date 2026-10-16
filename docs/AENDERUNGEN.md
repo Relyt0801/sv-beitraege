@@ -27,7 +27,9 @@ im Blatt, wie in den iOS-Einstellungen.
   deinen Komitees“ nebeneinander (`ZuErledigen.tsx`).
 - **Finanzen, Kassenbuch** (2,37 → 1,83): „Geplante Aktionen“ und
   „Kostenanfragen“ unter 1024 px als zwei Zeilen in einer Gruppe, die Listen
-  im Blatt (`GeplantKarte alsZeile`, `KostenKarte alsZeile`). Steht eine
+  im Blatt (`GeplantKarte alsZeile`, `KostenKarte alsZeile`). Die Zeile zählt
+  nur, was noch ansteht; Vergangenes (sieht nur der Kassenwart, zum
+  Aufräumen) steht dahinter: „1 · ab 3. Nov. · 2 vorbei“. Steht eine
   Anfrage offen oder ist man Vorsitz, bleibt die Karte groß oben. Drei statt
   vier neueste Buchungen, Elternbeiträge + zwei Posten statt vier,
   kürzere Erklärzeilen. Am Laptop (zwei Spalten) unverändert.
@@ -37,11 +39,19 @@ im Blatt, wie in den iOS-Einstellungen.
   „Schicht antippen …“ sieht das Team nur, bis es einmal eine Schicht
   geöffnet hat (`sv:hinweis:schicht-antippen`).
 - **Kasse**: Personen ohne Besonderheit einzeilig („dabei seit EF.1“ entfällt,
-  nur „dabei ab Q1.1“/„verlässt …“ bleibt) – je Person ~14 px, bei 100
-  Personen 1400 px weniger. Tippflächen der Halbjahre bleiben 44 px.
+  nur „dabei ab Q1.1“/„verlässt …“ bleibt) – je Person ~12 px, bei 100
+  Personen 1200 px weniger. Namenskreis überall 32 px (die Namen fluchten),
+  der Personen-Knopf bleibt 44 px hoch antippbar, die Halbjahre auch.
 - **Eltern** (1,79 → 1,55): Der Absatz zu EF/Q1/„erlassen“ steht am Handy
   hinter „Was heißen EF, Q1 und „erlassen“?“ im Blatt; vor dem Ticketverkauf
-  ersetzt eine Zeile das große Eltern-&-Gäste-Ticket mit „Preis folgt“.
+  ersetzt eine Zeile das große Eltern-&-Gäste-Ticket („Eltern & Gäste: Preis
+  folgt“ bzw. der Preis, sobald er feststeht). Mit Geschwistern gilt die
+  Grenze 700 px wie beim Raster daneben, sonst 768 px.
+- **Gegenprüfung** (drei unabhängige Prüfer, jeder Fund einzeln gegengeprüft):
+  Streifen 44 px hoch und 12 px Schrift, gleich große Namenskreise in der
+  Kasse, „nichts eingetragen“ an anderen Tagen wieder als eigene Zeile, keine
+  doppelte Überschrift im Blatt „Kostenanfragen“, Höhenschätzung der
+  Laptop-Spalten in Events ohne die entfernte Fußzeile.
 - **Test in WebKit** (die Engine von Safari): WebKitGTK 2.52 mit
   `WebKitWebDriver` unter Xvfb, App in einem Rahmen mit exakt 390 × 844,
   375 × 667, 820 × 1180 und 1440 × 900 – 120 Ansichten, 6 Rollen: nichts

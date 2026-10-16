@@ -253,7 +253,8 @@ export function AktionenListe({ onAendern }: { onAendern?: (t: Termin) => void }
     const sichtbar = b.aufklappbar
       ? Math.max(1, b.schichten.filter((t) => t.datum <= bisSonntag || st(t) !== null || schichtEnde(t).getTime() < jetzt).length)
       : b.schichten.length;
-    return 1.2 + sichtbar + (b.aufklappbar ? 0.8 : 0);
+    // eingeklappt ohne Fußzeile (der Kopf zeigt „n Termine · k weitere“)
+    return 1.2 + sichtbar;
   };
 
   if (!bloecke.length) return null;

@@ -602,17 +602,24 @@ export function TicketFamilie({
   const erstes = kinder[0];
   if (!erstes) return null;
   const mehrere = kinder.length > 1;
+  // Vor dem Verkauf am Handy knapp: eine Zeile statt Ticket und Hinweiskasten.
+  // Grenze passend zum Raster darunter – mit Geschwistern (breit) stehen
+  // Ticket und Staffel schon ab 700 px nebeneinander, sonst ab md.
+  const knapp = zeigen && status === "aus";
+  const knappWeg = breit ? "max-[699px]:hidden" : "max-md:hidden";
+  const knappDa = breit ? "min-[700px]:hidden" : "md:hidden";
+  const gaestePreis = ticketPreise(erstes.prozent, settings);
 
   return (
     <section className="card p-4 sm:p-5" aria-label="Abiball-Tickets">
       <AusHinweis funktion="abiball" className="mb-2" />
       <h2 className="text-[15px] font-semibold">
         {zeigen ? "Abiball-Tickets" : "Mithilfe senkt den Ticketpreis"}
-        {/* Vor dem Verkauf am Handy: eine Zeile statt Ticket mit „Preis folgt“
-            und Hinweiskasten darunter (~130 px ohne neue Information) */}
-        {zeigen && status === "aus" && (
-          <span className="block text-[12.5px] font-normal text-tinte-leise md:hidden">
-            Eltern &amp; Gäste: Preis folgt · Verkauf noch nicht gestartet
+        {/* Vor dem Verkauf am Handy: eine Zeile statt Ticket und Hinweiskasten
+            darunter (~130 px ohne neue Information) */}
+        {knapp && (
+          <span className={`block text-[12.5px] font-normal text-tinte-leise ${knappDa}`}>
+            Eltern &amp; Gäste: {gaestePreis.preisSteht ? `${gaestePreis.weiteres} € je Karte` : "Preis folgt"} · Verkauf noch nicht gestartet
           </span>
         )}
       </h2>
@@ -621,7 +628,7 @@ export function TicketFamilie({
         className={`grid ${zeigen && breit ? "min-[700px]:grid-cols-2 min-[700px]:items-start min-[700px]:gap-x-6 lg:grid-cols-[minmax(0,24rem)_minmax(0,1fr)] lg:gap-x-10" : ""}`}
       >
         {zeigen && (
-          <div className={`mt-3 grid content-start gap-2.5 ${status === "aus" ? "max-md:hidden" : ""}`}>
+          <div className={`mt-3 grid content-start gap-2.5 ${knapp ? knappWeg : ""}`}>
             {/* Das Ticket der Eltern selbst: hängt von keinem Kind ab */}
             <AbiTicket art="weiteres" student={erstes.student} settings={settings} prozent={erstes.prozent} klein />
             <Info>
@@ -645,7 +652,7 @@ export function TicketFamilie({
           pct={erstes.prozent}
           settings={settings}
           kinder={mehrere ? kinder.map((k) => ({ name: k.student.vorname, pct: k.prozent })) : undefined}
-          className={zeigen && breit ? `mt-4 min-[700px]:mt-3 ${status === "aus" ? "max-md:mt-3" : ""}` : zeigen ? `mt-4 ${status === "aus" ? "max-md:mt-3" : ""}` : "mt-2"}
+          className={zeigen && breit ? `mt-4 min-[700px]:mt-3 ${knapp ? "max-[699px]:mt-3" : ""}` : zeigen ? `mt-4 ${knapp ? "max-md:mt-3" : ""}` : "mt-2"}
         />
       </div>
     </section>

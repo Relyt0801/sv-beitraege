@@ -797,9 +797,9 @@ function KostenKarte({
     else hinScrollen("sprung-kosten");
   });
 
-  const kopf = (imBlatt: boolean) => (
+  const kopf = (
     <div className="mb-1.5 flex items-center gap-3 px-4">
-      <h2 className={`auf-bild min-w-0 flex-1 text-[13px] font-semibold uppercase tracking-[0.02em] text-tinte-leise ${imBlatt ? "sr-only" : ""}`}>
+      <h2 className="auf-bild min-w-0 flex-1 text-[13px] font-semibold uppercase tracking-[0.02em] text-tinte-leise">
         Kostenanfragen{offene.length > 0 ? ` · ${offene.length} offen` : ""}
       </h2>
       {vorsitze.length > 0 && (
@@ -895,8 +895,9 @@ function KostenKarte({
           </span>
         </Zeile>
         <Sheet open={listeAuf} onClose={() => setListeAuf(false)}>
+          {/* Als Zeile gibt es nichts zu entscheiden und keinen Vorsitz – die
+              Überschrift steht im Blattkopf, „+ Anfragen“ braucht es nicht */}
           <SheetKopf titel="Kostenanfragen" onClose={() => setListeAuf(false)} />
-          {kopf(true)}
           {liste(true)}
         </Sheet>
         {blaetter}
@@ -905,7 +906,7 @@ function KostenKarte({
 
   return (
     <section id="sprung-kosten" className="min-w-0">
-      {kopf(false)}
+      {kopf}
       {liste(false)}
       {blaetter}
     </section>
