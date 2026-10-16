@@ -2,6 +2,10 @@ import { useEffect, useState } from "react";
 import { useTermine } from "../termine-store";
 import { committeeIcon, committeeLabel } from "../lib/committees";
 import { Sheet, SheetKopf } from "./Sheet";
+import { Gruppe, Zeile, ZeileHaken, ZeileMitSchalter } from "./Liste";
+import { Schalter } from "./Schalter";
+import { FussLeiste } from "./FussLeiste";
+import { ZeitFeld } from "./ZeitFeld";
 import { heuteKey } from "../lib/termine";
 
 /**
@@ -61,115 +65,87 @@ export function AnfrageSheet({ offen, onSchliessen }: { offen: boolean; onSchlie
     else onSchliessen();
   }
 
+  const textFeld = "min-w-0 flex-1 bg-transparent text-right text-[16px] outline-none placeholder:text-tinte-leise";
+
   return (
     <Sheet open={offen} onClose={onSchliessen}>
-      <SheetKopf titel={<>Termin anfragen</>} onClose={onSchliessen} />
-      <p className="mb-3 text-[12px] leading-relaxed text-tinte-leise">
-        Die Anfrage geht an das Stufenteam. Erst wenn sie übernommen wird, steht
-        der Termin im Kalender.
-      </p>
+      <SheetKopf
+        titel="Termin anfragen"
+        unter="Die Anfrage geht an das Stufenteam. Erst wenn sie übernommen wird, steht der Termin im Kalender."
+        onClose={onSchliessen}
+      />
 
       {meineVorsitze.length > 1 && (
-        <div className="mb-3 flex flex-wrap gap-1.5">
+        <Gruppe titel="Für welches Komitee?" className="mt-0">
           {meineVorsitze.map((k) => (
-            <button
+            <ZeileHaken
               key={k}
+              gewaehlt={tag === k}
               onClick={() => setTag(k)}
-              className={`rounded-lg px-2.5 py-2 text-[13px] font-bold transition ${
-                tag === k ? "bg-brand text-white" : "bg-papier-matt text-tinte-matt dark:bg-slate-800 dark:text-slate-300"
-              }`}
-            >
-              {committeeIcon(k)} {committeeLabel(k)}
-            </button>
+              label={
+                <>
+                  <span aria-hidden className="mr-2">{committeeIcon(k)}</span>
+                  {committeeLabel(k)}
+                </>
+              }
+            />
           ))}
-        </div>
+        </Gruppe>
       )}
 
-      <label className="mb-2 block">
-        <span className="mb-1 block text-[12px] font-semibold text-tinte-leise">Wofür</span>
-        <input
-          className="field"
-          placeholder="z. B. Sitzung Abiball"
-          value={titel}
-          onChange={(e) => setTitel(e.target.value)}
-          autoFocus
-        />
-      </label>
+      <Gruppe className={meineVorsitze.length > 1 ? "mt-4" : "mt-0"}>
+        <Zeile label="Wofür">
+          <input
+            className={textFeld}
+            placeholder="z. B. Sitzung Abiball"
+            aria-label="Wofür ist der Termin?"
+            value={titel}
+            onChange={(e) => setTitel(e.target.value)}
+            autoFocus
+          />
+        </Zeile>
+        <Zeile label="Ort">
+          <input className={textFeld} placeholder="optional, z. B. Raum 204" aria-label="Ort (optional)" value={ort} onChange={(e) => setOrt(e.target.value)} />
+        </Zeile>
+      </Gruppe>
 
-      <label className="mb-3 block">
-        <span className="mb-1 block text-[12px] font-semibold text-tinte-leise">Ort (optional)</span>
-        <input
-          className="field"
-          placeholder="z. B. Raum 204"
-          value={ort}
-          onChange={(e) => setOrt(e.target.value)}
-        />
-      </label>
-
-      <div className="mb-3 rounded-2xl border border-papier-linie p-3 dark:border-slate-700">
-        <label className="mb-2 flex items-center gap-2">
-          <span className="shrink-0 text-[12px] font-semibold text-tinte-leise">Am</span>
+      <Gruppe titel="Wann">
+        <Zeile label="Am">
           <input
             type="date"
-            className="min-w-0 flex-1 rounded-lg border border-papier-linie bg-white px-2.5 py-2 text-[14px] dark:border-slate-700 dark:bg-slate-800"
+            aria-label="Datum"
+            className="min-w-0 bg-transparent text-right text-[16px] outline-none"
             value={datum}
             onChange={(e) => setDatum(e.target.value)}
           />
-        </label>
-
-        <button
-          onClick={() => setGanztaegig(!ganztaegig)}
-          className="mb-2 flex items-center gap-2 text-[13px] font-semibold"
-        >
-          <span
-            className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border text-[11px] text-white ${
-              ganztaegig ? "border-brand bg-brand" : "border-papier-linie dark:border-slate-600"
-            }`}
-          >
-            {ganztaegig ? "✓" : ""}
-          </span>
-          <span className="text-tinte-matt dark:text-slate-300">ganztägig</span>
-        </button>
-
+        </Zeile>
+        <ZeileMitSchalter label="Ganztägig">
+          <Schalter an={ganztaegig} onChange={setGanztaegig} label="Ganztägig" />
+        </ZeileMitSchalter>
         {!ganztaegig && (
-          <div className="flex flex-wrap items-center gap-2">
-            <label className="flex min-w-0 flex-1 items-center gap-2">
-              <span className="shrink-0 text-[12px] font-semibold text-tinte-leise">Von</span>
-              <input
-                type="time"
-                className="min-w-0 flex-1 rounded-lg border border-papier-linie bg-white px-2.5 py-2 text-[14px] dark:border-slate-700 dark:bg-slate-800"
-                value={von}
-                onChange={(e) => setVon(e.target.value)}
-              />
-            </label>
-            <label className="flex min-w-0 flex-1 items-center gap-2">
-              <span className="shrink-0 text-[12px] font-semibold text-tinte-leise">Bis</span>
-              <input
-                type="time"
-                className="min-w-0 flex-1 rounded-lg border border-papier-linie bg-white px-2.5 py-2 text-[14px] dark:border-slate-700 dark:bg-slate-800"
-                value={bis}
-                onChange={(e) => setBis(e.target.value)}
-              />
-            </label>
-          </div>
+          <Zeile label="Uhrzeit">
+            <ZeitFeld wert={von} onChange={setVon} label="Beginn" />
+            <span aria-hidden className="text-tinte-leise">–</span>
+            <ZeitFeld wert={bis} onChange={setBis} label="Ende" />
+          </Zeile>
         )}
-      </div>
+      </Gruppe>
 
-      <label className="mb-3 block">
-        <span className="mb-1 block text-[12px] font-semibold text-tinte-leise">Warum (optional)</span>
-        <textarea
-          className="field min-h-[4.5rem]"
-          placeholder="Ein Satz fürs Stufenteam …"
-          value={nachricht}
-          onChange={(e) => setNachricht(e.target.value)}
-        />
-      </label>
+      <textarea
+        className="field mt-4 min-h-[4.5rem]"
+        placeholder="Warum? (optional) – ein Satz fürs Stufenteam …"
+        aria-label="Warum (optional)"
+        value={nachricht}
+        onChange={(e) => setNachricht(e.target.value)}
+      />
 
-      {fehler && <p className="mb-2 text-[13px] font-semibold text-amber-600">{fehler}</p>}
+      {fehler && <p className="mt-3 px-4 text-[14px] font-semibold text-amber-700 dark:text-amber-300">{fehler}</p>}
 
-      <button disabled={busy} onClick={senden} className="btn-primary w-full disabled:opacity-50">
-        {busy ? "…" : "Anfrage senden"}
-      </button>
+      <FussLeiste>
+        <button disabled={busy} onClick={senden} className="btn-primary">
+          {busy ? "…" : "Anfrage senden"}
+        </button>
+      </FussLeiste>
     </Sheet>
   );
 }

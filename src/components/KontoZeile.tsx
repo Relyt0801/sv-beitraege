@@ -6,7 +6,7 @@ import type { Student } from "../lib/types";
 
 /**
  * Wie eine Person in den Verwaltungslisten steht – im Rollen-Reiter genauso
- * wie im Rechte-Reiter.
+ * wie unter Rollen → „Rechte je Rolle“.
  *
  * Immer dieselben drei Dinge: Namenskreis, "Nachname, Vorname" und darunter
  * der Nutzername mit der Rolle. Konten ohne eigene Person (Elternzugänge,
@@ -45,7 +45,9 @@ export function KontoZeile({
         <span
           title={punkt ? "hat ein eigenes Passwort gesetzt" : "nutzt noch das Startpasswort"}
           className={`h-2.5 w-2.5 shrink-0 rounded-full ${
-            punkt ? "bg-emerald-500" : "bg-slate-300 dark:bg-slate-600"
+            // Startpasswort als hohler Ring: unterscheidbar ohne Farbe und
+            // auch im Dunkeln sichtbar (grauer Punkt verschwand fast)
+            punkt ? "bg-emerald-500" : "border-[1.5px] border-slate-500 dark:border-slate-400"
           }`}
         />
       )}
@@ -56,7 +58,9 @@ export function KontoZeile({
         </div>
         <div className="mt-0.5 truncate text-[13px] leading-tight text-tinte-leise">
           {name ? (
-            `${profil.username} · ${rolleName(profil.role)}`
+            // Rolle zuerst: Sie ist hier das Wichtigste – wird es eng, wird
+            // höchstens der Login gekürzt, nicht „Stufenspr…“
+            `${rolleName(profil.role)} · ${profil.username}`
           ) : (
             <>
               {rolleName(profil.role)}
@@ -86,7 +90,7 @@ export function Suchfeld({
   platzhalter?: string;
 }) {
   return (
-    <div className="mb-3 flex h-11 items-center gap-2 rounded-xl bg-[rgb(118_118_128/0.12)] px-3 dark:bg-[rgb(118_118_128/0.24)]">
+    <div className="feld-auf-bild mb-3 flex h-11 items-center gap-2 rounded-xl bg-[rgb(118_118_128/0.12)] px-3 dark:bg-[rgb(118_118_128/0.24)]">
       <span className="text-tinte-leise">
         <Icon name="lupe" size={17} />
       </span>
@@ -96,9 +100,17 @@ export function Suchfeld({
         value={wert}
         onChange={(e) => onChange(e.target.value)}
       />
+      {/* Leeren wie in iOS: kleiner grauer Kreis, Tippfläche trotzdem 44 × 44 px */}
       {wert && (
-        <button onClick={() => onChange("")} aria-label="Suche leeren" className="px-1 text-tinte-leise">
-          ✕
+        <button
+          type="button"
+          onClick={() => onChange("")}
+          aria-label="Suche leeren"
+          className="-mr-3 flex h-11 w-11 shrink-0 items-center justify-center transition active:opacity-50"
+        >
+          <span className="flex h-[18px] w-[18px] items-center justify-center rounded-full bg-tinte-leise/70 text-white dark:text-slate-900">
+            <Icon name="x" size={11} strich={3} />
+          </span>
         </button>
       )}
     </div>

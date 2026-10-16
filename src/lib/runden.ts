@@ -18,9 +18,9 @@ import { abonniere } from "./realtime";
  * lehnt zu viele ab. Zahlen sieht nur, wer die Runden leitet, oder alle,
  * wenn das Ergebnis freigegeben ist.
  *
- * Honorable Mentions (supabase/honorable-mentions.sql): Kandidaten mit
+ * Herzens-Kandidaten (Honorable Mentions, supabase/honorable-mentions.sql): Kandidaten mit
  * hm = true zählen nicht zur Wahl. Für sie gibt es ein eigenes, inoffizielles
- * Voting „Sieger der Herzen“ mit genau 1 Stimme (eine neue ersetzt die alte).
+ * Voting „Gewinner der Herzen“ mit genau 1 Stimme (eine neue ersetzt die alte).
  * Je Runde abschaltbar (hm_aktiv).
  */
 export type RundenBereich = "motto" | "zitate" | "rankings" | "umfragen";
@@ -35,7 +35,7 @@ export interface Runde {
   stimmen: number;
   offen: boolean;
   ergebnis_sichtbar: boolean;
-  /** Sieger der Herzen (Honorable Mentions) läuft */
+  /** Gewinner der Herzen (Herzens-Kandidaten) läuft */
   hm_aktiv?: boolean;
   created_at: string;
   beendet_at: string | null;
@@ -46,7 +46,7 @@ export interface Kandidat {
   label: string;
   unter: string;
   sort: number;
-  /** Honorable Mention: zählt nicht zur Wahl, nur zum Sieger der Herzen */
+  /** Herzens-Kandidat: zählt nicht zur Wahl, nur zum Gewinner der Herzen */
   hm?: boolean;
 }
 export interface KandidatEingabe {
@@ -79,7 +79,7 @@ function demoSchreiben(d: DemoDaten) {
   }
 }
 
-/** Stimmen einer Runde zählen – Wahl und Sieger der Herzen getrennt */
+/** Stimmen einer Runde zählen – Wahl und Gewinner der Herzen getrennt */
 function zaehle(
   rundeId: string,
   stimmen: { ziel_id: string; user_id: string }[],
@@ -186,7 +186,7 @@ export function useRunden(bereich: RundenBereich, aktiv: boolean, uid: string | 
       const nWahl = p.kandidaten.filter((k) => !k.hm).length;
       const nHm = p.kandidaten.filter((k) => k.hm).length;
       if (nWahl < 2) return "Bitte mindestens zwei Möglichkeiten für die Wahl auswählen";
-      if (nHm === 1) return "Für den Sieger der Herzen braucht es mindestens zwei Honorable Mentions";
+      if (nHm === 1) return "Für den Gewinner der Herzen braucht es mindestens zwei Herzens-Kandidaten";
       if (!hasSupabase) {
         const d = demoLesen();
         const gruppe = p.gruppe || "";
@@ -263,7 +263,7 @@ export function useRunden(bereich: RundenBereich, aktiv: boolean, uid: string | 
       const an = !meine.has(key);
       const istHm = (z: string) => kandidaten.some((k) => k.runde_id === runde.id && k.ziel_id === z && k.hm);
       const hm = istHm(ziel);
-      if (hm && !runde.hm_aktiv) return "Der Sieger der Herzen ist gerade ausgeschaltet.";
+      if (hm && !runde.hm_aktiv) return "Der Gewinner der Herzen ist gerade ausgeschaltet.";
       // Andere Herzstimme, die durch diese ersetzt wird
       const alteHerz = hm && an ? [...meine].filter((k) => k.startsWith(runde.id + "|") && istHm(k.split("|")[1])) : [];
       const vergeben = [...meine].filter((k) => k.startsWith(runde.id + "|") && !istHm(k.split("|")[1])).length;
@@ -303,10 +303,10 @@ export function useRunden(bereich: RundenBereich, aktiv: boolean, uid: string | 
   const letzteBeendete = (gruppe: string) => runden.find((r) => !r.offen && r.gruppe === gruppe) || null;
   const kandidatenVon = (rundeId: string) => kandidaten.filter((k) => k.runde_id === rundeId).sort((a, b) => a.sort - b.sort);
   const istHmVon = (rundeId: string, ziel: string) => kandidaten.some((k) => k.runde_id === rundeId && k.ziel_id === ziel && k.hm);
-  /** Eigene Stimmen der Wahl (ohne Sieger der Herzen) */
+  /** Eigene Stimmen der Wahl (ohne Gewinner der Herzen) */
   const meineIn = (rundeId: string) =>
     [...meine].filter((k) => k.startsWith(rundeId + "|")).map((k) => k.split("|")[1]).filter((z) => !istHmVon(rundeId, z));
-  /** Eigene Herzstimme (Sieger der Herzen) oder null */
+  /** Eigene Herzstimme (Gewinner der Herzen) oder null */
   const meinHerz = (rundeId: string) =>
     [...meine].filter((k) => k.startsWith(rundeId + "|")).map((k) => k.split("|")[1]).find((z) => istHmVon(rundeId, z)) ?? null;
   const hatGewaehlt = (rundeId: string, ziel: string) => meine.has(`${rundeId}|${ziel}`);

@@ -1,0 +1,13 @@
+-- =====================================================================
+-- Abimotto: Spalten „bereich“ und „gewaehlt_at“ lesbar machen (Update 1.4)
+--
+-- motto_vorschlaege hat Lese-Rechte nur je Spalte (autor-spalten-schuetzen.sql:
+-- Einreicher bleiben verborgen). Die neuen Spalten aus
+-- offiziell-inoffiziell.sql waren dadurch für angemeldete Zugänge nicht
+-- lesbar – die App muss aber wissen, in welchem Teil (offiziell/inoffiziell)
+-- ein Vorschlag liegt und seit wann ein Motto feststeht.
+--
+-- Nur zusätzliche Rechte, nichts wird entfernt – abwärtskompatibel mit der
+-- Live-App. Die Zeilen-Regeln (Policies) gelten unverändert.
+-- =====================================================================
+grant select (bereich, gewaehlt_at) on public.motto_vorschlaege to authenticated;

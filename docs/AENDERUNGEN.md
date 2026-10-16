@@ -1,4 +1,4 @@
-# Änderungen – Stand 13.10.2026
+# Änderungen – Stand 15.10.2026
 
 Diese Datei erklärt, was sich in den letzten Runden geändert hat, **wo** es im
 Code steht und **warum** es so gebaut ist. Die Kommentare im Code selbst sind
@@ -11,6 +11,464 @@ ausführlich (auf Deutsch); hier steht der Überblick dazu.
 
 ---
 
+## Abgeschnittener Text, Finanzen am Laptop, „Was ist neu“ nach Rollen (16.10.2026)
+
+- **Abgeschnittener Text über der Eingabe:** Die klebende Fußleiste in
+  Kacheln (`Kachel.tsx` → `FussLeiste`: Album-Kommentare, Abiball,
+  Gewinner, Beiträge, Runden) stand mit `bottom-0` 24 px zu hoch, weil
+  Chrome/Safari „sticky“ vom Inhaltsrand messen – der letzte Text lag halb
+  darunter und ließ sich nicht freiscrollen. Jetzt wie
+  `components/FussLeiste.tsx` mit negativem `bottom` (Abstand + Safe Area).
+  Leerer Kommentar-Hinweis kürzer: „Noch kein offizieller Kommentar – schreib
+  den ersten.“
+- **Finanzen am Laptop:** Links (Ziel, Kassen, Anfragen) und rechts (Verlauf)
+  scrollen jetzt wirklich getrennt. Vorher scrollte die Seite mit, sobald
+  eine Spalte am Ende war. Beide Spalten bekommen die Resthöhe des Fensters
+  (`--finanz-oben`, gemessen), `overscroll-contain`, die Seite selbst scrollt
+  nicht mehr (`FinanzenTab.tsx`).
+- **„Was ist neu“ nach Rollen** (`lib/patchnotes.ts`): Einträge tragen
+  `fuer` (komitee, team, kasse, admin, eltern); `patchFuer()` filtert.
+  Komitee-Mitglieder bekommen eine kurze Erklärung „Offiziell oder
+  inoffiziell?“. Eltern sehen nur ihren eigenen Abschnitt – auch über
+  „Was ist neu“ im Profil (`ElternApp.tsx`, einmal je Version nach der
+  Einführung).
+
+## Abfragen gegen die echte Datenbank geprüft (16.10.2026)
+
+Alle Supabase-Abfragen der in dieser Runde geänderten Bereiche (Zu erledigen,
+Finanzen, Verwaltung, Eltern/Mitmachen) wurden **nur lesend** gegen die echte
+Datenbank geprüft: Tabellen, Spalten, Status-Werte (CHECK-Constraints) und
+die Lese-/Schreib-Policies – ohne Personendaten, nur Schema und Anzahlen.
+169 Abfragen, 164 in Ordnung. Wichtig, weil Fehler in der App oft still zu 0
+werden (`offen.ts`: `x.error ? 0`). Drei echte Fehler, behoben:
+
+- **„Aus deinen Komitees“** zählte Freitext-Abstimmungen dauerhaft als offen
+  (die Antwort liegt in `topic_antworten`, nicht in `topic_votes`) – jetzt
+  wie KomiteePage ohne `antwort_art` (`ZuErledigen`, ebenso der Untertitel
+  der Komitee-Zeile in `ChatsTab`).
+- **Eltern-Fragen erreichten das Team nie:** Eltern dürfen die Team-Profile
+  nicht lesen, die Empfängerliste war leer, `pushToUsers([])` schickte nichts;
+  eine neue Frage schickte gar keine Mitteilung. Jetzt `pushAnTeam(…, { art:
+  "eltern" })` in beiden Fällen (`eltern-store`), und die Edge-Function
+  beachtet im Team-Zweig den Mitteilungs-Schalter „Eltern“
+  (`supabase/functions/send-push`). **Die Edge-Function muss nach der Freigabe
+  neu bereitgestellt werden** (`supabase functions deploy send-push`) – bis
+  dahin bekommen auch Teammitglieder mit abgeschaltetem Schalter die Mitteilung.
+- **Zitat-Stimmen:** Das Prüf-Komitee darf alle Stimmen lesen (1105) – die
+  Datenbank liefert höchstens 1000 Zeilen, eigene Stimmen fehlten dann und
+  ließen sich nicht zurücknehmen. Jetzt nur die eigenen (`zitate.ts`; Zahlen
+  kommen ohnehin aus `useStimmenZahlen`). Motto (585 Stimmen) lädt
+  vorsorglich seitenweise (`motto.ts`).
+
+## Letzte Reste: Protokoll, Umfrage-Editor, Kontrast, Regal (16.10.2026)
+
+Nachmessung über alle Rollen × 5 Geräte × Reiter (Seitenhöhe, größte Lücke,
+Füllgrad des ersten Bildschirms): größte senkrechte Lücke im Inhalt überall
+≤ 69 px. Zu lang waren nur noch Übersicht und Finanzen am Handy:
+
+- **Übersicht (`MyKasse`):** Album, Motto, Zitate und Rankings am Handy als
+  Regal zum Wischen (wie Apple Music, die nächste Karte schaut herein) statt
+  fünf hoher Karten untereinander – iPhone 2294 → 1771 px. Ab 640 px
+  unverändert im Raster. Motto: Nebenknopf „Alle (7)“ wie bei den Zitaten,
+  sonst brach die Knopfreihe im Regal um.
+- **Finanzen (`FinanzenTab`):** Ein offener Monat zeigt am Handy/iPad die
+  5 neuesten Buchungen und „Alle 9 Buchungen anzeigen“ (am Laptop scrollt die
+  Spalte in sich, dort alles). Keine Kostenanfragen = eine Zeile statt eines
+  hohen Kastens. iPhone 2815 → 2585 px.
+- **Protokoll (`ProtokollSheet`):** „Ältere Stände“ je Stand eine Zeile mit
+  „›“; Herunterladen und „Diesen Stand übernehmen“ (rot, mit derselben
+  Rückfrage) auf der Unterseite – vorher zwei Knöpfe in jeder Zeile.
+- **Umfrage-Editor (`Umfragen`):** Kopf jeder Frage = Zeile „Fragetyp ›“;
+  Reihenfolge und „Frage entfernen“ (rot, unten, Rückfrage bei Text) auf der
+  Unterseite „Frage n“ – vorher Typ, ▲, ▼ und Mülleimer nebeneinander.
+- **Kontrast:** Blaue Schrift auf blau getöntem Grund nutzt im Dunkeln
+  `brand-dark`, jetzt #78B6FF (5,6:1 auf Karten, 4,9:1 in Blättern; vorher
+  #409CFF mit 4,36:1) – Wochenstreifen, Kalender, Prozent-Chips, Zähler.
+  Eltern-Avatar `bg-slate-600` statt 500 (4,14:1). axe-Kontrastfunde 28 → 0.
+- **Knopf im Knopf (axe „nested-interactive“, 50 → 0):** Bunte Karten mit
+  eigenen Knöpfen (Album, Motto, Zitate, Rankings) sind nur noch für
+  Finger/Maus als Ganzes antippbar (`karteKlick(…, nurZeiger)`); Tastatur
+  und Vorlesen nehmen den gleichwertigen Knopf in der Karte. Ranking-Knöpfe
+  heißen vorgelesen „Schüler-Ranking: Abstimmen“.
+- **Zoomen (`index.html`):** `maximum-scale=1` nur noch auf iOS (verhindert
+  dort allein das Hineinzoomen beim Antippen von Feldern, Zwei-Finger-Zoom
+  geht trotzdem). Android-Handys können wieder zoomen. axe: nichts gefunden.
+
+Nach unabhängiger Gegenprüfung (3 Blickwinkel, 9 bestätigte Funde) zusätzlich:
+
+- Protokoll-Unterseite zeigt Fehler/Erfolg selbst (lagen unsichtbar im Blatt
+  dahinter); bei Fehler bleibt die Rückfrage offen. Kassenwart (nur
+  Herunterladen): ein Tipp auf „Laden“ lädt direkt, ohne Unterseite.
+- Regal: Stichwahlen stehen als eigene Karte in der Spalte (nicht als 5.
+  Karte hinten im Regal); Rankings mit Offenem rücken nach vorn; Schatten
+  nicht mehr abgeschnitten; Tastatur-Fokus holt die Karte ins Bild;
+  Treppchen am Handy aus (lief in „ABI-RANKING“).
+- „Alle … anzeigen“ (Buchungen, Posten) setzt den Fokus auf die erste neu
+  sichtbare Zeile.
+- Umfrage-Editor: „Bearbeiten“ im Kopf jeder Frage (Typ, Reihenfolge,
+  Entfernen) – die Zeile „Fragetyp ›“ allein verriet das nicht.
+
+Noch kürzer am Handy (nur unter 768 px, iPad/Laptop unverändert):
+
+- „Deine Stufenkasse“ ohne offenen Betrag = eine Zeile („0 € nichts fällig“
+  + „Kontodaten“) statt 170 px hoher Karte; ist etwas fällig, bleibt die
+  große Zahl (`MyKasse`).
+- Abiball-Ticket vor dem Verkauf: „Verkauf noch nicht gestartet“ als
+  Unterzeile im Kopf statt eigenem Kasten (`AbiTicket`).
+- Ranking-Kacheln mit Fortschrittsbalken (wie der Steckbrief) statt leerer
+  Fläche über dem Knopf; Regal am alten SE (320 px) 92 % breit.
+- Finanzen: Legende am Kreis zeigt die drei größten Teile + „Weitere (n)“
+  (einzeln stehen sie direkt darunter).
+- Ab iPad: Die Motto-Karte zeigt die drei neuesten Vorschläge – vorher
+  leere Fläche neben dem gleich hohen Steckbrief (`Motto`).
+- Eltern-Infos als Liste mit Trennlinien wie die Fragen daneben (vorher je
+  Info ein umrandeter Kasten in der Karte) (`ElternInfosTab`).
+- Zusammenfassung → Detail (wie Health): Finanzen-Kreis mit Legende am
+  Handy als eine Zeile „Ziel Abiball · 17 %“ mit Farbbalken, ein Tipp zeigt
+  Kreis und ganze Legende im Blatt (`FinanzenTab`); die Ticket-Staffel der
+  Mithilfe am Handy hinter „So sinkt dein Ticketpreis ›“ (`MyKasse`).
+- Buchungen am Handy/iPad hoch wie „Letzte Transaktionen“ in Wallet: die
+  4 neuesten und „Alle N Buchungen · suchen, filtern ›“; Filter, Suche und
+  Monate im Blatt, eine Buchung öffnet darüber („‹ Buchungen“). Am Laptop
+  und iPad quer unverändert die klebende Spalte (`FinanzenTab`).
+- Profil-Avatar: mittelhelle Namensfarben (Himmelblau) werden für die
+  Initialen leicht abgedunkelt, damit sie 4,5:1 erreichen
+  (`grundFuerInitialen`, `Avatar`).
+- Gemessen (iPhone 390×844, Bildschirmhöhen): Übersicht 2,73 → 1,85,
+  Finanzen Kassenwart 3,34 → 2,37 (iPad hoch 2,25 → 1,76), Schüler
+  1,60 → 1,47, Eltern 1,64 → 1,51; größte Lücke im Inhalt 66 px.
+
+## Eltern und Verwaltung: weniger Scrollen (16.10.2026)
+
+Zwei Rollen gezielt nachgeschärft, die in der zweiten Prüfung am meisten
+Platz verschenkten:
+
+- **Eltern (`ElternApp`, `AbiTicket`, `Staffel`, `KontoTab`,
+  `ElternInfosTab`):** Kinder-Karten kompakt mit je einer Zeile
+  „Mithilfe“ und „Abiball-Ticket“, Legende nur einmal; Geschwister ab 700 px
+  nebeneinander. Tickets der Familie in einer Karte (`TicketFamilie`), die
+  Staffel zeigt eine Balkenskala mit den Namen der Geschwister. Konto ohne
+  umhüllende Karte, Kopier-Knöpfe 44 px. Eine angefangene Frage an das
+  Stufenteam bleibt erhalten, auch nach Reiterwechsel. iPhone-Übersicht
+  2215 → 1579 px, am Laptop passt sie auf einen Bildschirm.
+- **Admin/Stufenteam (`Rankings`, `RolesTab`, `FunktionenSheet`,
+  `KomiteeZugriff`, `RollenRechteTab`):** Ranking-Wahl als Liste mit Haken
+  statt großer Kacheln, Suche ab 7 Einträgen, „Weiß nicht“ als Zeile,
+  Podium kompakter. Komitees einer Person als eine Zeile mit Unterseite;
+  Legende der Passwort-Punkte, „Startpasswort“ als hohler Ring statt
+  grauem Punkt (im Dunkeln und auf dem Bild sonst unsichtbar,
+  `KontoZeile`); Eltern heißen „Eltern von …“. Themen mit nur
+  einer Funktion öffnen diese direkt. Beim Fremdzugriff ist „Darf“
+  änderbar. Die Rollen-Ansicht (Liste/Rechte) wird gemerkt.
+- **Tour:** Das Loch der Hervorhebung bleibt mindestens 4 px unter dem
+  oberen Rand.
+
+## Zweite Gesamtprüfung nach Rollen (16.10.2026)
+
+Dieselbe Prüfung noch einmal auf dem neuen Stand: keine Rolle meldete mehr
+verschobene Kopf- oder Reiterleisten. 48 Funde, 46 bestätigt – meist
+Feinschliff; behoben:
+
+- **Rückschritte:** Wichtige Infos bleiben in „Für dich offen“, bis man sie
+  öffnet (vorher reichte ein Tipp auf Events); Chats-Kachel zählt nur
+  Abstimmungen ohne eigene Stimme; „Bezeichnung“ bricht neben Eingabefeldern
+  nicht mehr um (`Zeile`); „Diese Woche“ passt am Android-Handy; Zahl an
+  „Übersicht“ = Einträge der Liste; Rolle in der Rollenliste zuerst (wird
+  nicht mehr abgeschnitten); Buchen aus einer Kategorie ist eine Unterseite.
+- **Pflichtfelder:** Die Meldung („Gib dem Termin eine Bezeichnung.“) steht
+  direkt über dem Knopf in der Fußleiste – vorher unsichtbar am Blattende.
+- **Feste Stellen:** Blattkopf am Handy springt nicht mehr, wenn die Seite
+  darunter gescrollt war (Griff klebt oben); jeder Reiter behält seine
+  Scroll-Stelle; Kasse merkt „Beiträge & Abiball“.
+- **Rollen:** Reiter-Reihenfolge je Rolle (Stufenteam/Sprecher: Events und
+  Chats vorne, Kassenwart: Kasse und Finanzen); Übersicht zeigt „Aus deinen
+  Komitees“ (offene Abstimmungen, To-dos) mit Sprung auf die Pinnwand;
+  Profil: Verwaltung und Daten gleich unter dem Konto.
+- **Kasse:** „+ Person“ am Handy in der Listenzeile statt schwebend über den
+  Beträgen; Abgehakte bleiben in „Offene“ stehen, bis der Filter wechselt;
+  Meldungen über der Auswahl-Leiste; Bestätigung nach „Person hinzufügen“ und
+  „gebucht“; Halbjahr „ändern“ ohne Höhensprung.
+- **Events/Chats:** Schicht-Blatt (eingeteilt) mit „Kann nicht? Stufenteam
+  schreiben“ (`#chats/team`); Nachricht löschen im Menü der Blase statt
+  Textlink; „Neu erstellen“ mit „Anlegen“ zuerst und Info|Abstimmung direkt
+  über den Feldern; Kalender zweizeilig; Abimotto öffnet „Offiziell“.
+- Alle Segment-Umschalter mit 44 px Tippfläche; Umschalter am Handy auf dem
+  Hintergrundbild deckend.
+
+## Gesamtprüfung nach Rollen: 44 Funde (15.10.2026, spät)
+
+Nach dem Zusammenführen hat je ein Agent pro Rolle (Schüler, Stufenteam,
+Kassenwart, Admin, Eltern) die App auf allen Geräten durchgespielt; jeder Fund
+wurde von einem zweiten nachgestellt (48 gemeldet, 44 bestätigt).
+
+**Leisten und Rahmen**
+- **Obere Reiterleiste steht still** (`GlasLeiste.tsx`): Die rote Zahl sitzt
+  absolut an der Ecke des Reiters, statt im Text zu stehen – vorher rutschten
+  alle Reiter um 11 px zur Seite, sobald eine Zahl kam oder ging (App und
+  Eltern-App). Die Leiste scrollt beim Mausrad nicht mehr in sich.
+- „Übersicht“ (Team) zeigt die Zahl für „Zu erledigen“; gezählt wird einmal
+  (`TeamAufgabenQuelle` in `lib/offen.ts`) und geteilt. Die Demo startet das
+  Team ohne Aufblitzen der Kasse direkt in der Übersicht.
+- **Zurück-Taste** (Android/Browser) schliesst die oberste Ebene (Chat,
+  Kalender, Blatt) statt die App zu verlassen; **Esc** auf einer Unterseite im
+  selben Blatt geht eine Seite zurück; Text im Feld schützt vor Esc
+  (`Sheet.tsx`).
+- „Chat | Pinnwand“ steht in der Kopfzeile immer direkt vor den App-Knöpfen,
+  „+ Neu“ links davon (vorher sprang der Umschalter um 89 px).
+- Adressen `#events/<ziel>` und `#chats/<ziel>` öffnen den Reiter und den
+  Eintrag (Sprünge aus „Für dich offen“/„Zu erledigen“ landen beim Eintrag).
+
+**Chats / Events / Kalender**
+- Kalender: links „‹ Events“, die Monatspfeile blau ohne Kreis – keine zwei
+  gleichen „‹“ mehr. Am Laptop Tag-Ansicht über die volle Breite, Tipp auf
+  einen Eintrag im Monat öffnet ihn.
+- Events am Handy: „Mitmachen“ wieder im ersten Bildschirm, „Bitte ansehen“
+  danach. „Ändern“ im Schicht-Blatt ist eine Unterseite (‹ zurück zur Schicht).
+- Tipp auf eine Abstimmung in der Chats-Liste springt zu genau dieser.
+- Gesprächsköpfe am iPhone: „Erledigt“ und „…“ (Löschen im Blatt).
+
+**Kasse / Finanzen / Rollen**
+- Einnahme-/Ausgabe-Blatt behält Betrag, Bezeichnung und Datum (vorher beim
+  Neuzeichnen geleert). Posten → Eintrag öffnet die volle Buchungsseite
+  („‹ Waffelverkauf“); Monatskopf der Buchungen klebt am Laptop.
+- Auswahl-Leiste kompakt (SE), Namens-Chips 44 px antippbar.
+- Beiträge & Abiball am iPad hoch zweispaltig; Bestellungen ohne zwei Knöpfe
+  je Zeile.
+- Personenblatt und „Neuer Zugriff“ am Handy in voller Höhe; „Chat sperren“
+  als Unterseite; Suche blendet „Person hinzufügen“ aus; Rechte-Blatt mit
+  vollem Rollennamen, Passwort nur noch im Personenblatt.
+
+**Blätter**
+- Steckbrief- und Ranking-Kategorien als iOS-Listen mit Bearbeiten-Blatt
+  (keine Pfeile/Schalter/Mülleimer je Zeile), „Umfragen verwalten“ ohne
+  Kachelraster, Komitee-Wunsch, „Für wen“ und Fragetyp als Häkchen-Unterseiten
+  (keine nativen Auswahlfelder mehr; `ZeileAuswahl` entfernt), Kinder
+  verknüpfen ohne rotes „Entfernen“, Album ohne Emoji-Symbole.
+- Impressum/Datenschutz ohne dritten „Schließen“; Rechtslinks und
+  „Suche leeren“ 44 px; Protokoll in der Demo mit erfundenen Einträgen
+  (echtes Protokoll unverändert, nicht löschbar).
+- Lange Zeilentitel brechen um, statt „›“ aus der Zeile zu schieben.
+
+**Eltern**
+- Frage ans Stufenteam und Gespräch als Blatt in voller Höhe (Kopf wandert
+  nicht), keine Meldung über der eigenen Nachricht; Install-Karte mit Abstand
+  nach „Neu“; Kopfzeile am iPad hoch fluchtet mit der Spalte.
+
+## Rollen-Prüfung: 121 Funde umgesetzt (15.10.2026, nachts)
+
+Alle Rollen (Schüler, Stufenteam, Kassenwart, Admin, Eltern) auf iPhone, SE,
+iPad hoch/quer und Laptop durchgespielt; 121 bestätigte Funde in sieben
+Bereichen umgesetzt, jeder Bereich danach gegengeprüft.
+
+**Kopfzeile und Ebenen**
+- Am Laptop legt nur die **oberste** offene Chat-Ebene ihren Kopf in die
+  Kopfzeile (vorher zwei Zurück-Knöpfe nebeneinander) – Ebenen-Stapel in
+  `ChatBlasen.tsx`. Esc schließt die oberste Ebene (`onSchliessen`), aber
+  nicht, solange unten noch Text im Eingabefeld steht.
+- **Kalender** ist eine `ChatEbene`: am Laptop stehen Zurück, Monat,
+  Monat|Woche|Tag, ‹ ›, Heute und + Termin in der EINEN Kopfzeile; Reiterleiste
+  bleibt. Am Handy Monat wie im iOS-Kalender (Punkte, Liste des Tages).
+- **Reiter noch einmal antippen** (`useReiter`, Ereignis `sv:reiter-wurzel`)
+  schließt offenen Chat bzw. Kalender – wie in iOS. Ein Reiterwechsel vergisst
+  den offenen Chat nicht mehr.
+- **Blätter** (`Sheet.tsx`): ab 640 px oben angedockt statt mittig (✕ springt
+  nicht mehr); ein Blatt über einem offenen Blatt ist eine Unterseite an
+  derselben Stelle mit „‹ <Seite davor>“, ✕ schließt den ganzen Stapel.
+  Neue Bausteine `SchliessenKnopf`, `ZurueckKnopf`, `useBlattKopf`, `<Sheet hoch>`.
+- Kopfband, Reiterleisten (App und Eltern), Kopf/Fuß der Chat-Ebene und die
+  Auswahl-Leiste sind ganz deckend. Seiten-Umschalter in der Kopfzeile alle
+  19 rem breit und enden direkt vor den App-Knöpfen. Am Laptop ist der Titel
+  der Kopfzeile die Seitenüberschrift (Bildschirmleser).
+
+**Übersicht**
+- „**Für dich offen**“ (Schüler) bzw. „**Zu erledigen**“ (Team) ganz oben:
+  offene Abstimmungen, wichtige Infos, eigene nächste Schicht; fürs Team
+  zusätzlich Schichten bestätigen, Termin-/Kosten-/Nachtrags-/Komitee-/
+  Entsperr-Anfragen, Fotos, Meldungen, Zitate prüfen – je mit Sprung
+  (`ZuErledigen.tsx`, `lib/offen.ts`). Team ohne eigene Person sieht es über
+  der Kasse.
+- Ticket vor dem Verkauf klein neben „Mithilfe“, keine leeren Karten mehr;
+  ab iPad hoch zweispaltig.
+
+**Chats / Komitees**
+- Komitee-„Übersicht“ heißt **Pinnwand** (vorher zweimal „Übersicht“
+  untereinander). Reihenfolge: Angepinnt → To-dos → offene Abstimmungen,
+  beendete zugeklappt zuletzt. Kachel sagt „5 neu auf der Pinnwand“ und das
+  Komitee öffnet dort, wenn nur dort Neues ist.
+- Unter den Kacheln (Schüler/Komitee-Mitglieder) steht, was im Komitee
+  wartet. Kachel „Mithilfe nachtragen“ entfällt (oben „+ Nachtragen“).
+- Keine Mülleimer mehr in Zeilen (To-dos, Angepinntes, Gespräche, Infos):
+  Zeile antippen → Blatt, Löschen unten mit Rückfrage. Eltern-Gespräche und
+  „Infos für Eltern“ wie die übrigen Unterseiten. Symbole statt Emojis.
+
+**Events**
+- „Bitte ansehen“ (offene Abstimmungen, wichtige Infos) als kurze Zeilen vor
+  „Mitmachen“; am Laptop rechts neben „Diese Woche“ mit „Deine Schichten“.
+- Eine Schicht öffnet überall dasselbe Blatt (Einteilen, Mithilfe bestätigen,
+  „Ändern“ oben rechts). Angemeldete als Auswahlliste statt ✕ je Zeile.
+- „Neu“ → „Termin“ legt einen Termin an (Ereignis `sv:termin-neu`).
+- Abschnittstitel mit `auf-bild` (Hintergrundbild lesbar).
+
+**Kasse (Team)**
+- Suche: Kennzahlen treten zurück, Treffer stehen direkt unter dem Feld.
+- Halbjahr-Kästchen in der Liste: nur offen ↔ bezahlt (mit Meldung);
+  erlassen geht nur im Blatt der Person. Kästchen 44 px hoch.
+- Filter öffnet direkt am Knopf und enthält nur Filter; Export/Import als
+  Gruppe „Daten“ unten. Spaltenköpfe stehen genau über den Werten.
+- „Mehrere auswählen“ steht auf dem laufenden Halbjahr (vorher fest EF.1),
+  Halbjahr per Häkchen-Liste statt `<select>`.
+- Personenblatt: künftige Halbjahre „später“ (grau) wie in der Liste,
+  „Dabei ab/Verlässt ab“ als Unterseite, „Person löschen“ als eigene Gruppe.
+- Am Handy drei flache Kennzahlen statt 2 × 2 (erste Person ~150 px früher).
+- Beiträge & Abiball am Laptop passt auf einen Bildschirm.
+
+**Finanzen**
+- „Für alle“ ab iPad zweispaltig; Kassenwart am Laptop mit klebender
+  Buchungsliste rechts, am Handy Buchungen direkt nach dem Kontostand.
+- Kategorien als Zeilen mit Unterseite; Buchungsblatt mit normalem Kopf,
+  „Buchung löschen“ als rote Zeile unten. Eltern lesen „Noch offen in der
+  ganzen Stufe“ statt „Offene Elternbeiträge“.
+
+**Rollen & Rechte (Admin)**
+- Personenblatt: Rolle als eine Zeile mit Unterseite und Rückfrage;
+  „Rechte je Rolle“ als eine Gruppe; Album- und Umfrage-Rechte wieder
+  einstellbar; „Fremdzugriff auf Komitees“ im iOS-Stil.
+
+**Blätter**
+- Ranking-Abstimmung, Steckbrief, „Mithilfe nachtragen“ mit normalem
+  Blatt-Kopf; „Antrag senden“ und „Ansehen | Speichern“ kleben unten;
+  Zitatwand-Filter in einer Zeile; Funktionen-Links als Zeilen mit „›“;
+  Lehrkräfte als Liste mit Blatt statt Mülleimer.
+
+**Eltern-App**
+- Eigenes Hintergrundbild jetzt sichtbar. Geschwister ab iPad nebeneinander,
+  Gäste-Ticket und Halbjahr-Erklärung nur einmal. Zeile „Neu“ auf der
+  Übersicht und Zähler am Reiter „Infos“. Fragen ans Stufenteam als Liste mit
+  Blatt statt dauernd offenem Formular. Konto kompakter; „kopieren“ hat einen
+  zweiten Weg, falls der Browser die Zwischenablage verweigert.
+
+**Allgemein**
+- Schrift überall mindestens 12 px (Ausnahme Reiterleiste Handy 10 px);
+  obere Reiter mit 45 px Tippfläche.
+- `tests/geraet.mjs`: Service Worker gesperrt (sonst lädt die Seite beim
+  ersten Besuch nach ~2 s neu) und `BILD=1` wird vor jedem Foto neu gesetzt.
+
+## Rückmeldung zur Vorschau (15.10.2026, spätabends)
+
+- **Kopfzeile am Laptop entrümpelt**: oben stehen nur noch Titel, der
+  Seiten-Umschalter, ein „+ Person/Neu“ und Hell/Dunkel, Nachtragen, Profil.
+  Filter und „Mehrere auswählen“ der Kasse stehen in der Kopfzeile der Liste
+  (neben „Alle | Nur offene“ und der Suche); Einnahme/Ausgabe am Anfang der
+  Finanzen-Seite neben der Erklärung der Ansicht – nicht mehr neben dem
+  grünen „Nachtragen“. Kein Hinweis-Kästchen mehr beim Darüberfahren (legte
+  sich über die Reiterleiste).
+- **Hinweis-Karten deckend** (`InstallHinweis.tsx`, `PushHinweis.tsx`): vorher
+  7 % Blau – auf dem eigenen Hintergrundbild schien das Foto durch. Ab
+  Tablet-Breite eine Zeile, ✕ oben rechts. „Stufenkasse als App“ steht nur
+  noch auf der eigenen Übersicht, nicht über der Kassenliste/den Beiträgen.
+- **Beiträge**: Werte als Kapsel „+50 €“, „25 €“, „8 %“ (`ZahlFeld`) – Zahl
+  und Einheit auf einer Linie, kein Loch mehr zwischen „+“, Zahl und „€“.
+- **Events → Mitmachen** (`AktionenListe.tsx`): Das „+5 %“-Abzeichen ist fürs
+  Team der Ändern-Knopf; die Fußzeile „… zählt +5 % · Ändern“ (doppelt)
+  entfällt. „N angemeldet“ ist bei voller Schicht grau statt blau.
+
+## Eine Kopfzeile, Rollen, weniger Scrollen (15.10.2026, abends)
+
+Anlass: Am Laptop stand im geöffneten Chat unter der App-Leiste ein zweites
+Band (Zurück, Name, „Chat | Übersicht“) – Kopfleisten an verschiedenen Orten.
+Danach alle Rollen auf iPhone, iPad und Laptop durchfotografiert.
+
+- **Kopfzeile** (`App.tsx`, `ChatBlasen.tsx` → `ChatEbene`/`ChatKopf`,
+  `index.css` → `.kopf-ebene`, `lib/gescrollt.ts` → `useBreit`): Am Laptop
+  steht der Titel fest oben links, darunter die Reiterleiste; der große Titel
+  im Inhalt entfällt dort (~75 px mehr Platz). Ein geöffneter Chat legt
+  Zurück, Name und „Chat | Übersicht“ in genau diese Zeile. Am Handy bleibt
+  der Chat eine Vollbild-Ebene wie in iMessage.
+- **Eltern-App** genauso: Titel springt nicht mehr je Reiter zwischen zwei
+  Breiten (Finanzen stand sogar neben dem Inhalt); Infos und Kontodaten am
+  Laptop zweispaltig.
+- **Kopf deckender** (0.95 statt 0.88): im Dunkeln schimmerte der große Titel
+  als Geist unter dem kleinen durch.
+- **Spalte wächst** (`--spalte`): 64rem, ab 1400 px 74rem, ab 1700 px 84rem –
+  bei 1920 px blieben vorher links und rechts je ~450 px leer.
+- **Übersicht statt Profil/Kasse**: Die eigene Startseite heißt für alle
+  „Übersicht“ (Haus-Symbol). Vorher „Profil“ beim Team (wie das Profil-Blatt)
+  und „Kasse“ bei Schülern. Am Laptop stehen Stufenkasse und Halbjahre
+  nebeneinander.
+- **Zuletzt benutzter Reiter** wird je Gerät gemerkt (`sv:reiter`): der
+  Kassenwart landet in Finanzen, Komitee-Leute in den Chats. Ein Sprung aus
+  einer Mitteilung geht vor.
+- **Beiträge & Abiball** ist kein eigener Reiter mehr, sondern oben in der
+  Kasse umschaltbar („Personen | Beiträge & Abiball“). Kassenwart: 5 Reiter
+  statt 6. Am Laptop stehen Prozente, Halbjahre und Ticket nebeneinander.
+- **Kasse (Team)**: Kennzahlen in EINER Karte, Halbjahre in einer Reihe, das
+  laufende Halbjahr stellt man dort um („EF.1 läuft · ändern“). Am Handy ist
+  die erste Person ~150 px früher zu sehen; am Laptop steht die Suche in der
+  Kopfzeile der Liste.
+- **Finanzen**: Einnahme/Ausgabe ganz oben (am Laptop neben „Für alle
+  sichtbar | Alle Buchungen“) statt unter Kontostand und Kreis.
+- **Seiten-Umschalter in der Kopfzeile** (`components/InKopf.tsx`): Kasse,
+  Rollen und Finanzen (samt Einnahme/Ausgabe) legen ihre Umschalter am
+  Laptop rechts in die Kopfzeile, am Handy bleiben sie über dem Inhalt.
+- **Chats**: Kachelraster ohne halbe leere Reihe (6 Kacheln = 3 + 3).
+  Komitee-Übersicht am Laptop: Angepinnt und To-dos nebeneinander,
+  Abstimmungen darunter.
+- **Titel = Reiter**: Eltern-„Übersicht“ heißt oben auch „Übersicht“ (vorher
+  „Stufenkasse“). Der kleine Titel im Kopf ist vor dem Scrollen auch für
+  Vorlesehilfen unsichtbar (`invisible`), nicht nur durchsichtig.
+- **Test `tests/ui-check.mjs`**: klickt Demo-Pop-ups weg (brach sonst ab) und
+  wartet vor der axe-Prüfung das Ausblenden ab. Vergleich alter/neuer
+  Demo-Build: Überlauf 0/0, verdeckt 0/0, Konsolenfehler keine, Knöpfe ohne
+  Namen 192 → 0 (die alte zugeklappte Halbjahres-Zeile), axe-Kontrast 82/82.
+- Regeln ergänzt: `docs/DESIGN-REGELN.md` Abschnitt 3, `CLAUDE.md` Punkt 7.
+
+## Laptop-Layout & Design-Regeln (15.10.2026)
+
+- **Beiträge**: Inhalt nutzt die volle Spalte (vorher `max-w-3xl` ohne
+  `mx-auto` → linksbündig und schmaler als Titel/Leiste). Möglichkeiten sind
+  iOS-Zeilen „Name … 5 % ›“; Bearbeiten, „Anpassbar“ und Löschen im Blatt
+  (`VorlageBlatt`), „Neue Möglichkeit“ als blaue letzte Zeile (`VorlageNeu`).
+- **Rollen**: eine Liste statt Karten-Raster mit Auswahlfeldern; Antippen
+  öffnet `PersonBlatt` (Rolle mit Häkchen, Komitees, Einzelne Rechte,
+  Passwort, Chat-Sperre). Anzeige-Schalter und „Person hinzufügen“ als Gruppe.
+- **Hintergrundbild**: Kopfleiste deckend (kein durchscheinender Titel),
+  Text auf dem Foto mit `auf-bild` lesbar, Segment/Suchfeld deckend,
+  Chat-Ebenen zeigen das Bild ebenfalls (`ebene-grund`, `--hg-bild`).
+- **Regeln für künftige Änderungen**: `CLAUDE.md` (Projektstamm) und
+  `docs/DESIGN-REGELN.md`; Foto-Helfer `tests/geraet.mjs` (`BILD=1`, `DARK=1`).
+
+---
+
+
+## 15.10.2026 (2): UX/UI-Prüfung und Überarbeitung (Branch `update-1-4`)
+
+Sechs simulierte Nutzer (Schülerin iPhone, Stufenteam kleine Handys, Admin Laptop/iPad, Eltern, Stresstest, Design-Prüfung) haben die App geprüft; danach wurde umgesetzt:
+- **Blätter**: Escape schließt nur das oberste; Kopf mit ✕ bleibt beim Scrollen sichtbar; Fußknöpfe kleben unten (`FussLeiste.tsx`, `BlattFuss`).
+- **Navigation**: 7 Reiter passen auch bei 360 px; Eltern-App mit derselben Glas-Reiterleiste; schwebendes „+“ beschriftet („Person“/„Neu“), am iPad/Laptop im Kopf; „Nachtragen“ immer beschriftet.
+- **Rückmeldungen**: Toasts unten über der Leiste, Offline-Kapsel verdeckt nichts mehr, Fehler beim Abstimmen/Ändern/Löschen werden gemeldet, „Erneut senden“ im Chat.
+- **Chats**: lange Links sprengen die Blase nicht mehr; Übersicht beginnt oben; „+“ in der Eingabezeile für Abstimmung/To-do/Anpinnen; Verschiebe-Anträge unter Chats → Anfragen.
+- **Abizeitung**: Kacheln der Startseite ganz antippbar; Begriffe vereinheitlicht („Runde“, „Gewinner der Herzen“, „Lehrkräfte“); Verschieben-Rückfrage nennt die nötigen Zustimmungen; Rankings springen nach der Stimme zur nächsten Kategorie.
+- **Events**: „Aktion mit Schichten“ direkt wählbar, 24-h-Zeitfeld mit Pausen-Vorschlägen, mehrere Schichten pro Tag, einheitliche Verben (Eintragen → Angemeldet → Eingeteilt).
+- **Verwaltung**: Passwort zurücksetzen sichtbar je Person; Funktionen mit einem Hauptschalter je Funktion; Beiträge-Reiter neu im iOS-Stil.
+- **Eltern**: Beträge eindeutig, Siezen durchgängig, Begriffe erklärt, „Aufschlag“ statt „Helferzuschuss“, feststehendes Motto als Karte.
+- **Leistung**: Lazy-Loading (`FaulLaden.tsx`), Start-Paket 374 → 215 kB (gzip); freundliche Meldung bei langsamem Netz.
+- **Profil**: Erscheinungsbild (Hell/Dunkel/Automatisch), „Was ist neu“ jederzeit aufrufbar.
+
+## 15.10.2026: Update 1.4 (Vorschau-Branch `update-1-4`)
+
+- **Design-Grundlagen** (`index.css`, `Liste.tsx`, `Sheet.tsx`): weiße Zellen auf grauem Grund wie in den iOS-Einstellungen (Variable `--zelle`, Klasse `zelle`), Blätter mit grauem Grund, Eingabefelder als weiße Zellen mit Haarlinie. Graue 8-%-Flächen sind ersetzt.
+- **Reiterleiste aus Glas** (`GlasLeiste.tsx`): schwebende Kapsel unten (Handy) bzw. oben (Laptop/iPad); eine gläserne Linse gleitet federnd zum gewählten Reiter, mit Maus folgt eine leichte Linse dem Zeiger.
+- **Offiziell / Inoffiziell** (`supabase/offiziell-inoffiziell.sql`, `lib/teile.ts`, `TeilUmschalter.tsx`): Rankings, Zitate, Mottos und Steckbrief-Kommentare haben zwei Teile. Bestand = inoffiziell. Wortfilter je Teil (offiziell Standard an, inoffiziell aus). Verschieben nur über `verschieben_beantragen` mit Zustimmungen (Freigaben → „Verschieben“, Standard 3; Admin allein reicht); direktes Ändern blockt der Trigger `bereich_schuetzen`. Eltern sehen keinen der beiden Teile.
+- **Gewinner küren** (`gewinner`-Tabelle, `Gewinner.tsx`): Gewinner + „Gewinner der Herzen“ je Teil bzw. je Ranking-Kategorie, groß oben angezeigt. Das offizielle Motto setzt zugleich `gewaehlt`.
+- **Motto-Enthüllung** (`MottoEnthuellung.tsx`, RPC `motto_enthuellung()`): Variante „Bühne“; einmal pro Person und Motto beim nächsten Öffnen, auch für Eltern. Demo: `?enthuellung=1`.
+- **Verwaltung in den Kacheln** (`KachelVerwaltung.tsx`): „Wer darf was?“ direkt im Einstellungs-Blatt von Motto, Zitate, Rankings; diese Rechte sind aus dem Rechte-Reiter ausgeblendet.
+- **Motto, Zitate, Rankings neu geordnet**: Stand-Karte oben (Runde läuft / Gewinner), Segment „Vorschläge | Ergebnis“, EIN Zahnrad-Blatt mit allen Einstellungen. Runden-Bausteine `RundenStandKarte`, `RundenEinstellungen`, `RundenErgebnisBlatt` (`Runden.tsx`).
+- **Eigene Antwort** (`supabase/abstimmung-sonstiges.sql`, `supabase/umfrage-eigene-antwort.sql`, `Freitext.tsx`, `Umfragen.tsx`): In Chat-Abstimmungen und Pop-up-Umfragen kann man ankreuzen und/oder „Eigene Antwort“ mit Text geben; gleiche Texte werden gruppiert.
+- **Chats**: Übersicht als bunte Kacheln (Anfragen, Stufenteam, Schüler, Eltern, Infos, Komitees); ein geöffneter Chat ist eine Vollbild-Ebene mit einer Glas-Kopfleiste und darunter „Chat | Übersicht“.
+- **Events**: gleichartige Termine/Beiträge (z. B. Waffelverkauf) als aufklappbare Gruppen, Ältere eingeklappt. „Ins Handy übernehmen“ ist vorübergehend aus (`KALENDER_SYNC_AN` in `lib/kalender-sync.ts`).
+- **Ohne Internet** (`lib/netz.ts`, `Verbindung.tsx`): verständliche Meldungen statt „Failed to fetch“, Lade-Zustand beim Anmelden, Offline-Band, Zeitlimit für Anfragen.
+- **Hintergrundbild** (`lib/hintergrund.ts`): Server ist die Wahrheit; Cache wird beim Start und beim Wieder-Öffnen abgeglichen – auf allen Geräten gleich.
+- **Speicherwächter** (`supabase/speicherwaechter.sql`, `LoeschfristenSheet.tsx`): Speicher-Anzeige; Chats müssen nicht gelöscht werden. Not-Aufräumen nur über 80 % – Teil B (mit Löschbefehl) muss noch im SQL-Editor eingespielt werden, bis dahin misst der Wächter nur.
 
 ## 13.10.2026: Freie Antworten, Spotify-Knopf
 

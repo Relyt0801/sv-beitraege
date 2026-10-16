@@ -8,7 +8,8 @@
     "edge": "node edge-check.mjs",
     "last": "node last-test.mjs",
     "ui": "node ui-check.mjs",
-    "masse": "node masse-check.mjs"
+    "masse": "node masse-check.mjs",
+    "geraet": "node geraet.mjs"
   },
   "dependencies": {
     "axe-core": "^4.10.0",

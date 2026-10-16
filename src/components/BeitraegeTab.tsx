@@ -1,20 +1,95 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useStore } from "../store";
-import { abiballVon, beitraegeVon, staffelVon } from "../lib/logic";
+import { beitraegeVon, staffelVon } from "../lib/logic";
 import { useEntwurf } from "../lib/entwurf";
 import { AbiballEinstellungen } from "./AbiballEinstellungen";
 import { HY, type ContribTemplate, type Halbjahr, type Staffel } from "../lib/types";
+import { Gruppe, Wert, Zeile, ZeileEingabe, ZeileMitSchalter } from "./Liste";
+import { Schalter } from "./Schalter";
+import { Sheet, SheetKopf } from "./Sheet";
+import { FussLeiste } from "./Kachel";
+import { useBreit } from "../lib/gescrollt";
 
 import { frage } from "../lib/melder";
+
 /**
- * Reiter "Beiträge": hier wird festgelegt, wofür es wie viel Prozent gibt und
+ * iPad hoch und breiter (ab 768 px, Tailwind „md“)? Dort ist Platz für zwei
+ * Spalten. Eigener kleiner Hook wie useBreit (gescrollt.ts), nur für diese Seite.
+ */
+const MITTEL = "(min-width: 768px)";
+function useMittel(): boolean {
+  const [mittel, setMittel] = useState(() => typeof window !== "undefined" && !!window.matchMedia?.(MITTEL).matches);
+  useEffect(() => {
+    const mq = window.matchMedia?.(MITTEL);
+    if (!mq) return;
+    const neu = () => setMittel(mq.matches);
+    neu();
+    mq.addEventListener("change", neu);
+    return () => mq.removeEventListener("change", neu);
+  }, []);
+  return mittel;
+}
+
+/**
+ * Zahl zum Ändern als kleine Kapsel: „+50 €“, „25 €“, „8 %“ – Zahl und Einheit
+ * dicht beieinander und auf einer Linie. Vorher stand die Zahl in einem
+ * 56 px breiten Feld rechtsbündig, das „+“ weit links davon und das „€“
+ * etwas höher daneben (Rückmeldung 15.10.: „+     50 €“).
+ * Die Kapsel zeigt außerdem, dass man den Wert antippen und ändern kann.
+ */
+function ZahlFeld({
+  wert,
+  aendern,
+  speichern,
+  einheit,
+  plus,
+  max,
+  label,
+}: {
+  wert: number;
+  aendern: (n: number) => void;
+  speichern: () => void;
+  einheit: "€" | "%";
+  plus?: boolean;
+  max?: number;
+  label: string;
+}) {
+  return (
+    <span className="zahl inline-flex shrink-0 cursor-text items-baseline rounded-lg bg-[rgb(118_118_128/0.12)] px-2.5 py-1 text-[16px] font-semibold leading-tight text-brand-dark transition focus-within:ring-2 focus-within:ring-brand/40 dark:bg-[rgb(118_118_128/0.24)] dark:text-brand">
+      {plus && <span aria-hidden>+</span>}
+      <input
+        type="number"
+        min={0}
+        max={max}
+        inputMode="numeric"
+        aria-label={label}
+        // So breit wie die Zahl (mind. 1 Zeichen) – kein Loch zwischen „+“, Zahl und Einheit
+        style={{ width: `${Math.max(1, String(wert).length)}ch` }}
+        className="bg-transparent p-0 text-right outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+        value={wert}
+        onChange={(e) => aendern(Math.max(0, Math.min(max ?? Infinity, Number(e.target.value) || 0)))}
+        onBlur={speichern}
+      />
+      <span aria-hidden className="ml-1">
+        {einheit}
+      </span>
+    </span>
+  );
+}
+
+/**
+ * Kasse → „Beiträge & Abiball“ (Umschalter oben; früher ein eigener Reiter):
+ * hier wird festgelegt, wofür es wie viel Prozent gibt und
  * was das Abiballticket kostet. Beim Eintragen bei einer Person wird danach nur
  * noch aus dieser Liste ausgewählt.
+ *
+ * Aufgebaut wie die iOS-Einstellungen: oben ein Segment, darunter Gruppen aus
+ * Zeilen. Keine eigenen Kästen, keine nativen Kästchen, kein Müll-Emoji.
  */
 export function BeitraegeTab() {
   const { templates, settings, addTemplate, updateTemplate, removeTemplate, setSettings } = useStore();
-  const [titel, setTitel] = useState("");
-  const [punkte, setPunkte] = useState("5");
+  // Möglichkeit antippen → Blatt zum Bearbeiten; "neu" → Blatt zum Anlegen
+  const [offen, setOffen] = useState<string | "neu" | null>(null);
 
   const sortiert = [...templates].sort((a, b) => a.sort - b.sort || a.punkte - b.punkte);
   const staffel = staffelVon(settings);
@@ -23,242 +98,294 @@ export function BeitraegeTab() {
   const preise = beitraegeVon(settings);
   const gesamt = HY.reduce((n, h) => n + (preise[h] || 0), 0);
 
-  // Drei Bereiche, einer zur Zeit. Oben stehen sie als Kacheln mit der
-  // wichtigsten Zahl – so sieht man alles auf einen Blick und tippt hinein.
+  // Drei Bereiche. Am Handy einer zur Zeit – als Segment (vorher Kacheln, die
+  // wie reine Zahlen-Anzeigen aussahen und nicht wie Reiter).
   const [bereich, setBereich] = useState<"prozente" | "halbjahre" | "ticket">("prozente");
-  const hoechsterZusatz = Math.max(0, ...staffel.map((x) => x.betrag));
-  const abiball = abiballVon(settings);
+  // Am Rechner ist Platz für alle drei nebeneinander, am iPad hoch für zwei
+  // Spalten – kein Umschalten, kein leerer Bildschirm unter einer kurzen Liste
+  // (Rollen-Prüfung Okt. 2026: am iPad hoch war gut die Hälfte leer).
+  const breit = useBreit();
+  const mittel = useMittel();
+  const spalten = breit ? 3 : mittel ? 2 : 1;
 
-  function anlegen() {
-    const t = titel.trim();
-    if (!t) return;
-    addTemplate(t, Number(punkte) || 0);
-    setTitel("");
-    setPunkte("5");
-  }
-
-  const kacheln: { key: typeof bereich; titel: string; wert: string; unter: string }[] = [
-    { key: "prozente", titel: "Prozente", wert: `${sortiert.length}`, unter: sortiert.length === 1 ? "Möglichkeit" : "Möglichkeiten" },
-    { key: "halbjahre", titel: "Halbjahre", wert: `${gesamt} €`, unter: "für alle sechs" },
-    {
-      key: "ticket",
-      titel: "Ticket",
-      wert: grund > 0 ? `${grund} €` : "offen",
-      unter: abiball.verkaufAb ? "Verkauf freigegeben" : `+ bis ${hoechsterZusatz} € Zuschlag`,
-    },
+  const reiter: { key: typeof bereich; titel: string }[] = [
+    { key: "prozente", titel: "Prozente" },
+    { key: "halbjahre", titel: "Halbjahre" },
+    { key: "ticket", titel: "Ticket" },
   ];
 
-  return (
-    <div className="mx-auto grid max-w-3xl gap-3">
-      <div className="grid grid-cols-3 gap-2">
-        {kacheln.map((k) => (
-          <button
-            key={k.key}
-            onClick={() => setBereich(k.key)}
-            className={`min-w-0 rounded-2xl border p-3 text-left transition active:scale-[0.98] ${
-              bereich === k.key
-                ? "border-brand bg-brand/10 dark:bg-brand/20"
-                : "border-papier-linie bg-white dark:border-slate-800 dark:bg-slate-900"
-            }`}
+  /* ---------------- Möglichkeiten ---------------- */
+  const prozente = (
+    <>
+      <Gruppe
+        titel="Wofür gibt es Prozent?"
+        className=""
+        fuss="Diese Liste siehst du später, wenn du bei jemandem etwas einträgst. Antippen zum Ändern oder Löschen."
+      >
+        {sortiert.length === 0 && <div className="px-4 py-4 text-[14px] text-tinte-leise">Noch nichts angelegt.</div>}
+        {sortiert.map((t) => (
+          <Zeile
+            key={t.id}
+            label={t.titel}
+            unter={t.variabel ? "Wert beim Eintragen anpassbar" : undefined}
+            onClick={() => setOffen(t.id)}
           >
-            <div className={`truncate text-[11px] font-semibold ${bereich === k.key ? "text-brand-dark dark:text-brand-soft" : "text-tinte-leise"}`}>{k.titel}</div>
-            <div className="zahl mt-0.5 truncate text-[1.25rem] font-extrabold leading-tight">{k.wert}</div>
-            <div className="truncate text-[11px] text-tinte-matt dark:text-slate-400">{k.unter}</div>
+            <Wert>{t.punkte} %</Wert>
+          </Zeile>
+        ))}
+        <Zeile label="Neue Möglichkeit" blau onClick={() => setOffen("neu")} />
+      </Gruppe>
+
+      <VorlageNeu
+        open={offen === "neu"}
+        onClose={() => setOffen(null)}
+        onAnlegen={(t, p, v) => {
+          addTemplate(t, p, v);
+          setOffen(null);
+        }}
+      />
+      {(() => {
+        const v = offen && offen !== "neu" ? templates.find((x) => x.id === offen) : undefined;
+        return v ? (
+          <VorlageBlatt
+            key={v.id}
+            vorlage={v}
+            onClose={() => setOffen(null)}
+            onAendern={(patch) => updateTemplate(v.id, patch)}
+            onLoeschen={async () => {
+              if (!(await frage(`„${v.titel}“ wirklich löschen?`, "Löschen", true))) return;
+              setOffen(null);
+              void removeTemplate(v.id);
+            }}
+          />
+        ) : null;
+      })()}
+    </>
+  );
+
+  /* ---------------- Beitrag je Halbjahr ---------------- */
+  const halbjahre = (
+    <>
+      <Gruppe
+        titel="Was kostet ein Halbjahr?"
+        className=""
+        fuss="Der Betrag gilt für jede Person, die in dem Halbjahr dabei ist. Änderst du einen Wert, rechnen sich alle offenen Beträge sofort neu aus."
+      >
+        {HY.map((h) => (
+          <HalbjahrZeile
+            key={h}
+            halbjahr={h}
+            betrag={preise[h]}
+            aktuell={h === settings.aktuelles_halbjahr}
+            onBetrag={(wert) => setSettings({ beitraege: { ...preise, [h]: wert } })}
+          />
+        ))}
+      </Gruppe>
+      <Gruppe className="mt-5">
+        <Zeile label="Alle sechs Halbjahre zusammen">
+          <Wert stark>{gesamt} €</Wert>
+        </Zeile>
+      </Gruppe>
+    </>
+  );
+
+  /* ---------------- Abiballticket ---------------- */
+  const ticket = (
+    <>
+      <Gruppe
+        titel="Abiball-Ticket"
+        className=""
+        fuss={grund === 0 ? "0 = Preis noch offen. Eltern und Schüler sehen dann „Preis folgt“." : undefined}
+      >
+        <label className="flex min-h-[48px] items-center gap-3 px-4 py-2">
+          <span className="min-w-0 flex-1 text-[15px]">Grundpreis je Ticket</span>
+          <ZahlFeld wert={preis.wert} aendern={preis.aendern} speichern={preis.jetztSpeichern} einheit="€" label="Grundpreis je Ticket in Euro" />
+        </label>
+      </Gruppe>
+
+      <Gruppe
+        titel="Aufschlag fürs 1. Ticket, je Prozentstufe"
+        className="mt-5"
+        fuss="Wer wenig mithilft, zahlt auf das 1. Ticket einen Aufschlag. Je mehr Mithilfe, desto kleiner wird er. Es zählt die höchste erreichte Stufe; weitere Tickets kosten den Grundpreis."
+      >
+        {staffel.map((stufe, i) => (
+          <StufenZeile
+            key={stufe.ab}
+            stufe={stufe}
+            grund={grund}
+            onBetrag={(wert) => setSettings({ staffel: staffel.map((x, j) => (j === i ? { ...x, betrag: wert } : x)) })}
+          />
+        ))}
+      </Gruppe>
+    </>
+  );
+
+  // Laptop (3 Spalten): Prozente + Bonus | Halbjahre + Abiball | Ticket +
+  // Verkauf + Bestellungen – etwa gleich lang. iPad hoch (2 Spalten): links
+  // Prozente, Bonus und Halbjahre, rechts alles zum Ticket samt Abiball-Tag.
+  // Handy: ein Bereich, darunter (bei Ticket) alle Abiball-Gruppen.
+  if (spalten > 1) {
+    // Abiball-Gruppen bringen ihren Abstand (mt-4) selbst mit
+    const bonus = <AbiballEinstellungen nur={["bonus"]} />;
+    const abiball = <AbiballEinstellungen nur={["abiball"]} />;
+    const verkauf = <AbiballEinstellungen nur={["verkauf", "bestellungen"]} />;
+    return (
+      // Volle Breite der Seitenspalte (max-w-5xl in App.tsx) – KEIN eigenes
+      // max-w-*: sonst endet der Inhalt am Laptop mitten auf der Seite, während
+      // Titel, Reiterleiste und Knöpfe bis zum Rand der Spalte gehen.
+      <div className={`grid items-start gap-x-4 ${spalten === 3 ? "grid-cols-3" : "grid-cols-2"}`}>
+        {spalten === 3 ? (
+          <>
+            <div className="min-w-0">
+              {prozente}
+              {bonus}
+            </div>
+            <div className="min-w-0">
+              {halbjahre}
+              {abiball}
+            </div>
+          </>
+        ) : (
+          <div className="min-w-0">
+            {prozente}
+            {bonus}
+            <div className="mt-4">{halbjahre}</div>
+          </div>
+        )}
+        <div className="min-w-0">
+          {ticket}
+          {/* iPad hoch: Tag und Ort stehen auf dem Ticket – hier, dann sind
+              beide Spalten etwa gleich lang */}
+          {spalten === 2 && abiball}
+          {verkauf}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div className="seg mb-3" role="tablist" aria-label="Bereich">
+        {reiter.map((r) => (
+          <button
+            key={r.key}
+            role="tab"
+            aria-selected={bereich === r.key}
+            onClick={() => setBereich(r.key)}
+            className={`seg-item !py-2 !text-[14px] ${bereich === r.key ? "seg-aktiv" : ""}`}
+          >
+            {r.titel}
           </button>
         ))}
       </div>
-
-      {/* ---------------- Möglichkeiten ---------------- */}
-      {bereich === "prozente" && (
-      <section className="card p-4 sm:p-5">
-        <h2 className="text-lg font-bold">Wofür gibt es Prozent?</h2>
-        <p className="mt-0.5 text-[13px] leading-relaxed text-tinte-matt dark:text-slate-400">
-          Diese Liste siehst du später, wenn du bei jemandem etwas einträgst. Setz einen Haken bei
-          „anpassbar", wenn der Wert je nach Aufwand schwankt.
-        </p>
-
-        <ul className="mt-4 grid gap-2">
-          {sortiert.map((t) => (
-            <VorlagenZeile
-              key={t.id}
-              vorlage={t}
-              onAendern={(patch) => updateTemplate(t.id, patch)}
-              onLoeschen={() => removeTemplate(t.id)}
-            />
-          ))}
-        </ul>
-
-        <div className="mt-3 min-w-0 rounded-2xl border border-dashed border-brand/50 p-2.5">
-          <div className="flex min-w-0 items-center gap-2">
-            <input
-              aria-label="Neue Bezeichnung"
-              className="w-0 min-w-0 flex-1 rounded-lg bg-papier-matt px-2.5 py-2 text-[15px] dark:bg-slate-800"
-              placeholder="Noch etwas, z. B. Fotobox betreut"
-              value={titel}
-              onChange={(e) => setTitel(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && anlegen()}
-            />
-            <div className="flex shrink-0 items-center gap-1 rounded-lg bg-papier-matt px-2 py-1 dark:bg-slate-800">
-              <input
-                type="number"
-                min={0}
-                max={100}
-                inputMode="numeric"
-                aria-label="Prozent für den neuen Eintrag"
-                className="w-12 bg-transparent text-right text-[15px] font-bold text-brand outline-none"
-                value={punkte}
-                onChange={(e) => setPunkte(e.target.value)}
-              />
-              <span className="text-[15px] font-bold text-brand">%</span>
-            </div>
-            <button
-              onClick={anlegen}
-              disabled={!titel.trim()}
-              className="shrink-0 rounded-lg bg-brand px-3.5 py-2 text-sm font-bold text-white disabled:opacity-40"
-            >
-              ＋
-            </button>
-          </div>
-        </div>
-      </section>
-      )}
-
-      {/* ---------------- Beitrag je Halbjahr ---------------- */}
-      {bereich === "halbjahre" && (
-      <section className="card h-fit p-4 sm:p-5">
-        <h2 className="text-lg font-bold">Was kostet ein Halbjahr?</h2>
-        <p className="mt-0.5 text-[13px] leading-relaxed text-tinte-matt dark:text-slate-400">
-          Der Betrag gilt für jede Person, die in dem Halbjahr dabei ist. Änderst du einen Wert,
-          rechnen sich alle offenen Beträge sofort neu aus.
-        </p>
-
-        <ul className="mt-4 grid gap-2">
-          {HY.map((h) => (
-            <HalbjahrZeile
-              key={h}
-              halbjahr={h}
-              betrag={preise[h]}
-              aktuell={h === settings.aktuelles_halbjahr}
-              onBetrag={(wert) => setSettings({ beitraege: { ...preise, [h]: wert } })}
-            />
-          ))}
-        </ul>
-
-        <div className="mt-3 flex items-center justify-between rounded-2xl bg-papier-matt px-3 py-2.5 dark:bg-slate-800/70">
-          <span className="text-[13px] font-semibold text-tinte-matt">Alle sechs Halbjahre zusammen</span>
-          <span className="text-[15px] font-extrabold">{gesamt} €</span>
-        </div>
-      </section>
-      )}
-
-      {/* ---------------- Abiballticket ---------------- */}
+      {bereich === "prozente" && prozente}
+      {bereich === "halbjahre" && halbjahre}
       {bereich === "ticket" && (
-      <section className="card h-fit p-4 sm:p-5">
-        <h2 className="text-lg font-bold">Abiball-Ticket</h2>
-        <p className="mt-0.5 text-[13px] leading-relaxed text-tinte-matt dark:text-slate-400">
-          Der Helferzuschuss gilt nur fürs 1. Ticket. Es zählt die höchste erreichte Stufe.
-        </p>
-
-        <label className="mt-4 flex items-center gap-3 rounded-2xl bg-papier-matt p-3 dark:bg-slate-800/70">
-          <span className="flex-1 text-[15px] font-semibold">Grundpreis je Ticket</span>
-          <input
-            type="number"
-            min={0}
-            inputMode="numeric"
-            className="w-20 rounded-lg bg-white px-2.5 py-2 text-right text-[15px] font-bold dark:bg-slate-900"
-            value={preis.wert}
-            onChange={(e) => preis.aendern(Math.max(0, Number(e.target.value) || 0))}
-            onBlur={preis.jetztSpeichern}
-          />
-          <span className="text-[15px] font-bold text-tinte-matt">€</span>
-        </label>
-        {grund === 0 && (
-          <p className="mt-1.5 text-[12px] text-tinte-leise">
-            0 = Preis noch offen.
-          </p>
-        )}
-
-        <div className="mt-4 text-xs font-semibold uppercase tracking-wide text-tinte-matt">
-          Helferzuschuss je Prozentstufe
-        </div>
-        <ul className="mt-2 grid gap-2">
-          {staffel.map((stufe, i) => (
-            <StufenZeile
-              key={stufe.ab}
-              stufe={stufe}
-              grund={grund}
-              onBetrag={(wert) =>
-                setSettings({ staffel: staffel.map((x, j) => (j === i ? { ...x, betrag: wert } : x)) })
-              }
-            />
-          ))}
-        </ul>
-
-        <AbiballEinstellungen />
-      </section>
+        <>
+          {ticket}
+          <AbiballEinstellungen />
+        </>
       )}
     </div>
   );
 }
 
 /**
- * Eine Zeile der Vorlagen-Liste. Titel und Prozentwert werden erst gespeichert,
- * wenn man kurz aufhoert zu tippen oder das Feld verlaesst.
+ * Eine Möglichkeit bearbeiten – als Blatt wie in den iOS-Einstellungen
+ * (vorher stand in jeder Zeile ein Kippschalter links, der Wert ganz rechts
+ * und ein roter Mülleimer: unruhig und am Laptop weit auseinandergezogen).
+ * Titel und Prozent speichern nach kurzer Tipp-Pause bzw. beim Verlassen.
  */
-function VorlagenZeile({
+function VorlageBlatt({
   vorlage,
+  onClose,
   onAendern,
   onLoeschen,
 }: {
   vorlage: ContribTemplate;
+  onClose: () => void;
   onAendern: (patch: Partial<Pick<ContribTemplate, "titel" | "punkte" | "variabel">>) => void;
   onLoeschen: () => void;
 }) {
   const titel = useEntwurf(vorlage.titel, (wert) => onAendern({ titel: wert }));
   const punkte = useEntwurf(vorlage.punkte, (wert) => onAendern({ punkte: wert }));
+  const schliessen = () => {
+    titel.jetztSpeichern();
+    punkte.jetztSpeichern();
+    onClose();
+  };
 
   return (
-    <li className="min-w-0 rounded-2xl border border-papier-linie p-2.5 dark:border-slate-700">
-      <div className="flex min-w-0 items-center gap-2">
-        <input
-          aria-label="Wofür (Bezeichnung)"
-          className="w-0 min-w-0 flex-1 rounded-lg bg-papier-matt px-2.5 py-2 text-[15px] font-semibold dark:bg-slate-800"
-          value={titel.wert}
-          onChange={(e) => titel.aendern(e.target.value)}
-          onBlur={titel.jetztSpeichern}
-        />
-        <div className="flex shrink-0 items-center gap-1 rounded-lg bg-papier-matt px-2 py-1 dark:bg-slate-800">
+    <Sheet open onClose={schliessen}>
+      <SheetKopf titel="Möglichkeit" unter="Änderungen werden sofort gespeichert." onClose={schliessen} />
+      <Gruppe className="">
+        <label className="flex min-h-[48px] items-center gap-3 px-4 py-2">
+          <span className="shrink-0 text-[15px]">Wofür</span>
           <input
-            type="number"
-            min={0}
-            max={100}
-            inputMode="numeric"
-            aria-label="Prozent"
-            className="w-10 bg-transparent text-right text-[15px] font-bold text-brand outline-none"
-            value={punkte.wert}
-            onChange={(e) => punkte.aendern(Math.max(0, Math.min(100, Number(e.target.value) || 0)))}
-            onBlur={punkte.jetztSpeichern}
+            aria-label="Wofür (Bezeichnung)"
+            className="min-w-0 flex-1 bg-transparent text-right text-[15px] outline-none"
+            value={titel.wert}
+            onChange={(e) => titel.aendern(e.target.value)}
+            onBlur={titel.jetztSpeichern}
           />
-          <span className="text-[15px] font-bold text-brand">%</span>
-        </div>
-        <button
-          onClick={() => void frage(`„${vorlage.titel}" wirklich löschen?`, "Löschen", true).then((ok) => { if (ok) void onLoeschen(); })}
-          className="shrink-0 rounded-lg px-2 py-2 text-tinte-leise transition active:scale-90"
-          aria-label="Löschen"
-        >
-          🗑
+        </label>
+        <label className="flex min-h-[48px] items-center gap-3 px-4 py-2">
+          <span className="min-w-0 flex-1 text-[15px]">Prozent</span>
+          <ZahlFeld wert={punkte.wert} aendern={punkte.aendern} speichern={punkte.jetztSpeichern} einheit="%" max={100} label="Prozent" />
+        </label>
+      </Gruppe>
+      <Gruppe fuss="Anpassbar heißt: Der Wert darf beim Eintragen je nach Aufwand geändert werden.">
+        <ZeileMitSchalter label="Anpassbar">
+          <Schalter an={Boolean(vorlage.variabel)} label="Wert beim Eintragen anpassbar" onChange={(v) => onAendern({ variabel: v })} />
+        </ZeileMitSchalter>
+      </Gruppe>
+      <Gruppe className="mt-6">
+        <Zeile label="Möglichkeit löschen" rot onClick={onLoeschen} />
+      </Gruppe>
+    </Sheet>
+  );
+}
+
+/** Neue Möglichkeit anlegen – gleiche Felder wie beim Bearbeiten. */
+function VorlageNeu({
+  open,
+  onClose,
+  onAnlegen,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onAnlegen: (titel: string, punkte: number, variabel: boolean) => void;
+}) {
+  const [titel, setTitel] = useState("");
+  const [punkte, setPunkte] = useState("5");
+  const [variabel, setVariabel] = useState(false);
+  const los = () => {
+    const t = titel.trim();
+    if (!t) return;
+    onAnlegen(t, Math.max(0, Math.min(100, Number(punkte) || 0)), variabel);
+    setTitel("");
+    setPunkte("5");
+    setVariabel(false);
+  };
+
+  return (
+    <Sheet open={open} onClose={onClose}>
+      <SheetKopf titel="Neue Möglichkeit" onClose={onClose} />
+      <Gruppe className="">
+        <ZeileEingabe label="Wofür" value={titel} onChange={setTitel} placeholder="z. B. Fotobox betreut" autoFocus onEnter={los} />
+        <ZeileEingabe label="Prozent" value={punkte} onChange={setPunkte} type="number" inputMode="numeric" onEnter={los} />
+      </Gruppe>
+      <Gruppe fuss="Anpassbar heißt: Der Wert darf beim Eintragen je nach Aufwand geändert werden.">
+        <ZeileMitSchalter label="Anpassbar">
+          <Schalter an={variabel} label="Wert beim Eintragen anpassbar" onChange={setVariabel} />
+        </ZeileMitSchalter>
+      </Gruppe>
+      <FussLeiste>
+        <button className="btn-primary" disabled={!titel.trim()} onClick={los}>
+          Hinzufügen
         </button>
-      </div>
-      <label className="mt-1.5 flex cursor-pointer items-center gap-2 pl-1 text-[12px] text-tinte-matt dark:text-slate-400">
-        <input
-          type="checkbox"
-          className="h-4 w-4 accent-brand"
-          checked={Boolean(vorlage.variabel)}
-          onChange={(e) => onAendern({ variabel: e.target.checked })}
-        />
-        Wert beim Eintragen anpassbar
-      </label>
-    </li>
+      </FussLeiste>
+    </Sheet>
   );
 }
 
@@ -275,25 +402,13 @@ function StufenZeile({
   const betrag = useEntwurf(stufe.betrag, onBetrag);
 
   return (
-    <li className="flex min-w-0 items-center gap-2 rounded-2xl border border-papier-linie px-3 py-2 dark:border-slate-700">
-      <span className="shrink-0 whitespace-nowrap text-[15px] font-bold text-brand">ab {stufe.ab} %</span>
-      <span className="min-w-0 flex-1 truncate text-[13px] text-tinte-matt dark:text-slate-400">
-        1. Ticket {grund + betrag.wert} €
+    <label className="flex min-h-[52px] min-w-0 items-center gap-3 px-4 py-2">
+      <span className="min-w-0 flex-1">
+        <span className="block text-[15px] font-semibold">ab {stufe.ab} % Mithilfe</span>
+        <span className="zahl block text-[12.5px] text-tinte-leise">1. Ticket kostet {grund + betrag.wert} €</span>
       </span>
-      <div className="flex shrink-0 items-center gap-1 rounded-lg bg-papier-matt px-2 py-1 dark:bg-slate-800">
-        <span className="text-[13px] font-semibold text-tinte-leise">+</span>
-        <input
-          type="number"
-          min={0}
-          inputMode="numeric"
-          className="w-12 bg-transparent text-right text-[15px] font-bold outline-none"
-          value={betrag.wert}
-          onChange={(e) => betrag.aendern(Math.max(0, Number(e.target.value) || 0))}
-          onBlur={betrag.jetztSpeichern}
-        />
-        <span className="text-[15px] font-bold text-tinte-matt">€</span>
-      </div>
-    </li>
+      <ZahlFeld wert={betrag.wert} aendern={betrag.aendern} speichern={betrag.jetztSpeichern} einheit="€" plus label={`Aufschlag ab ${stufe.ab} Prozent in Euro`} />
+    </label>
   );
 }
 
@@ -312,27 +427,12 @@ function HalbjahrZeile({
   const wert = useEntwurf(betrag, onBetrag);
 
   return (
-    <li
-      className={`flex min-w-0 items-center gap-2 rounded-2xl border px-3 py-2 ${
-        aktuell ? "border-brand bg-brand/5" : "border-papier-linie dark:border-slate-700"
-      }`}
-    >
-      <span className="w-14 shrink-0 text-[15px] font-bold">{halbjahr}</span>
-      <span className="min-w-0 flex-1 truncate text-[12px] text-tinte-leise">
-        {aktuell ? "läuft gerade" : ""}
+    <label className="flex min-h-[52px] min-w-0 items-center gap-3 px-4 py-2">
+      <span className="min-w-0 flex-1">
+        <span className="block text-[15px] font-semibold">{halbjahr}</span>
+        {aktuell && <span className="block text-[12.5px] font-medium text-brand-dark dark:text-brand">läuft gerade</span>}
       </span>
-      <div className="flex shrink-0 items-center gap-1 rounded-lg bg-papier-matt px-2 py-1 dark:bg-slate-800">
-        <input
-          type="number"
-          min={0}
-          inputMode="numeric"
-          className="w-14 bg-transparent text-right text-[15px] font-bold outline-none"
-          value={wert.wert}
-          onChange={(e) => wert.aendern(Math.max(0, Number(e.target.value) || 0))}
-          onBlur={wert.jetztSpeichern}
-        />
-        <span className="text-[15px] font-bold text-tinte-matt">€</span>
-      </div>
-    </li>
+      <ZahlFeld wert={wert.wert} aendern={wert.aendern} speichern={wert.jetztSpeichern} einheit="€" label={`Beitrag ${halbjahr} in Euro`} />
+    </label>
   );
 }

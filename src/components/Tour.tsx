@@ -1,4 +1,26 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
+
+/**
+ * Läuft gerade irgendwo eine Einführung? (Update 1.4, U3)
+ *
+ * Install-Hinweis, „Neu“-Hinweise und Patch-Notes sollen nie gleichzeitig mit
+ * einer Einführung auf dem Bildschirm stehen – auch nicht in der Elternansicht,
+ * deren Einführung in ElternApp.tsx läuft. Deshalb meldet sich jede offene
+ * <Tour> hier an, und wer Rücksicht nehmen will, fragt useTourOffen().
+ */
+let offeneTouren = 0;
+const tourHoerer = new Set<() => void>();
+const tourMelden = () => tourHoerer.forEach((f) => f());
+export function useTourOffen(): boolean {
+  return useSyncExternalStore(
+    (f) => {
+      tourHoerer.add(f);
+      return () => tourHoerer.delete(f);
+    },
+    () => offeneTouren > 0,
+    () => false,
+  );
+}
 
 export interface TourStep {
   /**
@@ -62,6 +84,17 @@ export function Tour({
 
   useEffect(() => {
     if (open) setI(0);
+  }, [open]);
+
+  // Anderen melden: „hier läuft eine Einführung“ (useTourOffen)
+  useEffect(() => {
+    if (!open) return;
+    offeneTouren++;
+    tourMelden();
+    return () => {
+      offeneTouren = Math.max(0, offeneTouren - 1);
+      tourMelden();
+    };
   }, [open]);
 
   const messen = useCallback(() => {
@@ -140,16 +173,21 @@ export function Tour({
         knoepfe[naechster].focus();
         return;
       }
-      if (e.key === "Escape") onClose();
-      else if (e.key === "ArrowRight") weiter();
+      if (e.key === "Escape") {
+        // Vor allen anderen abgreifen: ein offenes Blatt unter der Einführung
+        // (Sheet.tsx) soll von diesem Escape nichts mitbekommen.
+        e.stopPropagation();
+        onClose();
+      } else if (e.key === "ArrowRight") weiter();
       else if (e.key === "ArrowLeft") zurueck();
       else if (e.key === "Enter" && !(document.activeElement instanceof HTMLButtonElement)) {
         e.preventDefault();
         weiter();
       }
     };
-    window.addEventListener("keydown", taste);
-    return () => window.removeEventListener("keydown", taste);
+    // capture: kommt vor den Tasten-Griffen der Blätter dran
+    window.addEventListener("keydown", taste, true);
+    return () => window.removeEventListener("keydown", taste, true);
   }, [open, weiter, zurueck, onClose]);
 
   if (!open || !step) return null;
@@ -174,6 +212,12 @@ export function Tour({
       : { top: rect.top + rect.height + PAD + 12, left: links, width: w };
   }
 
+  // Das Loch nie über den oberen Rand: Der Profil-Knopf (44 px bei y = 8)
+  // ergab top = 0 – Ring und obere Rundung lagen außerhalb des Bildes.
+  // 4 px lassen Platz für den 2,5-px-Ring.
+  const lochOben = rect ? Math.max(4, rect.top - PAD) : 0;
+  const lochHoehe = rect ? rect.top + rect.height + PAD - lochOben : 0;
+
   return (
     <div className="fixed inset-0 z-[100]" role="dialog" aria-modal="true" aria-label="Einführung">
       {/* Abdunkeln mit Loch um das Element */}
@@ -182,16 +226,16 @@ export function Tour({
           <div
             className="pointer-events-none absolute rounded-[1.25rem] transition-all duration-300 ease-ios"
             style={{
-              top: rect.top - PAD,
+              top: lochOben,
               left: rect.left - PAD,
               width: rect.width + PAD * 2,
-              height: rect.height + PAD * 2,
+              height: lochHoehe,
               boxShadow: "0 0 0 9999px rgba(0,0,0,.66)",
             }}
           />
           <div
             className="pointer-events-none absolute animate-puls rounded-[1.25rem] ring-[2.5px] ring-brand transition-all duration-300 ease-ios"
-            style={{ top: rect.top - PAD, left: rect.left - PAD, width: rect.width + PAD * 2, height: rect.height + PAD * 2 }}
+            style={{ top: lochOben, left: rect.left - PAD, width: rect.width + PAD * 2, height: lochHoehe }}
           />
         </>
       ) : (
@@ -207,21 +251,21 @@ export function Tour({
       <div
         key={i}
         ref={karte}
-        className={`relative animate-aufsteigen rounded-[1.5rem] border border-white/40 bg-white/90 p-5 shadow-glas backdrop-blur-2xl backdrop-saturate-[1.8] dark:border-white/10 dark:bg-slate-900/90 ${
+        className={`relative animate-aufsteigen rounded-[1.5rem] border border-white/40 bg-white p-5 shadow-glas dark:border-white/10 dark:bg-slate-900 ${
           rect ? "" : "text-center"
         }`}
       >
         {!letzter && (
           <button
             onClick={onClose}
-            className="absolute right-2 top-2 rounded-full px-3 py-2 text-[13px] font-semibold text-tinte-leise transition active:scale-95"
+            className="absolute right-1.5 top-1 flex min-h-[44px] items-center rounded-full px-3.5 text-[14px] font-semibold text-tinte-leise transition active:scale-95"
           >
             Überspringen
           </button>
         )}
 
         {step.zeichen && <div className="mb-2 mt-1 text-[2.5rem] leading-none">{step.zeichen}</div>}
-        <h3 className={`text-[17px] font-semibold leading-snug tracking-[-0.01em] ${letzter ? "" : rect ? "pr-24" : "px-6"}`}>{step.title}</h3>
+        <h3 className={`text-[17px] font-semibold leading-snug tracking-[-0.01em] ${letzter ? "" : rect ? "pr-28" : step.zeichen ? "px-6" : "pt-9"}`}>{step.title}</h3>
         <p className="mt-1.5 text-[15px] leading-relaxed text-tinte-matt dark:text-slate-300">{step.text}</p>
 
         <div className={`mt-4 flex items-center gap-3 ${rect ? "" : "justify-center"}`}>
@@ -238,14 +282,14 @@ export function Tour({
           </div>
           <div className={`flex items-center gap-1 ${rect ? "" : "ml-auto"}`}>
             {i > 0 && (
-              <button onClick={zurueck} className="rounded-full px-4 py-2.5 text-[15px] font-semibold text-brand transition active:scale-95">
+              <button onClick={zurueck} className="min-h-[44px] rounded-full px-4 text-[15px] font-semibold text-brand transition active:scale-95">
                 Zurück
               </button>
             )}
             <button
               onClick={weiter}
               autoFocus
-              className="rounded-full bg-brand px-5 py-2.5 text-[15px] font-semibold text-white outline-none transition focus-visible:ring-4 focus-visible:ring-brand/30 active:scale-95"
+              className="min-h-[44px] rounded-full bg-brand px-5 text-[15px] font-semibold text-white outline-none transition focus-visible:ring-4 focus-visible:ring-brand/30 active:scale-95"
             >
               {letzter ? "Fertig" : i === 0 && !step.anchor ? "Los geht’s" : "Weiter"}
             </button>
@@ -263,23 +307,38 @@ type Staffel = { ab: number; betrag: number }[];
 
 const kette = (st: Staffel) => st.map((x) => `${x.ab} % → ${x.betrag} €`).join(", ");
 
-/** Schüler: die eigene Kasse, Events, Chats, Profil. */
-export function schuelerSchritte(staffel: Staffel): TourStep[] {
+/**
+ * Schüler: die eigene Kasse, die Kacheln der Startseite, Offiziell/Inoffiziell,
+ * Events, Chats, Profil. Einführung für 1.4 überarbeitet (U3): zeigt jetzt auch
+ * Abimotto/Zitate/Rankings/Album, den Nachtragen-Knopf und – nur wenn der
+ * Reiter da ist – Finanzen.
+ */
+export function schuelerSchritte(staffel: Staffel, o: { nachtragen?: boolean; finanzen?: boolean } = {}): TourStep[] {
   const voll = staffel[0]?.betrag ?? 50;
   // Betrag ab 100 % – steht in der Staffel, meist 0 €
   const bei100 = [...staffel].filter((x) => x.ab <= 100).sort((a, b) => b.ab - a.ab)[0]?.betrag ?? 0;
-  return [
+  const s: TourStep[] = [
     {
-      zeichen: "👋",
       title: "Willkommen in der Stufenkasse",
       text: "In einer Minute weißt du, wo du was findest. Du kannst jederzeit überspringen.",
     },
-    { tab: "kasse", anchor: "meine-karte", title: "Was du noch zahlst", text: "Oben steht dein offener Betrag. Steht dort 0 €, ist alles erledigt." },
+    { tab: "kasse", anchor: "meine-karte", title: "Was du noch zahlst", text: "Oben steht dein offener Betrag. Steht dort 0 €, ist im Moment nichts fällig." },
+    {
+      tab: "kasse",
+      anchor: "kacheln",
+      title: "Abimotto, Zitate, Rankings, Album",
+      text: "Hier machst du bei der Abizeitung mit: Motto vorschlagen, Zitate einreichen, abstimmen, Steckbrief ausfüllen. Ein Tipp auf eine Kachel öffnet sie.",
+    },
+    {
+      tab: "kasse",
+      title: "Offiziell oder Inoffiziell",
+      text: "Motto, Zitate, Rankings und Kommentare gibt es in zwei Teilen: Offiziell kommt ins Abibuch, Inoffiziell bleibt unter uns. Ganz oben im jeweiligen Bereich wechselst du.",
+    },
     {
       tab: "kasse",
       anchor: "meine-halbjahre",
       title: "Deine sechs Halbjahre",
-      text: "✓ heißt bezahlt, € offen, / erlassen. Blau umrandet ist das laufende Halbjahr, graue sind noch nicht fällig.",
+      text: "Jede Kachel ist ein Halbjahr: Haken = bezahlt, € = offen, Schrägstrich = erlassen. Blau umrandet ist das laufende, graue kommen später.",
     },
     {
       tab: "kasse",
@@ -287,10 +346,27 @@ export function schuelerSchritte(staffel: Staffel): TourStep[] {
       title: "Mithelfen lohnt sich",
       text: `Hilfst du bei Aktionen mit, sammelst du Prozent. Je mehr Prozent, desto kleiner der Aufschlag auf dein Abiball-Ticket – ohne Mithilfe ${voll} €, bei 100 % ${bei100} €.`,
     },
-    { tab: "events", anchor: "tab-events", title: "Events", text: "Termine, Aktionen und Abstimmungen vom Stufenteam. Für Aktionen trägst du dich hier ein." },
-    { tab: "themen", anchor: "tab-themen", title: "Chats", text: "Hier chattest du mit deinem Komitee und stellst dem Stufenteam Fragen." },
-    { tab: "kasse", anchor: "profil", title: "Dein Profil", text: "Bild, Namensfarbe, Passwort und Mitteilungen. Dort startest du diese Einführung auch neu." },
   ];
+  if (o.nachtragen)
+    s.push({
+      tab: "kasse",
+      anchor: "nachtragen",
+      title: "Mithilfe nachtragen",
+      text: "Bei einer Aktion geholfen, aber es wurde nicht eingetragen? Hier oben beantragst du es – das Stufenteam bestätigt.",
+    });
+  s.push(
+    { tab: "events", anchor: "tab-events", title: "Events", text: "Termine, Aktionen und Abstimmungen vom Stufenteam. Für Aktionen trägst du dich hier ein – das Team teilt dann ein." },
+    { tab: "themen", anchor: "tab-themen", title: "Chats", text: "Hier chattest du mit deinem Komitee und stellst dem Stufenteam Fragen." },
+  );
+  if (o.finanzen)
+    s.push({ tab: "finanzen", anchor: "tab-finanzen", title: "Finanzen", text: "Kontostand und Ausgaben der Stufenkasse – so siehst du, wofür das Geld verwendet wird." });
+  s.push({
+    tab: "kasse",
+    anchor: "profil",
+    title: "Dein Profil",
+    text: "Tipp auf dein Bild: Namensfarbe, Hintergrundbild, Mitteilungen und Darstellung (Hell, Dunkel oder Automatisch). Dort startest du diese Einführung auch neu.",
+  });
+  return s;
 }
 
 /** Stufenteam und alle mit Sonderrolle – je nach Rechten mehr oder weniger Reiter. */
@@ -301,36 +377,60 @@ export function teamSchritte(o: {
   finanzen: boolean;
   rollen: boolean;
   rechte: boolean;
+  /** Team mit eigener Person: Reiter Übersicht mit den Kacheln der Abizeitung */
+  profilReiter?: boolean;
+  /** Der Nachtragen-Knopf im Kopf (nur mit eigener Person) */
+  nachtragen?: boolean;
 }): TourStep[] {
   const s: TourStep[] = [
     {
-      zeichen: "👋",
       title: "Willkommen im Stufenteam",
       text: "Ein kurzer Rundgang durch alle Reiter – nur das Wichtigste. Du kannst jederzeit überspringen.",
     },
+  ];
+  if (o.profilReiter)
+    s.push({
+      tab: "profil",
+      anchor: "kacheln",
+      title: "Deine Startseite",
+      text: "Wie bei allen Schülern: Abimotto, Zitate, Rankings und Album. Jeder Bereich hat oben ein Zahnrad mit allen Einstellungen – Offiziell und Inoffiziell getrennt.",
+    });
+  s.push(
     { tab: "kasse", anchor: "kassenkopf", title: "Die Lage auf einen Blick", text: "Wie viel in der Stufe noch offen ist und wie viele noch zahlen müssen." },
     {
       tab: "kasse",
       anchor: "person",
       title: "Eine Person",
       text: o.kasseBearbeiten
-        ? "Ein Tipp auf ein Halbjahr schaltet zwischen offen, bezahlt und erlassen. Ein Tipp auf den Namen öffnet alle Details und die Mithilfe."
+        ? "Ein Tipp auf ein Halbjahr schaltet zwischen offen und bezahlt. Ein Tipp auf den Namen öffnet alle Details und die Mithilfe – dort kannst du ein Halbjahr auch erlassen."
         : "Ein Tipp auf den Namen öffnet alle Details – dort trägst du auch ein, wobei jemand geholfen hat.",
     },
-  ];
+  );
   if (o.mehrere)
     s.push({ tab: "kasse", anchor: "massen", title: "Mehrere auf einmal", text: "Personen auswählen und allen gleichzeitig eine Mithilfe oder einen Status geben." });
+  if (o.nachtragen)
+    s.push({
+      tab: "kasse",
+      anchor: "nachtragen",
+      title: "Mithilfe nachtragen",
+      text: "Bei einer Aktion geholfen, aber nicht eingetragen? Hier beantragst du es für dich – Anträge anderer bestätigst du unter Chats → Anfragen.",
+    });
   s.push(
-    { tab: "events", anchor: "tab-events", title: "Events", text: "Mitteilungen, Aktionen und Abstimmungen. Mit ＋ erstellst du neue und legst fest, wer sie bekommt." },
-    { tab: "themen", anchor: "tab-themen", title: "Chats", text: "Alle Komitee-Chats, der Stufenteam-Chat und die Fragen der Eltern an einem Ort." },
+    { tab: "events", anchor: "tab-events", title: "Events", text: "Mitteilungen, Aktionen und Abstimmungen. Über „Neu“ legst du Neues an und bestimmst, wer es bekommt." },
+    { tab: "themen", anchor: "tab-themen", title: "Chats", text: "Alle Komitee-Chats, der Stufenteam-Chat, die Fragen der Eltern und die Anfragen an einem Ort." },
   );
   if (o.beitraege)
-    s.push({ tab: "beitraege", anchor: "tab-beitraege", title: "Beiträge & Abiball", text: "Was jedes Halbjahr kostet, die Prozent-Staffel fürs Ticket und die Vorlagen für Mithilfe." });
+    s.push({ tab: "beitraege", anchor: "tab-beitraege", title: "Beiträge & Abiball", text: "Oben in der Kasse umschalten: was jedes Halbjahr kostet, die Prozent-Staffel fürs Ticket und die Vorlagen für Mithilfe." });
   if (o.finanzen)
     s.push({ tab: "finanzen", anchor: "tab-finanzen", title: "Finanzen", text: "Das Kassenbuch: Kontostand, Einnahmen und Ausgaben. Ein Tipp auf eine Buchung zeigt alle Details." });
   if (o.rollen || o.rechte)
-    s.push({ tab: "rollen", anchor: "tab-rollen", title: "Rollen & Rechte", text: "Oben umschalten: „Rollen“ zeigt alle Personen – Person antippen für ihre einzelnen Rechte. „Rechte“ legt fest, was jede Rolle darf." });
-  s.push({ tab: "kasse", anchor: "profil", title: "Dein Profil", text: "Bild, Passwort und Mitteilungen. Dort startest du diese Einführung jederzeit neu." });
+    s.push({ tab: "rollen", anchor: "tab-rollen", title: "Rollen", text: "Oben umschalten: „Personen“ zeigt alle – Person antippen für ihre Rolle und einzelnen Rechte. „Rechte je Rolle“ legt fest, was jede Rolle darf." });
+  s.push({
+    tab: "kasse",
+    anchor: "profil",
+    title: "Dein Profil",
+    text: "Tipp auf dein Bild: Namensfarbe, Hintergrundbild, Mitteilungen und Darstellung (Hell, Dunkel oder Automatisch). Dort startest du diese Einführung jederzeit neu.",
+  });
   return s;
 }
 
@@ -339,7 +439,6 @@ export function elternSchritte(o: { mehrereKinder: boolean }): TourStep[] {
   const kind = o.mehrereKinder ? "Ihre Kinder" : "Ihr Kind";
   return [
     {
-      zeichen: "👋",
       title: "Willkommen bei der Stufenkasse",
       text: `Hier sehen Sie auf einen Blick, was für ${kind} offen ist und wie es beim Abiball-Ticket steht.`,
     },
@@ -355,7 +454,7 @@ export function elternSchritte(o: { mehrereKinder: boolean }): TourStep[] {
       tab: "uebersicht",
       anchor: "kind-halbjahre",
       title: "Sechs Halbjahre",
-      text: "✓ bezahlt, € offen, / erlassen. Blau umrandet ist das laufende Halbjahr, graue sind noch nicht fällig. EF ist die 11, Q1 und Q2 die 12 und 13.",
+      text: "✓ bezahlt, € offen, / erlassen. Blau umrandet ist das laufende Halbjahr, graue kommen später. EF ist die 11, Q1 und Q2 die 12 und 13.",
     },
     {
       tab: "uebersicht",

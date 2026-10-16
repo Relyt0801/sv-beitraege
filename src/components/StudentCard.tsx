@@ -5,6 +5,24 @@ import { TermChip } from "./TermChip";
 import { Avatar } from "./Avatar";
 
 /**
+ * Spaltenbreiten der Kassenliste – EINMAL festgelegt, damit die Spaltenköpfe
+ * in App.tsx genau über den Werten stehen (vorher 40 px versetzt).
+ *
+ * Unter 768 px (Handy, Handy quer) stehen die sechs Halbjahre in einer eigenen
+ * Zeile über die volle Breite (≈ 51 × 44 px je Kästchen). Ab 768 px stehen sie
+ * in der Zeile: 6 × 44 px + 5 × 6 px Abstand = 18,5 rem, am Laptop bis 26 rem
+ * (≈ 64 px je Kästchen) – vorher waren es 35 × 36 px, zu klein zum sicheren
+ * Tippen (ein Fehltipp ändert den Zahlstatus), und daneben ~550 px Leere.
+ * Die Personenspalte startet bei 768 px schmaler (9,5 rem), damit die Zeile
+ * auch mit Auswahl-Kästchen nicht umbricht; Platz übrig bekommt sie zuerst.
+ */
+export const SPALTE_PERSON = "md:basis-[9.5rem] lg:basis-[13rem]";
+export const SPALTE_OFFEN = "md:w-16";
+export const SPALTE_HALBJAHRE = "md:grow md:basis-[18.5rem] md:min-w-[18.5rem] md:max-w-[18.5rem] lg:max-w-[26rem]";
+/** Balken (w-12) + Abstand (gap-1.5) + Zahl (w-10) */
+export const SPALTE_MITHILFE = "md:w-[5.875rem]";
+
+/**
  * Eine Person in der Kassenliste – eine Zeile, die man am Stueck liest:
  * Name, offener Betrag, die sechs Halbjahre, Mithilfe. Vorher war jede Person
  * eine eigene Karte; bei 130 Leuten wurde daraus eine sehr lange Kachelwand,
@@ -52,21 +70,27 @@ function StudentCardRoh({
       } ${leaving ? "bg-red-50/60 dark:bg-red-500/5" : ""}`}
     >
       {selectable && (
+        // Sichtbar 24 px, tippbar 44 px (Update 1.4, U3)
         <button
           onClick={() => onToggleSelect(student.id)}
           aria-label="Auswählen"
-          className={`flex h-6 w-6 min-w-6 shrink-0 items-center justify-center rounded-lg border-2 text-sm text-white transition ${
-            selected ? "border-brand bg-brand" : "border-papier-linie dark:border-slate-600"
-          }`}
+          aria-pressed={selected}
+          className="-my-2 -ml-2 flex h-11 w-11 shrink-0 items-center justify-center"
         >
-          {selected ? "✓" : ""}
+          <span
+            className={`flex h-6 w-6 items-center justify-center rounded-lg border-2 text-sm text-white transition ${
+              selected ? "border-brand bg-brand" : "border-papier-linie dark:border-slate-600"
+            }`}
+          >
+            {selected ? "✓" : ""}
+          </span>
         </button>
       )}
 
       {/* Person */}
       <button
         onClick={() => (selectable ? onToggleSelect(student.id) : onOpen(student.id))}
-        className="flex min-w-0 flex-1 items-center gap-2.5 text-left sm:basis-[13rem]"
+        className={`flex min-w-0 flex-1 items-center gap-2.5 text-left ${SPALTE_PERSON}`}
       >
         {/* Derselbe Namenskreis wie im Rollen-Reiter: Farbe der Person, nicht
             Farbe des Zahlungsstands. Der Betrag rechts sagt das ohnehin. */}
@@ -85,7 +109,7 @@ function StudentCardRoh({
           <span className="block truncate text-[14px] font-semibold">
             {student.nachname}, {student.vorname}
           </span>
-          <span className="block truncate text-[11px] text-tinte-leise">
+          <span className="block truncate text-[12px] text-tinte-leise">
             {leaving
               ? `verlässt ${student.verlaesst_ab}`
               : joiningLate
@@ -98,17 +122,15 @@ function StudentCardRoh({
       {/* Offen */}
       <button
         onClick={() => (selectable ? onToggleSelect(student.id) : onOpen(student.id))}
-        className={`zahl -my-2 min-w-[2.75rem] shrink-0 py-2 text-right text-[17px] font-bold sm:w-16 ${
+        className={`zahl -my-2 min-w-[2.75rem] shrink-0 py-2 text-right text-[17px] font-bold ${SPALTE_OFFEN} ${
           betrag > 0 ? "text-offen dark:text-amber-300" : "text-bezahlt dark:text-emerald-300"
         }`}
       >
         {betrag > 0 ? `${betrag} €` : "✓"}
       </button>
 
-      {/* Halbjahre */}
-      {/* sm:min-w: auf dem Tablet waren die sechs Kästchen nur 20 px breit –
-          zu klein zum sicheren Tippen (ein Fehltipp ändert den Zahlstatus). */}
-      <div className="order-last flex w-full gap-1.5 sm:order-none sm:w-auto sm:min-w-[12.5rem] sm:max-w-[15rem] sm:flex-1">
+      {/* Halbjahre – Breiten siehe SPALTE_HALBJAHRE (mind. 44 × 44 px je Kästchen) */}
+      <div className={`order-last flex w-full gap-1.5 md:order-none md:w-auto ${SPALTE_HALBJAHRE}`}>
         {HY.map((h, i) => (
           <TermChip
             key={h}
@@ -125,10 +147,10 @@ function StudentCardRoh({
       {/* Mithilfe */}
       <button
         onClick={() => (selectable ? onToggleSelect(student.id) : onOpen(student.id))}
-        className="-my-2 flex shrink-0 items-center gap-1.5 py-3"
+        className={`-my-2 flex shrink-0 items-center justify-end gap-1.5 py-3 ${SPALTE_MITHILFE}`}
         aria-label={`Mithilfe ${prozent} Prozent`}
       >
-        <span className="hidden h-1.5 w-12 overflow-hidden rounded-full bg-papier-matt dark:bg-slate-800 sm:block">
+        <span className="hidden h-1.5 w-12 overflow-hidden rounded-full bg-papier-matt dark:bg-slate-800 md:block">
           <span
             className="block h-full rounded-full bg-brand"
             style={{ width: `${Math.min(100, prozent)}%` }}
@@ -151,6 +173,12 @@ function StudentCardRoh({
  */
 export const StudentCard = memo(StudentCardRoh);
 
+/**
+ * Kreislauf offen → bezahlt → erlassen (für Blätter mit Erklärung daneben).
+ * In der Kassenliste schaltet ein Tipp nur zwischen offen und bezahlt
+ * (App.tsx, schalteHalbjahr) – „erlassen“ per Doppeltipp war zu leicht
+ * versehentlich und ohne Hinweis.
+ */
 export function nextStatus(cur: string) {
   const i = STATI.indexOf(cur as any);
   return STATI[(i + 1) % STATI.length];

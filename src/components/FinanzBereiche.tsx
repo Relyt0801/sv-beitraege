@@ -1,19 +1,20 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { committeeLabel } from "../lib/committees";
 import {
   KASSEN_FARBEN, centAus, euro, euroKurz, farbHex, postenFarbe, schuljahrVon, useGeplant,
-  type FinanzPosten, type FinanzUebersicht, type FinanzenValue, type KassenGeplant, type PostenRef, type Quelle,
+  type Buchung, type FinanzPosten, type FinanzUebersicht, type FinanzenValue, type KassenGeplant, type PostenRef, type Quelle,
 } from "../lib/finanzen";
 import { useDunkel } from "../lib/dunkel";
-import { frage, meldeFehler } from "../lib/melder";
+import { frage, melde, meldeFehler } from "../lib/melder";
 import { Sheet, SheetKopf } from "./Sheet";
 import { Icon } from "./Icon";
+import { Gruppe, Zeile } from "./Liste";
 
 /**
  * Finanzen unter dem Kontostand:
  *  1. „Aktionen, Beiträge und Sonstiges“ – alles, was Geld bewegt: Elternbeiträge
  *     (blau), jede Aktion/Kategorie in ihrer Farbe mit ihren Ausgaben verrechnet,
- *     Komitees, Spenden, Sonstiges (grau). Jede Zeile antippbar (ⓘ).
+ *     Komitees, Spenden, Sonstiges (grau). Jede Zeile antippbar („›“, vorher ⓘ).
  *  2. „Geplante Aktionen“ – was noch ansteht, mit Tag, Infos und Erwartung.
  *
  * Mit `fin` (Kassenwart/Admin, „Kassenbuch führen“) wird gebucht, gelöscht,
@@ -44,7 +45,25 @@ export function mitVorzeichen(cent: number, kurz = false): string {
   return cent > 0 ? `+${f(cent)}` : cent < 0 ? `−${f(-cent)}` : f(0);
 }
 
-export function PostenBereiche({ d, fin }: { d: FinanzUebersicht; fin?: FinanzenValue | null }) {
+/**
+ * `listeKlasse` / `geplantKlasse` setzen die beiden Karten im Raster der
+ * Seite an ihren Platz (z. B. am Laptop links/rechts oder am Handy in eine
+ * andere Reihenfolge) – PostenBereiche liefert sie ohne eigene Hülle.
+ */
+export function PostenBereiche({
+  d, fin, listeKlasse = "", geplantKlasse = "", onBuchung,
+}: {
+  d: FinanzUebersicht;
+  fin?: FinanzenValue | null;
+  listeKlasse?: string;
+  geplantKlasse?: string;
+  /**
+   * Eine einzelne Buchung eines Postens öffnen – dieselbe Detailseite wie
+   * in der Buchungsliste (FinanzenTab). Sie geht als Unterseite über dem
+   * Posten auf („‹ Waffelverkauf“), weil dessen Blatt offen bleibt.
+   */
+  onBuchung?: (b: Buchung) => void;
+}) {
   const dunkel = useDunkel();
   const [auswahl, setAuswahl] = useState<Auswahl>(null);
   const [neu, setNeu] = useState(false);
@@ -55,12 +74,17 @@ export function PostenBereiche({ d, fin }: { d: FinanzUebersicht; fin?: Finanzen
     (a, b) => REIHENFOLGE[a.art] - REIHENFOLGE[b.art] || Math.abs(b.ein_cent - b.aus_cent) - Math.abs(a.ein_cent - a.aus_cent),
   );
   const gewaehlt = auswahl?.typ === "posten" ? d.posten.find((p) => postenKey(p) === auswahl.key) ?? null : null;
+  // Am Handy/iPad zuerst die Elternbeiträge und die KURZ_POSTEN größten Posten
+  // (dieselben Kategorien stehen schon in der Legende am Kreis darüber); der
+  // Rest hinter „Alle … anzeigen“. Am Laptop alles (nur CSS, wie die Buchungen).
+  const [alle, setAlle] = useState(false);
+  const kuerzen = !alle && liste.length > KURZ_POSTEN + 1;
 
   return (
     <>
-      <section className="card p-5">
+      <section className={`card min-w-0 p-5 ${listeKlasse}`}>
         <BereichKopf titel="Aktionen, Beiträge und Sonstiges" onNeu={fin ? () => setNeu(true) : undefined} neuText="Kategorie" />
-        <ul className="grid gap-1.5">
+        <ul className="divide-y divide-papier-linie dark:divide-slate-800">
           <PostenZeile
             hex={farbHex("blau", dunkel)}
             name="Elternbeiträge"
@@ -68,7 +92,7 @@ export function PostenBereiche({ d, fin }: { d: FinanzUebersicht; fin?: Finanzen
             betrag={beitraegeSumme}
             onClick={() => setAuswahl({ typ: "beitraege" })}
           />
-          {liste.map((p) => (
+          {liste.map((p, i) => (
             <PostenZeile
               key={postenKey(p)}
               hex={farbHex(postenFarbe(p), dunkel)}
@@ -76,12 +100,29 @@ export function PostenBereiche({ d, fin }: { d: FinanzUebersicht; fin?: Finanzen
               unter={unterzeile(p)}
               betrag={p.ein_cent - p.aus_cent}
               onClick={() => setAuswahl({ typ: "posten", key: postenKey(p) })}
+              klasse={kuerzen && i >= KURZ_POSTEN ? "max-lg:hidden" : undefined}
             />
           ))}
+          {kuerzen && (
+            <li className="lg:hidden">
+              <button
+                type="button"
+                onClick={(e) => {
+                  // Fokus auf den ersten neu sichtbaren Posten (Kind 0 = Elternbeiträge)
+                  const ul = e.currentTarget.closest("ul");
+                  setAlle(true);
+                  requestAnimationFrame(() => ul?.children[KURZ_POSTEN + 1]?.querySelector<HTMLElement>("button")?.focus());
+                }}
+                className="flex min-h-[48px] w-full items-center text-left text-[15px] font-medium text-brand-dark transition active:opacity-60 dark:text-brand"
+              >
+                Alle {liste.length + 1} anzeigen
+              </button>
+            </li>
+          )}
         </ul>
       </section>
 
-      <GeplantKarte darf={Boolean(fin)} fin={fin ?? null} />
+      <GeplantKarte darf={Boolean(fin)} fin={fin ?? null} className={geplantKlasse} />
 
       <BeitraegeDetail open={auswahl?.typ === "beitraege"} d={d} onClose={() => setAuswahl(null)} />
       <PostenDetail
@@ -89,10 +130,12 @@ export function PostenBereiche({ d, fin }: { d: FinanzUebersicht; fin?: Finanzen
         fin={fin ?? null}
         onClose={() => setAuswahl(null)}
         onUmgezogen={(key) => setAuswahl({ typ: "posten", key })}
-        onBuchen={(start) => {
-          setAuswahl(null);
-          setBuchung(start);
-        }}
+        // Buchen aus einer Kategorie: die Kategorie bleibt offen, das
+        // Buchungsblatt geht als Unterseite darüber auf („‹ Waffelverkauf“,
+        // gleiche Höhe) – vorher ging sie zu und ein neues Blatt fuhr von unten
+        // herein (Kopf sprang um 180 px)
+        onBuchen={(start) => setBuchung(start)}
+        onBuchung={onBuchung}
       />
       {fin && (
         <>
@@ -108,11 +151,7 @@ export function PostenBereiche({ d, fin }: { d: FinanzUebersicht; fin?: Finanzen
           <BuchungSheet
             start={buchung}
             fin={fin}
-            onClose={() => {
-              const zurueck = buchung?.zurueck;
-              setBuchung(null);
-              if (zurueck) setAuswahl({ typ: "posten", key: zurueck });
-            }}
+            onClose={() => setBuchung(null)}
           />
         </>
       )}
@@ -137,7 +176,7 @@ function BereichKopf({ titel, onNeu, neuText = "Neu" }: { titel: string; onNeu?:
           type="button"
           onClick={onNeu}
           aria-label={`${neuText} anlegen`}
-          className="flex shrink-0 items-center gap-1 rounded-full bg-brand/10 px-3 py-1.5 text-[13px] font-bold text-brand active:scale-95 dark:bg-brand/20 dark:text-blue-300"
+          className="btn-klein shrink-0 gap-1"
         >
           <Icon name="plus" size={14} strich={2.4} />
           {neuText}
@@ -156,30 +195,34 @@ function Betrag({ cent, className = "", warnen }: { cent: number; className?: st
   return <span className={`zahl ${warnen && cent < 0 ? "text-red-600 dark:text-red-400" : ""} ${className}`}>{mitVorzeichen(cent)}</span>;
 }
 
+const KURZ_POSTEN = 4;
+
 function PostenZeile({
-  hex, name, unter, betrag, onClick,
+  hex, name, unter, betrag, onClick, klasse,
 }: {
   hex: string;
   name: string;
   unter?: string;
   betrag: number;
   onClick: () => void;
+  klasse?: string;
 }) {
   return (
-    <li>
+    <li className={klasse}>
       <button
         type="button"
         onClick={onClick}
-        className="flex w-full items-center gap-3 rounded-xl bg-papier-matt px-3 py-2.5 text-left transition active:scale-[.98] dark:bg-slate-800"
+        className="flex min-h-[52px] w-full items-center gap-3 py-2 text-left transition active:opacity-60"
       >
         <Punkt hex={hex} />
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-[14px] font-semibold">{name}</span>
+          {/* Höchstens zwei Zeilen statt abgeschnitten („Waffelstand Elternspr…“ am schmalen Handy) */}
+          <span className="line-clamp-2 block text-[14px] font-semibold leading-snug [overflow-wrap:anywhere]">{name}</span>
           {unter && <span className="zahl block truncate text-[12px] text-tinte-leise">{unter}</span>}
         </span>
         <Betrag cent={betrag} className="shrink-0 text-[15px] font-bold" />
         <span className="shrink-0 text-tinte-leise" aria-hidden>
-          <Icon name="info" size={17} />
+          <Icon name="chevron" size={14} strich={2.4} />
         </span>
       </button>
     </li>
@@ -191,6 +234,9 @@ function PostenZeile({
 function Kopf({ hex, titel, onClose, rechts }: { hex: string; titel: string; onClose: () => void; rechts?: ReactNode }) {
   return (
     <SheetKopf
+      // Der Titel ist kein reiner Text (Punkt + „Ändern“) – Kurzname für
+      // „‹ Waffelverkauf“ auf der Unterseite (vorher „‹ Zurück“)
+      name={titel}
       titel={
         <span className="flex items-center gap-2.5">
           <Punkt hex={hex} gross />
@@ -209,7 +255,7 @@ function BeitraegeDetail({ open, d, onClose }: { open: boolean; d: FinanzUebersi
   return (
     <Sheet open={open} onClose={onClose}>
       <Kopf hex={farbHex("blau", dunkel)} titel="Elternbeiträge" onClose={onClose} />
-      <div className="rounded-2xl bg-papier-matt p-4 dark:bg-slate-800">
+      <div className="rounded-2xl border border-papier-linie p-4 dark:border-slate-700">
         <ul className="grid gap-2.5">
           {PHASEN.map((k) => {
             const c = d.beitraege.find((b) => b.phase === k)?.cent ?? 0;
@@ -247,13 +293,14 @@ const tagKurz = (d: string) =>
   new Date(d + "T12:00:00").toLocaleDateString("de-DE", { weekday: "short", day: "2-digit", month: "2-digit", year: "2-digit" });
 
 function PostenDetail({
-  p, fin, onClose, onUmgezogen, onBuchen,
+  p, fin, onClose, onUmgezogen, onBuchen, onBuchung,
 }: {
   p: FinanzPosten | null;
   fin: FinanzenValue | null;
   onClose: () => void;
   onUmgezogen: (key: string) => void;
   onBuchen: (start: BuchungStart) => void;
+  onBuchung?: (b: Buchung) => void;
 }) {
   const dunkel = useDunkel();
   const [bearbeiten, setBearbeiten] = useState(false);
@@ -273,14 +320,18 @@ function PostenDetail({
   const start = (typ: "ein" | "aus") => onBuchen({ typ, ref: x.ref, name: anzeigeName(x), zurueck: postenKey(x) });
 
   return (
-    <Sheet open={p !== null} onClose={onClose}>
+    // Mit einzelnen Buchungen (Kassenwart) hat das Blatt Unterseiten – am
+    // Handy dann gleich volle Höhe, damit der Kopf beim Umblättern stehen
+    // bleibt. Auch ein noch leerer Posten: „Ändern“ klappt darin auf, und
+    // der Kopf soll dabei nicht nach oben springen.
+    <Sheet open={p !== null} onClose={onClose} hoch={Boolean(darf && onBuchung)}>
       <Kopf
         hex={hex}
         titel={anzeigeName(x)}
         onClose={onClose}
         rechts={
           umbenennbar && !bearbeiten ? (
-            <button type="button" onClick={() => setBearbeiten(true)} className="ml-auto shrink-0 rounded-full px-2.5 py-1 text-[13px] font-bold text-brand">
+            <button type="button" onClick={() => setBearbeiten(true)} className="ml-auto min-h-[44px] shrink-0 rounded-full px-3 text-[14px] font-bold text-brand">
               Ändern
             </button>
           ) : null
@@ -290,7 +341,7 @@ function PostenDetail({
       {bearbeiten && fin && <Bearbeiten p={x} fin={fin} onFertig={() => setBearbeiten(false)} onUmgezogen={onUmgezogen} onGeloescht={onClose} />}
 
       {/* Die Rechnung: Einnahmen − Ausgaben = Gewinn */}
-      <div className="rounded-2xl bg-papier-matt p-4 dark:bg-slate-800">
+      <div className="rounded-2xl border border-papier-linie p-4 dark:border-slate-700">
         <Balken ein={x.ein_cent} aus={x.aus_cent} hex={hex} />
         <dl className="mt-3 grid gap-1.5 text-[15px]">
           <div className="flex items-baseline gap-3">
@@ -314,7 +365,7 @@ function PostenDetail({
             <button
               type="button"
               onClick={() => start("ein")}
-              className="flex min-h-[3rem] items-center justify-center gap-1.5 rounded-full bg-bezahlt/[0.12] text-[15px] font-semibold text-bezahlt active:scale-[.97]"
+              className="flex min-h-[3rem] items-center justify-center gap-1.5 rounded-full bg-[#1E7B34] text-[15px] font-semibold text-white active:scale-[.97]"
             >
               <Icon name="plus" size={16} strich={2.4} />
               Einnahme
@@ -324,7 +375,7 @@ function PostenDetail({
             <button
               type="button"
               onClick={() => start("aus")}
-              className="flex min-h-[3rem] items-center justify-center gap-1.5 rounded-full bg-red-500/[0.12] text-[15px] font-semibold text-red-600 active:scale-[.97] dark:text-red-400"
+              className="flex min-h-[3rem] items-center justify-center gap-1.5 rounded-full bg-red-600 text-[15px] font-semibold text-white active:scale-[.97]"
             >
               <span className="text-[18px] leading-none">−</span>
               Ausgabe
@@ -333,7 +384,7 @@ function PostenDetail({
         </div>
       )}
 
-      <Unterpunkte p={x} fin={darf ? fin : null} />
+      <Unterpunkte p={x} fin={darf ? fin : null} onBuchung={onBuchung} />
     </Sheet>
   );
 }
@@ -353,10 +404,13 @@ function Balken({ ein, aus, hex }: { ein: number; aus: number; hex: string }) {
 
 /**
  * Die Unterpunkte eines Postens (Bezeichnung, Tag, Betrag). Alle sehen die
- * Summen je Tag und Bezeichnung; der Kassenwart sieht jede Buchung einzeln und
- * kann sie löschen.
+ * Summen je Tag und Bezeichnung; der Kassenwart sieht jede Buchung einzeln.
+ * Jede Buchung ist antippbar („›“) und öffnet DIESELBE Detailseite wie in
+ * der Buchungsliste (Status, Art, Erfasst von/am, Buchungs-Nr., Kategorie,
+ * Löschen ganz unten) – vorher ein abgespecktes Extra-Blatt nur mit Betrag
+ * und „Buchung löschen“.
  */
-function Unterpunkte({ p, fin }: { p: FinanzPosten; fin: FinanzenValue | null }) {
+function Unterpunkte({ p, fin, onBuchung }: { p: FinanzPosten; fin: FinanzenValue | null; onBuchung?: (b: Buchung) => void }) {
   const dunkel = useDunkel();
   const einzeln = fin && p.buchungen
     ? [...p.buchungen]
@@ -370,30 +424,37 @@ function Unterpunkte({ p, fin }: { p: FinanzPosten; fin: FinanzenValue | null })
         {einzeln.length === 1 ? "Eintrag" : `${einzeln.length} Einträge`}
       </h3>
       <ul className="divide-y divide-papier-linie dark:divide-slate-800">
-        {einzeln.map((e) => (
-          <li key={e.key} className="flex items-center gap-2.5 py-2">
-            {e.farbe && <Punkt hex={farbHex(e.farbe, dunkel)} />}
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-[14px] font-semibold">{e.titel}</span>
-              <span className="block text-[12px] text-tinte-leise">{tagKurz(e.datum)}</span>
-            </span>
-            <Betrag cent={e.cent} className="shrink-0 text-[14px] font-bold" />
-            {fin && e.buchung && !e.buchung.automatisch && e.buchung.quelle !== "abgleich" && (
-              <button
-                type="button"
-                aria-label="Eintrag löschen"
-                onClick={async () => {
-                  if (!(await frage(`„${e.titel}“ (${mitVorzeichen(e.cent)}) löschen?`, "Löschen", true))) return;
-                  const f = await fin.loeschen(e.buchung!.id);
-                  if (f) meldeFehler("Löschen hat nicht geklappt: " + f);
-                }}
-                className="-mr-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-tinte-leise active:bg-papier-matt dark:active:bg-slate-800"
-              >
-                <Icon name="muell" size={16} />
-              </button>
-            )}
-          </li>
-        ))}
+        {einzeln.map((e) => {
+          const b = e.buchung;
+          const inhalt = (
+            <>
+              {e.farbe && <Punkt hex={farbHex(e.farbe, dunkel)} />}
+              <span className="min-w-0 flex-1">
+                <span className="line-clamp-2 block text-[14px] font-semibold leading-snug [overflow-wrap:anywhere]">{e.titel}</span>
+                <span className="block text-[12px] text-tinte-leise">{tagKurz(e.datum)}</span>
+              </span>
+              <Betrag cent={e.cent} className="shrink-0 text-[14px] font-bold" />
+            </>
+          );
+          return (
+            <li key={e.key}>
+              {b && onBuchung ? (
+                <button
+                  type="button"
+                  onClick={() => onBuchung(b)}
+                  className="flex min-h-[44px] w-full items-center gap-2.5 py-2 text-left transition active:opacity-60"
+                >
+                  {inhalt}
+                  <span aria-hidden className="shrink-0 text-tinte-leise">
+                    <Icon name="chevron" size={14} strich={2.4} />
+                  </span>
+                </button>
+              ) : (
+                <div className="flex items-center gap-2.5 py-2">{inhalt}</div>
+              )}
+            </li>
+          );
+        })}
       </ul>
     </>
   );
@@ -442,28 +503,28 @@ function Bearbeiten({
       <input className="field" aria-label="Name" maxLength={40} value={name} onChange={(e) => setName(e.target.value)} />
       <FarbWahl wert={farbe} setzen={setFarbe} />
       <div className="mt-3 flex items-center gap-2">
-        <button type="button" disabled={busy} onClick={() => void speichern()} className="flex-1 rounded-xl bg-brand py-2.5 text-[14px] font-bold text-white disabled:opacity-50">
+        <button type="button" disabled={busy} onClick={() => void speichern()} className="btn-primary flex-1 disabled:opacity-50">
           {busy ? "…" : "Speichern"}
         </button>
-        <button type="button" onClick={onFertig} className="rounded-xl px-3 py-2.5 text-[14px] font-semibold text-tinte-leise">
+        <button type="button" onClick={onFertig} className="btn-grau flex-1">
           Abbrechen
         </button>
-        {r.typ === "kategorie" && (
-          <button
-            type="button"
-            aria-label="Kategorie löschen"
-            onClick={async () => {
-              if (!(await frage(`„${p.titel}“ löschen? Die Einträge bleiben im Kassenbuch, nur ohne Kategorie.`, "Löschen", true))) return;
-              const f = await fin.kategorieLoeschen(r.id);
-              if (f) return meldeFehler("Löschen hat nicht geklappt: " + f);
-              onGeloescht();
-            }}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-red-500"
-          >
-            <Icon name="muell" size={18} />
-          </button>
-        )}
       </div>
+      {/* Löschen als eigene rote Zeile mit Rückfrage statt Mülleimer neben den Knöpfen */}
+      {r.typ === "kategorie" && (
+        <button
+          type="button"
+          onClick={async () => {
+            if (!(await frage(`„${p.titel}“ löschen? Die Einträge bleiben im Kassenbuch, nur ohne Kategorie.`, "Löschen", true))) return;
+            const f = await fin.kategorieLoeschen(r.id);
+            if (f) return meldeFehler("Löschen hat nicht geklappt: " + f);
+            onGeloescht();
+          }}
+          className="mt-2 flex min-h-[44px] w-full items-center justify-center rounded-full text-[15px] font-semibold text-red-600 transition active:opacity-60 dark:text-red-400"
+        >
+          Kategorie löschen
+        </button>
+      )}
     </div>
   );
 }
@@ -536,8 +597,16 @@ export function BuchungSheet({ start, fin, onClose }: { start: BuchungStart | nu
   const [busy, setBusy] = useState(false);
   const [fehler, setFehler] = useState("");
 
-  useEffect(() => {
-    if (!start) return;
+  // Nur beim ÖFFNEN leeren – nicht bei jedem neuen Start-Objekt. Vorher
+  // leerte jedes Neuzeichnen der Seite (App-Timer, Realtime, Drehen über die
+  // lg-Grenze) Betrag und Bezeichnung, während man tippte. Layout-Effekt:
+  // das Blatt zeigt nie kurz die Eingaben vom letzten Mal.
+  const warOffen = useRef(false);
+  useLayoutEffect(() => {
+    const offen = start !== null;
+    const neu = offen && !warOffen.current;
+    warOffen.current = offen;
+    if (!neu || !start) return;
     setTyp(start.typ);
     setBetrag("");
     setTitel("");
@@ -589,11 +658,13 @@ export function BuchungSheet({ start, fin, onClose }: { start: BuchungStart | nu
     const f = await fin.buchen(b);
     setBusy(false);
     if (f) return setFehler("Hat nicht geklappt: " + f);
+    // Rückmeldung: die neue Buchung steht oft außer Sicht
+    melde(`${typ === "aus" ? "Ausgabe" : "Einnahme"} gebucht`, "erfolg");
     onClose();
   }
 
   const chip = (aktiv: boolean) =>
-    `flex items-center gap-1.5 rounded-full border px-3 py-2 text-[14px] font-semibold transition active:scale-95 ${
+    `flex min-h-[44px] items-center gap-1.5 rounded-full border px-3 py-2 text-[14px] font-semibold transition active:scale-95 ${
       aktiv ? "border-brand bg-brand/10 text-tinte dark:text-white" : "border-papier-linie dark:border-slate-700"
     }`;
 
@@ -645,7 +716,7 @@ export function BuchungSheet({ start, fin, onClose }: { start: BuchungStart | nu
           <button
             type="button"
             onClick={() => { setNeuOffen(true); setNeuFarbe(freieFarbe(fin)); }}
-            className="flex items-center gap-1 rounded-full px-3 py-2 text-[14px] font-bold text-brand"
+            className="flex min-h-[44px] items-center gap-1 rounded-full px-3 py-2 text-[14px] font-bold text-brand"
           >
             <Icon name="plus" size={14} strich={2.4} />
             Neue Kategorie
@@ -657,10 +728,10 @@ export function BuchungSheet({ start, fin, onClose }: { start: BuchungStart | nu
           <input className="field" placeholder="z. B. Lehrerkarten" maxLength={40} value={neuName} autoFocus onChange={(e) => setNeuName(e.target.value)} />
           <FarbWahl wert={neuFarbe} setzen={setNeuFarbe} />
           <div className="mt-2 flex gap-2">
-            <button type="button" disabled={!neuName.trim()} onClick={() => void neueKategorie()} className="flex-1 rounded-xl bg-brand py-2 text-[14px] font-bold text-white disabled:opacity-40">
+            <button type="button" disabled={!neuName.trim()} onClick={() => void neueKategorie()} className="btn-primary flex-1 disabled:opacity-40">
               Anlegen
             </button>
-            <button type="button" onClick={() => setNeuOffen(false)} className="rounded-xl px-3 text-[14px] font-semibold text-tinte-leise">
+            <button type="button" onClick={() => setNeuOffen(false)} className="btn-grau flex-1">
               Abbrechen
             </button>
           </div>
@@ -715,7 +786,7 @@ export function FarbWahl({ wert, setzen }: { wert: string; setzen: (f: string) =
           aria-label={f.name}
           title={f.name}
           onClick={() => setzen(f.key)}
-          className={`flex h-8 w-8 items-center justify-center rounded-full text-white transition ${wert === f.key ? "ring-2 ring-tinte/70 ring-offset-2 ring-offset-white dark:ring-white/80 dark:ring-offset-slate-900" : ""}`}
+          className={`flex h-11 w-11 items-center justify-center rounded-full text-white transition ${wert === f.key ? "ring-2 ring-tinte/70 ring-offset-2 ring-offset-white dark:ring-white/80 dark:ring-offset-slate-900" : ""}`}
           style={{ background: dunkel ? f.dunkel : f.hell }}
         >
           {wert === f.key && <Icon name="haken" size={15} strich={3} />}
@@ -729,7 +800,7 @@ export function FarbWahl({ wert, setzen }: { wert: string; setzen: (f: string) =
 
 const heuteKey = () => new Date().toISOString().slice(0, 10);
 
-function GeplantKarte({ darf, fin }: { darf: boolean; fin: FinanzenValue | null }) {
+function GeplantKarte({ darf, fin, className = "" }: { darf: boolean; fin: FinanzenValue | null; className?: string }) {
   const dunkel = useDunkel();
   const { liste, speichern, loeschen } = useGeplant(true);
   const [offen, setOffen] = useState<KassenGeplant | "neu" | null>(null);
@@ -739,12 +810,12 @@ function GeplantKarte({ darf, fin }: { darf: boolean; fin: FinanzenValue | null 
   const katFarbe = (id: string | null) => fin?.kategorien.find((k) => k.id === id)?.farbe ?? null;
 
   return (
-    <section className="card p-5">
+    <section className={`card min-w-0 p-5 ${className}`}>
       <BereichKopf titel="Geplante Aktionen" onNeu={darf ? () => setOffen("neu") : undefined} />
       {sichtbar.length === 0 ? (
         <p className="text-[13px] text-tinte-leise">Gerade ist nichts geplant.</p>
       ) : (
-        <ul className="grid gap-1.5">
+        <ul className="divide-y divide-papier-linie dark:divide-slate-800">
           {sichtbar.map((g) => {
             const vorbei = Boolean(g.datum && g.datum < h);
             const d = g.datum ? new Date(g.datum + "T12:00:00") : null;
@@ -754,18 +825,18 @@ function GeplantKarte({ darf, fin }: { darf: boolean; fin: FinanzenValue | null 
                 <button
                   type="button"
                   onClick={() => setOffen(g)}
-                  className={`flex w-full items-center gap-3 rounded-xl bg-papier-matt px-3 py-2.5 text-left transition active:scale-[.98] dark:bg-slate-800 ${vorbei ? "opacity-60" : ""}`}
+                  className={`flex min-h-[52px] w-full items-center gap-3 py-2 text-left transition active:opacity-60 ${vorbei ? "opacity-60" : ""}`}
                 >
-                  <span className="flex w-11 shrink-0 flex-col items-center rounded-lg bg-white py-1 leading-none dark:bg-slate-900">
-                    <span className="text-[10px] font-bold uppercase text-red-600 dark:text-red-400">
+                  <span className="flex w-11 shrink-0 flex-col items-center rounded-lg border border-papier-linie py-1 leading-none dark:border-slate-700">
+                    <span className="text-[12px] font-bold uppercase text-red-600 dark:text-red-400">
                       {d ? d.toLocaleDateString("de-DE", { month: "short" }).replace(".", "") : "–"}
                     </span>
                     <span className="zahl mt-0.5 text-[17px] font-bold">{d ? d.getDate() : "?"}</span>
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="flex items-center gap-1.5">
+                    <span className="flex items-baseline gap-1.5">
                       {f && <Punkt hex={farbHex(f, dunkel)} />}
-                      <span className="truncate text-[14px] font-semibold">{g.titel}</span>
+                      <span className="line-clamp-2 min-w-0 text-[14px] font-semibold leading-snug [overflow-wrap:anywhere]">{g.titel}</span>
                     </span>
                     <span className="block truncate text-[12px] text-tinte-leise">
                       {[
@@ -776,7 +847,7 @@ function GeplantKarte({ darf, fin }: { darf: boolean; fin: FinanzenValue | null 
                     </span>
                   </span>
                   <span className="shrink-0 text-tinte-leise" aria-hidden>
-                    <Icon name="info" size={17} />
+                    <Icon name="chevron" size={14} strich={2.4} />
                   </span>
                 </button>
               </li>
@@ -843,7 +914,7 @@ function GeplantSheet({
           onClose={onClose}
         />
         {bestehend.erwartet_cent != null && bestehend.erwartet_cent !== 0 && (
-          <div className="mb-3 flex items-baseline gap-3 rounded-2xl bg-papier-matt p-4 dark:bg-slate-800">
+          <div className="mb-3 flex items-baseline gap-3 rounded-2xl border border-papier-linie p-4 dark:border-slate-700">
             <span className="min-w-0 flex-1 text-[15px] font-semibold">Erwartet</span>
             <span className="zahl shrink-0 text-[1.4rem] font-bold">ca. {mitVorzeichen(bestehend.erwartet_cent)}</span>
           </div>
@@ -909,7 +980,7 @@ function GeplantSheet({
                 key={k.id}
                 aria-pressed={kategorie === k.id}
                 onClick={() => setKategorie(kategorie === k.id ? null : k.id)}
-                className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[13px] font-semibold ${
+                className={`flex min-h-[44px] items-center gap-1.5 rounded-full border px-3 py-1.5 text-[14px] font-semibold ${
                   kategorie === k.id ? "border-brand bg-brand/10" : "border-papier-linie dark:border-slate-700"
                 }`}
               >
@@ -920,26 +991,24 @@ function GeplantSheet({
           </div>
         </>
       )}
-      <div className="mt-4 flex items-center gap-2">
-        <button disabled={busy || !titel.trim()} onClick={() => void speichern()} className="btn-primary disabled:opacity-40">
-          {busy ? "…" : "Speichern"}
-        </button>
-        {bestehend && (
-          <button
-            type="button"
-            aria-label="Geplante Aktion löschen"
+      <button disabled={busy || !titel.trim()} onClick={() => void speichern()} className="btn-primary mt-4 disabled:opacity-40">
+        {busy ? "…" : "Speichern"}
+      </button>
+      {/* Löschen ganz unten als eigene Gruppe mit Rückfrage (Design-Regeln §2) */}
+      {bestehend && (
+        <Gruppe className="mt-6">
+          <Zeile
+            label="Aus der Planung löschen"
+            rot
             onClick={async () => {
               if (!(await frage(`„${bestehend.titel}“ aus der Planung löschen?`, "Löschen", true))) return;
               const f = await onLoeschen(bestehend.id);
               if (f) return meldeFehler("Löschen hat nicht geklappt: " + f);
               onClose();
             }}
-            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-red-500"
-          >
-            <Icon name="muell" size={19} />
-          </button>
-        )}
-      </div>
+          />
+        </Gruppe>
+      )}
     </Sheet>
   );
 }
@@ -951,11 +1020,13 @@ function GeplantSheet({
  * Zeile für die offenen Elternbeiträge.
  */
 export function Kennzahlen({
-  ein, aus, offen,
+  ein, aus, offen, offenTitel,
 }: {
   ein: number;
   aus: number;
   offen?: { cent: number; personen?: number; halbjahr: string } | null;
+  /** Bezeichnung der Offen-Zeile – Eltern lesen „Offene Elternbeiträge“ sonst als eigene Schuld */
+  offenTitel?: string;
 }) {
   return (
     <div className="mt-4 grid gap-2">
@@ -964,12 +1035,15 @@ export function Kennzahlen({
         <Kachel icon="pfeil-raus" titel="Ausgaben" wert={mitVorzeichen(-aus, true)} />
       </dl>
       {offen && (
-        <div className="flex items-center gap-3 rounded-xl bg-papier-matt px-3 py-2.5 dark:bg-slate-800">
+        <div className="flex items-center gap-3 rounded-xl border border-papier-linie px-3 py-2.5 dark:border-slate-700">
           <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[rgb(118_118_128/0.14)] text-tinte-matt dark:text-slate-300">
             <Icon name="kalender" size={16} />
           </span>
           <span className="min-w-0 flex-1">
-            <span className="block truncate text-[14px] font-semibold">Offene Elternbeiträge</span>
+            {/* Darf umbrechen: „Noch offen in der ganzen Stufe“ (Eltern) wurde am
+                iPhone SE sonst zu „Noch offen in der ganze…“ – ausgerechnet
+                „Stufe“ fiel weg, das die Zahl von der eigenen Schuld trennt. */}
+            <span className="block text-[14px] font-semibold leading-snug">{offenTitel ?? "Offene Elternbeiträge"}</span>
             <span className="block truncate text-[12px] text-tinte-leise">
               fällig bis {offen.halbjahr} · {schuljahrVon(offen.halbjahr)}
               {offen.personen != null ? ` · ${offen.personen} Pers.` : ""}
@@ -984,7 +1058,7 @@ export function Kennzahlen({
 
 function Kachel({ icon, titel, wert }: { icon: "pfeil-rein" | "pfeil-raus"; titel: string; wert: string }) {
   return (
-    <div className="min-w-0 rounded-xl bg-papier-matt px-3 py-2.5 dark:bg-slate-800">
+    <div className="min-w-0 rounded-xl border border-papier-linie px-3 py-2.5 dark:border-slate-700">
       <dt className="flex items-center gap-1 text-[12px] font-medium text-tinte-leise">
         <Icon name={icon} size={13} strich={2.2} />
         {titel}

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { hasSupabase, supabase } from "./supabase";
+import { fehlerText } from "./netz";
 
 /**
  * Eigenes Hintergrundbild (nur fürs eigene Konto).
@@ -15,9 +16,57 @@ import { hasSupabase, supabase } from "./supabase";
  * ein anderes Gerät das Bild nur neu, wenn es sich geändert hat; dazwischen
  * liegt es im Cache-Speicher des Browsers (Cache API – anders als localStorage
  * ohne 5-MB-Grenze und ohne Umweg über Text).
+ *
+ * ----------------------------------------------------------------------------
+ * Fehler bis 1.3: verschiedene Bilder auf verschiedenen Geräten (Update 1.4)
+ * ----------------------------------------------------------------------------
+ * Ursache 1 (die Hauptursache): Das Bild liegt IMMER unter demselben Namen
+ * (<uid>/bild.jpg) und wurde mit „cache-control: max-age=31536000“ (1 Jahr)
+ * hochgeladen. Hatte Gerät B das alte Bild schon einmal geladen, lieferte der
+ * HTTP-Cache des Browsers (bzw. das CDN vor dem Speicher) beim nächsten
+ * Herunterladen wieder das ALTE Bild – obwohl hintergrund_at sich geändert
+ * hatte. Gerät B legte dieses alte Bild dann mit dem NEUEN Zeitstempel in
+ * seinen Cache und hielt es damit für aktuell – dauerhaft.
+ *   → Jetzt: Herunterladen mit `cacheNonce = hintergrund_at` (andere Adresse
+ *     je Version, am CDN vorbei) und `cache: "no-store"` (am HTTP-Cache des
+ *     Browsers vorbei). Neue Uploads bekommen max-age=0.
+ *
+ * Ursache 2: Scheiterte die Abfrage von hintergrund_at (kein Netz, Schul-WLAN),
+ * galt das als „kein Bild“ – der Cache wurde geleert und das Bild verschwand
+ * auf diesem Gerät, auf den anderen nicht.
+ *   → Jetzt: Bei einem Fehler bleibt alles, wie es ist.
+ *
+ * Ursache 3: Geprüft wurde nur beim Start. Eine App, die tagelang im
+ * Hintergrund offen bleibt (iPhone), bekam eine Änderung nie mit.
+ *   → Jetzt: Prüfen beim Start, beim Wieder-Sichtbarwerden (visibilitychange)
+ *     und live über Realtime auf die eigene profiles-Zeile
+ *     (components/HintergrundEbene.tsx).
+ *
+ * Ursache 4: Beim Ändern/Entfernen wurde erst die Datei angefasst und dann
+ * hintergrund_at – ging der zweite Schritt schief, zeigte dieses Gerät das
+ * neue Bild, alle anderen das alte. Und wer zweimal kurz hintereinander lud,
+ * konnte die Antworten in falscher Reihenfolge bekommen.
+ *   → Jetzt: Die Datenbank ist die Wahrheit. Gezeigt wird nur, was dort
+ *     gespeichert ist; Ladevorgänge sind nummeriert, nur der letzte zählt.
  */
 const PFAD = (uid: string) => `${uid}/bild.jpg`; // Name bleibt, Typ steht im Content-Type
-const CACHE_NAME = "sv-hintergrund";
+/*
+ * Neuer Name ab 1.4: Im alten Cache („sv-hintergrund“) kann wegen Ursache 1
+ * ein ALTES Bild mit NEUEM Zeitstempel liegen – das würde der Abgleich für
+ * aktuell halten. Darum wird er einmal verworfen und neu geladen.
+ */
+const CACHE_NAME = "sv-hintergrund-2";
+const ALTER_CACHE_NAME = "sv-hintergrund";
+let alterCacheWeg = false;
+function alterCacheWegraeumen() {
+  if (alterCacheWeg) return;
+  alterCacheWeg = true;
+  try {
+    if ("caches" in window) void caches.delete(ALTER_CACHE_NAME).catch(() => undefined);
+  } catch {
+    /* privater Modus */
+  }
+}
 const CACHE_URL = (uid: string) => `/__hintergrund/${uid}`;
 const ALT_CACHE = (uid: string) => `sv:hintergrund:${uid}`; // bis 1.3: data:-URL in localStorage
 const EREIGNIS = "sv:hintergrund";
@@ -56,11 +105,17 @@ async function cacheSchreiben(uid: string, eintrag: { at: string; blob: Blob } |
 }
 
 let aktuell: string | null = null;
-function setzeAktuell(blob: Blob | null) {
+/** Welche Version (hintergrund_at) gerade angezeigt wird – "" = unbekannt. */
+let aktuellAt: string | null = null;
+function setzeAktuell(blob: Blob | null, at: string | null = null) {
   if (aktuell) URL.revokeObjectURL(aktuell);
   aktuell = blob ? URL.createObjectURL(blob) : null;
+  aktuellAt = blob ? at : null;
   window.dispatchEvent(new CustomEvent(EREIGNIS, { detail: aktuell }));
 }
+
+/** Welche Version gerade angezeigt wird (für den Realtime-Abgleich). */
+export const hintergrundVersion = (): string | null => aktuellAt;
 
 function bildOeffnen(datei: Blob): Promise<HTMLImageElement> {
   const url = URL.createObjectURL(datei);
@@ -124,23 +179,68 @@ async function aufbereiten(datei: File): Promise<Blob> {
   throw new Error("Das Bild ist zu groß.");
 }
 
-/** Beim Start: eigenes Bild laden (aus dem Cache oder neu vom Server) */
+/**
+ * Mit dem Server abgleichen: beim Start, beim Zurückkommen in die App und
+ * wenn Realtime eine Änderung an der eigenen profiles-Zeile meldet.
+ *
+ * Ablauf:
+ *  1. Sofort das Bild aus dem Cache zeigen (schneller Start, auch offline).
+ *  2. hintergrund_at vom Server holen – das ist die Wahrheit.
+ *     - Fehler (kein Netz …)  → nichts ändern, Cache bleibt.
+ *     - null                  → Bild wurde (auf irgendeinem Gerät) entfernt:
+ *                               Cache leeren, nichts zeigen.
+ *     - gleich wie im Cache   → fertig.
+ *     - anders                → neu herunterladen, an allen Caches vorbei.
+ */
+let ladeNr = 0;
 export async function hintergrundLaden(uid: string | null): Promise<void> {
+  const nr = ++ladeNr;
+  const nochAktuell = () => nr === ladeNr;
   if (!uid) return setzeAktuell(null);
   const c = await cacheLesen(uid);
-  if (!hasSupabase) return setzeAktuell(c?.blob ?? null);
-  if (c) setzeAktuell(c.blob);
-  const { data } = await supabase!.from("profiles").select("hintergrund_at").eq("user_id", uid).maybeSingle();
-  const at = (data as { hintergrund_at?: string | null } | null)?.hintergrund_at ?? null;
-  if (!at) {
-    await cacheSchreiben(uid, null);
-    return setzeAktuell(null);
+  if (!nochAktuell()) return;
+  if (!hasSupabase) {
+    if (!aktuell || aktuellAt !== (c?.at ?? null)) setzeAktuell(c?.blob ?? null, c?.at ?? null);
+    return;
   }
-  if (c && c.at === at) return;
-  const { data: blob, error } = await supabase!.storage.from("hintergruende").download(PFAD(uid));
-  if (error || !blob) return;
-  await cacheSchreiben(uid, { at, blob });
-  setzeAktuell(blob);
+  // 1. Aus dem Cache zeigen – aber nicht dasselbe Bild neu setzen (kein Flackern)
+  if (c && aktuellAt !== c.at) setzeAktuell(c.blob, c.at);
+
+  // 2. Wahrheit vom Server
+  let at: string | null;
+  try {
+    const { data, error } = await supabase!.from("profiles").select("hintergrund_at").eq("user_id", uid).maybeSingle();
+    if (error) return; // kein Netz o. Ä.: so lassen, wie es ist
+    at = (data as { hintergrund_at?: string | null } | null)?.hintergrund_at ?? null;
+  } catch {
+    return;
+  }
+  if (!nochAktuell()) return;
+
+  if (!at) {
+    // Entfernt (auch auf einem anderen Gerät) → hier ebenfalls weg
+    if (c) await cacheSchreiben(uid, null);
+    if (nochAktuell() && aktuell) setzeAktuell(null);
+    return;
+  }
+  if (c && c.at === at) {
+    if (aktuellAt !== at) setzeAktuell(c.blob, at);
+    return;
+  }
+  if (aktuellAt === at) return; // zeigt schon genau diese Version
+
+  // Neue Version: an CDN (cacheNonce = neue Adresse je Version) und
+  // HTTP-Cache des Browsers (no-store) vorbei herunterladen.
+  try {
+    const { data: blob, error } = await supabase!.storage
+      .from("hintergruende")
+      .download(PFAD(uid), { cacheNonce: at }, { cache: "no-store" });
+    if (error || !blob || !nochAktuell()) return;
+    await cacheSchreiben(uid, { at, blob });
+    if (nochAktuell()) setzeAktuell(blob, at);
+  } catch {
+    /* kein Netz: beim nächsten Abgleich wieder */
+  }
 }
 
 export async function hintergrundSetzen(uid: string | null, datei: File): Promise<string | null> {
@@ -153,25 +253,45 @@ export async function hintergrundSetzen(uid: string | null, datei: File): Promis
     return (e as Error).message;
   }
   const at = new Date().toISOString();
+  ladeNr++; // laufende Abgleiche dürfen das neue Bild nicht mehr überschreiben
   if (hasSupabase) {
-    const { error } = await supabase!.storage
-      .from("hintergruende")
-      .upload(PFAD(uid), blob, { upsert: true, contentType: blob.type || "image/jpeg", cacheControl: "31536000" });
-    if (error) return error.message;
-    const { error: e2 } = await supabase!.from("profiles").update({ hintergrund_at: at }).eq("user_id", uid);
-    if (e2) return e2.message;
+    try {
+      // Erst die Datei, dann der Zeitstempel. Der Zeitstempel ist das Signal
+      // für alle anderen Geräte – er darf erst stehen, wenn die Datei da ist.
+      // max-age=0: Browser und CDN sollen sich das Bild nicht merken (die App
+      // hat ihren eigenen Cache mit Versionsabgleich).
+      const { error } = await supabase!.storage
+        .from("hintergruende")
+        .upload(PFAD(uid), blob, { upsert: true, contentType: blob.type || "image/jpeg", cacheControl: "0" });
+      if (error) return fehlerText(error);
+      const { error: e2 } = await supabase!.from("profiles").update({ hintergrund_at: at }).eq("user_id", uid);
+      // Ohne Zeitstempel sehen die anderen Geräte das neue Bild nicht – dann
+      // lieber auch hier beim alten bleiben, damit alle dasselbe zeigen.
+      if (e2) return fehlerText(e2);
+    } catch (e) {
+      return fehlerText(e);
+    }
   }
   await cacheSchreiben(uid, { at, blob });
-  setzeAktuell(blob);
+  setzeAktuell(blob, at);
   return null;
 }
 
 export async function hintergrundEntfernen(uid: string | null): Promise<string | null> {
   if (!uid) return null;
+  ladeNr++;
   if (hasSupabase) {
-    const { error } = await supabase!.storage.from("hintergruende").remove([PFAD(uid)]);
-    if (error) return error.message;
-    await supabase!.from("profiles").update({ hintergrund_at: null }).eq("user_id", uid);
+    try {
+      // Zuerst die Wahrheit setzen (hintergrund_at = null): Damit entfernen
+      // alle anderen Geräte das Bild beim nächsten Abgleich bzw. sofort über
+      // Realtime. Danach erst die Datei – bleibt die liegen, stört sie nicht.
+      const { error } = await supabase!.from("profiles").update({ hintergrund_at: null }).eq("user_id", uid);
+      if (error) return fehlerText(error);
+      const { error: e2 } = await supabase!.storage.from("hintergruende").remove([PFAD(uid)]);
+      if (e2) console.warn("[hintergrund] Datei blieb liegen:", e2.message);
+    } catch (e) {
+      return fehlerText(e);
+    }
   }
   await cacheSchreiben(uid, null);
   setzeAktuell(null);

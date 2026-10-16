@@ -2,11 +2,17 @@ import { useEffect, useMemo, useState } from "react";
 import { COMMITTEES, committeeIcon } from "../lib/committees";
 import { normalize, sortStudents } from "../lib/logic";
 import { useStore } from "../store";
-import { useTermine } from "../termine-store";
+import { useSchichtStatus, useTermine } from "../termine-store";
 import { useRole } from "../auth/RoleProvider";
 import { Sheet, SheetKopf } from "./Sheet";
+import { Gruppe, Zeile, ZeileHaken, ZeileMitSchalter } from "./Liste";
+import { Schalter } from "./Schalter";
+import { Icon } from "./Icon";
+import { FussLeiste } from "./FussLeiste";
+import { ZeitFeld } from "./ZeitFeld";
+import { SchichtSheet } from "./AktionenListe";
 import {
-  FARBEN, STUNDEN, SYMBOLE, WOCHENTAG_WAHL, heuteKey, istKuerzel, plusTage, tagLang, uhr, wiederholungsTage, zeitText,
+  FARBEN, STUNDEN, SYMBOLE, WOCHENTAG_WAHL, heuteKey, istKuerzel, plusTage, schichtEnde, tagLang, uhr, wiederholungsTage, zeitText,
   type NeuerTermin, type Sichtbarkeit, type Termin,
 } from "../lib/termine";
 import { committeeLabel } from "../lib/committees";
@@ -14,7 +20,27 @@ import { umfangText } from "../lib/termine";
 
 import { frage } from "../lib/melder";
 import { terminAlsDatei, useKalenderDemo } from "../lib/kalender-sync";
-const seg = "flex-1 rounded-lg py-2 text-[13px] font-bold transition";
+
+/**
+ * „Neu“ → „Termin“ (EventComposer): Termin-Formular im Reiter Events öffnen.
+ * Ist der Reiter schon da, fängt EventsTab das Ereignis ab und meldet
+ * `erledigt`. Sonst bleibt ein Merker in sessionStorage, den EventsTab beim
+ * ersten Zeichnen abholt, und die Adresse #events öffnet den Reiter.
+ */
+export const TERMIN_NEU_EREIGNIS = "sv:termin-neu";
+export const TERMIN_NEU_MERKER = "sv:termin-neu";
+export type TerminNeuDetail = { erledigt: boolean };
+export function terminNeuAnfordern() {
+  const detail: TerminNeuDetail = { erledigt: false };
+  window.dispatchEvent(new CustomEvent<TerminNeuDetail>(TERMIN_NEU_EREIGNIS, { detail }));
+  if (detail.erledigt) return;
+  try {
+    sessionStorage.setItem(TERMIN_NEU_MERKER, "1");
+  } catch {
+    /* privates Fenster – dann öffnet sich nur der Reiter */
+  }
+  window.location.hash = "events";
+}
 
 /**
  * Termin anlegen oder ändern.
@@ -203,148 +229,132 @@ export function TerminSheet({
     }
   }
 
+
+  /** Eine Auswahl ein-/ausschalten (Komitees, Personen, Wochentage) */
+  function umschalten<T>(setter: (f: (prev: Set<T>) => Set<T>) => void, id: T) {
+    setter((prev) => {
+      const n = new Set(prev);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      return n;
+    });
+  }
+
+  /** Datumsfeld rechts in einer Zeile – 16 px, damit iOS beim Antippen nicht zoomt */
+  const datumFeld = "min-w-0 bg-transparent text-right text-[16px] outline-none";
+  /** Textfeld rechts in einer Zeile */
+  const textFeld = "min-w-0 flex-1 bg-transparent text-right text-[16px] outline-none placeholder:text-tinte-leise";
+  /** runder Wahlknopf (Farbe, Zeichen, Wochentag) */
+  const chip = (an: boolean) =>
+    `rounded-xl text-[14px] font-semibold transition active:scale-95 ${
+      an ? "bg-brand text-white" : "bg-[rgb(118_118_128/0.12)] text-tinte-matt dark:bg-[rgb(118_118_128/0.24)] dark:text-slate-300"
+    }`;
+
   return (
     <Sheet open={offen} onClose={onSchliessen}>
       <SheetKopf titel={termin ? "Termin ändern" : "Neuer Termin"} onClose={onSchliessen} />
 
       {/* ------------------------------------------------ Was */}
-      <label className="mb-2 block">
-        <span className="mb-1 block text-[12px] font-semibold text-tinte-leise">Bezeichnung</span>
-        <input
-          className="field"
-          placeholder="z. B. Komiteesitzung Abiball"
-          value={titel}
-          onChange={(e) => setTitel(e.target.value)}
-          autoFocus
-        />
-      </label>
-
-      <label className="mb-3 block">
-        <span className="mb-1 block text-[12px] font-semibold text-tinte-leise">Ort (optional)</span>
-        <input
-          className="field"
-          placeholder="z. B. Raum 204"
-          value={ort}
-          onChange={(e) => setOrt(e.target.value)}
-        />
-      </label>
+      <Gruppe className="mt-0">
+        <Zeile label="Bezeichnung">
+          <input
+            className={textFeld}
+            placeholder="z. B. Komiteesitzung"
+            aria-label="Bezeichnung"
+            value={titel}
+            onChange={(e) => setTitel(e.target.value)}
+            // Nur beim Neuanlegen: Beim Ändern (meist Uhrzeit oder Ort) ging
+            // sonst am Handy die Tastatur über dem Formular auf, und Esc/Zurück
+            // nahm erst nur den Fokus aus dem vollen Feld, statt zur Schicht
+            // zurückzugehen.
+            autoFocus={!termin}
+          />
+        </Zeile>
+        <Zeile label="Ort">
+          <input
+            className={textFeld}
+            placeholder="optional, z. B. Raum 204"
+            aria-label="Ort (optional)"
+            value={ort}
+            onChange={(e) => setOrt(e.target.value)}
+          />
+        </Zeile>
+      </Gruppe>
 
       {/* ------------------------------------------------ Wann */}
-      <div className="mb-3 rounded-2xl border border-papier-linie p-3 dark:border-slate-700">
-        <div className="mb-2 flex flex-wrap items-center gap-2">
-          <label className="flex min-w-0 flex-1 items-center gap-2">
-            <span className="shrink-0 text-[12px] font-semibold text-tinte-leise">
-              {wiederholt ? "Ab" : "Am"}
-            </span>
-            <input
-              type="date"
-              className="min-w-0 flex-1 rounded-lg border border-papier-linie bg-white px-2.5 py-2 text-[14px] dark:border-slate-700 dark:bg-slate-800"
-              value={datum}
-              onChange={(e) => setDatum(e.target.value)}
-            />
-          </label>
-        </div>
-
-        <div className="mb-2 flex flex-wrap gap-x-4 gap-y-1.5">
-          <Haken an={ganztaegig} setzen={setGanztaegig} text="ganztägig" />
-          {!wiederholt && <Haken an={mehrtaegig} setzen={setMehrtaegig} text="über mehrere Tage" />}
-          {/* Beim Ändern nicht anbieten: sonst würde aus einem Termin
-              plötzlich eine ganze Reihe und der alte bliebe stehen. */}
-          {!termin && (
-            <Haken
+      <Gruppe
+        titel="Wann"
+        fuss={
+          wiederholt
+            ? wdhTage.length === 0
+              ? "Wähle Wochentage und einen Zeitraum."
+              : `Das ergibt ${wdhTage.length} Termin${wdhTage.length === 1 ? "" : "e"} – vom ${tagLang(wdhTage[0])} bis ${tagLang(wdhTage[wdhTage.length - 1])}. Jeder steht einzeln im Kalender und lässt sich einzeln absagen.`
+            : undefined
+        }
+      >
+        <Zeile label={wiederholt ? "Ab" : mehrtaegig ? "Von" : "Am"}>
+          <input type="date" aria-label="Datum" className={datumFeld} value={datum} onChange={(e) => setDatum(e.target.value)} />
+        </Zeile>
+        {mehrtaegig && !wiederholt && (
+          <Zeile label="Bis">
+            <input type="date" aria-label="Letzter Tag" min={datum} className={datumFeld} value={bisDatum} onChange={(e) => setBisDatum(e.target.value)} />
+          </Zeile>
+        )}
+        <ZeileMitSchalter label="Ganztägig">
+          <Schalter an={ganztaegig} onChange={setGanztaegig} label="Ganztägig" />
+        </ZeileMitSchalter>
+        {!wiederholt && (
+          <ZeileMitSchalter label="Über mehrere Tage">
+            <Schalter an={mehrtaegig} onChange={setMehrtaegig} label="Über mehrere Tage" />
+          </ZeileMitSchalter>
+        )}
+        {/* Beim Ändern nicht anbieten: sonst würde aus einem Termin
+            plötzlich eine ganze Reihe und der alte bliebe stehen. */}
+        {!termin && (
+          <ZeileMitSchalter label="Wiederholt sich">
+            <Schalter
               an={wiederholt}
-              setzen={(v) => {
+              onChange={(v) => {
                 setWiederholt(v);
                 if (v) {
                   setMehrtaegig(false);
                   if (!wdhBis) setWdhBis(plusTage(datum || heuteKey(), 42));
                 }
               }}
-              text="wiederholt sich"
+              label="Wiederholt sich"
             />
-          )}
-        </div>
-
+          </ZeileMitSchalter>
+        )}
         {wiederholt && (
-          <div className="mb-2 rounded-xl bg-papier-matt p-2.5 dark:bg-slate-800">
-            <label className="mb-2 flex items-center gap-2">
-              <span className="shrink-0 text-[12px] font-semibold text-tinte-leise">Bis</span>
-              <input
-                type="date"
-                min={datum}
-                className="min-w-0 flex-1 rounded-lg border border-papier-linie bg-white px-2.5 py-2 text-[14px] dark:border-slate-700 dark:bg-slate-900"
-                value={wdhBis}
-                onChange={(e) => setWdhBis(e.target.value)}
-              />
-            </label>
-            <div className="mb-2 flex flex-wrap gap-1">
-              {WOCHENTAG_WAHL.map((w) => {
-                const an = wochentage.has(w.nr);
-                return (
+          <>
+            <Zeile label="Bis">
+              <input type="date" aria-label="Letzter Tag der Reihe" min={datum} className={datumFeld} value={wdhBis} onChange={(e) => setWdhBis(e.target.value)} />
+            </Zeile>
+            <div className="px-4 py-3">
+              <div className="mb-2 text-[13px] text-tinte-leise">An diesen Wochentagen</div>
+              <div className="grid grid-cols-7 gap-1.5">
+                {WOCHENTAG_WAHL.map((w) => (
                   <button
                     key={w.nr}
-                    onClick={() =>
-                      setWochentage((prev) => {
-                        const n = new Set(prev);
-                        if (an) n.delete(w.nr);
-                        else n.add(w.nr);
-                        return n;
-                      })
-                    }
+                    onClick={() => umschalten(setWochentage, w.nr)}
                     aria-label={w.lang}
-                    className={`h-9 w-10 rounded-lg text-[12px] font-bold transition ${
-                      an ? "bg-brand text-white" : "bg-white text-tinte-matt dark:bg-slate-900 dark:text-slate-300"
-                    }`}
+                    aria-pressed={wochentage.has(w.nr)}
+                    className={`h-11 ${chip(wochentage.has(w.nr))}`}
                   >
                     {w.kurz}
                   </button>
-                );
-              })}
+                ))}
+              </div>
             </div>
-            <p className="text-[11px] leading-relaxed text-tinte-leise">
-              {wdhTage.length === 0
-                ? "Wähle Wochentage und einen Zeitraum."
-                : `Das ergibt ${wdhTage.length} Termin${wdhTage.length === 1 ? "" : "e"} – vom ${tagLang(wdhTage[0])} bis ${tagLang(wdhTage[wdhTage.length - 1])}. Jeder steht einzeln im Kalender und lässt sich einzeln absagen.`}
-            </p>
-          </div>
+          </>
         )}
-
-        {mehrtaegig && !wiederholt && (
-          <label className="mb-2 flex items-center gap-2">
-            <span className="shrink-0 text-[12px] font-semibold text-tinte-leise">Bis</span>
-            <input
-              type="date"
-              min={datum}
-              className="min-w-0 flex-1 rounded-lg border border-papier-linie bg-white px-2.5 py-2 text-[14px] dark:border-slate-700 dark:bg-slate-800"
-              value={bisDatum}
-              onChange={(e) => setBisDatum(e.target.value)}
-            />
-          </label>
-        )}
-
         {!ganztaegig && (
-          <div className="flex flex-wrap items-center gap-2">
-            <label className="flex min-w-0 flex-1 items-center gap-2">
-              <span className="shrink-0 text-[12px] font-semibold text-tinte-leise">Von</span>
-              <input
-                type="time"
-                className="min-w-0 flex-1 rounded-lg border border-papier-linie bg-white px-2.5 py-2 text-[14px] dark:border-slate-700 dark:bg-slate-800"
-                value={von}
-                onChange={(e) => setVon(e.target.value)}
-              />
-            </label>
-            <label className="flex min-w-0 flex-1 items-center gap-2">
-              <span className="shrink-0 text-[12px] font-semibold text-tinte-leise">Bis</span>
-              <input
-                type="time"
-                className="min-w-0 flex-1 rounded-lg border border-papier-linie bg-white px-2.5 py-2 text-[14px] dark:border-slate-700 dark:bg-slate-800"
-                value={bis}
-                onChange={(e) => setBis(e.target.value)}
-              />
-            </label>
-          </div>
+          <Zeile label="Uhrzeit">
+            <ZeitFeld wert={von} onChange={setVon} label="Beginn" />
+            <span aria-hidden className="text-tinte-leise">–</span>
+            <ZeitFeld wert={bis} onChange={setBis} label="Ende" />
+          </Zeile>
         )}
-
         {!ganztaegig && (
           <StundenWahl
             von={von}
@@ -355,95 +365,90 @@ export function TerminSheet({
             }}
           />
         )}
-      </div>
+      </Gruppe>
 
       {/* ------------------------------------------------ Aussehen */}
-      <div className="mb-3 rounded-2xl border border-papier-linie p-3 dark:border-slate-700">
-        <div className="mb-1.5 text-[12px] font-semibold text-tinte-leise">Farbe im Kalender</div>
-        <div className="mb-3 flex flex-wrap gap-1.5" role="radiogroup" aria-label="Farbe">
-          <button
-            role="radio"
-            aria-checked={farbe === null}
-            onClick={() => setFarbe(null)}
-            className={`flex h-8 items-center rounded-full border px-2.5 text-[12px] font-bold ${
-              farbe === null ? "border-brand text-brand" : "border-papier-linie text-tinte-leise dark:border-slate-700"
-            }`}
-          >
-            Standard
-          </button>
-          {FARBEN.map((f) => (
+      <Gruppe
+        titel="Aussehen im Kalender"
+        fuss="Ein Fach-Kürzel steht als kleines Schild im Kalender – gut für Klausuren. „Ferien“ färbt die Tage durchgehend ein, auch über mehrere Wochen."
+      >
+        <div className="px-4 py-3">
+          <div className="mb-2 text-[13px] text-tinte-leise">Farbe</div>
+          <div className="flex flex-wrap items-center gap-2" role="radiogroup" aria-label="Farbe">
             <button
-              key={f.key}
               role="radio"
-              aria-checked={farbe === f.key}
-              aria-label={f.name}
-              title={f.name}
-              onClick={() => setFarbe(f.key)}
-              className={`h-8 w-8 rounded-full ${f.punkt} transition ${
-                farbe === f.key ? "ring-2 ring-brand ring-offset-2 dark:ring-offset-slate-900" : ""
-              }`}
-            />
-          ))}
-        </div>
-
-        <div className="mb-1.5 text-[12px] font-semibold text-tinte-leise">Zeichen</div>
-        <div className="mb-2 flex flex-wrap gap-1">
-          <button
-            onClick={() => setSymbol("")}
-            className={`h-9 rounded-lg px-2.5 text-[12px] font-bold ${
-              !symbol ? "bg-brand text-white" : "bg-papier-matt text-tinte-matt dark:bg-slate-800 dark:text-slate-300"
-            }`}
-          >
-            keins
-          </button>
-          {SYMBOLE.map((z) => (
-            <button
-              key={z}
-              onClick={() => setSymbol(z)}
-              aria-label={`Zeichen ${z}`}
-              className={`h-9 w-9 rounded-lg text-[18px] leading-none transition ${
-                symbol === z ? "bg-brand/15 ring-2 ring-brand" : "bg-papier-matt dark:bg-slate-800"
+              aria-checked={farbe === null}
+              onClick={() => setFarbe(null)}
+              className={`min-h-[40px] rounded-full px-3.5 text-[14px] font-semibold ${
+                farbe === null ? "bg-brand text-white" : "bg-[rgb(118_118_128/0.12)] text-tinte-matt dark:bg-[rgb(118_118_128/0.24)] dark:text-slate-300"
               }`}
             >
-              {z}
+              Standard
             </button>
-          ))}
+            {FARBEN.map((f) => (
+              <button
+                key={f.key}
+                role="radio"
+                aria-checked={farbe === f.key}
+                aria-label={f.name}
+                title={f.name}
+                onClick={() => setFarbe(f.key)}
+                className={`h-10 w-10 rounded-full ${f.punkt} transition active:scale-90 ${
+                  farbe === f.key ? "ring-2 ring-brand ring-offset-2 ring-offset-[rgb(var(--zelle))]" : ""
+                }`}
+              />
+            ))}
+          </div>
         </div>
-        <label className="flex items-center gap-2">
-          <span className="shrink-0 text-[12px] font-semibold text-tinte-leise">oder Kürzel</span>
+        <div className="px-4 py-3">
+          <div className="mb-2 text-[13px] text-tinte-leise">Zeichen</div>
+          <div className="flex flex-wrap gap-1.5">
+            <button onClick={() => setSymbol("")} aria-pressed={!symbol} className={`min-h-[40px] px-3.5 ${chip(!symbol)}`}>
+              Keins
+            </button>
+            {SYMBOLE.map((z) => (
+              <button
+                key={z}
+                onClick={() => setSymbol(z)}
+                aria-label={`Zeichen ${z}`}
+                aria-pressed={symbol === z}
+                className={`h-10 w-10 rounded-xl text-[20px] leading-none transition active:scale-95 ${
+                  symbol === z ? "bg-brand/15 ring-2 ring-brand" : "bg-[rgb(118_118_128/0.12)] dark:bg-[rgb(118_118_128/0.24)]"
+                }`}
+              >
+                {z}
+              </button>
+            ))}
+          </div>
+        </div>
+        <Zeile label="Oder Kürzel">
           <input
-            className="min-w-0 flex-1 rounded-lg border border-papier-linie bg-white px-2.5 py-2 text-[14px] font-bold uppercase dark:border-slate-700 dark:bg-slate-800"
+            className={`${textFeld} font-bold uppercase`}
             placeholder="z. B. M, EK, F7"
+            aria-label="Fach-Kürzel"
             maxLength={4}
             value={istKuerzel(symbol) ? symbol : ""}
             onChange={(e) => setSymbol(e.target.value.replace(/[^A-Za-z0-9]/g, "").toUpperCase().slice(0, 4))}
           />
-        </label>
-        <p className="mt-1 text-[11px] leading-relaxed text-tinte-leise">
-          Ein Fach-Kürzel steht als kleines Schild im Kalender – gut für Klausuren.
-        </p>
-
-        <div className="mt-3">
-          <Haken
+        </Zeile>
+        <ZeileMitSchalter label="Ferien / unterrichtsfrei">
+          <Schalter
             an={frei}
-            setzen={(v) => {
+            onChange={(v) => {
               setFrei(v);
               if (v) {
                 setGanztaegig(true);
                 if (!farbe) setFarbe("gruen");
               }
             }}
-            text="Ferien / unterrichtsfrei"
+            label="Ferien / unterrichtsfrei"
           />
-          <p className="mt-1 pl-7 text-[11px] leading-relaxed text-tinte-leise">
-            Färbt die Tage im Kalender durchgehend ein – auch über mehrere Wochen.
-          </p>
-        </div>
-      </div>
+        </ZeileMitSchalter>
+      </Gruppe>
 
       {/* ------------------------------------------------ Wer */}
-      <div className="mb-1.5 px-1 text-[12px] font-semibold uppercase tracking-[0.04em] text-tinte-leise">Wer sieht den Termin?</div>
-      <div className="mb-2 flex gap-1.5 rounded-xl bg-papier-matt p-1 dark:bg-slate-800">
+      <div className="mb-1.5 mt-4 px-4 text-[13px] uppercase tracking-[0.02em] text-tinte-leise">Wer sieht den Termin?</div>
+      <div className="seg" role="tablist" aria-label="Wer sieht den Termin?">
         {(
           [
             ["alle", "Alle"],
@@ -453,139 +458,112 @@ export function TerminSheet({
         ).map(([k, label]) => (
           <button
             key={k}
+            role="tab"
+            aria-selected={sichtbar === k}
             onClick={() => setSichtbar(k)}
-            className={`${seg} ${sichtbar === k ? "bg-brand text-white" : "text-tinte-matt"}`}
+            className={`seg-item whitespace-nowrap !py-2 !text-[14px] ${sichtbar === k ? "seg-aktiv" : ""}`}
           >
             {label}
           </button>
         ))}
       </div>
-      <p className="mb-2 text-[11px] leading-relaxed text-tinte-leise">
+      <p className="mt-1.5 px-4 text-[13px] leading-snug text-tinte-leise">
         {sichtbar === "alle"
           ? "Jeder in der Stufe sieht diesen Termin."
           : "Wer nicht dazugehört, sieht den Termin gar nicht – auch keine Lücke im Kalender."}
       </p>
 
       {sichtbar === "komitee" && (
-        <div className="mb-3 grid gap-1 rounded-2xl border border-papier-linie p-2 dark:border-slate-700 sm:grid-cols-2">
-          {COMMITTEES.map((c) => {
-            const on = tags.has(c.slug);
-            return (
-              <button
-                key={c.slug}
-                onClick={() =>
-                  setTags((prev) => {
-                    const n = new Set(prev);
-                    if (on) n.delete(c.slug);
-                    else n.add(c.slug);
-                    return n;
-                  })
-                }
-                className={`flex items-center gap-2 rounded-lg px-2.5 py-2 text-left text-[13px] font-semibold transition ${
-                  on ? "bg-brand/10 text-brand" : "hover:bg-papier-matt dark:hover:bg-slate-800"
-                }`}
-              >
-                <span
-                  className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border text-[11px] text-white ${
-                    on ? "border-brand bg-brand" : "border-papier-linie dark:border-slate-600"
-                  }`}
-                >
-                  {on ? "✓" : ""}
-                </span>
-                <span className="shrink-0">{committeeIcon(c.slug)}</span>
-                <span className="min-w-0 truncate">{c.label}</span>
-              </button>
-            );
-          })}
-        </div>
+        <Gruppe className="mt-3">
+          {COMMITTEES.map((c) => (
+            <ZeileHaken
+              key={c.slug}
+              label={
+                <>
+                  <span aria-hidden className="mr-2">{committeeIcon(c.slug)}</span>
+                  {c.label}
+                </>
+              }
+              gewaehlt={tags.has(c.slug)}
+              onClick={() => umschalten(setTags, c.slug)}
+            />
+          ))}
+        </Gruppe>
       )}
 
       {sichtbar === "personen" && (
-        <div className="mb-3 rounded-2xl border border-papier-linie p-2 dark:border-slate-700">
-          <input
-            className="field mb-2"
-            placeholder="Person suchen…"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-          />
-          <div className="max-h-48 overflow-y-auto">
-            {liste.map((s) => {
-              const on = personen.has(s.id);
-              return (
-                <button
+        <div className="mt-3">
+          <input className="field mb-2" placeholder="Person suchen…" aria-label="Person suchen" value={q} onChange={(e) => setQ(e.target.value)} />
+          <div className="max-h-64 overflow-y-auto overscroll-contain rounded-[0.875rem]">
+            <Gruppe className="" fuss={personen.size === 0 ? "Noch niemand gewählt" : `${personen.size} ausgewählt`}>
+              {liste.map((s) => (
+                <ZeileHaken
                   key={s.id}
-                  onClick={() =>
-                    setPersonen((prev) => {
-                      const n = new Set(prev);
-                      if (on) n.delete(s.id);
-                      else n.add(s.id);
-                      return n;
-                    })
-                  }
-                  className={`flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[13px] transition ${
-                    on ? "bg-brand/10 font-semibold text-brand" : "hover:bg-papier-matt dark:hover:bg-slate-800"
-                  }`}
-                >
-                  <span
-                    className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border text-[11px] text-white ${
-                      on ? "border-brand bg-brand" : "border-papier-linie dark:border-slate-600"
-                    }`}
-                  >
-                    {on ? "✓" : ""}
-                  </span>
-                  <span className="min-w-0 truncate">
-                    {s.nachname}, {s.vorname}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-          <div className="px-1 pt-1 text-[11px] text-tinte-leise">
-            {personen.size === 0 ? "Noch niemand gewählt" : `${personen.size} ausgewählt`}
+                  label={`${s.nachname}, ${s.vorname}`}
+                  gewaehlt={personen.has(s.id)}
+                  onClick={() => umschalten(setPersonen, s.id)}
+                />
+              ))}
+            </Gruppe>
           </div>
         </div>
       )}
 
-      <div className="mb-3">
-        <Haken
-          an={fuerEltern}
-          setzen={setFuerEltern}
-          text="Eltern sehen diesen Termin auch"
-        />
-        <p className="mt-1 pl-7 text-[11px] leading-relaxed text-tinte-leise">
-          Standardmäßig aus. Sinnvoll z. B. beim Abiball oder der Zeugnisvergabe.
-        </p>
-      </div>
+      <Gruppe fuss="Standardmäßig aus. Sinnvoll z. B. beim Abiball oder der Zeugnisvergabe.">
+        <ZeileMitSchalter label="Eltern sehen diesen Termin auch">
+          <Schalter an={fuerEltern} onChange={setFuerEltern} label="Eltern sehen diesen Termin auch" />
+        </ZeileMitSchalter>
+      </Gruppe>
 
-      <label className="mb-3 block">
-        <span className="mb-1 block text-[12px] font-semibold text-tinte-leise">Notiz (optional)</span>
+      <div className="mt-4">
         <textarea
           className="field min-h-[4.5rem]"
-          placeholder="Was man vorher wissen sollte …"
+          placeholder="Notiz (optional) – was man vorher wissen sollte …"
+          aria-label="Notiz (optional)"
           value={beschreibung}
           onChange={(e) => setBeschreibung(e.target.value)}
         />
-      </label>
+      </div>
 
-      <div className="mb-3">
-        <Haken
-          an={melden}
-          setzen={setMelden}
-          text={termin ? "Änderung als Mitteilung schicken" : "Mitteilung an alle, die ihn sehen"}
-        />
-        <p className="mt-1 pl-7 text-[11px] leading-relaxed text-tinte-leise">
-          {termin
+      <Gruppe
+        fuss={
+          termin
             ? "Aus: Der Termin ändert sich still im Kalender. An, wenn sich Zeit, Datum oder Ort ändern."
             : melden
               ? "Kommt bei allen an, die Mitteilungen erlaubt haben."
-              : "Still eintragen: Der Termin steht nur im Kalender, niemand bekommt ein Pop-up."}
-        </p>
-      </div>
+              : "Still eintragen: Der Termin steht nur im Kalender, niemand bekommt ein Pop-up."
+        }
+      >
+        <ZeileMitSchalter label={termin ? "Änderung als Mitteilung schicken" : "Mitteilung an alle, die ihn sehen"}>
+          <Schalter an={melden} onChange={setMelden} label="Mitteilung schicken" />
+        </ZeileMitSchalter>
+      </Gruppe>
 
-      {fehler && <p className="mb-2 text-[13px] font-semibold text-amber-600">{fehler}</p>}
+      {/* Löschen weit weg vom Hauptknopf, rot, mit Rückfrage */}
+      {termin && (
+        <Gruppe className="mt-8">
+          <Zeile
+            rot
+            label="Termin löschen …"
+            onClick={async () => {
+              if (await frage(`Den Termin „${termin.titel}“ wirklich löschen?`, "Löschen", true)) {
+                void loeschen(termin.id);
+                onSchliessen();
+              }
+            }}
+          />
+        </Gruppe>
+      )}
 
-      <div className="flex gap-2">
-        <button disabled={busy} onClick={speichern} className="btn-primary min-w-0 flex-1 disabled:opacity-50">
+      <FussLeiste>
+        {fehler && (
+          // Direkt über dem Knopf, der sie auslöst (klebende Fußleiste) – vorher
+          // stand die Meldung unsichtbar am Blattende und der Knopf wirkte tot
+          <p role="alert" className="mb-2 px-1 text-center text-[13px] font-semibold text-amber-700 dark:text-amber-300">
+            {fehler}
+          </p>
+        )}
+        <button disabled={busy} onClick={speichern} className="btn-primary">
           {busy
             ? "…"
             : termin
@@ -594,20 +572,7 @@ export function TerminSheet({
                 ? `${wdhTage.length} Termine eintragen`
                 : "Eintragen"}
         </button>
-        {termin && (
-          <button
-            onClick={async () => {
-              if (await frage(`Den Termin „${termin.titel}" wirklich löschen?`, "Löschen", true)) {
-                void loeschen(termin.id);
-                onSchliessen();
-              }
-            }}
-            className="shrink-0 rounded-xl border border-red-300 px-4 text-[14px] font-bold text-red-500 dark:border-red-500/40"
-          >
-            Löschen
-          </button>
-        )}
-      </div>
+      </FussLeiste>
     </Sheet>
   );
 }
@@ -618,17 +583,18 @@ function StundenWahl({ von, bis, setzen }: { von: string; bis: string; setzen: (
   const bisNr = STUNDEN.find((s) => s.bis === bis)?.nr ?? null;
   const [warteAufEnde, setWarteAufEnde] = useState(false);
   return (
-    <div className="mt-2">
-      <div className="mb-1 text-[11px] font-semibold text-tinte-leise">
+    <div className="px-4 py-3">
+      <div className="mb-2 text-[13px] text-tinte-leise">
         {warteAufEnde ? "Bis zu welcher Stunde?" : "Nach Schulstunden (tippen: Beginn, dann Ende)"}
       </div>
-      <div className="grid grid-cols-5 gap-1 sm:grid-cols-10">
+      <div className="grid grid-cols-5 gap-1.5 sm:grid-cols-10">
         {STUNDEN.map((s) => {
           const drin = ab !== null && bisNr !== null && s.nr >= ab && s.nr <= bisNr;
           return (
             <button
               key={s.nr}
               title={`${s.nr}. Stunde: ${s.von}–${s.bis}`}
+              aria-pressed={drin}
               onClick={() => {
                 if (warteAufEnde && ab !== null && s.nr >= ab) {
                   setzen(STUNDEN[ab - 1].von, s.bis);
@@ -638,12 +604,12 @@ function StundenWahl({ von, bis, setzen }: { von: string; bis: string; setzen: (
                   setWarteAufEnde(true);
                 }
               }}
-              className={`rounded-lg py-1.5 text-center leading-tight transition ${
-                drin ? "bg-brand text-white" : "bg-papier-matt text-tinte-matt dark:bg-slate-800 dark:text-slate-300"
+              className={`min-h-[44px] rounded-xl py-1.5 text-center leading-tight transition active:scale-95 ${
+                drin ? "bg-brand text-white" : "bg-[rgb(118_118_128/0.12)] text-tinte-matt dark:bg-[rgb(118_118_128/0.24)] dark:text-slate-300"
               }`}
             >
-              <span className="block text-[12px] font-extrabold">{s.nr}.</span>
-              <span className={`block text-[9px] ${drin ? "text-white/85" : "text-tinte-leise"}`}>{s.von}</span>
+              <span className="block text-[14px] font-extrabold">{s.nr}.</span>
+              <span className={`zahl block text-[12px] ${drin ? "text-white" : "text-tinte-leise"}`}>{s.von}</span>
             </button>
           );
         })}
@@ -652,34 +618,26 @@ function StundenWahl({ von, bis, setzen }: { von: string; bis: string; setzen: (
   );
 }
 
-function Haken({
-  an, setzen, text,
-}: { an: boolean; setzen: (v: boolean) => void; text: string }) {
-  return (
-    <button onClick={() => setzen(!an)} className="flex items-center gap-2 text-[13px] font-semibold">
-      <span
-        className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border text-[11px] text-white ${
-          an ? "border-brand bg-brand" : "border-papier-linie dark:border-slate-600"
-        }`}
-      >
-        {an ? "✓" : ""}
-      </span>
-      <span className="text-tinte-matt dark:text-slate-300">{text}</span>
-    </button>
-  );
-}
-
-/** Ein Termin zum Ansehen – für alle, die ihn nicht ändern dürfen. */
+/**
+ * Ein Termin zum Ansehen (Wochenstreifen, Kalender). Fürs Team mit „Ändern“
+ * oben rechts wie im iOS-Kalender – unten kein zweites „Fertig“ mehr, das ✕
+ * schließt. Schichten öffnen fürs Team dasselbe Blatt wie unter „Mitmachen“
+ * (SchichtSheet: einteilen, Mithilfe bestätigen); Schüler können sich hier
+ * direkt eintragen.
+ */
 export function TerminAnsehen({
   termin, onSchliessen, onBearbeiten,
 }: { termin: Termin | null; onSchliessen: () => void; onBearbeiten?: () => void }) {
-  const { termine, loeschen, loeschenViele, zuteilen } = useTermine();
+  const { termine, aktionen, loeschen, loeschenViele, bewerbungen, bewerben, meineUid, meineStudentIds } = useTermine();
   const { students } = useStore();
   const { isStaff, can } = useRole();
   const darf = isStaff || can("termine.manage");
+  const st = useSchichtStatus();
+  // „In meinen Kalender“ (.ics) – zurzeit aus: KALENDER_SYNC_AN in lib/kalender-sync.ts
   const kalenderDemo = useKalenderDemo();
-  // Immer den frischen Stand zeigen (z. B. nach dem Austragen einer Person)
-  const t = termin ? termine.find((x) => x.id === termin.id) ?? termin : null;
+  // Immer den frischen Stand zeigen (z. B. nach dem Austragen einer Person).
+  // Gelöscht (auch im Formular darüber, „Ändern“ → „Termin löschen“): Blatt zu.
+  const t = termin ? termine.find((x) => x.id === termin.id) ?? null : null;
 
   /** Die "Reihe": gleicher Titel, gleiche Uhrzeit, gleiche Aktion, ab heute. */
   const reihe = useMemo(() => {
@@ -693,123 +651,136 @@ export function TerminAnsehen({
   }, [termine, t]);
 
   if (!t) return null;
+  // Team + Schicht: dasselbe Blatt wie unter „Mitmachen“
+  if (t.aktion_id && darf)
+    return (
+      <SchichtSheet
+        schicht={t}
+        aktion={aktionen.find((a) => a.id === t.aktion_id) || null}
+        onSchliessen={onSchliessen}
+        onAendern={onBearbeiten}
+      />
+    );
   const termin_ = t;
   const namen = new Map(students.map((s) => [s.id, `${s.vorname} ${s.nachname}`]));
+  /** Wert rechts in einer Zeile – darf umbrechen, nichts wird abgeschnitten */
+  const wert = (text: string) => <span className="min-w-0 text-right text-[15px] leading-snug text-tinte-matt dark:text-slate-300">{text}</span>;
+
+  // Schüler und Schicht: hier direkt eintragen – wie unter „Mitmachen“
+  const status = termin_.aktion_id ? st(termin_) : null;
+  const ichGemeldet = Boolean(meineUid && (bewerbungen[termin_.id] || []).includes(meineUid));
+  const schichtVoll = termin_.personen.length >= (termin_.plaetze ?? 1);
+  const schichtVorbei = schichtEnde(termin_).getTime() < Date.now();
+  const kannEintragen =
+    Boolean(termin_.aktion_id) && !darf && meineStudentIds.length > 0 && !termin_.abschluss && !schichtVorbei &&
+    status !== "eingeteilt" && (ichGemeldet || !schichtVoll);
+
   return (
     <Sheet open onClose={onSchliessen}>
-      <div className="mb-3 flex items-start gap-3">
-        <span className="min-w-0 flex-1">
-          <span className="block font-zahl text-[1.25rem] font-extrabold leading-tight tracking-[-0.02em]">
-            {termin_.titel}
-          </span>
-          {umfangText(termin_, committeeLabel) && (
-            <span className="mt-0.5 block text-[12px] text-tinte-leise">
-              {umfangText(termin_, committeeLabel)}
-            </span>
-          )}
-        </span>
-        <button className="iconbtn shrink-0" onClick={onSchliessen} aria-label="Schließen">
-          ✕
-        </button>
-      </div>
+      <SheetKopf
+        titel={termin_.titel}
+        unter={umfangText(termin_, committeeLabel) || undefined}
+        onClose={onSchliessen}
+        extra={
+          onBearbeiten && (
+            <button type="button" onClick={onBearbeiten} className="btn-klein-grau -mt-1 shrink-0 !px-3.5">
+              Ändern
+            </button>
+          )
+        }
+      />
 
-      <dl className="grid gap-2">
-        <Zeile label="Wann" wert={`${tagLang(termin_.datum)}${termin_.bis_datum && termin_.bis_datum !== termin_.datum ? ` bis ${tagLang(termin_.bis_datum)}` : ""}`} />
-        <Zeile label="Uhrzeit" wert={zeitText(termin_)} />
-        {termin_.ort && <Zeile label="Ort" wert={termin_.ort} />}
-      </dl>
+      <Gruppe className="mt-0">
+        <Zeile label="Wann">
+          {wert(`${tagLang(termin_.datum)}${termin_.bis_datum && termin_.bis_datum !== termin_.datum ? ` bis ${tagLang(termin_.bis_datum)}` : ""}`)}
+        </Zeile>
+        <Zeile label="Uhrzeit">{wert(zeitText(termin_))}</Zeile>
+        {termin_.ort && <Zeile label="Ort">{wert(termin_.ort)}</Zeile>}
+      </Gruppe>
+
+      {kannEintragen && (
+        <Gruppe
+          className="mt-4"
+          fuss={
+            ichGemeldet
+              ? "Du bist angemeldet – das Stufenteam teilt ein, wer wenig Mithilfe hat, zuerst."
+              : "Du meldest dich an – das Stufenteam teilt dann ein, wer wenig Mithilfe hat, zuerst."
+          }
+        >
+          {ichGemeldet ? (
+            <Zeile blau label="Anmeldung zurückziehen" onClick={() => void bewerben(termin_.id, false)} />
+          ) : (
+            <Zeile blau label="Für diese Schicht eintragen" onClick={() => void bewerben(termin_.id, true)} />
+          )}
+        </Gruppe>
+      )}
+
+      {/* Eingeteilt und es klappt doch nicht: direkt dem Stufenteam schreiben
+          (vorher war das Blatt eine Sackgasse ohne jede Aktion) */}
+      {status === "eingeteilt" && !darf && !schichtVorbei && (
+        <Gruppe className="mt-4" fuss="Das Stufenteam sucht dann Ersatz.">
+          <Zeile
+            blau
+            label="Kann nicht? Stufenteam schreiben"
+            onClick={() => {
+              onSchliessen();
+              window.location.hash = "chats/team";
+            }}
+          />
+        </Gruppe>
+      )}
 
       {termin_.beschreibung && (
-        <p className="mt-3 whitespace-pre-wrap rounded-xl bg-papier-matt p-3 text-[13px] leading-relaxed text-tinte-matt dark:bg-slate-800 dark:text-slate-300">
-          {termin_.beschreibung}
-        </p>
+        <Gruppe titel="Notiz">
+          <p className="whitespace-pre-wrap px-4 py-3 text-[15px] leading-relaxed text-tinte-matt dark:text-slate-300">{termin_.beschreibung}</p>
+        </Gruppe>
       )}
 
       {termin_.personen.length > 0 && (termin_.aktion_id || darf) && (
-        <div className="mt-3">
-          <div className="mb-1 text-[12px] font-semibold text-tinte-leise">
-            {termin_.aktion_id ? "Eingeteilt" : "Für diese Personen"}
-          </div>
-          <ul className="grid gap-1">
-            {termin_.personen.map((sid) => (
-              <li key={sid} className="flex items-center gap-2 rounded-lg bg-papier-matt px-2.5 py-1.5 text-[13px] dark:bg-slate-800">
-                <span className="min-w-0 flex-1 truncate font-semibold">{namen.get(sid) || "Unbekannt"}</span>
-                {darf && termin_.aktion_id && (
-                  <button
-                    onClick={async () => {
-                      if (await frage(`${namen.get(sid) || "Diese Person"} aus der Schicht nehmen? Sie bekommt Bescheid.`, "Austragen", true))
-                        void zuteilen(termin_.id, sid, false);
-                    }}
-                    className="shrink-0 rounded-md px-2 py-0.5 text-[12px] font-bold text-red-500"
-                    aria-label="Austragen"
-                  >
-                    austragen
-                  </button>
-                )}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {darf && (
-        <div className="mt-4 grid gap-1.5 rounded-xl border border-red-200 p-2.5 dark:border-red-500/30">
-          <button
-            onClick={async () => {
-              if (await frage(`„${termin_.titel}" am ${tagLang(termin_.datum)} löschen?`, "Löschen", true)) {
-                void loeschen(termin_.id);
-                onSchliessen();
-              }
-            }}
-            className="w-full rounded-lg py-2 text-[13px] font-bold text-red-500"
-          >
-            Nur diesen Termin löschen
-          </button>
-          {reihe.length > 1 && (
-            <button
-              onClick={async () => {
-                if (await frage(`Alle ${reihe.length} kommenden Termine „${termin_.titel}" löschen?`, "Alle löschen", true)) {
-                  void loeschenViele(reihe.map((x) => x.id));
-                  onSchliessen();
-                }
-              }}
-              className="w-full rounded-lg bg-red-500 py-2 text-[13px] font-bold text-white"
-            >
-              Alle {reihe.length} kommenden „{termin_.titel}" löschen
-            </button>
-          )}
-        </div>
+        <Gruppe titel={termin_.aktion_id ? "Eingeteilt" : "Für diese Personen"}>
+          {termin_.personen.map((sid) => (
+            // Austragen geht fürs Team im Schicht-Blatt (SchichtSheet)
+            <div key={sid} className="flex min-h-[48px] items-center gap-2 py-1.5 pl-4 pr-4">
+              <span className="min-w-0 flex-1 truncate text-[15px] font-semibold">{namen.get(sid) || "Unbekannt"}</span>
+            </div>
+          ))}
+        </Gruppe>
       )}
 
       {/* Testphase: einzelnen Termin in den eigenen Kalender übernehmen */}
       {kalenderDemo && (
         <button onClick={() => terminAlsDatei(termin_)} className="btn-grau mt-4 gap-2 !text-[15px]">
-          <span aria-hidden>📱</span> In meinen Kalender übernehmen
+          <Icon name="kalender" size={18} /> In meinen Kalender übernehmen
         </button>
       )}
 
-      <div className="mt-4 flex gap-2">
-        {onBearbeiten && (
-          <button
-            onClick={onBearbeiten}
-            className="min-w-0 flex-1 rounded-xl border border-papier-linie py-2.5 text-[14px] font-bold text-tinte-matt dark:border-slate-700"
-          >
-            Ändern
-          </button>
-        )}
-        <button onClick={onSchliessen} className="btn-primary min-w-0 flex-1">
-          Fertig
-        </button>
-      </div>
+      {/* Löschen: ganz unten, rot, jeweils mit Rückfrage */}
+      {darf && (
+        <Gruppe className="mt-8">
+          <Zeile
+            rot
+            label="Nur diesen Termin löschen …"
+            onClick={async () => {
+              if (await frage(`„${termin_.titel}“ am ${tagLang(termin_.datum)} löschen?`, "Löschen", true)) {
+                void loeschen(termin_.id);
+                onSchliessen();
+              }
+            }}
+          />
+          {reihe.length > 1 && (
+            <Zeile
+              rot
+              label={`Alle ${reihe.length} kommenden „${termin_.titel}“ löschen …`}
+              onClick={async () => {
+                if (await frage(`Alle ${reihe.length} kommenden Termine „${termin_.titel}“ löschen?`, "Alle löschen", true)) {
+                  void loeschenViele(reihe.map((x) => x.id));
+                  onSchliessen();
+                }
+              }}
+            />
+          )}
+        </Gruppe>
+      )}
     </Sheet>
-  );
-}
-
-function Zeile({ label, wert }: { label: string; wert: string }) {
-  return (
-    <div className="flex items-center gap-2 rounded-xl bg-papier-matt px-3 py-2.5 dark:bg-slate-800">
-      <dt className="w-20 shrink-0 text-[12px] font-semibold text-tinte-leise">{label}</dt>
-      <dd className="min-w-0 flex-1 text-[14px] font-semibold">{wert}</dd>
-    </div>
   );
 }

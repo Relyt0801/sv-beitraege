@@ -2,6 +2,8 @@ import { useEffect, useState, type ReactNode } from "react";
 import { hasSupabase, supabase } from "../lib/supabase";
 import { SELECTABLE_COMMITTEES, committeeLabel } from "../lib/committees";
 import { passwortProblem, passwortStaerke } from "../lib/passwort";
+import { fehlerText, istNetzfehler, OFFLINE_TEXT } from "../lib/netz";
+import { AnmeldeKopf, AnmeldeRahmen, FormFehler, LadeKnopf, Splash, ZELLEN_FELD } from "./AuthGate";
 
 // Das Vertagen gilt pro Konto und nicht ewig.
 //
@@ -44,11 +46,17 @@ export function PasswordGate({ children }: { children: ReactNode }) {
       }
       setState(!eltern && (await braucheKomitee(uid)) ? "komitee" : "ok");
     };
-    void check();
+    // Scheitert die Prüfung (z. B. kein Netz), nicht ewig den Ladebildschirm
+    // zeigen: weiter in die App – dort erklärt das Offline-Band, was los ist.
+    const sicherPruefen = () =>
+      check().catch(() => {
+        if (alive) setState("ok");
+      });
+    void sicherPruefen();
     const { data: sub } = supabase!.auth.onAuthStateChange((event) => {
       if (event === "SIGNED_IN") {
         setState("loading");
-        void check();
+        void sicherPruefen();
       }
       if (event === "SIGNED_OUT") setState("ok");
     });
@@ -58,25 +66,24 @@ export function PasswordGate({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  if (state === "loading")
-    return (
-      <div className="flex h-full items-center justify-center text-tinte-leise">
-        <div className="animate-pulse text-lg font-semibold">Stufenkasse …</div>
-      </div>
-    );
+  if (state === "loading") return <Splash />;
   if (state === "change")
     return (
       <ChangeForm
         onDone={async () => {
-          const { data: s } = await supabase!.auth.getSession();
-          const uid = s.session?.user.id;
-          if (!uid) {
+          try {
+            const { data: s } = await supabase!.auth.getSession();
+            const uid = s.session?.user.id;
+            if (!uid) {
+              setState("ok");
+              return;
+            }
+            const { data: p } = await supabase!.from("profiles").select("role").eq("user_id", uid).maybeSingle();
+            const eltern = (p as { role?: string } | null)?.role === "eltern";
+            setState(!eltern && (await braucheKomitee(uid)) ? "komitee" : "ok");
+          } catch {
             setState("ok");
-            return;
           }
-          const { data: p } = await supabase!.from("profiles").select("role").eq("user_id", uid).maybeSingle();
-          const eltern = (p as { role?: string } | null)?.role === "eltern";
-          setState(!eltern && (await braucheKomitee(uid)) ? "komitee" : "ok");
         }}
       />
     );
@@ -108,193 +115,298 @@ function vertagen(uid: string) {
   }
 }
 
-function KomiteeForm({ onDone }: { onDone: () => void }) {
+/**
+ * Komitee wählen – im Apple-Look als Auswahlliste mit Häkchen (wie die
+ * Auswahl in den iOS-Einstellungen), statt einzelner umrandeter Kästen.
+ */
+export function KomiteeForm({ onDone }: { onDone: () => void }) {
   const [sel, setSel] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+  const [netz, setNetz] = useState(false);
 
   async function speichern() {
-    if (!sel) return;
-    setBusy(true);
+    if (!sel || busy) return;
     setErr("");
-    const { data: s } = await supabase!.auth.getSession();
-    const uid = s.session?.user.id;
-    if (!uid) {
+    setNetz(false);
+    if (typeof navigator !== "undefined" && navigator.onLine === false) {
+      setErr(OFFLINE_TEXT);
+      setNetz(true);
+      return;
+    }
+    setBusy(true);
+    try {
+      if (!hasSupabase) {
+        await new Promise((r) => setTimeout(r, 900)); // Demo-Vorschau
+        onDone();
+        return;
+      }
+      const { data: s } = await supabase!.auth.getSession();
+      const uid = s.session?.user.id;
+      if (!uid) {
+        setErr("Die Anmeldung ist abgelaufen. Bitte neu anmelden.");
+        return;
+      }
+      const { error } = await supabase!.from("tag_members").insert({ tag: sel, user_id: uid });
+      if (error) {
+        setNetz(istNetzfehler(error));
+        setErr(fehlerText("Das hat nicht geklappt: " + error.message));
+        return;
+      }
+      onDone();
+    } catch (e) {
+      setNetz(istNetzfehler(e));
+      setErr(fehlerText(e));
+    } finally {
       setBusy(false);
-      setErr("Die Anmeldung ist abgelaufen. Bitte neu anmelden.");
-      return;
     }
-    const { error } = await supabase!.from("tag_members").insert({ tag: sel, user_id: uid });
-    setBusy(false);
-    if (error) {
-      setErr("Das hat nicht geklappt: " + error.message);
-      return;
-    }
-    onDone();
   }
 
   return (
-    <div className="flex min-h-full items-center justify-center p-6">
-      <div className="card w-full max-w-sm p-6">
-        <div className="mb-1 text-center text-2xl font-bold">Dein Komitee</div>
-        <p className="mb-5 text-center text-sm text-tinte-matt">
-          Wähle aus, wo du mitarbeitest. Du kommst damit automatisch in den passenden Chat.
-        </p>
+    <AnmeldeRahmen>
+      <AnmeldeKopf symbol={false} titel="Dein Komitee" unter="Wähle aus, wo du mitarbeitest. Du kommst damit automatisch in den passenden Chat." />
 
-        <div className="mb-4 grid gap-2">
-          {SELECTABLE_COMMITTEES.map((c) => (
+      <div className="gruppe-zellen" role="radiogroup" aria-label="Komitee">
+        {SELECTABLE_COMMITTEES.map((c) => {
+          const an = sel === c.slug;
+          return (
             <button
               key={c.slug}
+              type="button"
+              role="radio"
+              aria-checked={an}
+              disabled={busy}
               onClick={() => setSel(c.slug)}
-              className={`flex items-center gap-3 rounded-xl border px-4 py-3 text-left text-[15px] font-semibold transition ${
-                sel === c.slug
-                  ? "border-brand bg-brand/10 text-brand"
-                  : "border-papier-linie dark:border-slate-700"
-              }`}
+              className="flex min-h-[48px] w-full items-center gap-3 px-4 py-2 text-left text-[16px] transition active:bg-black/[0.04] dark:active:bg-white/[0.06]"
             >
-              <span
-                className={`flex h-5 w-5 items-center justify-center rounded-full border-2 text-[11px] text-white ${
-                  sel === c.slug ? "border-brand bg-brand" : "border-papier-linie dark:border-slate-600"
-                }`}
+              <span className="min-w-0 flex-1">{c.label}</span>
+              {/* Häkchen rechts in Systemblau – wie bei Auswahllisten in iOS */}
+              <svg
+                aria-hidden
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className={`shrink-0 text-brand transition duration-200 ease-ios ${an ? "scale-100 opacity-100" : "scale-50 opacity-0"}`}
               >
-                {sel === c.slug ? "✓" : ""}
-              </span>
-              {c.label}
+                <path d="M5 12.5l4.5 4.5L19 7.5" />
+              </svg>
             </button>
-          ))}
-        </div>
+          );
+        })}
+      </div>
+      <p className="mt-1.5 px-4 text-[13px] leading-snug text-tinte-leise">
+        Ändern kann das später nur das Stufenteam. Aufsichtsrat wird ausschließlich vom Stufenteam vergeben.
+      </p>
 
-        {err && <div className="mb-3 text-sm font-medium text-red-500">{err}</div>}
+      {err ? <FormFehler text={err} netz={netz} /> : <div className="h-6" />}
 
-        <button className="btn-primary" disabled={!sel || busy} onClick={speichern}>
-          {busy ? "…" : sel ? `„${committeeLabel(sel)}" übernehmen` : "Komitee wählen"}
-        </button>
-
-        <p className="mt-3 text-center text-[11px] leading-relaxed text-tinte-leise">
-          Das kannst du später nicht selbst ändern – nur das Stufenteam.
-          <br />
-          Aufsichtsrat wird ausschließlich vom Stufenteam vergeben.
-        </p>
-        <button
-          onClick={async () => {
-            const { data: s } = await supabase!.auth.getSession();
+      <LadeKnopf
+        busy={busy}
+        disabled={!sel}
+        onClick={() => void speichern()}
+        text={sel ? `„${committeeLabel(sel)}“ übernehmen` : "Komitee wählen"}
+        busyText="Speichern …"
+      />
+      <button
+        type="button"
+        disabled={busy}
+        onClick={async () => {
+          try {
+            const { data: s } = hasSupabase ? await supabase!.auth.getSession() : { data: { session: null } };
             const uid = s.session?.user.id;
             if (uid) vertagen(uid);
-            onDone();
-          }}
-          className="mt-3 w-full text-center text-sm font-semibold text-tinte-leise"
-        >
-          Ich weiß es noch nicht
-        </button>
-      </div>
-    </div>
+          } catch {
+            /* ohne Sitzung: dann eben beim nächsten Mal wieder fragen */
+          }
+          onDone();
+        }}
+        className="mt-2 flex min-h-[2.75rem] w-full items-center justify-center rounded-full text-[17px] text-brand transition active:opacity-50 disabled:opacity-40"
+      >
+        Ich weiß es noch nicht
+      </button>
+    </AnmeldeRahmen>
   );
 }
 
-function ChangeForm({ onDone }: { onDone: () => void }) {
+/**
+ * Startpasswort ersetzen. Wie beim Anmelden: Knopf mit Rädchen und
+ * „Speichern …“, gesperrt während es läuft; Netzfehler auf Deutsch.
+ *
+ * Zwei Schritte gehen ans Netz: erst das Passwort (Supabase Auth), dann der
+ * Vermerk must_change_password = false im Profil. Klappt nur der zweite
+ * nicht, ist das Passwort schon geändert – dann merkt sich das Formular das
+ * und versucht beim nächsten Tippen NUR den Vermerk (ein zweites Setzen
+ * desselben Passworts würde Supabase sonst ablehnen).
+ */
+export function ChangeForm({ onDone }: { onDone: () => void }) {
   const [pw1, setPw1] = useState("");
   const [pw2, setPw2] = useState("");
   const [err, setErr] = useState("");
+  const [netz, setNetz] = useState(false);
   const [busy, setBusy] = useState(false);
   const [nutzer, setNutzer] = useState("");
+  // Eltern werden gesiezt, alle anderen geduzt
+  const [eltern, setEltern] = useState(false);
+  const [pwSchonGesetzt, setPwSchonGesetzt] = useState(false);
 
   // Den eigenen Nutzernamen holen, damit er nicht als Passwort durchgeht.
   useEffect(() => {
     if (!hasSupabase) return;
     void (async () => {
-      const { data: s } = await supabase!.auth.getSession();
-      const uid = s.session?.user.id;
-      if (!uid) return;
-      const { data } = await supabase!.from("profiles").select("username").eq("user_id", uid).maybeSingle();
-      setNutzer(((data as { username?: string } | null)?.username) || "");
+      try {
+        const { data: s } = await supabase!.auth.getSession();
+        const uid = s.session?.user.id;
+        if (!uid) return;
+        const { data } = await supabase!.from("profiles").select("username, role").eq("user_id", uid).maybeSingle();
+        const profil = data as { username?: string; role?: string } | null;
+        setNutzer(profil?.username || "");
+        setEltern(profil?.role === "eltern");
+      } catch {
+        /* ohne Netz: Prüfung gegen den Namen entfällt, der Rest greift */
+      }
     })();
   }, []);
 
   const staerke = passwortStaerke(pw1);
 
   async function submit() {
+    if (busy) return;
     setErr("");
-    const problem = passwortProblem(pw1, nutzer);
-    if (problem) {
-      setErr(problem);
-      return;
+    setNetz(false);
+    if (!pwSchonGesetzt) {
+      const problem = passwortProblem(pw1, nutzer);
+      if (problem) {
+        setErr(problem);
+        return;
+      }
+      if (pw1 !== pw2) {
+        setErr("Die Passwörter stimmen nicht überein.");
+        return;
+      }
     }
-    if (pw1 !== pw2) {
-      setErr("Die Passwörter stimmen nicht überein.");
+    if (typeof navigator !== "undefined" && navigator.onLine === false) {
+      setErr(OFFLINE_TEXT);
+      setNetz(true);
       return;
     }
     setBusy(true);
-    const { error } = await supabase!.auth.updateUser({ password: pw1 });
-    if (error) {
+    try {
+      if (!hasSupabase) {
+        await new Promise((r) => setTimeout(r, 1200)); // Demo-Vorschau
+        throw new Error("Demo-Modus: Ohne Datenbank wird nichts gespeichert.");
+      }
+      if (!pwSchonGesetzt) {
+        const { error } = await supabase!.auth.updateUser({ password: pw1 });
+        if (error) {
+          setNetz(istNetzfehler(error));
+          setErr(
+            /new password should be different/i.test(error.message)
+              ? "Das neue Passwort muss sich vom Startpasswort unterscheiden."
+              : fehlerText(error),
+          );
+          return;
+        }
+        setPwSchonGesetzt(true);
+      }
+      const { data: s } = await supabase!.auth.getSession();
+      if (s.session) {
+        const { error: e2 } = await supabase!.from("profiles").update({ must_change_password: false }).eq("user_id", s.session.user.id);
+        if (e2) {
+          setNetz(istNetzfehler(e2));
+          setErr(fehlerText(`${eltern ? "Ihr" : "Dein"} Passwort ist geändert, nur der Vermerk fehlt noch: ` + e2.message) + (eltern ? " Tippen Sie einfach nochmal auf „Weiter“." : " Tipp einfach nochmal auf „Weiter“."));
+          return;
+        }
+      }
+      onDone();
+    } catch (e) {
+      setNetz(istNetzfehler(e));
+      setErr(fehlerText(e));
+    } finally {
       setBusy(false);
-      setErr(error.message === "New password should be different from the old password."
-        ? "Das neue Passwort muss sich vom Startpasswort unterscheiden."
-        : error.message);
-      return;
     }
-    const { data: s } = await supabase!.auth.getSession();
-    if (s.session) {
-      await supabase!.from("profiles").update({ must_change_password: false }).eq("user_id", s.session.user.id);
-    }
-    setBusy(false);
-    onDone();
   }
 
   return (
-    <div className="flex min-h-full items-center justify-center p-6">
-      <div className="card w-full max-w-sm p-6">
-        <div className="mb-1 text-center text-2xl font-bold">Neues Passwort</div>
-        <p className="mb-5 text-center text-sm text-tinte-matt">
-          Du nutzt noch dein Startpasswort. Bitte lege jetzt ein eigenes fest – danach geht es weiter.
-        </p>
-        <input
-          className="field mb-1.5"
-          type="password"
-          placeholder="Neues Passwort"
-          autoComplete="new-password"
-          autoFocus
-          value={pw1}
-          onChange={(e) => setPw1(e.target.value)}
-        />
+    <AnmeldeRahmen>
+      <AnmeldeKopf
+        titel="Neues Passwort"
+        unter={eltern ? "Sie nutzen noch das Startpasswort. Legen Sie jetzt ein eigenes fest – danach geht es weiter." : "Du nutzt noch dein Startpasswort. Leg jetzt ein eigenes fest – danach geht es weiter."}
+      />
+      <form
+        noValidate
+        onSubmit={(e) => {
+          e.preventDefault();
+          void submit();
+        }}
+      >
+        {/* Verstecktes Nutzerfeld: Passwortmanager wissen so, zu welchem
+            Konto das neue Passwort gehört, und speichern es richtig. */}
+        <input type="text" name="username" autoComplete="username" value={nutzer} readOnly hidden />
+        <div className="gruppe-zellen shadow-[0_0_0_0.5px_rgba(0,0,0,0.05)] dark:shadow-none">
+          <label className="block">
+            <span className="sr-only">Neues Passwort</span>
+            <input
+              className={ZELLEN_FELD}
+              type="password"
+              placeholder="Neues Passwort"
+              autoComplete="new-password"
+              autoFocus
+              disabled={busy || pwSchonGesetzt}
+              value={pw1}
+              onChange={(e) => setPw1(e.target.value)}
+            />
+          </label>
+          <label className="block">
+            <span className="sr-only">Passwort bestätigen</span>
+            <input
+              className={ZELLEN_FELD}
+              type="password"
+              placeholder="Passwort bestätigen"
+              autoComplete="new-password"
+              disabled={busy || pwSchonGesetzt}
+              value={pw2}
+              onChange={(e) => setPw2(e.target.value)}
+            />
+          </label>
+        </div>
+
         {/* Kleine Rückmeldung, solange getippt wird */}
-        {pw1.length > 0 && (
-          <div className="mb-3 flex items-center gap-2">
-            <div className="flex h-1.5 flex-1 gap-1">
-              {[1, 2, 3].map((n) => (
-                <div
-                  key={n}
-                  className={`h-full flex-1 rounded-full ${
-                    staerke.stufe >= n
-                      ? staerke.stufe === 1
-                        ? "bg-amber-400"
-                        : staerke.stufe === 2
-                          ? "bg-lime-500"
-                          : "bg-emerald-500"
-                      : "bg-slate-200 dark:bg-slate-700"
-                  }`}
-                />
-              ))}
-            </div>
-            <span className="shrink-0 text-[11px] font-semibold text-tinte-leise">{staerke.text}</span>
-          </div>
-        )}
-        <input
-          className="field mb-3"
-          type="password"
-          placeholder="Passwort bestätigen"
-          autoComplete="new-password"
-          value={pw2}
-          onChange={(e) => setPw2(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && submit()}
-        />
-        {err && <div className="mb-3 text-sm font-medium text-red-500">{err}</div>}
-        <button className="btn-primary" disabled={busy} onClick={submit}>
-          {busy ? "…" : "Passwort speichern"}
-        </button>
-        <p className="mt-3 text-center text-[11px] leading-relaxed text-tinte-leise">
-          Mindestens 8 Zeichen. Nimm nichts, was du anderswo schon benutzt.
+        <div className="mt-2 flex h-4 items-center gap-2 px-4">
+          {pw1.length > 0 && (
+            <>
+              <div className="flex h-1 flex-1 gap-1">
+                {[1, 2, 3].map((n) => (
+                  <div
+                    key={n}
+                    className={`h-full flex-1 rounded-full transition-colors duration-300 ${
+                      staerke.stufe >= n
+                        ? staerke.stufe === 1
+                          ? "bg-[#FF9500]"
+                          : staerke.stufe === 2
+                            ? "bg-[#FFCC00]"
+                            : "bg-[#34C759]"
+                        : "bg-[rgb(118_118_128/0.16)] dark:bg-[rgb(118_118_128/0.32)]"
+                    }`}
+                  />
+                ))}
+              </div>
+              <span className="shrink-0 text-[12px] font-semibold text-tinte-leise">{staerke.text}</span>
+            </>
+          )}
+        </div>
+        <p className="mt-1 px-4 text-[13px] leading-snug text-tinte-leise">
+          {eltern ? "Mindestens 8 Zeichen. Bitte nichts verwenden, was Sie anderswo schon benutzen." : "Mindestens 8 Zeichen. Nimm nichts, was du anderswo schon benutzt."}
         </p>
-      </div>
-    </div>
+
+        {err ? <FormFehler text={err} netz={netz} /> : <div className="h-6" />}
+
+        <LadeKnopf type="submit" busy={busy} text={pwSchonGesetzt ? "Weiter" : "Passwort speichern"} busyText="Speichern …" />
+      </form>
+    </AnmeldeRahmen>
   );
 }

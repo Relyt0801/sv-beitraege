@@ -1,5 +1,5 @@
 import { useProfiles } from "../profiles-store";
-import { farbe as farbeVon, farbeAusName, initialen as initialenVon, lesbarerName, namensfarbe, schriftAuf } from "../lib/profil";
+import { farbe as farbeVon, farbeAusName, grundFuerInitialen, initialen as initialenVon, lesbarerName, namensfarbe, schriftAuf } from "../lib/profil";
 import { personIcon } from "../lib/committees";
 import { useTheme } from "../lib/theme";
 
@@ -24,6 +24,8 @@ export function Avatar({
   const anzeige = lesbarerName(p?.anzeigename || name || "");
   const kurz = p?.initialen || initialenVon(anzeige);
   const f = farbeVon(p?.farbe || farbeAusName(anzeige || String(userId ?? "")));
+  // Mittelhelle Farben etwas abdunkeln, damit die Initialen 4,5:1 erreichen
+  const grund = grundFuerInitialen(dunkel ? f.dunkel : f.hell);
 
   const Tag = onClick ? "button" : "div";
   return (
@@ -33,7 +35,7 @@ export function Avatar({
       style={{
         width: size,
         height: size,
-        backgroundColor: dunkel ? f.dunkel : f.hell,
+        backgroundColor: grund,
         border: f.kontur ? "1px solid rgba(100,116,139,.5)" : undefined,
       }}
       className={`flex shrink-0 select-none items-center justify-center rounded-full ${
@@ -41,7 +43,7 @@ export function Avatar({
       } ${onClick ? "transition active:scale-95" : ""}`}
     >
       <span
-        style={{ fontSize: Math.round(size * 0.4), color: schriftAuf(dunkel ? f.dunkel : f.hell) }}
+        style={{ fontSize: Math.round(size * 0.4), color: schriftAuf(grund) }}
         className="font-extrabold leading-none"
       >
         {kurz}

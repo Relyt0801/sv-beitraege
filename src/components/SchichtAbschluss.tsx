@@ -5,10 +5,26 @@ import { useStore } from "../store";
 import { pushAnPersonen } from "../lib/push";
 import { hasSupabase } from "../lib/supabase";
 import { heuteKey, schichtEnde as endeVon, tagLang, terminIcon, uhr, type Termin } from "../lib/termine";
-import { Sheet } from "./Sheet";
+import { Sheet, SheetKopf } from "./Sheet";
+import { Icon } from "./Icon";
 
 /** Ereignis, mit dem der Hinweis im Events-Reiter das Fenster wieder öffnet. */
 const OEFFNEN = "sv:schicht-abschluss";
+
+/**
+ * Von selbst geht das Fenster höchstens einmal pro Tag auf (Update 1.4, U3).
+ * Vorher kam es bei JEDEM Start der App wieder, solange etwas offen war – wer
+ * sich mehrmals am Tag einloggt, wurde damit genervt. Der Hinweis im
+ * Events-Reiter bleibt, und von dort öffnet sich das Fenster jederzeit.
+ */
+const TAG_MERKER = "sv:schicht-abschluss:tag";
+function heuteSchonGezeigt(): boolean {
+  try {
+    return localStorage.getItem(TAG_MERKER) === heuteKey();
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Alle Schichten, die vorbei sind und noch auf „Punkte vergeben / ohne“
@@ -58,10 +74,11 @@ export function AbschlussHinweis() {
   return (
     <button
       onClick={abschlussOeffnen}
-      className="mb-3 flex w-full items-center gap-3 rounded-2xl border border-amber-500/40 bg-amber-50 px-4 py-3 text-left transition active:scale-[.99] dark:border-amber-400/30 dark:bg-amber-500/10"
+      className="mb-3 flex w-full items-center gap-3 rounded-2xl border border-amber-500/40 bg-amber-50 px-4 py-3 text-left transition active:scale-[.99] dark:border-amber-400/30 dark:bg-[#2b2214]"
     >
-      <span className="text-xl leading-none" aria-hidden>
-        🙌
+      {/* Symbol aus Icon statt Emoji (Design-Regeln 5) */}
+      <span className="symbol bg-[#FF9500]" aria-hidden>
+        <Icon name="haken" size={17} strich={2.4} />
       </span>
       <span className="min-w-0 flex-1">
         <span className="block text-[14px] font-bold text-amber-800 dark:text-amber-200">
@@ -92,6 +109,8 @@ export function SchichtAbschluss() {
   const [vonHand, setVonHand] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [fehler, setFehler] = useState("");
+  // Beim Start entschieden: war es heute schon einmal von selbst da?
+  const [autoErlaubt] = useState(() => !heuteSchonGezeigt());
 
   const aktionVon = useMemo(() => new Map(aktionen.map((a) => [a.id, a])), [aktionen]);
   const alleOffen = useOffeneAbschluesse();
@@ -114,7 +133,19 @@ export function SchichtAbschluss() {
       .filter((t) => !spaeter.has(t.id));
   }, [alleOffen, vonHand, spaeter]);
 
-  if (!offen.length) return null;
+  // Sobald es von selbst aufgeht, ist der Tag „verbraucht“ (auch wenn man es
+  // wegschiebt) – beim nächsten Start heute bleibt es zu.
+  const zeigen = offen.length > 0 && (autoErlaubt || vonHand);
+  useEffect(() => {
+    if (!zeigen || vonHand) return;
+    try {
+      localStorage.setItem(TAG_MERKER, heuteKey());
+    } catch {
+      /* privater Modus: dann eben bei jedem Start */
+    }
+  }, [zeigen, vonHand]);
+
+  if (!zeigen) return null;
   function wegLegen() {
     setSpaeter(new Set([...spaeter, ...offen.map((t) => t.id)]));
     setVonHand(false);
@@ -148,14 +179,11 @@ export function SchichtAbschluss() {
 
   return (
     <Sheet open onClose={wegLegen}>
-      <div className="mb-1 font-zahl text-[1.2rem] font-extrabold tracking-[-0.02em]">
-        {offen.length === 1 ? "Eine Schicht ist vorbei" : `${offen.length} Schichten sind vorbei`}
-      </div>
-      <p className="mb-3 text-[13px] leading-relaxed text-tinte-leise">
-        Haben alle Eingeteilten mitgemacht? Dann bekommen sie mit einem Tipp ihre Beitragspunkte.
-        Wer nicht da war, vorher in der Schicht austragen. Weggewischt? Im Reiter Events steht
-        es weiter oben, bis alles bestätigt ist.
-      </p>
+      <SheetKopf
+        titel={offen.length === 1 ? "Eine Schicht ist vorbei" : `${offen.length} Schichten sind vorbei`}
+        unter="Haben alle Eingeteilten mitgemacht? Dann bekommen sie mit einem Tipp ihre Mithilfe. Wer nicht da war, vorher in der Schicht austragen. Weggewischt? Es steht weiter in der Übersicht unter „Zu erledigen“ und oben in Events, bis alles bestätigt ist."
+        onClose={wegLegen}
+      />
 
       <ul className="grid gap-2.5">
         {offen.map((t) => {
@@ -171,7 +199,7 @@ export function SchichtAbschluss() {
                     {t.von ? ` · ${uhr(t.von)}${t.bis ? `–${uhr(t.bis)}` : ""}` : ""}
                   </span>
                 </span>
-                <span className="zahl shrink-0 rounded-full bg-brand/10 px-2 py-0.5 text-[11px] font-bold text-brand dark:bg-brand/20">
+                <span className="zahl shrink-0 rounded-full bg-brand/10 px-2 py-0.5 text-[12px] font-bold text-brand dark:text-brand-dark dark:bg-brand/20">
                   +{a.prozent} %
                 </span>
               </div>
@@ -188,7 +216,7 @@ export function SchichtAbschluss() {
                   onClick={() => void erledigen(t, true)}
                   className="btn-primary min-w-0 flex-1 !py-2.5 !text-[14px] disabled:opacity-50"
                 >
-                  {busy === t.id ? "…" : `Punkte vergeben (${t.personen.length})`}
+                  {busy === t.id ? "…" : `Mithilfe bestätigen (${t.personen.length})`}
                 </button>
                 <button
                   disabled={busy === t.id}

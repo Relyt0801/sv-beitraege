@@ -102,6 +102,25 @@ export function schriftAuf(hex: string): string {
   return gegenDunkel > gegenWeiss ? "#111827" : "#ffffff";
 }
 
+/**
+ * Grund für Initialen, auf dem die Schrift aus schriftAuf mindestens 4,5:1
+ * erreicht. Mittelhelle Farben (relative Helligkeit um 0,2) schaffen weder mit
+ * Weiß noch mit Dunkel mehr als ~4,2:1 – dann wird der Grund im selben Farbton
+ * schrittweise abgedunkelt, bis Weiß 4,5:1 hat (axe fand das am Profil-Knopf).
+ */
+export function grundFuerInitialen(hex: string): string {
+  const h = hex.replace("#", "");
+  let rgb = [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16));
+  const kanal = (c: number) => {
+    const x = c / 255;
+    return x <= 0.03928 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4);
+  };
+  const L = (f: number[]) => 0.2126 * kanal(f[0]) + 0.7152 * kanal(f[1]) + 0.0722 * kanal(f[2]);
+  const besterKontrast = (f: number[]) => Math.max(1.05 / (L(f) + 0.05), (L(f) + 0.05) / (0.0106 + 0.05));
+  for (let i = 0; i < 12 && besterKontrast(rgb) < 4.5; i++) rgb = rgb.map((c) => Math.round(c * 0.92));
+  return "#" + rgb.map((c) => c.toString(16).padStart(2, "0")).join("");
+}
+
 /** Früher: leuchtender Rand um Weiß/Schwarz. Gibt es nicht mehr (siehe namensfarbe). */
 export function farbKontur(_key: string | null | undefined, _dunkel: boolean): string | undefined {
   return undefined;

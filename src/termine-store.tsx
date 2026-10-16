@@ -3,11 +3,14 @@ import {
 } from "react";
 import { hasSupabase, supabase } from "./lib/supabase";
 import { abonniere } from "./lib/realtime";
-import { kurzDatum, schichtStatus, uhr, type Aktion, type SchichtStatus, type NeueAnfrage, type NeuerTermin, type Termin, type TerminAnfrage } from "./lib/termine";
+import { demoTermine, heuteKey, kurzDatum, schichtStatus, uhr, type Aktion, type SchichtStatus, type NeueAnfrage, type NeuerTermin, type Termin, type TerminAnfrage } from "./lib/termine";
 import { pushAnTeam, pushToUsers, pushZuTermin } from "./lib/push";
 import { committeeIcon, committeeLabel } from "./lib/committees";
 
 import { meldeFehler } from "./lib/melder";
+import { demoRolle, demoUid } from "./lib/demo";
+import { useRole } from "./auth/RoleProvider";
+import { useStore } from "./store";
 const LS = "sv-beitraege:termine";
 const LOCAL_UID = "local-user";
 
@@ -119,7 +122,7 @@ export function TermineProvider({ children }: { children: ReactNode }) {
 
   // ---------------------------------------------------------- lokal
   useEffect(() => {
-    if (hasSupabase) return;
+    if (hasSupabase || demoRolle()) return;
     try {
       setTermine(JSON.parse(localStorage.getItem(LS) || "[]"));
     } catch {
@@ -127,7 +130,40 @@ export function TermineProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  // ---------------------------------------------------------- Demo
+  // Demo-Modus (?rolle=…, ohne Datenbank): erfundene Aktionen, Schichten und
+  // Termine aus lib/termine.ts → demoTermine. Wartet, bis die Demo-Personen
+  // da sind, damit belegte Plätze echte (erfundene) Namen haben. Als Schüler
+  // ist man selbst in einer Schicht eingeteilt und für eine gemeldet.
+  const { studentId: demoIch } = useRole();
+  const { students: demoPersonen } = useStore();
+  // Nur EINMAL je eigener Person erzeugen (wie demo.current in lib/finanzen.ts).
+  // Vorher hing der Effekt an der ganzen Personenliste: Jede Zahlung in der
+  // Kasse erzeugte alle Termine neu – was man in der Demo an Terminen und
+  // Schichten geändert hatte, war weg, und der Zähler an „Events“ sprang ohne
+  // Grund von 8 auf „9+“.
+  const demoFuer = useRef<string | null>(null);
+  useEffect(() => {
+    const rolle = demoRolle();
+    if (hasSupabase || !rolle || !demoPersonen.length) return;
+    const schluessel = demoIch ?? "-";
+    if (demoFuer.current === schluessel) return;
+    demoFuer.current = schluessel;
+    const uid = demoUid(rolle) ?? LOCAL_UID;
+    uidRef.current = uid;
+    setMeineUid(uid);
+    setMeineStudentIds(demoIch ? [demoIch] : []);
+    const andere = demoPersonen.map((p) => p.id).filter((id) => id !== demoIch);
+    const d = demoTermine(heuteKey(), demoIch, andere, uid);
+    setTermine(d.termine);
+    setAktionen(d.aktionen);
+    setBewerbungen(d.bewerbungen);
+  }, [demoIch, demoPersonen]);
+
   const lokalSpeichern = useCallback((next: Termin[]) => {
+    // Demo-Daten nicht in den lokalen Speicher schreiben – sonst tauchten sie
+    // später im lokalen Modus ohne ?rolle= wieder auf.
+    if (demoRolle()) return;
     localStorage.setItem(LS, JSON.stringify(next));
   }, []);
 
@@ -461,12 +497,14 @@ export function TermineProvider({ children }: { children: ReactNode }) {
   // ---------------------------------------------------------- Schichten
   const bewerben = useCallback<TermineValue["bewerben"]>(
     async (terminId, an) => {
-      if (!hasSupabase || !uidRef.current) return;
+      if (!uidRef.current) return;
       const ich = uidRef.current;
       setBewerbungen((prev) => {
         const l = prev[terminId] || [];
         return { ...prev, [terminId]: an ? [...new Set([...l, ich])] : l.filter((u) => u !== ich) };
       });
+      // Ohne Datenbank (Demo): nur hier im Browser merken
+      if (!hasSupabase) return;
       const { error } = an
         ? await supabase!.from("aktion_bewerbungen").insert({ termin_id: terminId, user_id: ich })
         : await supabase!
@@ -484,7 +522,6 @@ export function TermineProvider({ children }: { children: ReactNode }) {
 
   const zuteilen = useCallback<TermineValue["zuteilen"]>(
     async (terminId, studentId, an) => {
-      if (!hasSupabase) return;
       setTermine((prev) =>
         prev.map((t) =>
           t.id === terminId
@@ -497,6 +534,8 @@ export function TermineProvider({ children }: { children: ReactNode }) {
             : t,
         ),
       );
+      // Ohne Datenbank (Demo): nur hier im Browser einteilen
+      if (!hasSupabase) return;
       const { error } = an
         ? await supabase!.from("termin_personen").insert({ termin_id: terminId, student_id: studentId })
         : await supabase!
@@ -533,8 +572,8 @@ export function TermineProvider({ children }: { children: ReactNode }) {
 
   const bewerbungEntfernen = useCallback<TermineValue["bewerbungEntfernen"]>(
     async (terminId, userId) => {
-      if (!hasSupabase) return;
       setBewerbungen((prev) => ({ ...prev, [terminId]: (prev[terminId] || []).filter((u) => u !== userId) }));
+      if (!hasSupabase) return;
       const { error } = await supabase!
         .from("aktion_bewerbungen")
         .delete()

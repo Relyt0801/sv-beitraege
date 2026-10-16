@@ -24,6 +24,13 @@ import "./index.css";
  *    Satz neu geladen, sondern sobald das Feld verlassen wird oder die App in
  *    den Hintergrund geht – so geht keine Eingabe verloren.
  */
+/*
+ * Meldet index.html: „Die Programmdateien sind da, die App läuft an.“ Erst
+ * wenn das ausbleibt, zeigt der Notausgang dort seinen „Neu laden“-Knopf – bei
+ * bloß langsamem Netz kommt nur ein freundlicher Wartetext (Update 1.4, U3).
+ */
+(window as unknown as { __svGestartet?: boolean }).__svGestartet = true;
+
 // iPhone: Tab-Leiste rutscht nach dem Tippen sonst in die Mitte (siehe Datei)
 iosFensterReparieren();
 

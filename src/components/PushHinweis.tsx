@@ -61,13 +61,21 @@ export function PushHinweis({ fuerEltern }: { fuerEltern?: boolean }) {
 
   const sie = fuerEltern;
   return (
-    <div className="card mb-3 flex flex-wrap items-center gap-3 border-brand/40 bg-brand/5 p-3.5">
-      <span className="text-[20px]">🔔</span>
-      <div className="min-w-0 flex-1">
-        <div className="text-[14px] font-bold">
+    // Deckende Karte (vorher bg-brand/5: auf dem Hintergrundbild schien das
+    // Foto durch, der Text war kaum lesbar) – nur ein blauer Rand hebt sie ab
+    <div className="card mb-3 flex flex-wrap items-center gap-3 !border-brand/30 p-3.5">
+      {/* Glocke als Linien-Symbol statt Emoji (Update 1.4, U3) */}
+      <span aria-hidden className="symbol bg-[#FF3B30]">
+        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M6 9a6 6 0 0 1 12 0c0 6 2.5 7.5 2.5 7.5h-17S6 15 6 9z" />
+          <path d="M10 20a2 2 0 0 0 4 0" />
+        </svg>
+      </span>
+      <div className="min-w-0 flex-1 basis-[12rem]">
+        <div className="text-[15px] font-semibold">
           {perm === "denied" ? "Benachrichtigungen sind blockiert" : "Benachrichtigungen einschalten"}
         </div>
-        <div className="text-[12px] leading-relaxed text-tinte-matt dark:text-slate-400">
+        <div className="text-[13px] leading-relaxed text-tinte-matt dark:text-slate-400">
           {iphone
             ? IPHONE_HINWEIS
             : perm === "denied"
@@ -76,7 +84,7 @@ export function PushHinweis({ fuerEltern }: { fuerEltern?: boolean }) {
                 ? "Dann erfahren Sie sofort, wenn das Stufenteam antwortet."
                 : "Dann bekommst du Bescheid bei neuen Nachrichten, Events und Schichten."}
         </div>
-        {fehler && <div className="mt-1 text-[12px] font-semibold text-amber-600">{fehler}</div>}
+        {fehler && <div className="mt-1 text-[13px] font-semibold text-amber-700 dark:text-amber-400">{fehler}</div>}
       </div>
       <div className="flex shrink-0 gap-2">
         <button
@@ -88,7 +96,7 @@ export function PushHinweis({ fuerEltern }: { fuerEltern?: boolean }) {
             }
             setWeg(true);
           }}
-          className="rounded-lg px-2.5 py-1.5 text-[13px] font-semibold text-tinte-leise"
+          className="btn-klein-grau"
         >
           Später
         </button>
@@ -106,7 +114,7 @@ export function PushHinweis({ fuerEltern }: { fuerEltern?: boolean }) {
                   setFehler("Hat nicht geklappt: " + r.error);
               });
             }}
-            className="rounded-lg bg-brand px-3 py-1.5 text-[13px] font-bold text-white disabled:opacity-50"
+            className="btn-klein"
           >
             {busy ? "…" : "Einschalten"}
           </button>

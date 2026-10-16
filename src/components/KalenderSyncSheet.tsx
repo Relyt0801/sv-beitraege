@@ -7,6 +7,10 @@ import { tagLang, zeitText, type Termin } from "../lib/termine";
 /**
  * "Mit deinem Kalender verbinden" – TESTPHASE, nur für die Testkonten.
  *
+ * Vorübergehend ausgeblendet (Wunsch 14.10.2026): Alle Einstiege hängen an
+ * useKalenderDemo(), und das bleibt false, solange KALENDER_SYNC_AN in
+ * lib/kalender-sync.ts aus ist. Zum Wiedereinschalten nur dort `true` setzen.
+ *
  * Oben: die Termine der Stufe als Abo im eigenen Kalender.
  * Unten: den eigenen Kalender (iCloud/Google/Outlook) grau in der App zeigen.
  */
@@ -58,7 +62,7 @@ export function KalenderSyncSheet({ open, onClose }: { open: boolean; onClose: (
         {/* Klar gekennzeichnet: nur die Termine der STUFE, nur in EINE Richtung. */}
         <div className="flex flex-wrap items-center gap-2">
           <h3 className="text-[15px] font-bold">Stufen-Termine ins Handy</h3>
-          <span className="rounded-full bg-brand/10 px-2 py-0.5 text-[11px] font-bold text-brand-dark dark:bg-brand/20 dark:text-brand-soft">
+          <span className="rounded-full bg-brand/10 px-2 py-0.5 text-[12px] font-bold text-brand-dark dark:bg-brand/20 dark:text-brand-dark">
             nur Stufe → Handy
           </span>
         </div>

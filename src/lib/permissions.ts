@@ -46,7 +46,7 @@ export type PermKey =
   | "funktion.motto"
   | "funktion.umfragen";
 
-/** eltern: Das Recht lässt sich auch Elternzugängen geben (eigene Schaltfläche im Rechte-Reiter). */
+/** eltern: Das Recht lässt sich auch Elternzugängen geben (eigene Kapsel unter Rollen → Rechte je Rolle). */
 export interface PermDef { key: PermKey; label: string; desc: string; eltern?: boolean; /** Unterpunkt innerhalb des Themas (z. B. „Zitate“) */ unter?: string }
 export interface PermCategory { label: string; icon: string; perms: PermDef[] }
 
@@ -81,7 +81,7 @@ export const PERM_CATEGORIES: PermCategory[] = [
     label: "Daten", icon: "🗂️", perms: [
       { key: "data.edit", label: "Daten bearbeiten", desc: "Namen, Personen, Halbjahr, Import/Export." },
       { key: "hilfen.edit", label: "Beteiligungen eintragen", desc: "Mithilfe/Beitragshilfen (Prozent) bei Personen eintragen – einzeln oder für mehrere auf einmal." },
-      { key: "beitraege.manage", label: "Beiträge-Reiter", desc: "Halbjahresbeiträge, Möglichkeiten zum Prozentsammeln und die Abiball-Staffel festlegen." },
+      { key: "beitraege.manage", label: "Beiträge & Abiball festlegen", desc: "Halbjahresbeiträge, Möglichkeiten zum Prozentsammeln und die Abiball-Staffel festlegen (Kasse → Beiträge & Abiball)." },
     ],
   },
   {
@@ -111,8 +111,8 @@ export const PERM_CATEGORIES: PermCategory[] = [
       { unter: "Zitatwand", key: "funktion.zitate", label: "Zitatwand an/aus", desc: "Den ganzen Bereich für alle ein- oder ausschalten." },
       { unter: "Rankings", key: "rankings.nutzen", label: "Rankings nutzen", desc: "In den Schüler- und Lehrer-Rankings abstimmen und die Top 3 sehen." },
       { unter: "Rankings", key: "rankings.verwalten", label: "Rankings verwalten", desc: "Ranking-Kategorien anlegen, ändern, löschen – auch direkt aus Umfrage-Ergebnissen." },
-      { unter: "Rankings", key: "rankings.runden", label: "Ranking-Abstimmungsrunden", desc: "Stichwahlen je Kategorie starten, Stimmen je Person festlegen, beenden." },
-      { unter: "Rankings", key: "lehrer.verwalten", label: "Lehrerliste pflegen", desc: "Lehrkräfte für Lehrer-Rankings und Zitate eintragen, ändern, löschen." },
+      { unter: "Rankings", key: "rankings.runden", label: "Ranking-Runden", desc: "Runden (Stichwahl) je Kategorie starten, Stimmen je Person festlegen, beenden." },
+      { unter: "Rankings", key: "lehrer.verwalten", label: "Lehrkräfte pflegen", desc: "Lehrkräfte für Lehrer-Rankings und Zitate eintragen, ändern, löschen." },
       { unter: "Rankings", key: "funktion.rankings", label: "Rankings an/aus", desc: "Den ganzen Bereich für alle ein- oder ausschalten." },
     ],
   },
@@ -140,7 +140,7 @@ export const PERM_CATEGORIES: PermCategory[] = [
   {
     label: "Rollen & Rechte", icon: "👑", perms: [
       { key: "roles.manage", label: "Rollen ändern", desc: "Rollen anderer Personen setzen." },
-      { key: "perms.manage", label: "Berechtigungen vergeben", desc: "Diesen Rechte-Reiter benutzen." },
+      { key: "perms.manage", label: "Berechtigungen vergeben", desc: "Rechte je Rolle, Komitee-Rechte und Ausnahmen für einzelne Personen einstellen (Rollen → Rechte je Rolle)." },
       { key: "funktionen.verwalten", label: "Alle Funktionen an/aus", desc: "Jeden Bereich für alle ein- oder ausschalten (Profil → Funktionen). Einzelne Bereiche lassen sich auch Komitees geben." },
     ],
   },
@@ -152,7 +152,7 @@ export type RolleKey = "schueler" | "sprecher" | "stv_sprecher" | "stufenteam" |
 
 /**
  * Wie eine Rolle heisst – einmal ausgeschrieben, einmal kurz.
- * Steht hier zentral, damit Rollen-Reiter und Rechte-Reiter dieselben
+ * Steht hier zentral, damit „Personen“ und „Rechte je Rolle“ dieselben
  * Bezeichnungen benutzen und nirgends der rohe Schluessel durchrutscht.
  */
 export const ROLLE_LANG: Record<string, string> = {
@@ -182,7 +182,7 @@ export function rolleName(role: string): string {
 
 /**
  * Für Rechte zählen Stufensprecher*in und Stv. als EINE Rolle: beide bekommen
- * immer dieselben Rechte. Deshalb gibt es im Rechte-Reiter nur eine Spalte
+ * immer dieselben Rechte. Deshalb gibt es unter „Rechte je Rolle“ nur eine Kapsel
  * "Sprecher", und jede Änderung wird auf beide Rollen geschrieben.
  */
 export const PERM_ROLES: { key: RolleKey; label: string }[] = [
@@ -211,7 +211,7 @@ const TEAM_STANDARD: PermKey[] = ["chats.view_all", "chats.delete_messages", "ch
 const ABIZEITUNG: PermKey[] = ["album.nutzen", "zitate.nutzen", "rankings.nutzen", "motto.nutzen"];
 
 /**
- * Rechte, die sich ganzen Komitees geben lassen (Rechte → Komitee-Rechte,
+ * Rechte, die sich ganzen Komitees geben lassen (Rollen → Rechte je Rolle → Komitee-Rechte,
  * Tabelle komitee_rechte). Startwerte: Abizeitung prüft Zitate und verwaltet
  * Rankings + Lehrerliste, Motto & Pullis verwaltet das Abimotto.
  */

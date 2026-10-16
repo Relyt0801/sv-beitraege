@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { hasSupabase, supabase } from "./supabase";
 import { abonniere } from "./realtime";
 import { useStore } from "../store";
+import { demoRolle } from "./demo";
 
 /**
  * Pop-up-Umfragen (supabase/abi-album.sql)
@@ -38,6 +39,11 @@ export interface Frage {
   titel: string;
   optionen: string[];
   pflicht: boolean;
+  /**
+   * Nur bei Auswahl (einfach/mehrfach): zusätzlich „Eigene Antwort“ anbieten
+   * (supabase/umfrage-eigene-antwort.sql). Alte Fragen: fehlt/false.
+   */
+  eigene?: boolean;
 }
 
 export type Wert = string | string[] | number;
@@ -45,7 +51,15 @@ export type Wert = string | string[] | number;
 export interface Ergebnis {
   teilnehmer: number;
   zielgruppe: number;
-  fragen: { frage_id: string; antworten: number; zaehlung: Record<string, number>; texte: string[] }[];
+  fragen: {
+    frage_id: string;
+    antworten: number;
+    /** Auswahl: Stimmen je Möglichkeit – die freie Möglichkeit heißt hier „Eigene Antwort“ */
+    zaehlung: Record<string, number>;
+    texte: string[];
+    /** Texte zu „Eigene Antwort“ (ohne Namen) – fehlt bei alter Datenbank */
+    eigene?: string[];
+  }[];
 }
 
 export interface UPerson {
@@ -94,11 +108,59 @@ export function alsZahl(t: string): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+/* ---------------------------------------------------------------- Eigene Antwort */
+/**
+ * „Eigene Antwort“ bei Auswahl-Fragen. In der Datenbank steht im Wert die
+ * Marke "__eigene__" (bei Mehrfachwahl als Eintrag der Liste) und der Text
+ * in der eigenen Spalte umfrage_antworten.eigene.
+ *
+ * In der App reisen Marke und Text zusammen als EIN Eintrag
+ * "__eigene__:Text" – so bleibt eine Antwort ein einfacher Wert (string bzw.
+ * string[]) und das Pop-up muss nichts Neues lernen. Erst beim Speichern wird
+ * getrennt (zerlegen), beim Laden wieder zusammengesetzt (zusammensetzen).
+ */
+export const EIGENE = "__eigene__";
+/** So heißt die freie Möglichkeit in Pop-up und Auswertung */
+export const EIGENE_NAME = "Eigene Antwort";
+export const istEigene = (w: unknown): boolean => typeof w === "string" && (w === EIGENE || w.startsWith(EIGENE + ":"));
+export const eigeneText = (w: string) => (w.startsWith(EIGENE + ":") ? w.slice(EIGENE.length + 1) : "");
+export const eigenerWert = (text: string) => `${EIGENE}:${text}`;
+/** Darf die Frage „Eigene Antwort“ haben? */
+export const mitEigener = (f: Pick<Frage, "typ" | "eigene">) => Boolean(f.eigene) && (f.typ === "einfach" || f.typ === "mehrfach");
+
+/** App-Wert → Datenbank: { wert, eigene }. null = (noch) nichts zu speichern. */
+export function zerlegen(w: Wert): { wert: Wert; eigene: string | null } | null {
+  if (typeof w === "string" && istEigene(w)) {
+    const t = eigeneText(w).trim();
+    return t ? { wert: EIGENE, eigene: t } : null;
+  }
+  if (Array.isArray(w)) {
+    const frei = w.find(istEigene);
+    const t = frei ? eigeneText(frei).trim() : "";
+    // Leere eigene Antwort zählt (noch) nicht – nur die normalen Kreuze speichern
+    const liste: string[] = w.filter((x): boolean => !istEigene(x)).concat(t ? [EIGENE] : []);
+    if (!liste.length && frei) return null;
+    return { wert: liste, eigene: t || null };
+  }
+  return { wert: w, eigene: null };
+}
+
+/** Datenbank → App-Wert ("__eigene__" + Text wird "__eigene__:Text"). */
+export function zusammensetzen(wert: Wert, eigene: string | null | undefined): Wert {
+  if (wert === EIGENE) return eigenerWert(eigene || "");
+  if (Array.isArray(wert)) return wert.map((x) => (x === EIGENE ? eigenerWert(eigene || "") : x));
+  return wert;
+}
+
 /** Ist die Antwort ausgefüllt? */
 export function beantwortet(f: Frage, w: Wert | undefined): boolean {
   if (w === undefined || w === null) return false;
-  if (Array.isArray(w)) return w.length > 0;
-  if (typeof w === "string") return f.typ === "text" && textArt(f) === "zahl" ? alsZahl(w) !== null : w.trim().length > 0;
+  // „Eigene Antwort“ zählt erst mit Text
+  if (Array.isArray(w)) return w.some((x): boolean => !istEigene(x) || eigeneText(x).trim().length > 0);
+  if (typeof w === "string") {
+    if (istEigene(w)) return eigeneText(w).trim().length > 0;
+    return f.typ === "text" && textArt(f) === "zahl" ? alsZahl(w) !== null : w.trim().length > 0;
+  }
   return true;
 }
 
@@ -117,7 +179,45 @@ function demoLesen(): DemoDaten {
   } catch {
     /* privater Modus */
   }
-  return { umfragen: [], fragen: [], antworten: [], fertig: [] };
+  return demoRolle() ? demoBeispiel() : { umfragen: [], fragen: [], antworten: [], fertig: [] };
+}
+
+/**
+ * Erfundene Beispiele für den Demo-Modus (?rolle=…): eine beendete Umfrage
+ * mit Ergebnis (inkl. „Eigene Antwort“) und ein Entwurf. Absichtlich keine
+ * laufende – die würde sonst bei jedem Öffnen als Pop-up erscheinen.
+ */
+function demoBeispiel(): DemoDaten {
+  const tag = (d: number) => new Date(Date.now() - d * 86400_000).toISOString();
+  const u1 = "demo-umfrage-fahrt";
+  const u2 = "demo-umfrage-entwurf";
+  const umfragen: Umfrage[] = [
+    { id: u1, titel: "Abschlussfahrt", beschreibung: "Wohin geht es nach dem Abi?", status: "beendet", pflicht: false, zielgruppe: "schueler", ergebnis_sichtbar: true, created_at: tag(9), gestartet_at: tag(8), endet_at: tag(1) },
+    { id: u2, titel: "Abiball-Location", beschreibung: "", status: "entwurf", pflicht: true, zielgruppe: "schueler", ergebnis_sichtbar: false, created_at: tag(0.5), gestartet_at: null, endet_at: null },
+  ];
+  const fragen: Frage[] = [
+    { id: "demo-f-ziel", umfrage_id: u1, sort: 1, typ: "einfach", titel: "Wohin soll die Fahrt gehen?", optionen: ["Prag", "Amsterdam", "Berlin"], pflicht: true, eigene: true },
+    { id: "demo-f-wichtig", umfrage_id: u1, sort: 2, typ: "mehrfach", titel: "Was ist dir wichtig?", optionen: ["Günstig", "Strand", "Kultur", "Abends weggehen"], pflicht: true, eigene: true },
+    { id: "demo-f-noch", umfrage_id: u1, sort: 3, typ: "text", titel: "Sonst noch etwas?", optionen: ["kurz"], pflicht: false },
+    { id: "demo-f-ort", umfrage_id: u2, sort: 1, typ: "einfach", titel: "Wo soll der Abiball stattfinden?", optionen: ["Stadthalle", "Schulaula"], pflicht: true, eigene: true },
+  ];
+  // Antworten von 14 erfundenen Personen – Werte in App-Form ("__eigene__:Text")
+  const ziel = ["Prag", "Amsterdam", "Prag", "Berlin", eigenerWert("Barcelona"), "Amsterdam", "Prag", eigenerWert("barcelona"), "Prag", "Amsterdam", eigenerWert("Kroatien"), "Prag", eigenerWert("Barcelona!"), "Berlin"];
+  const wichtig: string[][] = [
+    ["Günstig", "Kultur"], ["Strand"], ["Günstig", "Abends weggehen"], ["Kultur"], ["Strand", eigenerWert("Alle zusammen im Hostel")], ["Günstig"],
+    ["Abends weggehen", "Strand"], ["Günstig", eigenerWert("Kurze Anreise")], ["Kultur", "Günstig"], ["Strand"], ["Günstig"], [eigenerWert("alle zusammen im Hostel")], ["Abends weggehen"], ["Günstig", "Strand"],
+  ];
+  const noch = ["Bitte nicht mit dem Bus", "", "Vegetarisches Essen", "", "Nicht in der Klausurphase", "Bitte nicht mit dem Bus", "", "", "", "", "", "", "", ""];
+  const antworten: DemoDaten["antworten"] = [];
+  const fertig: DemoDaten["fertig"] = [];
+  ziel.forEach((w, i) => {
+    const user_id = `demo-p${i + 1}`;
+    antworten.push({ frage_id: "demo-f-ziel", umfrage_id: u1, user_id, wert: w });
+    antworten.push({ frage_id: "demo-f-wichtig", umfrage_id: u1, user_id, wert: wichtig[i] });
+    if (noch[i]) antworten.push({ frage_id: "demo-f-noch", umfrage_id: u1, user_id, wert: noch[i] });
+    fertig.push({ umfrage_id: u1, user_id });
+  });
+  return { umfragen, fragen, antworten, fertig };
 }
 function demoSchreiben(d: DemoDaten) {
   try {
@@ -163,11 +263,13 @@ export function useOffeneUmfragen(aktiv: boolean, fuerMich: (z: Zielgruppe) => b
     const ids = liste.map((x) => x.id);
     const [f, a, t] = await Promise.all([
       sb.from("umfrage_fragen").select("*").in("umfrage_id", ids).order("sort"),
-      sb.from("umfrage_antworten").select("frage_id, wert").in("umfrage_id", ids),
+      sb.from("umfrage_antworten").select("frage_id, wert, eigene").in("umfrage_id", ids),
       sb.from("umfrage_teilnahme").select("umfrage_id").in("umfrage_id", ids),
     ]);
     setFragen((f.data as Frage[]) || []);
-    setAntworten(Object.fromEntries(((a.data as { frage_id: string; wert: Wert }[]) || []).map((x) => [x.frage_id, x.wert])));
+    setAntworten(
+      Object.fromEntries(((a.data as { frage_id: string; wert: Wert; eigene?: string | null }[]) || []).map((x) => [x.frage_id, zusammensetzen(x.wert, x.eigene)])),
+    );
     setFertig(new Set(((t.data as { umfrage_id: string }[]) || []).map((x) => x.umfrage_id)));
     setBereit(true);
   }, []);
@@ -202,9 +304,20 @@ export function useOffeneUmfragen(aktiv: boolean, fuerMich: (z: Zielgruppe) => b
       demoSchreiben(d);
       return null;
     }
-    const { error } = await supabase!
-      .from("umfrage_antworten")
-      .upsert({ frage_id: f.id, umfrage_id: f.umfrage_id, wert, updated_at: new Date().toISOString() }, { onConflict: "frage_id,user_id" });
+    // „Eigene Antwort“ ohne Text: nur im Bildschirm merken, noch nicht speichern
+    const teile = zerlegen(wert);
+    if (!teile) return null;
+    const { error } = await supabase!.from("umfrage_antworten").upsert(
+      {
+        frage_id: f.id,
+        umfrage_id: f.umfrage_id,
+        wert: teile.wert,
+        // Spalte nur mitschicken, wo die Frage sie kennt (alte Fragen bleiben unberührt)
+        ...(mitEigener(f) ? { eigene: teile.eigene } : {}),
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "frage_id,user_id" },
+    );
     return error ? error.message : null;
   }, []);
 
@@ -313,7 +426,12 @@ export function useUmfragenVerwaltung(aktiv: boolean) {
         if (fr.length) {
           const { error: e2 } = await sb
             .from("umfrage_fragen")
-            .insert(fr.map((f, i) => ({ umfrage_id: id, sort: i + 1, typ: f.typ, titel: f.titel.trim().slice(0, 160), optionen: f.optionen, pflicht: f.pflicht })));
+            .insert(
+              fr.map((f, i) => ({
+                umfrage_id: id, sort: i + 1, typ: f.typ, titel: f.titel.trim().slice(0, 160), optionen: f.optionen, pflicht: f.pflicht,
+                eigene: mitEigener(f),
+              })),
+            );
           if (e2) return { fehler: e2.message };
         }
       }
@@ -365,13 +483,24 @@ export function useUmfragenVerwaltung(aktiv: boolean) {
       const fr = d.fragen.filter((f) => f.umfrage_id === id).sort((a, b) => a.sort - b.sort);
       return {
         teilnehmer: d.fertig.filter((f) => f.umfrage_id === id).length,
-        zielgruppe: 1,
+        // Demo: kennt keine echte Zielgruppe – wenigstens nicht „14 von 1“
+        zielgruppe: Math.max(1, d.fertig.filter((f) => f.umfrage_id === id).length + 6),
         fragen: fr.map((f) => {
           const as = d.antworten.filter((a) => a.frage_id === f.id);
           const zaehlung: Record<string, number> = {};
+          const eigene: string[] = [];
           if (f.typ !== "text")
-            for (const a of as) for (const w of Array.isArray(a.wert) ? a.wert : [a.wert]) zaehlung[String(w)] = (zaehlung[String(w)] || 0) + 1;
-          return { frage_id: f.id, antworten: as.length, zaehlung, texte: f.typ === "text" ? as.map((a) => String(a.wert)).filter((t) => t.trim()) : [] };
+            for (const a of as)
+              for (const w of Array.isArray(a.wert) ? a.wert : [a.wert]) {
+                // wie umfrage_ergebnis(): Marke heißt „Eigene Antwort“, Texte extra
+                if (istEigene(w)) {
+                  if (!eigeneText(String(w)).trim()) continue;
+                  eigene.push(eigeneText(String(w)).trim());
+                }
+                const k = istEigene(w) ? EIGENE_NAME : String(w);
+                zaehlung[k] = (zaehlung[k] || 0) + 1;
+              }
+          return { frage_id: f.id, antworten: as.length, zaehlung, texte: f.typ === "text" ? as.map((a) => String(a.wert)).filter((t) => t.trim()) : [], eigene };
         }),
       };
     }

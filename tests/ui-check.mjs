@@ -29,7 +29,7 @@ const bilder = process.env.BILDER ? ordner('bilder') : null;
 const browser = await browserStarten();
 const ergebnis = [];
 for (const rolle of ROLLEN) for (const g of GROESSEN) for (const thema of ['light', 'dark']) {
-  const ctx = await browser.newContext({ viewport: { width: g.w, height: g.h }, isMobile: g.mobil, hasTouch: g.mobil, colorScheme: thema, locale: 'de-DE' });
+  const ctx = await browser.newContext({ viewport: { width: g.w, height: g.h }, isMobile: g.mobil, hasTouch: g.mobil, colorScheme: thema, locale: 'de-DE', serviceWorkers: 'block' });
   await ctx.addInitScript(TOUR_WEG);
   const page = await ctx.newPage();
   const fehler = [];
@@ -37,6 +37,16 @@ for (const rolle of ROLLEN) for (const g of GROESSEN) for (const thema of ['ligh
   page.on('pageerror', (e) => fehler.push('pageerror: ' + String(e).slice(0, 160)));
   await page.goto(`${DEMO_BASIS}/?rolle=${rolle}`, { waitUntil: 'networkidle' });
   await page.waitForTimeout(600);
+  // Pop-ups der Demo (Umfrage, Install-Hinweis, Enthüllung) wegklicken – sonst
+  // fängt das Fenster jeden Klick auf die Reiter ab
+  for (let i = 0; i < 4; i++) {
+    let weg = false;
+    for (const t of ['Später', 'Überspringen', 'Fertig', 'Schließen']) {
+      const u = page.locator('[role=dialog]').getByRole('button', { name: t, exact: true });
+      if (await u.count()) { await u.first().click({ timeout: 2000 }).catch(() => {}); await page.waitForTimeout(300); weg = true; }
+    }
+    if (!weg) break;
+  }
 
   const sichtbareReiter = () => page.$$eval('nav button', (bs) => bs
     .filter((b) => { const r = b.getBoundingClientRect(); return r.width > 0 && r.height > 0 && getComputedStyle(b).visibility !== 'hidden'; })
@@ -82,13 +92,23 @@ for (const rolle of ROLLEN) for (const g of GROESSEN) for (const thema of ['ligh
       for (const el of document.querySelectorAll('#root *')) {
         if (el.closest('nav') || el.children.length || !(el.innerText || '').trim()) continue;
         const r = el.getBoundingClientRect(); const cs = getComputedStyle(el);
-        if (r.height && cs.visibility !== 'hidden' && cs.position !== 'fixed') unten = Math.max(unten, r.bottom);
+        if (!r.height || cs.visibility === 'hidden' || cs.position === 'fixed') continue;
+        // In einer eigenen Scroll-Fläche (z. B. Buchungsliste am Laptop) zählt
+        // nur der sichtbare Teil – weggescrollte Zeilen liegen nicht unter der Leiste
+        let b = r.bottom;
+        for (let a = el.parentElement; a && a !== document.body; a = a.parentElement) {
+          if (/(auto|scroll|hidden)/.test(getComputedStyle(a).overflowY)) b = Math.min(b, a.getBoundingClientRect().bottom);
+        }
+        if (b > r.top) unten = Math.max(unten, b);
       }
       window.scrollTo(0, 0);
       return unten > oben + 1 ? Math.round(unten - oben) : 0;
     });
     let axe = null;
     if (g.n === 'iPhone390') {
+      // Nach dem Zurückscrollen blenden Kopf-Titel noch aus (0,3 s) – erst
+      // danach prüfen, sonst zählt halb durchsichtiger Text als Kontrastfehler
+      await page.waitForTimeout(400);
       await page.evaluate(axeQuelle);
       axe = await page.evaluate(async () => (await window.axe.run(document, { runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa'] }, resultTypes: ['violations'] }))
         .violations.map((v) => ({ id: v.id, n: v.nodes.length, bsp: v.nodes.slice(0, 2).map((x) => x.target.join(' ')).join(' | ') })));

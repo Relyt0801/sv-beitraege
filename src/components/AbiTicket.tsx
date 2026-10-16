@@ -1,6 +1,6 @@
 import { useFunktionen } from "../lib/funktionen";
 import { AusHinweis } from "./Funktionen";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Abiball, Settings, Student } from "../lib/types";
 import { abiballVon, bestellBetrag, ticketPreise } from "../lib/logic";
 import {
@@ -14,12 +14,14 @@ import {
 } from "../lib/tickets";
 import { KontoTab, jahrgangKurz } from "./KontoTab";
 import { Sheet, SheetKopf } from "./Sheet";
-import { Gruppe, Zeile } from "./Liste";
+import { Gruppe, Symbol, Zeile } from "./Liste";
+import { Icon } from "./Icon";
+import { StaffelKacheln } from "./Staffel";
 
 /**
  * Das Abiball-Ticket – personalisiert, so wie es später auch aussehen soll.
  *
- * Auf dem eigenen Ticket steht der Listenpreis (Grundpreis + Helferzuschuss
+ * Auf dem eigenen Ticket steht der Listenpreis (Grundpreis + Aufschlag
  * bei 0 %) durchgestrichen und darunter, was es bei diesem Stand wirklich
  * kostet. Das zweite Ticket (schwarz-gold) zeigt den Preis für jedes weitere –
  * Eltern und Gäste. Rechts daneben (am Handy darunter) liegt die Kasse.
@@ -124,7 +126,7 @@ export function AbiTicket({
 
       {/* ------------------------------------------ linker Teil */}
       <div className={`relative min-w-0 flex-1 ${klein ? "px-4 py-3" : "px-4 py-4 sm:px-5"}`}>
-        <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.22em] text-[#E9C460]">
+        <div className="flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-[0.16em] text-[#E9C460]">
           <span aria-hidden>✦</span> Abiball{jahrVon(a.datum)}
         </div>
         <div
@@ -133,12 +135,12 @@ export function AbiTicket({
         >
           {erstes ? `${student.vorname} ${student.nachname}` : "Eltern & Gäste"}
         </div>
-        <div className="mt-0.5 truncate text-[11.5px] text-white/60">
+        <div className="mt-0.5 truncate text-[12px] text-white/60">
           {erstes ? "Persönliches Ticket · 1. Karte" : "Jedes weitere Ticket"}
         </div>
 
         {(a.ort || wann) && (
-          <div className={`grid gap-0.5 text-white/85 ${klein ? "mt-1.5 text-[11.5px]" : "mt-2.5 text-[12px]"}`}>
+          <div className={`grid gap-0.5 text-white/85 ${klein ? "mt-1.5 text-[12px]" : "mt-2.5 text-[12px]"}`}>
             {wann && (
               <span className="truncate">
                 <span aria-hidden className="mr-1.5 text-[#E9C460]">◷</span>
@@ -164,7 +166,7 @@ export function AbiTicket({
 
       {/* ------------------------------------------ Abriss mit Preis */}
       <div className="relative flex w-[36%] shrink-0 flex-col items-center justify-center px-2 py-3 text-center sm:w-[32%]">
-        <div className="text-[9.5px] font-bold uppercase tracking-[0.18em] text-white/55">
+        <div className="text-[12px] font-bold uppercase tracking-[0.1em] text-white/60">
           {erstes ? (fuerEltern ? "1. Ticket" : "Dein Preis") : "je Karte"}
         </div>
         {!p.preisSteht ? (
@@ -182,7 +184,7 @@ export function AbiTicket({
               {p.erstes}&nbsp;€
             </div>
             {p.gespart > 0 && (
-              <div className="mt-1.5 whitespace-nowrap rounded-full bg-[#E2B744]/20 px-2 py-0.5 text-[10.5px] font-bold text-[#F6DD8B]">
+              <div className="mt-1.5 whitespace-nowrap rounded-full bg-[#E2B744]/20 px-2 py-0.5 text-[12px] font-bold text-[#F6DD8B]">
                 −{p.gespart} € gespart
               </div>
             )}
@@ -208,7 +210,7 @@ const STATUS_TEXT: Record<TicketBestellung["status"], string> = {
 /** Kleine Info-Zeile statt großer Kästen */
 function Info({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex items-center gap-2 rounded-xl bg-[rgb(118_118_128/0.08)] px-3 py-2 text-[12.5px] text-tinte-matt dark:bg-[rgb(118_118_128/0.16)] dark:text-slate-300">
+    <div className="flex items-center gap-2 rounded-xl zelle px-3 py-2 text-[12px] text-tinte-matt dark:text-slate-300">
       {children}
     </div>
   );
@@ -273,8 +275,8 @@ export function TicketKasse({
   return (
     <div className="grid content-start gap-2.5">
       {status === "bald" && (
-        <div className="rounded-2xl bg-[rgb(118_118_128/0.08)] p-4 text-center dark:bg-[rgb(118_118_128/0.16)]">
-          <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-tinte-leise">Verkauf startet in</div>
+        <div className="rounded-2xl zelle p-4 text-center">
+          <div className="text-[12px] font-bold uppercase tracking-[0.16em] text-tinte-leise">Verkauf startet in</div>
           <div className="zahl mt-1 text-[1.9rem] font-extrabold leading-none tracking-[-0.02em]">{countdown(abMs - jetzt)}</div>
           <div className="mt-1 text-[12px] text-tinte-leise">{zeitpunktSchoen(a.verkaufAb!)}</div>
           {!fuerEltern && (
@@ -282,7 +284,7 @@ export function TicketKasse({
               disabled
               className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl bg-slate-300 py-3 text-[15px] font-bold text-white dark:bg-slate-700 dark:text-slate-400"
             >
-              <span aria-hidden>🔒</span> Bestellen
+              Bestellen (ab Start möglich)
             </button>
           )}
         </div>
@@ -291,9 +293,9 @@ export function TicketKasse({
       {status === "laeuft" && !fuerEltern && (
         <div className="rounded-2xl bg-gradient-to-b from-[#12284D] to-[#0A1730] p-4 text-white ring-1 ring-[#E2B744]/40">
           <div className="flex items-center justify-between gap-2">
-            <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#E9C460]">Tickets bestellen</span>
+            <span className="text-[12px] font-bold uppercase tracking-[0.16em] text-[#E9C460]">Tickets bestellen</span>
             {a.kontingent > 0 && (
-              <span className="text-[11px] font-semibold text-white/60">noch {Math.max(0, a.kontingent - verkauft)} frei</span>
+              <span className="text-[12px] font-semibold text-white/60">noch {Math.max(0, a.kontingent - verkauft)} frei</span>
             )}
           </div>
 
@@ -311,7 +313,7 @@ export function TicketKasse({
                     onClick={() => setAnzahl(Math.max(1, n - 1))}
                     disabled={n <= 1}
                     aria-label="Ein Ticket weniger"
-                    className="flex h-9 w-9 items-center justify-center rounded-full text-xl font-bold transition active:scale-90 disabled:opacity-30"
+                    className="flex h-11 w-11 items-center justify-center rounded-full text-xl font-bold transition active:scale-90 disabled:opacity-30"
                   >
                     −
                   </button>
@@ -320,14 +322,14 @@ export function TicketKasse({
                     onClick={() => setAnzahl(Math.min(moeglich, n + 1))}
                     disabled={n >= moeglich}
                     aria-label="Ein Ticket mehr"
-                    className="flex h-9 w-9 items-center justify-center rounded-full text-xl font-bold transition active:scale-90 disabled:opacity-30"
+                    className="flex h-11 w-11 items-center justify-center rounded-full text-xl font-bold transition active:scale-90 disabled:opacity-30"
                   >
                     +
                   </button>
                 </div>
                 <div className="text-right">
                   <div className={`zahl text-[1.7rem] font-extrabold leading-none ${GOLD_TEXT}`}>{betrag} €</div>
-                  <div className="mt-0.5 text-[11px] text-white/55">
+                  <div className="mt-0.5 text-[12px] text-white/55">
                     {schon === 0 ? (n > 1 ? `${p.erstes} € + ${n - 1} × ${p.weiteres} €` : "dein 1. Ticket") : `${n} × ${p.weiteres} €`}
                   </div>
                 </div>
@@ -339,22 +341,22 @@ export function TicketKasse({
               >
                 {busy ? "Einen Moment …" : `${n} ${n === 1 ? "Ticket" : "Tickets"} bestellen`}
               </button>
-              <div className="mt-1.5 text-center text-[11px] text-white/50">
+              <div className="mt-1.5 text-center text-[12px] text-white/50">
                 Max. {a.maxProPerson} je Person{schon > 0 ? ` · du hast ${schon}` : ""}
               </div>
             </>
           )}
-          {fehler && <p className="mt-2 text-center text-[12.5px] font-semibold text-red-300">Das hat nicht geklappt: {fehler}</p>}
+          {fehler && <p className="mt-2 text-center text-[12px] font-semibold text-red-300">Das hat nicht geklappt: {fehler}</p>}
         </div>
       )}
 
       {status === "laeuft" && fuerEltern && aktiv.length === 0 && (
-        <Info>🎟️ Verkauf läuft – {student.vorname} bestellt über den eigenen Zugang.</Info>
+        <Info>Verkauf läuft – {student.vorname} bestellt über den eigenen Zugang.</Info>
       )}
 
       {meine.length > 0 && (
-        <div className="overflow-hidden rounded-2xl bg-[rgb(118_118_128/0.08)] dark:bg-[rgb(118_118_128/0.16)]">
-          <div className="px-4 pb-1 pt-2.5 text-[11px] font-bold uppercase tracking-[0.14em] text-tinte-leise">
+        <div className="overflow-hidden rounded-2xl zelle">
+          <div className="px-4 pb-1 pt-2.5 text-[12px] font-bold uppercase tracking-[0.14em] text-tinte-leise">
             {fuerEltern ? `Bestellungen von ${student.vorname}` : "Deine Bestellungen"}
           </div>
           {meine.map((b) => (
@@ -364,7 +366,7 @@ export function TicketKasse({
                   {b.anzahl} {b.anzahl === 1 ? "Ticket" : "Tickets"} · {euroAusCent(b.betrag_cent)}
                 </div>
                 <div
-                  className={`text-[11.5px] font-semibold ${
+                  className={`text-[12px] font-semibold ${
                     b.status === "bezahlt" ? "text-bezahlt" : b.status === "offen" ? "text-offen" : "text-tinte-leise"
                   }`}
                 >
@@ -375,7 +377,7 @@ export function TicketKasse({
               {b.status === "offen" && (
                 <button
                   onClick={() => setZahlen(b)}
-                  className="shrink-0 rounded-full bg-brand px-3.5 py-1.5 text-[13px] font-bold text-white transition active:scale-95"
+                  className="btn-klein shrink-0"
                 >
                   Überweisen
                 </button>
@@ -413,7 +415,7 @@ export function TicketUeberweisen({
         onClose={onClose}
       />
       <div className="mb-4 flex flex-col items-center rounded-2xl bg-gradient-to-b from-[#12284D] to-[#0A1730] px-4 py-5 text-center text-white ring-1 ring-[#E2B744]/40">
-        <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#E9C460]">Zu überweisen</div>
+        <div className="text-[12px] font-bold uppercase tracking-[0.16em] text-[#E9C460]">Zu überweisen</div>
         <div className={`zahl mt-1 text-[2.6rem] font-extrabold leading-none tracking-[-0.03em] ${GOLD_TEXT}`}>
           {euroAusCent(bestellung.betrag_cent)}
         </div>
@@ -455,12 +457,23 @@ function TicketAnsicht({
 
       <Gruppe titel="1. Ticket">
         <Zeile label="Grundpreis">{wert(p.preisSteht ? `${p.grund} €` : "folgt", "text-tinte-matt dark:text-slate-300")}</Zeile>
-        <Zeile label={`Helferzuschuss (${Math.min(prozent, 100)} %)`}>{wert(`+${p.aufschlag} €`, "text-tinte-matt dark:text-slate-300")}</Zeile>
+        <Zeile label={`Aufschlag bei ${Math.min(prozent, 100)} % Mithilfe`}>{wert(`+${p.aufschlag} €`, "text-tinte-matt dark:text-slate-300")}</Zeile>
         {a.ueber100 && (
           <Zeile label="✦ Bonus">{wert(p.rabatt > 0 ? `−${p.rabatt} €` : "0 €", "text-[#8A650A] dark:text-[#E9C460]")}</Zeile>
         )}
-        <Zeile label="Preis">
-          <span className="zahl text-[17px] font-extrabold">{p.preisSteht ? `${p.erstes} €` : `+${p.aufschlag - p.rabatt} €`}</span>
+        {/* Steht der Grundpreis noch nicht fest, gibt es auch keinen Endpreis –
+            „Preis +50 €“ las sich wie ein Endpreis (Prüfung Okt. 2026). */}
+        <Zeile
+          label="Preis"
+          unter={
+            p.preisSteht
+              ? undefined
+              : p.aufschlag - p.rabatt > 0
+                ? `Grundpreis + ${p.aufschlag - p.rabatt} € Aufschlag`
+                : "nur der Grundpreis, kein Aufschlag"
+          }
+        >
+          <span className="zahl text-[17px] font-extrabold">{p.preisSteht ? `${p.erstes} €` : "folgt"}</span>
         </Zeile>
       </Gruppe>
 
@@ -483,24 +496,194 @@ function TicketAnsicht({
   );
 }
 
+// ================================================================ Eltern
+
+/** Kleines Ticket-Symbol für Zeilen: Nachtblau mit goldenem Funken wie das Ticket selbst */
+function TicketSymbol() {
+  return (
+    <Symbol farbe="bg-gradient-to-br from-[#23467F] to-[#0A1730] !text-[#E9C460] ring-1 ring-inset ring-[#E2B744]/45">
+      <Icon name="funke" size={16} strich={2.2} />
+    </Symbol>
+  );
+}
+
+/**
+ * Eltern-Übersicht: das Ticket EINES Kindes als Zeile in dessen Karte (eine
+ * `gruppe-zellen`) – „Abiball-Ticket · Preis“, darunter der Stand. Ein Tipp
+ * öffnet die Ticket-Ansicht mit dem großen Ticket. Offene Bestellungen stehen
+ * als eigene Zeile mit „Überweisen“ darunter – das ist das, was Eltern tun.
+ *
+ * Prüfung Okt. 2026: Vorher stand bei jedem Kind eine eigene Ticket-Karte mit
+ * großer Grafik „Preis folgt“ und beim ersten Kind zusätzlich das Gäste-
+ * Ticket – zusammen über einen Bildschirm, das zweite Kind kam erst nach 1,5
+ * Bildschirmen. Was für alle gilt (Gäste-Ticket, Countdown, Staffel), steht
+ * jetzt EINMAL in `TicketFamilie`.
+ */
+export function TicketZeilen({ student, settings, prozent }: { student: Student; settings: Settings; prozent: number }) {
+  const { sichtbar } = useFunktionen();
+  const zeigen = sichtbar("abiball");
+  const [auf, setAuf] = useState(false);
+  const [zahlen, setZahlen] = useState<TicketBestellung | null>(null);
+  const a = abiballVon(settings);
+  const abMs = a.verkaufAb ? Date.parse(a.verkaufAb) : NaN;
+  // Kein Countdown in der Zeile – nur der Wechsel „bald“ → „läuft“ zählt
+  const jetzt = useJetzt(Number.isFinite(abMs) && abMs > Date.now(), 30_000);
+  const status = verkaufStatus(a, jetzt);
+  const { liste } = useTicketBestellungen(zeigen);
+  if (!zeigen) return null;
+
+  const p = ticketPreise(prozent, settings);
+  const aktiv = liste.filter((b) => b.student_id === student.id && b.status !== "storniert");
+  const offene = aktiv.filter((b) => b.status === "offen");
+  const anzahl = aktiv.reduce((n, b) => n + b.anzahl, 0);
+  const stand =
+    anzahl > 0
+      ? `${anzahl} ${anzahl === 1 ? "Ticket" : "Tickets"} bestellt · ${offene.length ? "Überweisung offen" : "bezahlt"}`
+      : status === "laeuft"
+        ? `Verkauf läuft – ${student.vorname} bestellt selbst`
+        : status === "bald"
+          ? `Verkauf ab ${zeitpunktSchoen(a.verkaufAb!)}`
+          : "Verkauf noch nicht gestartet";
+
+  return (
+    <>
+      <Zeile symbol={<TicketSymbol />} label="Abiball-Ticket" unter={stand} onClick={() => setAuf(true)}>
+        <span className="zahl text-[15px] font-semibold text-tinte-matt dark:text-slate-300">{p.preisSteht ? `${p.erstes} €` : "Preis folgt"}</span>
+      </Zeile>
+      {offene.map((b) => (
+        // Eingerückt bis zum Text der Ticket-Zeile darüber (16 + 30 + 12 px) –
+        // so gehört die Bestellung sichtbar zum Ticket
+        <div key={b.id} className="flex min-h-[52px] items-center gap-3 py-2 pl-[58px] pr-4 before:!left-[58px]">
+          <span className="min-w-0 flex-1">
+            <span className="block text-[15px] leading-snug">
+              {b.anzahl} {b.anzahl === 1 ? "Ticket" : "Tickets"} · {euroAusCent(b.betrag_cent)}
+            </span>
+            <span className="mt-0.5 block text-[12.5px] font-semibold leading-snug text-offen">Überweisung offen · {bestellNummer(b)}</span>
+          </span>
+          <button
+            onClick={() => setZahlen(b)}
+            className="btn-klein min-h-[44px] shrink-0"
+            aria-label={`${b.anzahl} ${b.anzahl === 1 ? "Ticket" : "Tickets"} für ${student.vorname} überweisen`}
+          >
+            Überweisen
+          </button>
+        </div>
+      ))}
+      {auf && <TicketAnsicht student={student} settings={settings} prozent={prozent} fuerEltern onClose={() => setAuf(false)} />}
+      {zahlen && <TicketUeberweisen bestellung={zahlen} student={student} settings={settings} du={false} onClose={() => setZahlen(null)} />}
+    </>
+  );
+}
+
+/**
+ * Eltern-Übersicht: was für die ganze Familie gilt, EINMAL – das Ticket für
+ * Eltern & Gäste, der Verkaufsstand (mit Countdown) und die Staffel, in der
+ * bei Geschwistern jedes Kind mit Vornamen an seiner Stufe steht.
+ *
+ * Vorher stand das Gäste-Ticket nur in der Karte des ersten Kindes (wirkte
+ * wie dessen Ticket, die Spalten waren ungleich hoch) und die Staffel bei
+ * jedem Kind einzeln.
+ *
+ * `breit`: Die Karte geht über die volle Breite (Geschwister) – ab 700 px dann
+ * Ticket links, Staffel rechts. Bei einem Kind steht sie neben dessen Karte.
+ */
+export function TicketFamilie({
+  settings,
+  kinder,
+  breit,
+}: {
+  settings: Settings;
+  kinder: { student: Student; prozent: number }[];
+  breit?: boolean;
+}) {
+  const { sichtbar } = useFunktionen();
+  const zeigen = sichtbar("abiball");
+  const { a, abMs, jetzt, status } = useVerkauf(settings);
+  const erstes = kinder[0];
+  if (!erstes) return null;
+  const mehrere = kinder.length > 1;
+
+  return (
+    <section className="card p-4 sm:p-5" aria-label="Abiball-Tickets">
+      <AusHinweis funktion="abiball" className="mb-2" />
+      <h2 className="text-[15px] font-semibold">{zeigen ? "Abiball-Tickets" : "Mithilfe senkt den Ticketpreis"}</h2>
+      {/* Am Laptop behält das Ticket Ticket-Maße (vorher ~780 px breit gezogen) */}
+      <div
+        className={`grid ${zeigen && breit ? "min-[700px]:grid-cols-2 min-[700px]:items-start min-[700px]:gap-x-6 lg:grid-cols-[minmax(0,24rem)_minmax(0,1fr)] lg:gap-x-10" : ""}`}
+      >
+        {zeigen && (
+          <div className="mt-3 grid content-start gap-2.5">
+            {/* Das Ticket der Eltern selbst: hängt von keinem Kind ab */}
+            <AbiTicket art="weiteres" student={erstes.student} settings={settings} prozent={erstes.prozent} klein />
+            <Info>
+              {status === "bald" ? (
+                <span>
+                  Verkauf startet in <b className="zahl font-bold text-tinte dark:text-slate-100">{countdown(abMs - jetzt)}</b> ·{" "}
+                  {zeitpunktSchoen(a.verkaufAb!)}
+                </span>
+              ) : status === "laeuft" ? (
+                <span>
+                  Verkauf läuft – {mehrere ? "jedes Kind bestellt" : `${erstes.student.vorname} bestellt`} über den eigenen Zugang, auch die
+                  Karten für Eltern & Gäste.
+                </span>
+              ) : (
+                <span>Der Verkauf ist noch nicht gestartet.</span>
+              )}
+            </Info>
+          </div>
+        )}
+        <StaffelKacheln
+          pct={erstes.prozent}
+          settings={settings}
+          kinder={mehrere ? kinder.map((k) => ({ name: k.student.vorname, pct: k.prozent })) : undefined}
+          className={zeigen && breit ? "mt-4 min-[700px]:mt-3" : zeigen ? "mt-4" : "mt-2"}
+        />
+      </div>
+    </section>
+  );
+}
+
 // ================================================================ Bereich
 
 /**
  * Der Ticket-Bereich auf der eigenen Seite (und bei den Eltern). Links die
  * Tickets, rechts die Kasse – die gibt es erst, wenn der Verkauf freigegeben
  * ist; vorher nur eine kleine Info. Eltern sehen ihr Gäste-Ticket zuerst.
+ *
+ * Prüfung Okt. 2026:
+ *   • Vor dem Verkauf standen auf der Übersicht zwei große Tickets mit „Preis
+ *     folgt“ über die volle Breite (~300 px ohne Information). Jetzt: nur
+ *     das eigene Ticket in klein und eine Zeile – die Karte passt neben
+ *     „Mithilfe bei Aktionen“ (davon hängt der Preis ja ab).
+ *   • `onMitKasse` sagt der Übersicht, ob rechts eine Kasse steht (dann
+ *     braucht der Bereich die volle Breite).
+ *   • `ohneGaeste`: Bei mehreren Kindern zeigen Eltern das Gäste-Ticket nur
+ *     einmal (es hängt nicht vom Kind ab).
+ *   • `eineSpalte`: Steht der Bereich in einer halben Spalte (Geschwister
+ *     nebeneinander), kommen Tickets und Kasse untereinander statt gequetscht.
+ *   • Die Eltern-Übersicht nutzt seit der Prüfung Okt. 2026 `TicketZeilen` (je
+ *     Kind eine Zeile) und `TicketFamilie` (Gäste-Ticket und Staffel einmal).
  */
 export function TicketBereich({
   student,
   settings,
   prozent,
   fuerEltern,
+  ohneGaeste,
+  eineSpalte,
+  onMitKasse,
   className = "",
 }: {
   student: Student;
   settings: Settings;
   prozent: number;
   fuerEltern?: boolean;
+  /** Gäste-Ticket ausblenden (z. B. beim zweiten Kind) */
+  ohneGaeste?: boolean;
+  /** Tickets und Kasse immer untereinander (schmale Spalte) */
+  eineSpalte?: boolean;
+  /** Meldet, ob der Verkauf läuft bzw. Bestellungen da sind (rechts die Kasse) */
+  onMitKasse?: (mitKasse: boolean) => void;
   className?: string;
 }) {
   // Profil → Funktionen: Tickets ganz ausgeblendet (nur wer verwaltet, sieht sie mit Hinweis)
@@ -510,34 +693,58 @@ export function TicketBereich({
   const { status } = useVerkauf(settings);
   const { liste } = useTicketBestellungen(zeigen);
   const mitKasse = status !== "aus" || liste.some((b) => b.student_id === student.id);
-
-  const eigenes = <AbiTicket art="erstes" student={student} settings={settings} prozent={prozent} fuerEltern={fuerEltern} onClick={() => setAuf(true)} />;
-  const gaeste = <AbiTicket art="weiteres" student={student} settings={settings} prozent={prozent} onClick={() => setAuf(true)} klein />;
+  useEffect(() => {
+    onMitKasse?.(zeigen && mitKasse);
+  }, [zeigen, mitKasse, onMitKasse]);
 
   if (!zeigen) return null;
+  // Vor dem Verkauf (nicht bei Eltern): klein und knapp
+  const knapp = !mitKasse && !fuerEltern;
+
+  const eigenes = (
+    <AbiTicket art="erstes" student={student} settings={settings} prozent={prozent} fuerEltern={fuerEltern} onClick={() => setAuf(true)} klein={knapp} />
+  );
+  const gaeste = <AbiTicket art="weiteres" student={student} settings={settings} prozent={prozent} onClick={() => setAuf(true)} klein />;
+
   return (
     <section className={`card p-4 sm:p-5 ${className}`} data-tour="abiball-ticket">
       <AusHinweis funktion="abiball" className="mb-2" />
       <div className="flex items-baseline justify-between gap-2">
-        <h2 className="text-[15px] font-semibold">Abiball-Ticket</h2>
-        <button onClick={() => setAuf(true)} className="-my-2 py-2 text-[13px] font-semibold text-brand-dark dark:text-brand">
-          Details ›
+        <h2 className="text-[15px] font-semibold">
+          Abiball-Ticket
+          {/* Vor dem Verkauf am Handy als Unterzeile statt eigenem Kasten */}
+          {knapp && <span className="block text-[12.5px] font-normal text-tinte-leise md:hidden">Verkauf noch nicht gestartet</span>}
+        </h2>
+        <button onClick={() => setAuf(true)} className="-my-3 -mr-3 flex min-h-[44px] items-center gap-0.5 px-3 text-[14px] font-semibold text-brand-dark dark:text-brand">
+          Details <Icon name="chevron" size={14} strich={2.4} />
         </button>
       </div>
-      <div className={`mt-3 grid gap-4 ${mitKasse ? "lg:grid-cols-[minmax(0,1.4fr)_minmax(280px,1fr)]" : ""}`}>
+      <div className={`mt-3 grid gap-4 ${mitKasse && !eineSpalte ? "md:grid-cols-[minmax(0,1.4fr)_minmax(260px,1fr)]" : ""}`}>
         <div className="grid content-start gap-2.5">
-          {fuerEltern ? (
+          {knapp ? (
             <>
-              {gaeste}
+              {eigenes}
+              {/* Ab iPad steht die Karte neben „Mithilfe“ – dort ist Platz für
+                  das Gäste-Ticket, am Handy reicht eine Zeile */}
+              {!ohneGaeste && <div className="hidden md:block">{gaeste}</div>}
+              {/* Ab iPad als Kasten; am Handy steht der Satz im Kopf der Karte,
+                  die weiteren Tickets stehen in „Details“ */}
+              <div className="max-md:hidden">
+                <Info>Verkauf noch nicht gestartet</Info>
+              </div>
+            </>
+          ) : fuerEltern ? (
+            <>
+              {!ohneGaeste && gaeste}
               {eigenes}
             </>
           ) : (
             <>
               {eigenes}
-              {gaeste}
+              {!ohneGaeste && gaeste}
             </>
           )}
-          {!mitKasse && <Info>🎟️ Der Ticketverkauf ist noch nicht gestartet.</Info>}
+          {!mitKasse && fuerEltern && <Info>Der Ticketverkauf ist noch nicht gestartet.</Info>}
         </div>
         {mitKasse && <TicketKasse student={student} settings={settings} prozent={prozent} fuerEltern={fuerEltern} />}
       </div>

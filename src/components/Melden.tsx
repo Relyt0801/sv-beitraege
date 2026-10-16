@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Sheet, SheetKopf } from "./Sheet";
+import { Gruppe, Wert, Zeile, ZeileHaken, ZeileMitSchalter } from "./Liste";
 import { Schalter } from "./Schalter";
 import { MuteKnopf } from "./MuteKnopf";
 import { Avatar } from "./Avatar";
@@ -58,7 +59,7 @@ export function MeldenWurzel() {
                 onClick={() => setGrund(g.key)}
                 aria-pressed={grund === g.key}
                 className={`flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left text-[15px] font-semibold transition active:scale-[.99] ${
-                  grund === g.key ? "bg-brand text-white" : "bg-[rgb(118_118_128/0.08)] dark:bg-[rgb(118_118_128/0.18)]"
+                  grund === g.key ? "bg-brand text-white" : "zelle"
                 }`}
               >
                 <span className="text-[20px]">{g.zeichen}</span>
@@ -165,7 +166,7 @@ function MeldungKarte({ gruppe, m }: { gruppe: Meldung[]; m: ReturnType<typeof u
           <div className="mt-0.5 text-[12.5px] text-tinte-matt dark:text-slate-300">
             {gruende.join(", ")} · {gruppe.length === 1 ? "1 Meldung" : `${gruppe.length} Meldungen`}
           </div>
-          <blockquote className="mt-2 whitespace-pre-wrap break-words rounded-xl bg-[rgb(118_118_128/0.08)] px-3 py-2 text-[13.5px] leading-snug dark:bg-[rgb(118_118_128/0.18)]">
+          <blockquote className="mt-2 whitespace-pre-wrap break-words rounded-xl zelle px-3 py-2 text-[13.5px] leading-snug">
             {x.auszug || "–"}
           </blockquote>
           {notizen.map((n, i) => (
@@ -237,6 +238,10 @@ export function WortfilterSheet({ open, onClose }: { open: boolean; onClose: () 
   const [zeichen, setZeichen] = useState("");
   const [zeichenAlt, setZeichenAlt] = useState("");
   const bereiche = useWortfilterBereiche(open);
+  // Ein Eintrag als Unterseite (Modus, an/aus, löschen) – vorher drei
+  // Bedienelemente in jeder Zeile (Auswahlfeld, Schalter, Mülleimer)
+  const [offenId, setOffenId] = useState<string | null>(null);
+  const offenEintrag = liste.find((x) => x.id === offenId) ?? null;
 
   const laden = async () => {
     if (!hasSupabase) return;
@@ -267,15 +272,28 @@ export function WortfilterSheet({ open, onClose }: { open: boolean; onClose: () 
     void laden();
   }
 
-  async function loeschen(e: Eintrag) {
+  async function loeschen(e: Eintrag): Promise<boolean> {
     const ok = await frage(`„${e.wort}“ aus der Liste löschen?`, "Löschen", true);
-    if (!ok) return;
+    if (!ok) return false;
     setListe((l) => l.filter((x) => x.id !== e.id));
     const { error } = await supabase!.from("wortfilter").delete().eq("id", e.id);
     if (error) {
       meldeFehler("Ging nicht: " + error.message);
       void laden();
     }
+    return true;
+  }
+
+  async function modusSetzen(e: Eintrag, v: Eintrag["modus"]) {
+    setListe((l) => l.map((x) => (x.id === e.id ? { ...x, modus: v } : x)));
+    const { error } = await supabase!.from("wortfilter").update({ modus: v }).eq("id", e.id);
+    if (error) meldeFehler("Ging nicht: " + error.message);
+  }
+
+  async function aktivSetzen(e: Eintrag, v: boolean) {
+    setListe((l) => l.map((x) => (x.id === e.id ? { ...x, aktiv: v } : x)));
+    const { error } = await supabase!.from("wortfilter").update({ aktiv: v }).eq("id", e.id);
+    if (error) meldeFehler("Ging nicht: " + error.message);
   }
 
   return (
@@ -328,7 +346,7 @@ export function WortfilterSheet({ open, onClose }: { open: boolean; onClose: () 
 
       {teil === "bereiche" ? (
         <>
-          <div className="liste bg-[rgb(118_118_128/0.08)] dark:bg-[rgb(118_118_128/0.18)]">
+          <div className="liste zelle">
             {WF_BEREICHE.map((b) => (
               <label key={b.key} className="zeile">
                 <span className="min-w-0 flex-1">
@@ -354,7 +372,7 @@ export function WortfilterSheet({ open, onClose }: { open: boolean; onClose: () 
         <>
           {/* Hinzufügen */}
           <h3 className="abschnitt">{teil === "block" ? "Neues Wort blocken" : "Neue Ausnahme"}</h3>
-          <div className="liste mb-1.5 bg-[rgb(118_118_128/0.08)] dark:bg-[rgb(118_118_128/0.18)]">
+          <div className="liste mb-1.5 zelle">
             <div className="zeile">
               <input
                 className="min-w-0 flex-1 bg-transparent text-[16px] outline-none placeholder:text-tinte-leise"
@@ -385,7 +403,7 @@ export function WortfilterSheet({ open, onClose }: { open: boolean; onClose: () 
           {teil === "block" && (
             <>
               <h3 className="abschnitt mt-5">Emojis blocken</h3>
-              <div className="liste bg-[rgb(118_118_128/0.08)] dark:bg-[rgb(118_118_128/0.18)]">
+              <div className="liste zelle">
                 <div className="zeile">
                   <input
                     className="min-w-0 flex-1 bg-transparent text-[20px] tracking-wider outline-none placeholder:text-[15px] placeholder:tracking-normal placeholder:text-tinte-leise"
@@ -419,55 +437,49 @@ export function WortfilterSheet({ open, onClose }: { open: boolean; onClose: () 
             <h3 className="kennlabel min-w-0 flex-1">{teil === "block" ? "Geblockte Wörter" : "Ausnahmen"}</h3>
           </div>
           <input className="field mb-2" placeholder="In der Liste suchen" value={suche} onChange={(e) => setSuche(e.target.value)} />
-          <div className="liste bg-[rgb(118_118_128/0.08)] dark:bg-[rgb(118_118_128/0.18)]">
+          <Gruppe className="">
             {sichtbar.map((e) => (
-              <div key={e.id} className={`zeile !gap-2 ${e.aktiv ? "" : "opacity-55"}`}>
-                <span className="min-w-0 flex-1 truncate text-[15px]">{e.wort}</span>
-                {e.stufe === "block" && (
-                  <select
-                    aria-label={`Modus für ${e.wort}`}
-                    className="max-w-[7.5rem] rounded-lg bg-white px-2 py-1 text-[12.5px] dark:bg-slate-800"
-                    value={e.modus}
-                    onChange={async (ev) => {
-                      const v = ev.target.value as Eintrag["modus"];
-                      setListe((l) => l.map((x) => (x.id === e.id ? { ...x, modus: v } : x)));
-                      const { error } = await supabase!.from("wortfilter").update({ modus: v }).eq("id", e.id);
-                      if (error) meldeFehler("Ging nicht: " + error.message);
-                    }}
-                  >
-                    {MODI.map((x) => (
-                      <option key={x.key} value={x.key}>
-                        {x.text}
-                      </option>
-                    ))}
-                  </select>
-                )}
-                <Schalter
-                  an={e.aktiv}
-                  label={`${e.wort} aktiv`}
-                  onChange={async (v) => {
-                    setListe((l) => l.map((x) => (x.id === e.id ? { ...x, aktiv: v } : x)));
-                    const { error } = await supabase!.from("wortfilter").update({ aktiv: v }).eq("id", e.id);
-                    if (error) meldeFehler("Ging nicht: " + error.message);
-                  }}
-                />
-                <button
-                  aria-label={`${e.wort} löschen`}
-                  onClick={() => void loeschen(e)}
-                  className="-mr-2 flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-red-600 transition active:scale-90 dark:text-red-400"
-                >
-                  <Icon name="muell" size={18} />
-                </button>
-              </div>
+              <Zeile key={e.id} label={<span className={e.aktiv ? "" : "text-tinte-leise"}>{e.wort}</span>} onClick={() => setOffenId(e.id)}>
+                <Wert>{[e.stufe === "block" ? MODI.find((x) => x.key === e.modus)?.text : null, e.aktiv ? null : "aus"].filter(Boolean).join(" · ")}</Wert>
+              </Zeile>
             ))}
             {sichtbar.length === 0 && <p className="px-4 py-3 text-[13px] text-tinte-leise">{q ? "Nichts gefunden." : "Noch nichts eingetragen."}</p>}
-          </div>
+          </Gruppe>
           <p className="mt-2 px-4 text-[12px] leading-snug text-tinte-leise">
             Erkennt auch Umgehungen: Groß/klein, Umlaute, Zahlen statt Buchstaben (4rsch), Zeichen dazwischen (A.r.s.c.h), Leerzeichen, Wiederholungen und Sternchen (f*ck).
-            Schalter aus = bleibt gespeichert, wirkt aber nicht; 🗑 löscht es ganz.
+            Eintrag antippen: Modus, an/aus oder löschen. Aus = bleibt gespeichert, wirkt aber nicht.
           </p>
         </>
       )}
+      {/* Ein Eintrag als Unterseite („‹ Wortfilter“): über dem offenen Blatt */}
+      <Sheet open={offenEintrag !== null} onClose={() => setOffenId(null)}>
+        {offenEintrag && (
+          <>
+            <SheetKopf titel={offenEintrag.wort} unter={offenEintrag.stufe === "block" ? "Geblocktes Wort" : "Ausnahme"} onClose={() => setOffenId(null)} />
+            {offenEintrag.stufe === "block" && (
+              <Gruppe titel="Wo blocken?" className="">
+                {MODI.map((m) => (
+                  <ZeileHaken key={m.key} label={m.text} unter={m.hilfe} gewaehlt={offenEintrag.modus === m.key} onClick={() => void modusSetzen(offenEintrag, m.key)} />
+                ))}
+              </Gruppe>
+            )}
+            <Gruppe className="mt-5">
+              <ZeileMitSchalter label="Aktiv" unter="Aus = bleibt gespeichert, wirkt aber nicht.">
+                <Schalter an={offenEintrag.aktiv} label={`${offenEintrag.wort} aktiv`} onChange={(v) => void aktivSetzen(offenEintrag, v)} />
+              </ZeileMitSchalter>
+            </Gruppe>
+            <Gruppe className="mt-8">
+              <Zeile
+                label="Aus der Liste löschen …"
+                rot
+                onClick={async () => {
+                  if (await loeschen(offenEintrag)) setOffenId(null);
+                }}
+              />
+            </Gruppe>
+          </>
+        )}
+      </Sheet>
     </Sheet>
   );
 }

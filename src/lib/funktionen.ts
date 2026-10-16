@@ -7,7 +7,7 @@ import type { PermKey } from "./permissions";
 /**
  * Funktionen an/aus (Profil → Funktionen, Recht funktionen.verwalten).
  * Schaltet ganze Bereiche für alle. Wer innerhalb eines Bereichs was darf,
- * steht weiter im Rechte-Reiter. Gespeichert in app_settings.funktionen
+ * steht weiter unter Rollen → „Rechte je Rolle“. Gespeichert in app_settings.funktionen
  * (supabase/funktionen-zitate.sql); ändern nur über funktion_setzen().
  *
  * Ausgeschaltetes sieht nur, wer die Funktionen verwaltet – mit Hinweis –,

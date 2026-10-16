@@ -88,7 +88,7 @@ interface StoreValue {
   addContribution: (studentId: string, titel: string, punkte: number, datum?: string) => void;
   /** Denselben Beitrag mehreren Personen gutschreiben. */
   addContributionMany: (studentIds: string[], titel: string, punkte: number, datum?: string) => void;
-  addTemplate: (titel: string, punkte: number) => void;
+  addTemplate: (titel: string, punkte: number, variabel?: boolean) => void;
   updateTemplate: (id: string, patch: Partial<Pick<ContribTemplate, "titel" | "punkte" | "sort" | "variabel">>) => void;
   removeTemplate: (id: string) => void;
   updateContribution: (id: string, patch: Partial<Pick<Contribution, "titel" | "punkte" | "datum">>) => void;
@@ -506,13 +506,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   );
 
   const addTemplate: StoreValue["addTemplate"] = useCallback(
-    (titel, punkte) => {
+    (titel, punkte, variabel = false) => {
       const t: ContribTemplate = {
         id: crypto.randomUUID(),
         titel: titel.trim(),
         punkte: Math.max(0, Math.round(punkte) || 0),
         sort: 100,
-        variabel: false,
+        variabel,
       };
       if (!t.titel) return;
       setTemplates((prev) => [...prev, t]);

@@ -2,7 +2,8 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState, ty
 import { hasSupabase, supabase } from "./lib/supabase";
 import { abonniere } from "./lib/realtime";
 import { sendePush } from "./lib/push";
-import type { EventItem, NewEvent } from "./lib/events";
+import { demoEvents, type EventItem, type NewEvent } from "./lib/events";
+import { demoRolle } from "./lib/demo";
 
 import { meldeFehler } from "./lib/melder";
 const LS = "sv-beitraege:events";
@@ -55,12 +56,24 @@ export function EventsProvider({ children }: { children: ReactNode }) {
     if (hasSupabase) return;
     try {
       const d = JSON.parse(localStorage.getItem(LS) || "{}");
-      setEvents(d.events || []);
+      // Demo-Modus (?rolle=…): immer die erfundenen Beiträge aus lib/events.ts
+      // (plus selbst angelegte), damit man Gruppen und „Älter“ sieht. Die
+      // Stimmen der anderen kommen erfunden dazu, die eigenen aus dem Speicher.
+      const demo = demoRolle() ? demoEvents() : null;
+      const gespeichert: EventItem[] = d.events || [];
+      setEvents(
+        demo
+          ? [...gespeichert.filter((e) => !e.id.startsWith("demo-ev-")), ...demo.events].sort((a, b) =>
+              b.created_at.localeCompare(a.created_at),
+            )
+          : gespeichert,
+      );
       setMyVotes(d.votes || {});
       setReads(new Set(d.reads || []));
       const counts: Record<string, Record<string, number>> = {};
+      for (const [eid, je] of Object.entries(demo?.stimmen || {})) counts[eid] = { ...je };
       for (const [eid, opts] of Object.entries((d.votes || {}) as Record<string, string[]>)) {
-        counts[eid] = {};
+        counts[eid] ||= {};
         for (const o of opts) counts[eid][o] = (counts[eid][o] || 0) + 1;
       }
       setVoteCounts(counts);
@@ -261,21 +274,22 @@ export function EventsProvider({ children }: { children: ReactNode }) {
     async (eventId: string, optionId: string, multiple: boolean) => {
       const has = (myVotes[eventId] || []).includes(optionId);
       if (!hasSupabase) {
-        setMyVotes((prev) => {
-          let cur = prev[eventId] || [];
-          if (has) cur = cur.filter((o) => o !== optionId);
-          else cur = multiple ? [...cur, optionId] : [optionId];
-          const next = { ...prev, [eventId]: cur };
-          // counts neu
-          setVoteCounts((vc) => {
-            const c: Record<string, number> = {};
-            for (const o of cur) c[o] = (c[o] || 0) + 1;
-            return { ...vc, [eventId]: c };
-          });
-          setVoters((vv) => ({ ...vv, [eventId]: cur.map((option_id) => ({ option_id, user_id: LOCAL_UID })) }));
-          saveLocal(events, next, reads);
-          return next;
+        // Außerhalb der Updater gerechnet (StrictMode ruft Updater doppelt auf –
+        // eine Zählung „alt weg, neu dazu“ darin würde doppelt zählen).
+        const alt = myVotes[eventId] || [];
+        const cur = has ? alt.filter((o) => o !== optionId) : multiple ? [...alt, optionId] : [optionId];
+        const next = { ...myVotes, [eventId]: cur };
+        setMyVotes(next);
+        // Zählung anpassen: eigene alte Stimme weg, neue dazu – die
+        // (erfundenen) Stimmen der anderen im Demo-Modus bleiben stehen.
+        setVoteCounts((vc) => {
+          const c: Record<string, number> = { ...(vc[eventId] || {}) };
+          for (const o of alt) c[o] = Math.max(0, (c[o] || 0) - 1);
+          for (const o of cur) c[o] = (c[o] || 0) + 1;
+          return { ...vc, [eventId]: c };
         });
+        setVoters((vv) => ({ ...vv, [eventId]: cur.map((option_id) => ({ option_id, user_id: LOCAL_UID })) }));
+        saveLocal(events, next, reads);
         return;
       }
       const uid = uidRef.current;

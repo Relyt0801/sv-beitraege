@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { hasSupabase, supabase } from "./supabase";
 import { abonniere } from "./realtime";
 import { useStimmenZahlen } from "./ergebnisse";
+import type { Teil } from "./teile";
 
 /**
  * Abimotto (supabase/komitees-motto.sql)
@@ -20,8 +21,41 @@ import { useStimmenZahlen } from "./ergebnisse";
  *   Vorschläge   alle reichen ein, abstimmen geht noch nicht
  *   Abstimmung   👍/🔥 offen, neue Vorschläge nur noch vom Komitee
  * Die Datenbank prüft beides (Policies auf motto_vorschlaege/motto_stimmen).
+ *
+ * Offiziell / Inoffiziell (supabase/offiziell-inoffiziell.sql, Update 1.4):
+ * Jeder Vorschlag liegt in genau einem Teil (Spalte bereich). Eingereicht
+ * wird in den Teil, der gerade offen ist; verschieben geht nur mit
+ * Zustimmungen (lib/teile.ts → useVerschiebungen). Bestand = inoffiziell.
+ * Das offizielle Motto kürt man über die Gewinner-Tabelle (gewinner_kueren
+ * setzt dann gewaehlt + gewaehlt_at); daran hängt die Enthüllung für alle.
  */
 export type MottoArt = "like" | "feuer";
+
+/**
+ * Alle Motto-Stimmen seitenweise: Wer das Motto verwaltet, darf alle lesen –
+ * die Datenbank liefert aber höchstens 1000 Zeilen je Abfrage. Ohne Seiten
+ * fehlten ab der 1001. Stimme still Zeilen – dann auch eigene Stimmen (nicht
+ * zurücknehmbar) und die Zahlen, bis stimmen_zahlen() geantwortet hat.
+ * Sortiert nach dem Primärschlüssel, damit sich die Seiten nicht überlappen.
+ */
+async function alleStimmen(): Promise<{ data: unknown[] | null; error: unknown }> {
+  const SEITE = 1000;
+  const alle: unknown[] = [];
+  for (let von = 0; von < 20 * SEITE; von += SEITE) {
+    const r = await supabase!
+      .from("motto_stimmen")
+      .select("vorschlag_id, user_id, art")
+      .eq("an", true)
+      .order("vorschlag_id")
+      .order("user_id")
+      .order("art")
+      .range(von, von + SEITE - 1);
+    if (r.error) return { data: null, error: r.error };
+    alle.push(...(r.data || []));
+    if ((r.data || []).length < SEITE) break;
+  }
+  return { data: alle, error: null };
+}
 
 export interface Motto {
   id: string;
@@ -33,6 +67,10 @@ export interface Motto {
   created_at: string;
   ausgeblendet: boolean;
   gewaehlt: boolean;
+  /** Teil: offiziell (kommt ins Abibuch) oder inoffiziell (nur die Stufe) */
+  bereich: Teil;
+  /** Seit wann das Motto feststeht (nur beim gekürten offiziellen Motto) */
+  gewaehlt_at?: string | null;
 }
 
 interface Stimme {
@@ -41,7 +79,8 @@ interface Stimme {
   art: MottoArt;
 }
 
-const DEMO = "sv-motto-demo";
+// v2: seit Update 1.4 mit Teil (bereich) – alte Demo-Daten ohne Teil bleiben liegen
+const DEMO = "sv-motto-demo-v2";
 const DEMO_PHASE = "sv-motto-abstimmung-demo";
 interface DemoDaten {
   mottos: Motto[];
@@ -50,12 +89,18 @@ interface DemoDaten {
 function demoLesen(): DemoDaten {
   try {
     const roh = localStorage.getItem(DEMO);
-    if (roh) return JSON.parse(roh) as DemoDaten;
+    if (roh) {
+      const d = JSON.parse(roh) as DemoDaten;
+      // Sicherheitshalber: Einträge ohne Teil gelten als inoffiziell (wie in der Datenbank)
+      d.mottos = d.mottos.map((x) => ({ ...x, bereich: x.bereich === "offiziell" ? "offiziell" : "inoffiziell" }));
+      return d;
+    }
   } catch {
     /* privater Modus */
   }
+  // Erfundene Beispiele – beide Teile, damit der Umschalter etwas zeigt
   const jetzt = Date.now();
-  const m = (i: number, text: string, erklaerung: string): Motto => ({
+  const m = (i: number, text: string, erklaerung: string, bereich: Teil): Motto => ({
     id: `demo-m${i}`,
     text,
     erklaerung,
@@ -64,19 +109,29 @@ function demoLesen(): DemoDaten {
     created_at: new Date(jetzt - i * 36e5 * 30).toISOString(),
     ausgeblendet: false,
     gewaehlt: false,
+    bereich,
+    gewaehlt_at: null,
   });
+  // Likes von erfundenen Personen a–h
+  const likes = (id: string, wer: string) => wer.split("").map((u) => ({ vorschlag_id: id, user_id: u, art: "like" as MottoArt }));
   return {
     mottos: [
-      m(1, "ABIgeschlossen", "Wortspiel mit abgeschlossen"),
-      m(2, "Abi Wan Kenobi – möge der Schnitt mit uns sein", ""),
-      m(3, "Abiversum – 12 Jahre, ein Ziel", ""),
+      m(1, "ABIgeschlossen", "Wortspiel mit abgeschlossen", "offiziell"),
+      m(2, "Abiversum – 12 Jahre, ein Ziel", "", "offiziell"),
+      m(3, "Mit Abstand die Besten", "", "offiziell"),
+      m(4, "Abikalypse – wir haben überlebt", "", "offiziell"),
+      m(5, "Abi Wan Kenobi – möge der Schnitt mit uns sein", "", "inoffiziell"),
+      m(6, "Abipedia – wir wissen alles, nur nicht wann", "", "inoffiziell"),
+      m(7, "Notenlos glücklich", "", "inoffiziell"),
     ],
     stimmen: [
-      { vorschlag_id: "demo-m1", user_id: "a", art: "feuer" },
-      { vorschlag_id: "demo-m1", user_id: "b", art: "like" },
-      { vorschlag_id: "demo-m2", user_id: "a", art: "like" },
-      { vorschlag_id: "demo-m3", user_id: "c", art: "feuer" },
-      { vorschlag_id: "demo-m3", user_id: "d", art: "feuer" },
+      ...likes("demo-m1", "abcdef"),
+      ...likes("demo-m2", "abc"),
+      ...likes("demo-m3", "de"),
+      ...likes("demo-m4", "abcdefg"),
+      ...likes("demo-m5", "abcd"),
+      ...likes("demo-m6", "ef"),
+      ...likes("demo-m7", "g"),
     ],
   };
 }
@@ -128,8 +183,8 @@ export function useMotto(aktiv: boolean, uid: string | null) {
     // Einreicher stehen nicht in der Liste (Spalten sind gesperrt) – welche
     // Vorschläge meine sind, sagt meine_eintraege().
     const [m, s, a, mi] = await Promise.all([
-      supabase!.from("motto_vorschlaege").select("id, text, erklaerung, created_at, ausgeblendet, gewaehlt").order("created_at", { ascending: false }).limit(500),
-      supabase!.from("motto_stimmen").select("vorschlag_id, user_id, art").eq("an", true),
+      supabase!.from("motto_vorschlaege").select("id, text, erklaerung, created_at, ausgeblendet, gewaehlt, bereich, gewaehlt_at").order("created_at", { ascending: false }).limit(500),
+      alleStimmen(),
       supabase!.from("app_settings").select("motto_abstimmung").eq("id", 1).maybeSingle(),
       supabase!.rpc("meine_eintraege"),
     ]);
@@ -164,19 +219,21 @@ export function useMotto(aktiv: boolean, uid: string | null) {
   }, [aktiv, laden]);
 
   const vorschlagen = useCallback(
-    async (text: string, erklaerung: string): Promise<string | null> => {
+    async (text: string, erklaerung: string, bereich: Teil): Promise<string | null> => {
       const t = text.trim().slice(0, 80);
       const e = erklaerung.trim().slice(0, 200);
       if (t.length < 2) return "Das Motto ist zu kurz";
-      if (mottos.some((x) => x.text.toLowerCase() === t.toLowerCase())) return "Dieses Motto gibt es schon";
+      // Doppelt nur innerhalb desselben Teils – offiziell und inoffiziell dürfen gleich heißen
+      if (mottos.some((x) => x.bereich === bereich && x.text.toLowerCase() === t.toLowerCase())) return "Dieses Motto gibt es schon";
       if (!hasSupabase) {
         const d = demoLesen();
-        d.mottos.unshift({ id: crypto.randomUUID(), text: t, erklaerung: e, von: me, von_name: "Ich", created_at: new Date().toISOString(), ausgeblendet: false, gewaehlt: false });
+        d.mottos.unshift({ id: crypto.randomUUID(), text: t, erklaerung: e, von: me, von_name: "Ich", created_at: new Date().toISOString(), ausgeblendet: false, gewaehlt: false, bereich, gewaehlt_at: null });
         demoSchreiben(d);
         await laden();
         return null;
       }
-      const { error } = await supabase!.from("motto_vorschlaege").insert({ text: t, erklaerung: e });
+      // Der Teil wird beim Einreichen gesetzt (später ändern geht nur über Verschieben)
+      const { error } = await supabase!.from("motto_vorschlaege").insert({ text: t, erklaerung: e, bereich });
       if (error) return error.message;
       await laden();
       return null;
@@ -184,7 +241,10 @@ export function useMotto(aktiv: boolean, uid: string | null) {
     [laden, me, mottos],
   );
 
-  /** Verwalten: Text ändern, aus-/einblenden, als Motto festlegen */
+  /**
+   * Verwalten: Text ändern, aus-/einblenden. gewaehlt setzt die App nur noch
+   * im Demo-Modus selbst – mit Datenbank macht das gewinner_kueren().
+   */
   const aendern = useCallback(
     async (id: string, patch: Partial<Pick<Motto, "text" | "erklaerung" | "ausgeblendet" | "gewaehlt">>): Promise<string | null> => {
       setMottos((l) =>
@@ -271,7 +331,22 @@ export function useMotto(aktiv: boolean, uid: string | null) {
 
   const istMeins = useCallback((id: string) => meineIds.has(id), [meineIds]);
 
-  return { bereit, mottos, me, istMeins, zahlenSichtbar, neuZaehlen: z.laden, abstimmung, abstimmungSetzen, vorschlagen, aendern, abstimmen, zahl, meine, punkte, meinFavorit, waehlende };
+  /**
+   * Nur Demo-Modus: Teil direkt wechseln (mit Datenbank geht das nur über
+   * verschieben_beantragen mit Zustimmungen – siehe useVerschiebungen).
+   */
+  const demoVerschieben = useCallback(
+    (id: string, nach: Teil) => {
+      if (hasSupabase) return;
+      const d = demoLesen();
+      d.mottos = d.mottos.map((x) => (x.id === id ? { ...x, bereich: nach } : x));
+      demoSchreiben(d);
+      void laden();
+    },
+    [laden],
+  );
+
+  return { bereit, mottos, me, istMeins, laden, demoVerschieben, zahlenSichtbar, neuZaehlen: z.laden, abstimmung, abstimmungSetzen, vorschlagen, aendern, abstimmen, zahl, meine, punkte, meinFavorit, waehlende };
 }
 
 export type MottoWahl = ReturnType<typeof useMotto>;

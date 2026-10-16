@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useRole } from "../auth/RoleProvider";
 import { RolesTab } from "./RolesTab";
 import { PermissionsTab } from "./PermissionsTab";
+import { InKopf } from "./InKopf";
 
 /**
  * Rollen und Rechte in einem Reiter. Oben ein Umschalter wie in iOS:
@@ -10,33 +11,67 @@ import { PermissionsTab } from "./PermissionsTab";
  *  - Rechte: was jede Rolle darf, nach Bereichen zugeklappt
  * Vorher gab es die Personenliste zweimal (in Rollen und in Rechte).
  */
+type Ansicht = "rollen" | "rechte";
+
+/*
+ * Die Wahl bleibt beim Reiterwechsel stehen (wie in iOS: nur erneutes
+ * Antippen des Reiters führt zur Wurzel). Der Reiter wird beim Wechsel
+ * ausgehängt (<main key={tab}>), darum merken wir sie in sessionStorage –
+ * gilt bis zum Schließen des Tabs. Ohne Speicher (privates Fenster): einfach
+ * der Anfang.
+ */
+const MERKER = "sv:rollen-ansicht";
+function gemerkt(): Ansicht | null {
+  try {
+    const w = sessionStorage.getItem(MERKER);
+    return w === "rollen" || w === "rechte" ? w : null;
+  } catch {
+    return null;
+  }
+}
+function merken(a: Ansicht) {
+  try {
+    sessionStorage.setItem(MERKER, a);
+  } catch {
+    /* ohne Speicher: nur für diesen Besuch des Reiters */
+  }
+}
+
 export function RollenRechteTab() {
   const { canManageRoles, can } = useRole();
   const darfRechte = can("perms.manage");
-  const [ansicht, setAnsicht] = useState<"rollen" | "rechte">(canManageRoles ? "rollen" : "rechte");
+  const [ansicht, setAnsicht] = useState<Ansicht>(() => gemerkt() ?? (canManageRoles ? "rollen" : "rechte"));
   const beide = canManageRoles && darfRechte;
   const zeige = beide ? ansicht : canManageRoles ? "rollen" : "rechte";
 
   return (
     <div>
       {beide && (
-        <div className="mb-3 grid grid-cols-2 gap-0.5 rounded-xl bg-[rgb(118_118_128/0.12)] p-0.5 dark:bg-[rgb(118_118_128/0.24)]" role="tablist">
+        // Segment wie in iOS (.seg) – gleiche Optik wie überall in der App.
+        // Am Rechner rechts in der Kopfzeile (InKopf), am Handy hier oben.
+        <InKopf className="mb-4" kopfClassName="w-[19rem]">
+        <div className="seg w-full" role="tablist" aria-label="Rollen und Rechte">
           {(["rollen", "rechte"] as const).map((a) => (
             <button
               key={a}
               role="tab"
               aria-selected={zeige === a}
-              onClick={() => setAnsicht(a)}
-              className={`rounded-[10px] py-2 text-[14px] font-semibold transition ${
-                zeige === a ? "bg-white text-tinte shadow-sm dark:bg-slate-600 dark:text-white" : "text-tinte-matt dark:text-slate-300"
-              }`}
+              data-ansicht={a}
+              onClick={() => {
+                merken(a);
+                setAnsicht(a);
+              }}
+              className={`seg-item whitespace-nowrap !py-[7px] !text-[14px] lg:!py-1.5 lg:!text-[13px] ${zeige === a ? "seg-aktiv" : ""}`}
             >
-              {a === "rollen" ? "Rollen" : "Rechte"}
+              {a === "rollen" ? "Personen" : "Rechte je Rolle"}
             </button>
           ))}
         </div>
+        </InKopf>
       )}
-      {zeige === "rollen" ? <RolesTab /> : <PermissionsTab />}
+      <div key={zeige} className="animate-fadeIn">
+        {zeige === "rollen" ? <RolesTab /> : <PermissionsTab />}
+      </div>
     </div>
   );
 }

@@ -63,6 +63,12 @@ interface RoleCtx {
 }
 
 const Ctx = createContext<RoleCtx | null>(null);
+/**
+ * Wie useRole, aber ohne Fehler außerhalb des Providers (null) – für
+ * Bausteine, die auch vor dem Anmelden erscheinen (z. B. Install-Hinweis auf
+ * der Anmeldeseite).
+ */
+export const useRoleOptional = () => useContext(Ctx);
 export const useRole = () => {
   const v = useContext(Ctx);
   if (!v) throw new Error("useRole outside provider");
@@ -75,7 +81,7 @@ export function RoleProvider({ children }: { children: ReactNode }) {
   // Lokaler Modus (ohne Supabase): voller Zugriff zum Entwickeln/Testen –
   // oder die Rolle aus ?rolle=… (Demo-Modus, siehe src/lib/demo.ts).
   const [demo] = useState(() => demoRolle());
-  const { students } = useStore();
+  const { students, ready: personenBereit } = useStore();
   const [role, setRoleState] = useState<Role>(hasSupabase ? "schueler" : demoRolleAlsRolle(demo) ?? "admin");
   const [ready, setReady] = useState(!hasSupabase);
   const [profiles, setProfiles] = useState<Profile[]>([]);
@@ -162,7 +168,9 @@ export function RoleProvider({ children }: { children: ReactNode }) {
     if (hasSupabase || !students.length) return;
     setUid(demoUid(demo));
     setProfiles((vorher) => (vorher.length ? vorher : demoProfile(students)));
-    if (demo && !STAFF.includes(role) && role !== "eltern") setStudentId(students[0].id);
+    // Auch Stufenteam und Admin sind in echt meist selbst Schüler der Stufe
+    // (mit eigenem Steckbrief und Profil-Reiter) – in der Demo genauso.
+    if (demo && role !== "eltern") setStudentId(STAFF.includes(role) ? (students[1] ?? students[0]).id : students[0].id);
   }, [students, demo, role]);
 
   useEffect(() => {
@@ -343,9 +351,17 @@ export function RoleProvider({ children }: { children: ReactNode }) {
       userByStudent[p.student_id] = p.user_id;
     }
 
+  // Demo (?rolle=…): erst „bereit“, wenn auch die eigene Kennung und Person
+  // feststehen – so wie mit Datenbank (dort kommt studentId vor setReady).
+  // Vorher war die Demo sofort bereit, die eigene Person kam erst einen Takt
+  // später: Der Start-Reiter wurde ohne „Übersicht“ gewählt (Team landete in
+  // der Kasse), und der Reiter „Übersicht“ tauchte nachträglich in der Leiste
+  // auf – alle Reiter rutschten. Ohne Personen (leere Demo) nicht ewig warten.
+  const demoBereit = !demo || uid !== null || (personenBereit && students.length === 0);
+
   const value: RoleCtx = {
     role,
-    ready,
+    ready: hasSupabase ? ready : ready && demoBereit,
     isAdmin,
     isStaff,
     isEltern,

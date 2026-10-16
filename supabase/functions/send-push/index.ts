@@ -266,7 +266,9 @@ Deno.serve(async (req) => {
       // An das Stufenteam, z. B. eine neue Terminanfrage
       const { data } = await supabase.from("profiles").select("user_id").in("role", TEAM);
       userIds = (data || []).map((p: { user_id: string }) => p.user_id);
-      if (art === "anfrage") userIds = await ohneAbgeschaltete(userIds, "anfragen");
+      // Wie im Direkt-Modus: abgeschaltete Kategorien beachten (Eltern-Chats
+      // kommen seit 1.4 über an_team – Eltern dürfen die Team-Liste nicht lesen)
+      if (art === "eltern" || art === "anfrage") userIds = await ohneAbgeschaltete(userIds, art === "eltern" ? "eltern" : "anfragen");
       title = kurz(directTitle || "Stufenkasse", 80);
       body = kurz(directBody, 200);
     } else if (eltern_info_id) {

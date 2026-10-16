@@ -24,6 +24,18 @@ import { heuteKey, plusTage, type Termin } from "./termine";
 
 export const DEMO_KONTEN = ["admin.test", "test.admin"];
 
+/**
+ * DER Schalter für die Kalender-Verbindung („Stufen-Termine ins Handy
+ * übernehmen“, Abo-Link, .ics-Datei eines Termins, eigener Kalender in der App).
+ *
+ * Vorübergehend aus, Wunsch 14.10.2026. Der Code bleibt komplett drin – zum
+ * Wiedereinschalten nur hier `true` setzen. Dann erscheinen die Einstiege im
+ * Wochenstreifen, im großen Kalender und „In meinen Kalender“ im Termin
+ * wieder (für dieselben Personen wie vorher, siehe useKalenderDemo).
+ * Der Kalender IN der App ist davon nicht betroffen, der bleibt immer an.
+ */
+export const KALENDER_SYNC_AN = false;
+
 let eigenerName: string | null | undefined;
 
 /** Nutzername aus der Anmeldung ("admin.test@sv-beitraege.local" → "admin.test"). */
@@ -35,9 +47,10 @@ async function nutzername(): Promise<string | null> {
   return eigenerName;
 }
 
-/** Darf diese Person die Kalender-Verbindung (Testphase) sehen? */
+/** Darf diese Person die Kalender-Verbindung (Testphase) sehen? Immer nein,
+ *  solange KALENDER_SYNC_AN aus ist. */
 export function useKalenderDemo(): boolean {
-  // Freigabe über den Rechte-Reiter („Kalender-Verbindung (Testphase)“) –
+  // Freigabe unter Rollen → „Rechte je Rolle“ („Kalender-Verbindung (Testphase)“) –
   // Namen stehen so nicht im Code. Die Function prüft dasselbe.
   const { can } = useRole();
   const perm = can("kalender.test");
@@ -55,7 +68,9 @@ export function useKalenderDemo(): boolean {
       sub.subscription.unsubscribe();
     };
   }, []);
-  return ja || perm;
+  // Hauptschalter zuletzt prüfen – die Hooks oben laufen trotzdem immer
+  // (React verlangt bei jedem Aufruf dieselbe Reihenfolge).
+  return KALENDER_SYNC_AN && (ja || perm);
 }
 
 // ---------------------------------------------------------------- App → Handy

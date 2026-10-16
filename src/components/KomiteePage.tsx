@@ -1,45 +1,121 @@
-import { useEffect, useMemo, useState } from "react";
+import { Children, isValidElement, useEffect, useMemo, useState } from "react";
 import { useTopics, type Topic, type TopicItem } from "../topics-store";
 import { useRole } from "../auth/RoleProvider";
-import { useStore } from "../store";
 import { committeeIcon, committeeLabel } from "../lib/committees";
-import { WerHatGestimmt } from "./WerHatGestimmt";
-import { Avatar, PersonName } from "./Avatar";
-import { ChatBlase, SystemZeile } from "./ChatBlasen";
+import { useBreit } from "../lib/gescrollt";
+import { PersonName } from "./Avatar";
+import { ChatBlasen, ChatEbene, ChatEingabe, ChatKopf } from "./ChatBlasen";
 import { BannHinweis } from "./BannHinweis";
 import { Sheet, SheetKopf } from "./Sheet";
-import { useChatEnde } from "../lib/gescrollt";
 import { VorsitzZeile } from "./VorsitzSheet";
-import { Icon } from "./Icon";
+import { Icon, type IconName } from "./Icon";
+import { Gruppe, Symbol, Zeile, ZeileMitSchalter } from "./Liste";
+import { Schalter } from "./Schalter";
 
 import { frage } from "../lib/melder";
-import { ANTWORT_ART_NAME, FreiAntworten, type AntwortArt } from "./Freitext";
+import { AbstimmungKarte, NeuEintragSheet, type NeuDaten } from "./Freitext";
 type Neu = "pin" | "umfrage" | "todo" | null;
+/** Die beiden Teile einer Komitee-Seite. Intern heißt die Pinnwand weiter „uebersicht“ (Gelesen-Marken, Datenbank). */
+export type KomiteeTeil = "chat" | "uebersicht";
+
+/** Die drei Dinge, die man im Komitee anlegen kann – für das „+“ im Chat und die Knöpfe auf der Pinnwand. */
+const NEU_ARTEN: { art: Exclude<Neu, null>; label: string; unter: string; icon: IconName; farbe: string }[] = [
+  { art: "umfrage", label: "Abstimmung", unter: "Alle im Komitee stimmen ab", icon: "umfrage", farbe: "bg-[#5E5CE6]" },
+  { art: "todo", label: "To-do", unter: "Eine Aufgabe, die jemand abhakt", icon: "haken", farbe: "bg-[#248A3D]" },
+  { art: "pin", label: "Anpinnen", unter: "Kurze Info, die oben stehen bleibt", icon: "pin", farbe: "bg-[#E8590C]" },
+];
+
+const abgelaufen = (u: TopicItem) => Boolean(u.poll_deadline) && new Date(u.poll_deadline!).getTime() < Date.now();
+const datumKurz = (iso: string) =>
+  new Date(iso).toLocaleString("de-DE", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
 
 /**
- * Eine Komitee-Seite: oben das Wichtige (Angepinntes, Abstimmungen, To-dos),
- * unten an fester Stelle der Chat.
+ * Eine Komitee-Seite: Chat und Pinnwand (Angepinntes, To-dos, Abstimmungen).
+ *
+ * Die Pinnwand hieß bis Okt. 2026 „Übersicht“ – am Laptop stand dann
+ * „Chat | Übersicht“ direkt über dem App-Reiter „Übersicht“ (Startseite).
  */
-export function KomiteePage({ topic, onBack }: { topic: Topic; onBack: () => void }) {
-  const { items, postItem, updateItem, deleteItem, markRead, uid, committeesOf, unreadCount } = useTopics();
+export function KomiteePage({
+  topic,
+  onBack,
+  startTeil,
+  startZiel,
+  onTeil,
+}: {
+  topic: Topic;
+  onBack: () => void;
+  /** Mit welchem Teil die Seite aufgeht (z. B. aus der Vorschau im Chats-Reiter) */
+  startTeil?: KomiteeTeil;
+  /**
+   * Eintrag der Pinnwand, zu dem die Seite beim Öffnen springt und den sie
+   * kurz hervorhebt (Angepinntes, Abstimmung, To-do) – z. B. die angetippte
+   * Abstimmung aus der Vorschau im Chats-Reiter. Vorher ging die Pinnwand
+   * oben auf, und die angetippte Abstimmung lag am iPhone unter dem Rand.
+   */
+  startZiel?: string;
+  /** Meldet jeden Wechsel Chat ⇄ Pinnwand (der Chats-Reiter merkt sich den Stand) */
+  onTeil?: (t: KomiteeTeil) => void;
+}) {
+  const { items, postItem, updateItem, deleteItem, markRead, uid, committeesOf, unreadCount, myVotes } = useTopics();
   const { role, can, banned } = useRole();
+  const breit = useBreit();
   const darfLoeschen = can("chats.delete_messages");
   // To-dos, Abstimmungen und Angepinntes anderer löschen (eigenes Recht, 28.09.)
   const darfEintraege = can("chats.delete_items");
   const [neu, setNeu] = useState<Neu>(null);
-  // Man landet im Chat; die Übersicht (Angepinntes, Abstimmungen, To-dos)
-  // ist der zweite Knopf daneben. Beide haben ihren eigenen roten Punkt und
-  // ihre eigene Gelesen-Marke.
-  const [tab, setTab] = useState<"uebersicht" | "chat">("chat");
+  // „+“ links in der Eingabezeile (am Laptop auf der Pinnwand: „Neu“ oben rechts):
+  // Blatt „Abstimmung · To-do · Anpinnen“
+  const [neuMenue, setNeuMenue] = useState(false);
+  // Angepinntes oder To-do im Blatt (Details, Loslösen, Löschen)
+  const [eintragId, setEintragId] = useState<string | null>(null);
+  // Man landet im Chat; die Pinnwand ist der zweite Knopf daneben. Beide haben
+  // ihren eigenen roten Punkt und ihre eigene Gelesen-Marke. Ist im Chat nichts
+  // Neues, auf der Pinnwand aber schon, geht die Seite gleich dort auf – sonst
+  // landete man im leeren Chat, und die rote Zahl der Kachel war nirgends zu sehen.
+  const [tab, setTab] = useState<KomiteeTeil>(
+    () => startTeil ?? (unreadCount(topic.id, "chat") === 0 && unreadCount(topic.id, "uebersicht") > 0 ? "uebersicht" : "chat"),
+  );
+  useEffect(() => {
+    onTeil?.(tab);
+    // onTeil ist meist eine neue Funktion je Zeichnen – nur der Wechsel zählt
+  }, [tab]);
+
+  // Einmal nach dem Öffnen zum Ziel springen – nach dem Start-Scroll der
+  // Ebene („oben“), ohne Gleiten: man soll sofort sehen, was man angetippt hat.
+  useEffect(() => {
+    if (!startZiel || tab !== "uebersicht") return;
+    const t = setTimeout(() => {
+      const el = document.getElementById(`pinn-${startZiel}`);
+      if (el) hervorheben(el);
+    }, 120);
+    return () => clearTimeout(t);
+    // nur beim Öffnen
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const alle = useMemo(
     () => items.filter((i) => i.topic_id === topic.id).sort((a, b) => (a.created_at < b.created_at ? -1 : 1)),
     [items, topic.id],
   );
-  const pins = alle.filter((i) => i.type === "nachricht" && i.pinned);
-  const umfragen = alle.filter((i) => i.type === "umfrage");
-  const todos = alle.filter((i) => i.type === "todo");
+  // Angepinntes: das Neueste oben
+  const pins = alle.filter((i) => i.type === "nachricht" && i.pinned).reverse();
+  // Abstimmungen: erst die offenen ohne eigene Stimme, dann die offenen, zuletzt
+  // die beendeten (vorher stand eine beendete ganz oben); jeweils die neueste zuerst
+  // Die Reihenfolge wird nur beim Öffnen und bei neuen Abstimmungen festgelegt –
+  // sonst spränge eine Karte direkt nach dem Abstimmen nach unten weg.
+  const alleUmfragen = alle.filter((i) => i.type === "umfrage");
+  const umfrageIds = alleUmfragen.map((u) => u.id).join(",");
+  const reihe = useMemo(() => {
+    const rang = (u: TopicItem) => (abgelaufen(u) ? 2 : !u.antwort_art && !(myVotes[u.id] || []).length ? 0 : 1);
+    const sortiert = [...alleUmfragen].sort((a, b) => rang(a) - rang(b) || (a.created_at < b.created_at ? 1 : -1));
+    return new Map(sortiert.map((u, i) => [u.id, i]));
+    // Absichtlich nur bei neuen/entfernten Abstimmungen neu (myVotes bewusst nicht)
+  }, [umfrageIds]);
+  const umfragen = [...alleUmfragen].sort((a, b) => (reihe.get(a.id) ?? -1) - (reihe.get(b.id) ?? -1));
+  // To-dos: offene vor erledigten, sonst in der Reihenfolge des Anlegens
+  const todos = alle.filter((i) => i.type === "todo").sort((a, b) => Number(a.done) - Number(b.done));
   const chat = alle.filter((i) => (i.type === "nachricht" && !i.pinned) || i.type === "system");
+  const eintrag = eintragId ? alle.find((i) => i.id === eintragId) ?? null : null;
 
   // Gelesen wird nur, was man gerade sieht
   useEffect(() => {
@@ -47,39 +123,100 @@ export function KomiteePage({ topic, onBack }: { topic: Topic; onBack: () => voi
   }, [topic.id, tab, alle.length, markRead]);
 
   const titel = topic.tag ? committeeLabel(topic.tag) : topic.title;
-  const icon = topic.tag ? committeeIcon(topic.tag) : "💬";
+  const icon = topic.tag ? committeeIcon(topic.tag) : <Icon name="chats" size={17} />;
+
+  // Eigene Nachricht im Chat
+  const [text, setText] = useState("");
+  async function senden() {
+    if (!text.trim()) return;
+    const t = text;
+    setText("");
+    await postItem(topic, "nachricht", t, undefined, "", { role, koms: committeesOf(uid) });
+  }
+
+  /* Zwei Knöpfe: Chat (Standard) und Pinnwand – jeder mit eigenem roten Punkt.
+     Als schlankes Segment direkt unter der Kopfleiste (am Laptop rechts in
+     der Kopfzeile). */
+  const segment = (
+    <div className="seg">
+      {(["chat", "uebersicht"] as const).map((k) => {
+        const n = tab === k ? 0 : unreadCount(topic.id, k);
+        return (
+          <button
+            key={k}
+            onClick={() => setTab(k)}
+            aria-pressed={tab === k}
+            className={`seg-item flex items-center justify-center gap-1.5 ${tab === k ? "seg-aktiv" : ""}`}
+          >
+            {k === "chat" ? "Chat" : "Pinnwand"}
+            {n > 0 && (
+              <span className="zahl flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#FF3B30] px-1 text-[12px] font-bold leading-none text-white">
+                {n > 9 ? "9+" : n}
+              </span>
+            )}
+          </button>
+        );
+      })}
+    </div>
+  );
+
+  // Am Laptop: „Neu“ oben rechts in der Kopfzeile (wie „+ Neu“ der App) statt
+  // drei seitenbreiter Knöpfe unten. Am Handy bleiben sie unten, genau dort,
+  // wo im Chat die Eingabe steht.
+  const neuOben = tab === "uebersicht" && breit && !banned;
+  const wo = neuOben ? "über „Neu“ oben rechts" : null;
 
   return (
-    <div>
-      <div className="sticky top-[var(--kopf)] z-10 -mx-3 border-b border-papier-linie bg-papier-matt px-3 py-2 dark:border-slate-800 dark:bg-slate-950 sm:-mx-5 sm:px-5 lg:mx-0 lg:rounded-2xl lg:border lg:bg-[rgb(var(--glas))] lg:px-4 lg:shadow-card lg:dark:border-white/10 lg:dark:bg-[rgb(var(--glas))]">
-      <div className="flex items-center gap-2">
-        <button className="iconbtn" onClick={onBack} aria-label="Zurück">‹</button>
-        <span className="text-xl">{icon}</span>
-        <div className="min-w-0 flex-1 truncate text-[17px] font-bold">{titel}</div>
-      </div>
-      {/* Zwei Knöpfe: Chat (Standard) und Übersicht – jeder mit eigenem roten Punkt */}
-      <div className="seg mt-2">
-        {(["chat", "uebersicht"] as const).map((k) => {
-          const n = tab === k ? 0 : unreadCount(topic.id, k);
-          return (
-            <button
-              key={k}
-              onClick={() => setTab(k)}
-              aria-pressed={tab === k}
-              className={`seg-item flex items-center justify-center gap-1.5 ${tab === k ? "seg-aktiv" : ""}`}
-            >
-              {k === "chat" ? "💬 Chat" : "📋 Übersicht"}
-              {n > 0 && (
-                <span className="flex h-[17px] min-w-[17px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
-                  {n > 9 ? "9+" : n}
-                </span>
-              )}
-            </button>
-          );
-        })}
-      </div>
-      </div>
-
+    <ChatEbene
+      label={titel}
+      onSchliessen={onBack}
+      // Die Pinnwand beginnt oben (Angepinntes zuerst), der Chat unten bei der neuesten Nachricht
+      start={tab === "uebersicht" ? "oben" : "unten"}
+      kopf={
+        <ChatKopf
+          onBack={onBack}
+          symbol={icon}
+          titel={titel}
+          unter={topic.tag ? "Komitee" : "Chat"}
+          rechts={
+            neuOben ? (
+              <button type="button" className="btn-klein" onClick={() => setNeuMenue(true)}>
+                <Icon name="plus" size={16} strich={2.6} />
+                Neu
+              </button>
+            ) : undefined
+          }
+        >
+          {segment}
+        </ChatKopf>
+      }
+      fuss={
+        banned ? undefined : tab === "chat" ? (
+          <ChatEingabe
+            wert={text}
+            setWert={setText}
+            onSenden={() => void senden()}
+            links={
+              <button
+                type="button"
+                onClick={() => setNeuMenue(true)}
+                aria-label="Neu: Abstimmung, To-do oder Anpinnen"
+                title="Abstimmung, To-do oder Anpinnen"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[rgb(118_118_128/0.12)] text-brand-dark transition duration-200 ease-ios active:scale-90 dark:bg-[rgb(118_118_128/0.24)] dark:text-brand"
+              >
+                <Icon name="plus" size={20} strich={2.4} />
+              </button>
+            }
+          />
+        ) : breit ? undefined : (
+          <div className="grid grid-cols-3 gap-2">
+            {NEU_ARTEN.map((n) => (
+              <NeuKnopf key={n.art} icon={n.icon} label={n.label} onClick={() => setNeu(n.art)} />
+            ))}
+          </div>
+        )
+      }
+    >
       {banned && (
         <div className="mt-3">
           <BannHinweis />
@@ -87,94 +224,155 @@ export function KomiteePage({ topic, onBack }: { topic: Topic; onBack: () => voi
       )}
 
       {tab === "uebersicht" ? (
-        <div className="mt-3 space-y-5 pb-8 lg:pb-4">
-          {/* Wer hier den Vorsitz hat, darf Termine anfragen. */}
-          {topic.tag && <VorsitzZeile tag={topic.tag} />}
-
-          <Abschnitt titel="Angepinnt" icon="📌" leer="Nichts angepinnt.">
-            {pins.map((p) => (
-              <div key={p.id} className="card flex items-start gap-2 p-3">
-                <div className="min-w-0 flex-1">
-                  <div className="text-[15px] font-semibold [overflow-wrap:anywhere]">{p.body}</div>
-                  <PersonName userId={p.created_by} name={p.author} role={p.author_role} koms={p.author_koms} className="text-[11px] font-semibold" />
-                </div>
-                {(p.created_by === uid || darfLoeschen || darfEintraege) && (
-                  <span className="flex shrink-0 flex-col items-end gap-1.5">
-                    {(p.created_by === uid || darfLoeschen) && <button
-                      onClick={() => void frage("Nicht mehr anpinnen? Die Nachricht wandert in den Chat.", "Loslösen").then((ok) => { if (ok) void updateItem(p.id, { pinned: false }); })}
-                      className="text-[12px] font-semibold text-tinte-leise"
-                      aria-label="Loslösen"
-                      title="Loslösen – bleibt im Chat"
-                    >
-                      📌✕
-                    </button>}
-                    <button
-                      onClick={() => void frage("Diese angepinnte Nachricht ganz löschen?", "Löschen", true).then((ok) => { if (ok) void deleteItem(p.id); })}
-                      className="text-[12px] font-bold text-red-500"
-                      aria-label="Löschen"
-                    >
-                      löschen
-                    </button>
+        // Auf jedem Gerät dieselbe Reihenfolge: Angepinnt → To-dos → Abstimmungen.
+        // Am Rechner stehen Angepinnt und To-dos (kurze Listen) nebeneinander,
+        // die Abstimmungen (Karten) darunter über die volle Breite – DOM und
+        // Anzeige stimmen überein (Tab-Taste, Vorlesen).
+        <div className="grid grid-cols-[minmax(0,1fr)] gap-5 py-3 lg:grid-cols-2 lg:items-start">
+          <Abschnitt
+            titel="Angepinnt"
+            leer={`Nichts angepinnt. ${wo ? `Eine Info, die oben stehen bleibt, legst du ${wo} an.` : "Mit „Anpinnen“ unten bleibt eine Info hier oben stehen."}`}
+            zellen
+          >
+            {pins.map((p) => {
+              const darf = p.created_by === uid || darfLoeschen || darfEintraege;
+              const inhalt = (
+                <>
+                  <span aria-hidden className="mt-[3px] shrink-0 text-[#E8590C] dark:text-[#FF9F0A]">
+                    <Icon name="pin" size={16} />
                   </span>
-                )}
-              </div>
-            ))}
-          </Abschnitt>
-
-          <Abschnitt titel="Abstimmungen" icon="🗳️" leer="Keine Abstimmung offen.">
-            {umfragen.map((u) => (
-              <UmfrageKarte key={u.id} item={u} kannLoeschen={u.created_by === uid || darfEintraege} onDelete={() => deleteItem(u.id)} />
-            ))}
-          </Abschnitt>
-
-          <Abschnitt titel="To-dos" icon="✅" leer="Keine offenen Aufgaben.">
-            {todos.map((t) => (
-              <div key={t.id} className="card flex w-full items-center gap-1 p-1.5">
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[15px] font-semibold leading-snug [overflow-wrap:anywhere]">{p.body}</span>
+                    <PersonName userId={p.created_by} name={p.author} role={p.author_role} koms={p.author_koms} className="text-[12px] font-semibold" />
+                  </span>
+                </>
+              );
+              // Mit Recht: ganze Zeile antippbar → Blatt (Loslösen, Löschen) – keine Textknöpfe je Zeile
+              return darf ? (
                 <button
+                  key={p.id}
+                  id={`pinn-${p.id}`}
+                  type="button"
+                  onClick={() => setEintragId(p.id)}
+                  className="flex w-full items-start gap-3 px-4 py-3 text-left transition active:bg-black/[0.04] dark:active:bg-white/[0.06]"
+                >
+                  {inhalt}
+                  <span aria-hidden className="shrink-0 self-center text-[17px] leading-none text-tinte-leise">›</span>
+                </button>
+              ) : (
+                <div key={p.id} id={`pinn-${p.id}`} className="flex items-start gap-3 px-4 py-3">
+                  {inhalt}
+                </div>
+              );
+            })}
+          </Abschnitt>
+
+          <Abschnitt
+            titel="To-dos"
+            leer={`Keine offenen Aufgaben. ${wo ? `Eine neue legst du ${wo} an.` : "Mit „To-do“ unten legst du eine an."}`}
+            zellen
+          >
+            {todos.map((t) => (
+              // Wie in „Erinnerungen“: der Kreis hakt ab, ein Tipp auf den Text öffnet das To-do
+              <div key={t.id} id={`pinn-${t.id}`} className="flex items-center">
+                <button
+                  type="button"
                   onClick={() => !banned && updateItem(t.id, { done: !t.done })}
-                  className="flex min-w-0 flex-1 items-center gap-3 rounded-xl p-1.5 text-left"
+                  disabled={banned}
+                  aria-pressed={t.done}
+                  aria-label={t.done ? `„${t.body}“ wieder öffnen` : `„${t.body}“ abhaken`}
+                  className="flex h-[52px] w-12 shrink-0 items-center justify-end pr-1 transition active:scale-90"
                 >
                   <span
-                    className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border-2 text-sm text-white ${
-                      t.done ? "border-emerald-500 bg-emerald-500" : "border-papier-linie dark:border-slate-600"
+                    aria-hidden
+                    className={`flex h-6 w-6 items-center justify-center rounded-full text-white ${
+                      t.done ? "bg-[#248A3D]" : "ring-[1.5px] ring-inset ring-black/25 dark:ring-white/35"
                     }`}
                   >
-                    {t.done ? "✓" : ""}
+                    {t.done && <Icon name="haken" size={14} strich={3} />}
                   </span>
-                  <span className={`min-w-0 flex-1 text-[15px] [overflow-wrap:anywhere] ${t.done ? "text-tinte-leise line-through" : "font-semibold"}`}>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEintragId(t.id)}
+                  className="flex min-h-[52px] min-w-0 flex-1 items-center gap-3 py-2 pl-2 pr-4 text-left transition active:bg-black/[0.04] dark:active:bg-white/[0.06]"
+                >
+                  <span className={`min-w-0 flex-1 text-[15px] leading-snug [overflow-wrap:anywhere] ${t.done ? "text-tinte-leise line-through" : "font-semibold"}`}>
                     {t.body}
                   </span>
-                  <PersonName userId={t.created_by} name={t.author} role={t.author_role} koms={t.author_koms} className="shrink-0 text-[11px] font-semibold" />
+                  <PersonName userId={t.created_by} name={t.author} role={t.author_role} koms={t.author_koms} className="max-w-[7rem] shrink-0 truncate text-[12px] font-semibold" />
+                  <span aria-hidden className="shrink-0 text-[17px] leading-none text-tinte-leise">›</span>
                 </button>
-                {(t.created_by === uid || darfEintraege) && (
-                  <button
-                    onClick={() => void frage("To-do löschen?", "Löschen", true).then((ok) => { if (ok) void deleteItem(t.id); })}
-                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-tinte-leise transition active:scale-90"
-                    aria-label="To-do löschen"
-                    title="To-do löschen"
-                  >
-                    <Icon name="muell" size={16} />
-                  </button>
-                )}
               </div>
             ))}
           </Abschnitt>
 
+          <Abschnitt
+            titel="Abstimmungen"
+            leer={`Keine Abstimmung offen. ${wo ? `Eine neue startest du ${wo}.` : "Mit „Abstimmung“ unten startest du eine."}`}
+            className="lg:col-span-2"
+            zweiSpalten={breit}
+          >
+            {umfragen.map((u) => (
+              // Hülle mit Kennung: Sprungziel aus der Vorschau im Chats-Reiter
+              <div key={u.id} id={`pinn-${u.id}`} className="rounded-[1.25rem]">
+                <AbstimmungKarte
+                  item={u}
+                  kannLoeschen={u.created_by === uid || darfEintraege}
+                  onDelete={() => deleteItem(u.id)}
+                  // Beendete nur mit Frage und Ergebnis – antippen klappt sie auf
+                  kompakt
+                />
+              </div>
+            ))}
+          </Abschnitt>
 
+          {/* Wer den Vorsitz hat (darf Termine anfragen) – selten gebraucht, darum am Ende.
+              Für Mitglieder ohne festgelegten Vorsitz fällt die Zeile ganz weg. */}
+          {topic.tag && (
+            <div className="empty:hidden lg:col-span-2">
+              <VorsitzZeile tag={topic.tag} />
+            </div>
+          )}
         </div>
       ) : (
-        <ChatBereich topic={topic} liste={chat} banned={banned} darfLoeschen={darfLoeschen} uid={uid} />
+        <ChatBlasen liste={chat} uid={uid} darfLoeschen={darfLoeschen} onDelete={(id) => void deleteItem(id)} />
       )}
 
-      {tab === "uebersicht" && !banned && (
-        <div className="fixed inset-x-0 bottom-[var(--leiste)] lg:bottom-0 lg:pb-[calc(env(safe-area-inset-bottom)+0.75rem)] z-30 border-t border-papier-linie bg-papier-matt/95 px-3 py-2 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95 sm:px-5">
-          <div className="mx-auto grid max-w-5xl grid-cols-3 gap-2">
-            <NeuKnopf icon="📌" label="Anpinnen" onClick={() => setNeu("pin")} />
-            <NeuKnopf icon="🗳️" label="Abstimmung" onClick={() => setNeu("umfrage")} />
-            <NeuKnopf icon="✅" label="To-do" onClick={() => setNeu("todo")} />
-          </div>
-        </div>
-      )}
+      {/* „+“ im Chat bzw. „Neu“ am Laptop: erst wählen, was angelegt werden soll */}
+      <Sheet open={neuMenue} onClose={() => setNeuMenue(false)}>
+        <SheetKopf titel={topic.tag ? "Neu im Komitee" : "Neu im Chat"} onClose={() => setNeuMenue(false)} />
+        <Gruppe className="mt-0" fuss="Abstimmungen, To-dos und Angepinntes stehen danach auf der „Pinnwand“.">
+          {NEU_ARTEN.map((n) => (
+            <Zeile
+              key={n.art}
+              label={n.label}
+              unter={n.unter}
+              symbol={
+                <Symbol farbe={n.farbe}>
+                  <Icon name={n.icon} size={17} strich={2.2} />
+                </Symbol>
+              }
+              onClick={() => {
+                setNeuMenue(false);
+                setNeu(n.art);
+              }}
+            />
+          ))}
+        </Gruppe>
+      </Sheet>
+
+      <EintragBlatt
+        eintrag={eintrag}
+        onClose={() => setEintragId(null)}
+        kannLosloesen={Boolean(eintrag && (eintrag.created_by === uid || darfLoeschen))}
+        kannLoeschen={Boolean(
+          eintrag && (eintrag.created_by === uid || darfEintraege || (eintrag.type === "nachricht" && darfLoeschen)),
+        )}
+        banned={banned}
+        onUpdate={(id, patch) => void updateItem(id, patch)}
+        onDelete={(id) => void deleteItem(id)}
+      />
 
       <NeuSheet
         art={neu}
@@ -186,347 +384,174 @@ export function KomiteePage({ topic, onBack }: { topic: Topic; onBack: () => voi
           if (daten.art === "umfrage")
             await postItem(topic, "umfrage", daten.text, daten.optionen, daten.text.slice(0, 60), {
               ...meta,
-              poll: { multi: daten.multi, anon: daten.anon, deadline: daten.frist, antwortArt: daten.antwortArt },
+              poll: { multi: daten.multi, anon: daten.anon, deadline: daten.frist, antwortArt: daten.antwortArt, eigene: daten.eigene },
             });
           setNeu(null);
         }}
       />
-    </div>
+    </ChatEbene>
   );
 }
 
+/**
+ * Zum Eintrag scrollen (mittig) und ihn kurz hervorheben: Karten mit einem
+ * blauen Ring, Zeilen in einer Gruppe (dort schneidet die Gruppe einen Ring
+ * ab) mit einem kurzen blauen Hauch – wie die Sprünge aus Benachrichtigungen.
+ */
+function hervorheben(el: HTMLElement) {
+  // Im Verlauf der Ebene: Kopf und Fuß liegen ÜBER dem Verlauf (Abstand oben/
+  // unten = ihre Höhe). Passt der Eintrag in den freien Teil, steht er dort
+  // mittig – sonst (lange Abstimmung) beginnt er knapp unter dem Kopf, statt
+  // mit Frage und Ring unter dem Kopf zu verschwinden.
+  const sc = el.closest<HTMLElement>("[data-chat-scroller]");
+  if (sc) {
+    const stil = getComputedStyle(sc);
+    const oben = parseFloat(stil.paddingTop) || 0;
+    const sicht = sc.clientHeight - oben - (parseFloat(stil.paddingBottom) || 0);
+    const r = el.getBoundingClientRect();
+    const y = r.top - sc.getBoundingClientRect().top + sc.scrollTop;
+    const luft = r.height < sicht - 32 ? (sicht - r.height) / 2 : 12;
+    sc.scrollTop = Math.max(0, y - oben - luft);
+  } else el.scrollIntoView({ block: "center" });
+  if (typeof el.animate !== "function" || window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+  const brand = getComputedStyle(document.documentElement).getPropertyValue("--brand").trim() || "10 132 255";
+  const inZeile = Boolean(el.closest(".gruppe-zellen"));
+  el.animate(
+    inZeile
+      ? [{ backgroundColor: `rgb(${brand} / 0.18)` }, { backgroundColor: `rgb(${brand} / 0.18)`, offset: 0.5 }, { backgroundColor: `rgb(${brand} / 0)` }]
+      : [{ boxShadow: `0 0 0 3px rgb(${brand} / 0.6)` }, { boxShadow: `0 0 0 3px rgb(${brand} / 0.6)`, offset: 0.55 }, { boxShadow: `0 0 0 3px rgb(${brand} / 0)` }],
+    { duration: 2200, easing: "ease-out" },
+  );
+}
+
+/**
+ * Abschnitt der Pinnwand: kleine Versalien-Überschrift (wie bei Gruppe), darunter
+ * entweder eine Zellen-Gruppe (zellen: Angepinntes, To-dos) oder einzelne Karten
+ * (Abstimmungen). Leer: ein ruhiger Satz, der sagt, wie man etwas anlegt.
+ *
+ * zweiSpalten (Laptop): Karten im Spaltensatz statt Raster – im Raster wurde
+ * jede Karte so hoch wie ihre Nachbarin (200 px Weiß unter einer kurzen
+ * Abstimmung), und eine dritte Karte stand allein in der Mitte.
+ */
 function Abschnitt({
-  titel, icon, leer, children,
-}: { titel: string; icon: string; leer: string; children: React.ReactNode }) {
-  const hat = Array.isArray(children) ? children.length > 0 : Boolean(children);
+  titel, leer, zellen, zweiSpalten, className = "", children,
+}: { titel: string; leer: string; zellen?: boolean; zweiSpalten?: boolean; className?: string; children: React.ReactNode }) {
+  const kinder = Children.toArray(children);
   return (
-    <section>
-      <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-tinte-leise">
-        {icon} {titel}
-      </h3>
-      {hat ? <div className="grid gap-2 lg:grid-cols-2">{children}</div> : <p className="text-sm text-tinte-leise">{leer}</p>}
+    <section className={`min-w-0 ${className}`}>
+      <h3 className="auf-bild mb-1.5 px-4 text-[13px] font-normal uppercase tracking-[0.02em] text-tinte-leise">{titel}</h3>
+      {kinder.length === 0 ? (
+        <div className="gruppe-zellen">
+          <p className="px-4 py-3 text-[14px] leading-snug text-tinte-leise">{leer}</p>
+        </div>
+      ) : zellen ? (
+        <div className="gruppe-zellen">{kinder}</div>
+      ) : zweiSpalten && kinder.length > 1 ? (
+        // Spaltensatz wie in einer Zeitung: der Browser verteilt die Karten so,
+        // dass beide Spalten etwa gleich hoch enden; keine Karte wird geteilt.
+        // gap-5 = Spaltenabstand des Rasters darüber (Angepinnt | To-dos) –
+        // so fluchten die Karten links und rechts mit den Gruppen oben.
+        <div className="columns-2 gap-5">
+          {kinder.map((k, i) => (
+            <div key={isValidElement(k) && k.key != null ? k.key : i} className="mb-2 break-inside-avoid">
+              {k}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="grid gap-2">{kinder}</div>
+      )}
     </section>
   );
 }
 
-function NeuKnopf({ icon, label, onClick }: { icon: string; label: string; onClick: () => void }) {
+/**
+ * Ein angepinnter Eintrag oder ein To-do im Blatt: ganzer Text, wer ihn
+ * angelegt hat, und die seltenen Aktionen – Loslösen, Abhaken, Löschen (ganz
+ * unten, mit Rückfrage). Vorher standen „Loslösen | Löschen“ unter jedem
+ * Angepinnten und ein Mülleimer an jedem To-do.
+ */
+function EintragBlatt({
+  eintrag, onClose, kannLosloesen, kannLoeschen, banned, onUpdate, onDelete,
+}: {
+  eintrag: TopicItem | null;
+  onClose: () => void;
+  kannLosloesen: boolean;
+  kannLoeschen: boolean;
+  banned: boolean;
+  onUpdate: (id: string, patch: Partial<Pick<TopicItem, "done" | "pinned">>) => void;
+  onDelete: (id: string) => void;
+}) {
+  const e = eintrag;
+  const todo = e?.type === "todo";
+  return (
+    <Sheet open={Boolean(e)} onClose={onClose}>
+      {e && (
+        <>
+          <SheetKopf titel={todo ? "To-do" : "Angepinnt"} onClose={onClose} />
+          <div className="gruppe-zellen">
+            <div className="px-4 py-3">
+              <p className="whitespace-pre-wrap text-[16px] font-semibold leading-snug [overflow-wrap:anywhere]">{e.body}</p>
+              <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-1.5 text-[12.5px] text-tinte-leise">
+                <PersonName userId={e.created_by} name={e.author} role={e.author_role} koms={e.author_koms} className="min-w-0 truncate font-semibold" />
+                <span aria-hidden>·</span>
+                <span>{datumKurz(e.created_at)}</span>
+              </div>
+            </div>
+          </div>
+          {todo && !banned && (
+            <Gruppe>
+              <ZeileMitSchalter label="Erledigt">
+                <Schalter an={e.done} onChange={(an) => onUpdate(e.id, { done: an })} label="Erledigt" />
+              </ZeileMitSchalter>
+            </Gruppe>
+          )}
+          {!todo && kannLosloesen && (
+            <Gruppe fuss="Die Nachricht bleibt im Chat stehen, nur nicht mehr oben.">
+              <Zeile
+                label="Loslösen"
+                blau
+                onClick={() => {
+                  onUpdate(e.id, { pinned: false });
+                  onClose();
+                }}
+              />
+            </Gruppe>
+          )}
+          {kannLoeschen && (
+            <Gruppe>
+              <Zeile
+                label={todo ? "To-do löschen" : "Angepinnte Nachricht löschen"}
+                rot
+                onClick={() =>
+                  void frage(todo ? "To-do löschen?" : "Diese angepinnte Nachricht ganz löschen?", "Löschen", true).then((ok) => {
+                    if (!ok) return;
+                    onDelete(e.id);
+                    onClose();
+                  })
+                }
+              />
+            </Gruppe>
+          )}
+        </>
+      )}
+    </Sheet>
+  );
+}
+
+function NeuKnopf({ icon, label, onClick }: { icon: IconName; label: string; onClick: () => void }) {
   return (
     <button
       onClick={onClick}
-      className="flex items-center justify-center gap-1.5 rounded-xl border border-dashed border-brand/50 py-2.5 text-center text-[13px] font-bold text-brand transition active:scale-[.98]"
+      className="flex min-h-[2.75rem] items-center justify-center gap-1.5 rounded-full bg-[rgb(118_118_128/0.12)] px-2 text-center text-[13.5px] font-semibold text-brand-dark transition active:scale-[.97] dark:bg-[rgb(118_118_128/0.24)] dark:text-brand"
     >
-      <span className="text-base">{icon}</span>
+      <Icon name={icon} size={16} strich={2.2} />
       {label}
     </button>
   );
 }
 
-function UmfrageKarte({
-  item, kannLoeschen, onDelete,
-}: { item: TopicItem; kannLoeschen: boolean; onDelete: () => void }) {
-  const { myVotes, voteCounts, voters, vote } = useTopics();
-  const { isAdmin } = useRole();
-  const meine = myVotes[item.id] || [];
-  const counts = voteCounts[item.id] || {};
-  const gesamt = Object.values(counts).reduce((a, b) => a + b, 0);
-  const abgelaufen = item.poll_deadline ? new Date(item.poll_deadline) < new Date() : false;
-
-  // anonym = nur Admins sehen, wer gestimmt hat
-  const zeigeWaehler = !item.poll_anon || isAdmin;
-
-  return (
-    <div className="card p-4">
-      <div className="flex items-start gap-2">
-        <div className="min-w-0 flex-1">
-          <div className="text-[15px] font-bold [overflow-wrap:anywhere]">{item.body}</div>
-          <div className="mt-0.5 flex flex-wrap gap-1.5 text-[11px] text-tinte-leise">
-            <span>{item.antwort_art ? `Freie Antwort · ${ANTWORT_ART_NAME[item.antwort_art]}` : item.poll_multi ? "Mehrfachwahl" : "Einfachwahl"}</span>
-            <span>·</span>
-            <span>{item.poll_anon ? "anonym" : "nicht anonym"}</span>
-            {item.poll_deadline && (
-              <>
-                <span>·</span>
-                <span className={abgelaufen ? "font-bold text-red-500" : ""}>
-                  {abgelaufen ? "beendet" : `bis ${new Date(item.poll_deadline).toLocaleString("de-DE", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}`}
-                </span>
-              </>
-            )}
-          </div>
-        </div>
-        {/* Name höchstens 40 % breit – sonst blieb der Frage auf schmalen
-            Handys nur eine schmale Spalte. */}
-        <span className="flex min-w-0 max-w-[40%] items-center gap-1.5 text-[11px] text-tinte-leise">
-          <Avatar userId={item.created_by} name={item.author} size={20} />
-          <PersonName userId={item.created_by} name={item.author} role={item.author_role} koms={item.author_koms} className="block min-w-0 truncate font-semibold" />
-        </span>
-        {kannLoeschen && (
-          <button onClick={() => void frage("Abstimmung löschen?", "Löschen", true).then((ok) => { if (ok) void onDelete(); })} className="shrink-0 text-tinte-leise">
-            🗑
-          </button>
-        )}
-      </div>
-
-      {item.antwort_art ? (
-        <FreiAntworten item={item} abgelaufen={abgelaufen} />
-      ) : (
-      <>
-      <div className="mt-3 grid gap-1.5">
-        {(Array.isArray(item.options) ? item.options : []).map((o) => {
-          const n = counts[o.id] || 0;
-          const pct = gesamt ? Math.round((n / gesamt) * 100) : 0;
-          const gewaehlt = meine.includes(o.id);
-          const waehler = zeigeWaehler
-            ? (voters[item.id] || []).filter((v) => v.option_id === o.id).map((v) => v.user_id)
-            : [];
-          return (
-            <button
-              key={o.id}
-              disabled={abgelaufen}
-              onClick={() => vote(item.id, o.id, item.poll_multi)}
-              className={`relative overflow-hidden rounded-xl border px-3 py-2 text-left transition disabled:opacity-60 ${
-                gewaehlt ? "border-brand" : "border-papier-linie dark:border-slate-700"
-              }`}
-            >
-              <div className="absolute inset-y-0 left-0 bg-brand/10" style={{ width: `${pct}%` }} />
-              <div className="relative flex items-center gap-2">
-                <span className={`flex h-4 w-4 shrink-0 items-center justify-center text-[10px] text-white ${item.poll_multi ? "rounded" : "rounded-full"} ${gewaehlt ? "bg-brand" : "border border-papier-linie dark:border-slate-600"}`}>
-                  {gewaehlt ? "✓" : ""}
-                </span>
-                <span className="min-w-0 flex-1 truncate text-[14px] font-semibold">{o.label}</span>
-                <span className="shrink-0 text-[12px] text-tinte-matt">{n}</span>
-              </div>
-              {zeigeWaehler
-                ? waehler.length > 0 && (
-                    <div className="relative mt-1.5 flex items-center pl-6">
-                      {waehler.slice(0, 12).map((u, i) => (
-                        <span key={u} style={{ marginLeft: i === 0 ? -24 : -8 }} className="relative">
-                          <Avatar userId={u} size={22} ring />
-                        </span>
-                      ))}
-                      {waehler.length > 12 && (
-                        <span className="ml-1 text-[11px] font-semibold text-tinte-leise">+{waehler.length - 12}</span>
-                      )}
-                    </div>
-                  )
-                : n > 0 && (
-                    // anonym: ein grauer Kreis je Stimme, ohne Initialen
-                    <div className="relative mt-1.5 flex items-center pl-6">
-                      {Array.from({ length: Math.min(n, 12) }).map((_, i) => (
-                        <span key={i} style={{ marginLeft: i === 0 ? -24 : -8 }} className="relative">
-                          <span
-                            style={{ width: 22, height: 22 }}
-                            className="flex items-center justify-center rounded-full bg-slate-300 text-[10px] font-extrabold leading-none text-tinte-matt ring-2 ring-white dark:bg-slate-600 dark:text-slate-300 dark:ring-slate-900"
-                          >
-                            ?
-                          </span>
-                        </span>
-                      ))}
-                      {n > 12 && <span className="ml-1 text-[11px] font-semibold text-tinte-leise">+{n - 12}</span>}
-                    </div>
-                  )}
-            </button>
-          );
-        })}
-      </div>
-      <div className="mt-1.5 text-[11px] text-tinte-leise">{gesamt} Stimme{gesamt === 1 ? "" : "n"}</div>
-      {zeigeWaehler && (
-        <WerHatGestimmt
-          optionen={Array.isArray(item.options) ? item.options : []}
-          stimmen={voters[item.id] || []}
-        />
-      )}
-      </>
-      )}
-    </div>
-  );
-}
-
-function ChatBereich({
-  topic, liste, banned, darfLoeschen, uid,
-}: { topic: Topic; liste: TopicItem[]; banned: boolean; darfLoeschen: boolean; uid: string }) {
-  const { postItem, deleteItem, committeesOf } = useTopics();
-  const { role } = useRole();
-  const [text, setText] = useState("");
-  const ende = useChatEnde(liste.length, liste[liste.length - 1]?.created_by === uid);
-
-  async function senden() {
-    if (!text.trim()) return;
-    const t = text;
-    setText("");
-    await postItem(topic, "nachricht", t, undefined, "", { role, koms: committeesOf(uid) });
-  }
-
-  return (
-    <div className="flex flex-col">
-      <div className="space-y-2.5 py-3">
-        {liste.length === 0 && <p className="py-12 text-center text-sm text-tinte-leise">Noch keine Nachricht.</p>}
-        {liste.map((m) => {
-          if (m.type === "system") return <SystemZeile key={m.id} m={m} darfLoeschen={darfLoeschen} onDelete={(id) => void deleteItem(id)} />;
-          return <ChatBlase key={m.id} m={m} meins={m.created_by === uid} darfLoeschen={darfLoeschen} onDelete={(id) => void deleteItem(id)} />;
-        })}
-        {/* Platz für Eingabezeile und Tab-Leiste, Scroll-Marke dahinter */}
-        <div aria-hidden className="h-8 lg:h-4" />
-        <div ref={ende} />
-      </div>
-
-      {!banned && (
-        <div className="fixed inset-x-0 bottom-[var(--leiste)] lg:bottom-0 lg:pb-[calc(env(safe-area-inset-bottom)+0.75rem)] z-30 flex items-end gap-2 border-t border-papier-linie bg-papier-matt/95 px-3 py-2 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95 sm:px-5">
-          <textarea
-            rows={1}
-            className="field max-h-28 flex-1 resize-none py-2.5"
-            placeholder="Nachricht…"
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                void senden();
-              }
-            }}
-          />
-          <button
-            onClick={senden}
-            disabled={!text.trim()}
-            className="flex h-11 w-11 items-center justify-center rounded-xl bg-brand text-lg text-white disabled:opacity-40"
-            aria-label="Senden"
-          >
-            ➤
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
-
-interface NeuDaten {
-  art: Exclude<Neu, null>;
-  text: string;
-  optionen: string[];
-  multi: boolean;
-  anon: boolean;
-  frist: string | null;
-  /** null = Auswahl-Möglichkeiten, sonst freie Antwort */
-  antwortArt: AntwortArt | null;
-}
-
+/** Blatt zum Anlegen (Angepinntes, Abstimmung, To-do) – gebaut in Freitext.tsx */
 function NeuSheet({ art, onClose, onSave }: { art: Neu; onClose: () => void; onSave: (d: NeuDaten) => void }) {
-  const [text, setText] = useState("");
-  const [optionen, setOptionen] = useState(["", ""]);
-  const [multi, setMulti] = useState(false);
-  const [anon, setAnon] = useState(true);
-  const [frist, setFrist] = useState("");
-  const [antwortArt, setAntwortArt] = useState<AntwortArt | null>(null);
-
-  useEffect(() => {
-    if (art) {
-      setAntwortArt(null);
-      setText("");
-      setOptionen(["", ""]);
-      setMulti(false);
-      setAnon(true);
-      setFrist("");
-    }
-  }, [art]);
-
-  if (!art) return null;
-  const maxLen = art === "pin" ? 100 : 200;
-  const titel = art === "pin" ? "Kurz anpinnen" : art === "todo" ? "Neues To-do" : "Neue Abstimmung";
-  const gueltig = text.trim() && (art !== "umfrage" || antwortArt || optionen.filter((o) => o.trim()).length >= 2);
-
-  return (
-    <Sheet open onClose={onClose}>
-      <SheetKopf titel={titel} onClose={onClose} />
-
-      <textarea
-        rows={art === "pin" ? 2 : 2}
-        autoFocus
-        maxLength={maxLen}
-        className="field mb-1 resize-none"
-        placeholder={art === "pin" ? "Kurze Info, die oben stehen bleibt" : art === "todo" ? "Was ist zu tun?" : "Worüber wird abgestimmt?"}
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-      />
-      <div className="mb-3 text-right text-[11px] text-tinte-leise">
-        {text.length} / {maxLen}
-      </div>
-
-      {art === "umfrage" && (
-        <>
-          <div className="mb-1.5 px-1 text-[12px] font-semibold uppercase tracking-[0.04em] text-tinte-leise">Art der Antwort</div>
-          <div className="seg mb-3" role="radiogroup" aria-label="Art der Antwort">
-            {([null, "kurz", "lang", "zahl"] as (AntwortArt | null)[]).map((a) => (
-              <button key={a ?? "auswahl"} role="radio" aria-checked={antwortArt === a} className={`seg-item ${antwortArt === a ? "seg-aktiv" : ""}`} onClick={() => setAntwortArt(a)}>
-                {a ? (a === "kurz" ? "Kurz" : a === "lang" ? "Lang" : "Zahl") : "Auswahl"}
-              </button>
-            ))}
-          </div>
-          {antwortArt && (
-            <p className="mb-4 px-1 text-[12.5px] text-tinte-leise">
-              {antwortArt === "kurz" ? "Alle antworten mit einer Zeile (höchstens 120 Zeichen)." : antwortArt === "lang" ? "Alle antworten mit freiem Text, auch mehrere Zeilen." : "Alle antworten mit einer Zahl. Dazu siehst du Ø, Median, kleinste und größte."}
-            </p>
-          )}
-          {!antwortArt && (
-          <>
-          <div className="mb-1.5 px-1 text-[12px] font-semibold uppercase tracking-[0.04em] text-tinte-leise">Antworten</div>
-          {optionen.map((o, i) => (
-            <input
-              key={i}
-              className="field mb-2"
-              placeholder={`Antwort ${i + 1}`}
-              value={o}
-              onChange={(e) => setOptionen((prev) => prev.map((x, j) => (j === i ? e.target.value : x)))}
-            />
-          ))}
-          <button onClick={() => setOptionen((p) => [...p, ""])} className="mb-4 text-sm font-bold text-brand">
-            ＋ Antwort
-          </button>
-          </>
-          )}
-
-          <div className="mb-4 grid gap-2 rounded-2xl bg-papier-matt p-3 dark:bg-slate-800/70">
-            {!antwortArt && <Schalter label="Mehrfachauswahl erlauben" on={multi} set={setMulti} />}
-            <Schalter label="Anonym abstimmen" on={anon} set={setAnon} />
-            <label className="flex items-center gap-2 text-sm">
-              <span className="flex-1 text-tinte-matt dark:text-slate-300">Frist (optional)</span>
-              <input
-                type="datetime-local"
-                className="rounded-lg border border-papier-linie bg-white px-2 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-900"
-                value={frist}
-                onChange={(e) => setFrist(e.target.value)}
-              />
-            </label>
-          </div>
-        </>
-      )}
-
-      <button
-        className="btn-primary"
-        disabled={!gueltig}
-        onClick={() =>
-          onSave({
-            art,
-            text: text.trim(),
-            optionen: antwortArt ? [] : optionen.map((o) => o.trim()).filter(Boolean),
-            multi: antwortArt ? false : multi,
-            antwortArt,
-            anon,
-            frist: frist ? new Date(frist).toISOString() : null,
-          })
-        }
-      >
-        {art === "pin" ? "Anpinnen" : art === "todo" ? "To-do anlegen" : "Abstimmung starten"}
-      </button>
-    </Sheet>
-  );
-}
-
-function Schalter({ label, on, set }: { label: string; on: boolean; set: (v: boolean) => void }) {
-  return (
-    <button onClick={() => set(!on)} className="flex items-center gap-2 text-left text-sm">
-      <span className={`flex h-5 w-5 items-center justify-center rounded border text-[11px] text-white ${on ? "border-brand bg-brand" : "border-papier-linie dark:border-slate-600"}`}>
-        {on ? "✓" : ""}
-      </span>
-      <span className="text-tinte-matt dark:text-slate-300">{label}</span>
-    </button>
-  );
+  return <NeuEintragSheet art={art} onClose={onClose} onSave={onSave} />;
 }

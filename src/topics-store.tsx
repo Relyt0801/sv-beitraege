@@ -5,7 +5,8 @@ import { lesbarerName } from "./lib/profil";
 import { abonniere } from "./lib/realtime";
 import { committeeIcon, committeeLabel } from "./lib/committees";
 
-import { meldeFehler } from "./lib/melder";
+import { melde, meldeFehler } from "./lib/melder";
+import { demoRolle } from "./lib/demo";
 /** Pop-up zu einer Chat-Nachricht. Wer es bekommt, entscheidet der Server. */
 async function chatPush(itemId: string, angepinnt = false): Promise<void> {
   await sendePush({ chat_item_id: itemId, angepinnt });
@@ -47,7 +48,13 @@ export interface TopicItem {
   type: TopicItemType;
   title: string;
   body: string;
-  options: { id: string; label: string }[] | null;
+  /**
+   * Möglichkeiten einer Abstimmung. `frei: true` = „Eigene Antwort“: wer sie
+   * ankreuzt, schreibt kurz dazu (topic_antworten,
+   * supabase/abstimmung-sonstiges.sql). Die alte App kennt das Kennzeichen
+   * nicht und zeigt sie als normale Möglichkeit.
+   */
+  options: { id: string; label: string; frei?: boolean }[] | null;
   done: boolean;
   pinned: boolean;
   /** Umfrage-Einstellungen */
@@ -70,6 +77,79 @@ export interface TopicItem {
 }
 
 const LS = "sv-beitraege:topics";
+/** Demo ohne Datenbank: Texte zu „Eigene Antwort“/freien Antworten je Abstimmung (liest Freitext.tsx) */
+export const DEMO_ANTWORTEN_LS = "sv-beitraege:topic-antworten";
+
+/* ---------------------------------------------------------------- Demo */
+/*
+ * Im Demo-Modus (?rolle=…) ist der Chat sonst leer. Beim allerersten Start
+ * gibt es deshalb einen erfundenen Komitee-Chat „Abizeitung“ mit zwei
+ * laufenden Abstimmungen (mit „Eigene Antwort“), einer beendeten, einer
+ * angepinnten Nachricht und einem To-do. Stimmen anderer sind feste Zahlen
+ * (DEMO_FREMDE_STIMMEN) – im Browser gibt es ja nur einen selbst.
+ */
+const DEMO_TOPIC = "demo-chat-abizeitung";
+const DEMO_FREMDE_STIMMEN: Record<string, Record<string, number>> = {
+  "demo-abst-treffen": { mo: 3, mi: 6, fr: 2, frei: 4 },
+  "demo-abst-rubriken": { zitate: 9, steckbriefe: 7, rankings: 8, frei: 7 },
+  "demo-abst-farbe": { blau: 11, rot: 7, schwarz: 4 },
+};
+
+/** Startzustand der Demo – nur, wenn noch nichts im Browser liegt. */
+function demoStart() {
+  const vor = (stunden: number) => new Date(Date.now() - stunden * 3600_000).toISOString();
+  const basis = {
+    topic_id: DEMO_TOPIC, title: "", done: false, pinned: false, author_role: "stufenteam", author_koms: ["abizeitung"],
+    created_by: "demo-team", author: "Mia Schäfer", poll_multi: false, poll_anon: true, poll_deadline: null as string | null, antwort_art: null,
+  };
+  const items: TopicItem[] = [
+    { ...basis, id: "demo-pin-1", type: "nachricht", body: "Redaktionsschluss für alle Texte ist der 15.11.", options: null, pinned: true, created_at: vor(72) },
+    {
+      ...basis, id: "demo-abst-farbe", type: "umfrage", body: "Welche Farbe bekommt der Umschlag?", created_at: vor(50),
+      poll_deadline: vor(20),
+      options: [{ id: "blau", label: "Dunkelblau" }, { id: "rot", label: "Weinrot" }, { id: "schwarz", label: "Schwarz" }],
+    },
+    {
+      ...basis, id: "demo-abst-treffen", type: "umfrage", body: "Wann treffen wir uns nächste Woche?", created_at: vor(26),
+      options: [{ id: "mo", label: "Montag" }, { id: "mi", label: "Mittwoch" }, { id: "fr", label: "Freitag" }, { id: "frei", label: "Eigene Antwort", frei: true }],
+    },
+    {
+      ...basis, id: "demo-abst-rubriken", type: "umfrage", body: "Welche Rubriken soll die Abizeitung haben?", created_at: vor(5),
+      poll_multi: true, author: "Jonas Müller", created_by: "demo-team-2",
+      options: [{ id: "zitate", label: "Lehrerzitate" }, { id: "steckbriefe", label: "Steckbriefe" }, { id: "rankings", label: "Rankings" }, { id: "frei", label: "Eigene Antwort", frei: true }],
+    },
+    { ...basis, id: "demo-todo-1", type: "todo", body: "Druckerei-Angebote vergleichen", options: null, created_at: vor(3) },
+  ];
+  const t = (user_id: string, wert: string, h: number) => ({ user_id, wert, updated_at: vor(h) });
+  try {
+    if (!localStorage.getItem(DEMO_ANTWORTEN_LS))
+      localStorage.setItem(
+        DEMO_ANTWORTEN_LS,
+        JSON.stringify({
+          "demo-abst-treffen": [
+            t("demo-f1", "Donnerstag nach der 6.", 20), t("demo-f2", "donnerstag nach der 6", 18), t("demo-f3", "Samstagvormittag", 15),
+            t("demo-f4", "Egal, Hauptsache online", 12), t("local-user", "Donnerstag nach der 6.", 10),
+          ],
+          "demo-abst-rubriken": [
+            t("demo-f1", "Kinderfotos", 4.5), t("demo-f2", "Best-of Stufenfahrt", 4.2), t("demo-f3", "Kinderfotos!", 4), t("demo-f4", "Rätselseite", 3.6),
+            t("demo-f5", "kinderfotos", 3), t("demo-f6", "Danksagungen", 2), t("demo-f7", "Horoskope", 1),
+          ],
+        }),
+      );
+  } catch {
+    /* privater Modus */
+  }
+  const topic: Topic = {
+    id: DEMO_TOPIC, title: "Abizeitung", kind: "chat", status: "offen", tag: "abizeitung", pinned: false, admin_only: false,
+    visibility: "komitee", parent_id: null, created_by: null, created_at: vor(400),
+  };
+  return {
+    topics: [topic],
+    items,
+    tagMembers: { abizeitung: ["local-user"] },
+    myVotes: { "demo-abst-treffen": ["frei"], "demo-abst-farbe": ["blau"] },
+  };
+}
 
 /**
  * Schnellauswahl der Reaktionen. Dazu kommt über „+“ jedes andere Emoji
@@ -137,9 +217,11 @@ interface TopicsValue {
   setUserCommittee: (userId: string, slug: string, on: boolean) => Promise<void>;
   selfAssignCommittee: (slug: string) => Promise<boolean>;
   committeesOf: (userId: string) => string[];
-  postItem: (topic: Topic, type: TopicItemType, body: string, options?: string[], title?: string, meta?: { role?: string | null; koms?: string[]; pinned?: boolean; poll?: { multi?: boolean; anon?: boolean; deadline?: string | null; antwortArt?: "kurz" | "lang" | "zahl" | null } }) => Promise<void>;
+  postItem: (topic: Topic, type: TopicItemType, body: string, options?: string[], title?: string, meta?: { role?: string | null; koms?: string[]; pinned?: boolean; poll?: { multi?: boolean; anon?: boolean; deadline?: string | null; antwortArt?: "kurz" | "lang" | "zahl" | null; eigene?: boolean } }) => Promise<void>;
   updateItem: (id: string, patch: Partial<Pick<TopicItem, "done" | "pinned">>) => Promise<void>;
   deleteItem: (id: string) => Promise<void>;
+  /** Eine nicht gesendete Nachricht noch einmal abschicken (Knopf „Erneut senden“ in der Blase). */
+  erneutSenden: (id: string) => Promise<void>;
   vote: (itemId: string, optionId: string, multi?: boolean) => Promise<void>;
   /** Als gelesen markieren – Chat und Übersicht getrennt (ohne Angabe: beides). */
   markRead: (topicId: string, bereich?: LeseBereich) => void;
@@ -191,7 +273,11 @@ export function TopicsProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (hasSupabase) return;
     try {
-      const d = JSON.parse(localStorage.getItem(LS) || "{}");
+      const gespeichert = JSON.parse(localStorage.getItem(LS) || "{}");
+      // Demo: solange es noch keinen Chat gibt, einen Beispiel-Chat mit
+      // Abstimmungen anlegen. (Nicht „solange nichts gespeichert ist“ – im
+      // StrictMode speichert der zweite Effekt vorher schon den leeren Stand.)
+      const d = !gespeichert.topics?.length && demoRolle() ? { ...gespeichert, ...demoStart() } : gespeichert;
       setTopics((d.topics || []).map(normTopic));
       setItems(d.items || []);
       setMembersState(d.members || {});
@@ -206,10 +292,12 @@ export function TopicsProvider({ children }: { children: ReactNode }) {
     if (!hasSupabase) {
       const counts: Record<string, Record<string, number>> = {};
       const roh: Record<string, { user_id: string; option_id: string }[]> = {};
+      // Demo: feste Stimmen „der anderen“ plus die eigenen
+      for (const [iid, z] of Object.entries(DEMO_FREMDE_STIMMEN)) counts[iid] = { ...z };
       for (const [iid, opts] of Object.entries(myVotes)) {
-        counts[iid] = {};
+        counts[iid] ||= {};
         for (const o of opts) {
-          counts[iid][o] = 1;
+          counts[iid][o] = (counts[iid][o] || 0) + 1;
           (roh[iid] ||= []).push({ user_id: uidRef.current, option_id: o });
         }
       }
@@ -464,7 +552,7 @@ export function TopicsProvider({ children }: { children: ReactNode }) {
       if (userIds.length)
         await supabase!.from("tag_members").insert(userIds.map((user_id) => ({ tag, user_id })));
       if (added.length)
-        void pushToUsers(added, `${committeeIcon(tag)} Komitee ${committeeLabel(tag)}`, "Du bist jetzt dabei – schau in die Übersicht!", "./#chats");
+        void pushToUsers(added, `${committeeIcon(tag)} Komitee ${committeeLabel(tag)}`, "Du bist jetzt dabei – schau auf die Pinnwand!", "./#chats");
     }
   }, []);
 
@@ -477,7 +565,7 @@ export function TopicsProvider({ children }: { children: ReactNode }) {
     if (hasSupabase) {
       if (on) {
         await supabase!.from("tag_members").upsert({ tag: slug, user_id: userId });
-        void pushToUsers([userId], `${committeeIcon(slug)} Komitee ${committeeLabel(slug)}`, "Das Stufenteam hat dich hinzugefügt – schau in die Übersicht!", "./#chats");
+        void pushToUsers([userId], `${committeeIcon(slug)} Komitee ${committeeLabel(slug)}`, "Das Stufenteam hat dich hinzugefügt – schau auf die Pinnwand!", "./#chats");
       } else {
         await supabase!.from("tag_members").delete().eq("tag", slug).eq("user_id", userId);
       }
@@ -506,10 +594,53 @@ export function TopicsProvider({ children }: { children: ReactNode }) {
     [tagMembers],
   );
 
+  /**
+   * Eintrag an den Server schicken. Klappt es nicht, bleibt er stehen und wird
+   * markiert (statt zu verschwinden): so sieht man, dass etwas geschrieben wurde
+   * und dass es nicht angekommen ist – und kann es mit „Erneut senden“ wiederholen.
+   * Gemeinsamer Weg für das erste Senden und den zweiten Versuch.
+   */
+  const sendeItem = useCallback(async (item: TopicItem): Promise<boolean> => {
+    const { error } = await supabase!.from("topic_items").insert({
+      id: item.id, topic_id: item.topic_id, type: item.type, title: item.title, body: item.body,
+      options: item.options, pinned: item.pinned, author: item.author,
+      poll_multi: item.poll_multi, poll_anon: item.poll_anon, poll_deadline: item.poll_deadline,
+      ...(item.antwort_art ? { antwort_art: item.antwort_art } : {}),
+      author_role: item.author_role, author_koms: item.author_koms, created_by: uidRef.current,
+    });
+    // 23505 = gibt es schon: der erste Versuch ist doch angekommen, nur die Antwort ging verloren
+    if (error && (error as { code?: string }).code !== "23505") {
+      setItems((p) => p.map((i) => (i.id === item.id ? { ...i, nicht_gesendet: error.message } : i)));
+      meldeFehler("Die Nachricht ging nicht raus: " + error.message);
+      return false;
+    }
+    setItems((p) => p.map((i) => (i.id === item.id && i.nicht_gesendet ? { ...i, nicht_gesendet: undefined } : i)));
+    // Empfänger rechnet der Server aus (send-push, chat_item_id). Im Browser
+    // sieht ein Schüler nur seine eigene Komitee-Zeile – vorher landeten
+    // Chat-Pop-ups deshalb nur bei den Nachrichten des Teams.
+    void chatPush(item.id);
+    return true;
+  }, []);
+
+  const erneutSenden: TopicsValue["erneutSenden"] = useCallback(async (id) => {
+    const item = stateRef.current.items.find((i) => i.id === id);
+    if (!item || !hasSupabase) return;
+    // Markierung sofort weg: der Knopf soll beim Tippen sichtbar „arbeiten“ und nicht doppelt auslösen
+    setItems((p) => p.map((i) => (i.id === id ? { ...i, nicht_gesendet: undefined } : i)));
+    if (await sendeItem({ ...item, nicht_gesendet: undefined })) melde("Gesendet", "erfolg");
+  }, [sendeItem]);
+
   const postItem: TopicsValue["postItem"] = useCallback(async (topic, type, body, options, title = "", meta) => {
     const item: TopicItem = {
       id: uuid(), topic_id: topic.id, type, title: title.trim(), body: body.trim(),
-      options: type === "umfrage" && !meta?.poll?.antwortArt ? (options || []).filter(Boolean).map((label) => ({ id: uuid(), label })) : null,
+      options:
+        type === "umfrage" && !meta?.poll?.antwortArt
+          ? [
+              ...(options || []).filter(Boolean).map((label) => ({ id: uuid(), label })),
+              // „Eigene Antwort“ als letzte Möglichkeit mit Kennzeichen
+              ...(meta?.poll?.eigene ? [{ id: uuid(), label: "Eigene Antwort", frei: true }] : []),
+            ]
+          : null,
       antwort_art: type === "umfrage" ? meta?.poll?.antwortArt ?? null : null,
       done: false, pinned: Boolean(meta?.pinned), author: nameRef.current,
       poll_multi: Boolean(meta?.poll?.multi), poll_anon: Boolean(meta?.poll?.anon),
@@ -520,38 +651,34 @@ export function TopicsProvider({ children }: { children: ReactNode }) {
     // Sofort anzeigen – die Nachricht steht da, bevor der Server geantwortet hat.
     setItems((p) => [...p, item]);
     if (!hasSupabase) return;
-    const { error } = await supabase!.from("topic_items").insert({
-      id: item.id, topic_id: item.topic_id, type: item.type, title: item.title, body: item.body,
-      options: item.options, pinned: item.pinned, author: item.author,
-      poll_multi: item.poll_multi, poll_anon: item.poll_anon, poll_deadline: item.poll_deadline,
-      ...(item.antwort_art ? { antwort_art: item.antwort_art } : {}),
-      author_role: item.author_role, author_koms: item.author_koms, created_by: uidRef.current,
-    });
-    if (error) {
-      // Stehen lassen und markieren statt löschen: so sieht man, dass etwas
-      // geschrieben wurde und dass es nicht angekommen ist.
-      setItems((p) => p.map((i) => (i.id === item.id ? { ...i, nicht_gesendet: error.message } : i)));
-      meldeFehler("Die Nachricht ging nicht raus: " + error.message);
-      return;
-    }
-    // Empfänger rechnet der Server aus (send-push, chat_item_id). Im Browser
-    // sieht ein Schüler nur seine eigene Komitee-Zeile – vorher landeten
-    // Chat-Pop-ups deshalb nur bei den Nachrichten des Teams.
-    void chatPush(item.id);
-  }, []);
+    await sendeItem(item);
+  }, [sendeItem]);
 
   const updateItem: TopicsValue["updateItem"] = useCallback(async (id, patch) => {
     setItems((p) => p.map((i) => (i.id === id ? { ...i, ...patch } : i)));
     if (!hasSupabase) return;
     const { error } = await supabase!.from("topic_items").update(patch).eq("id", id);
+    if (error) {
+      // Der Bildschirm hat die Änderung schon gezeigt – also sagen, dass sie nicht gespeichert
+      // ist, und den echten Stand vom Server zurückholen (sonst zeigt er etwas Falsches).
+      meldeFehler("Die Änderung wurde nicht gespeichert: " + error.message);
+      planeNachladen();
+      return;
+    }
     // Frisch angepinnt: alle Bescheid geben – auch wer Chat-Meldungen aus hat.
-    if (!error && patch.pinned === true) void chatPush(id, true);
-  }, []);
+    if (patch.pinned === true) void chatPush(id, true);
+  }, [planeNachladen]);
 
   const deleteItem: TopicsValue["deleteItem"] = useCallback(async (id) => {
     setItems((p) => p.filter((i) => i.id !== id));
-    if (hasSupabase) await supabase!.from("topic_items").delete().eq("id", id);
-  }, []);
+    if (!hasSupabase) return;
+    const { error } = await supabase!.from("topic_items").delete().eq("id", id);
+    if (error) {
+      // Sonst verschwindet der Eintrag nur auf diesem Gerät und kommt beim nächsten Laden zurück
+      meldeFehler("Das Löschen hat nicht geklappt: " + error.message);
+      planeNachladen();
+    }
+  }, [planeNachladen]);
 
   const vote: TopicsValue["vote"] = useCallback(async (itemId, optionId, multi = false) => {
     const bisher = stateRef.current.myVotes[itemId] || [];
@@ -603,6 +730,7 @@ export function TopicsProvider({ children }: { children: ReactNode }) {
     // die ganze Seite neu laden lassen.
     if (schiefgegangen) {
       console.error("[Abstimmung]", schiefgegangen);
+      meldeFehler("Deine Stimme ist nicht angekommen: " + schiefgegangen);
       planeNachladen();
     }
   }, [planeNachladen]);
@@ -675,7 +803,7 @@ export function TopicsProvider({ children }: { children: ReactNode }) {
   const value: TopicsValue = {
     topics, items, members, topicTags, tagMembers, myVotes, voteCounts, voters, reads, readsUebersicht, reaktionen, reagieren,
     uid: uidRef.current, ready,
-    createTopic, updateTopic, deleteTopic, setMembers, setTagMembers, setUserCommittee, selfAssignCommittee, committeesOf, postItem, updateItem, deleteItem, vote, markRead, unreadCount,
+    createTopic, updateTopic, deleteTopic, setMembers, setTagMembers, setUserCommittee, selfAssignCommittee, committeesOf, postItem, updateItem, deleteItem, erneutSenden, vote, markRead, unreadCount,
   };
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

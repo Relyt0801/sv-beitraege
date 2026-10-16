@@ -29,6 +29,8 @@
   --erlassen-grund: 238 238 252;
   --erlassen-rand: 214 213 247;
   --glas: 255 255 255;
+  /* Zelle in gruppierten Listen und Feldern: weiß auf grauem Grund (iOS) */
+  --zelle: 255 255 255;
 }
 .dark {
   /* Blaue SCHRIFT auf Schwarz/Dunkelgrau: #409CFF (6:1 auf #1C1C1E, 4,5:1
@@ -38,7 +40,10 @@
      (weiß auf #0A84FF = 3,6:1, auf #0071E3 = 4,7:1). */
   --brand-fuell: 0 113 227;    /* #0071E3 */
   --brand-soft: 64 156 255;
-  --brand-dark: 100 170 255;
+  /* Blaue Schrift auf blau getöntem Grund (bg-brand/20): #78B6FF – 5,6:1 auf
+     Karten (#1C1C1E), 4,9:1 in Blättern (#2C2C2E). #64AAFF schaffte in
+     Blättern nur 4,27:1 (Zähler-Chip „×3“ in den Umfrage-Ergebnissen). */
+  --brand-dark: 120 182 255;
   --papier: 0 0 0;
   --karte: 28 28 30;
   --linie: 56 56 58;
@@ -56,6 +61,11 @@
   --erlassen-grund: 34 33 70;
   --erlassen-rand: 58 56 110;
   --glas: 30 30 32;
+  --zelle: 28 28 30;           /* #1C1C1E auf Schwarz */
+}
+/* In Blättern ist der Grund schon #1C1C1E – Zellen eine Stufe heller (#2C2C2E) */
+.dark .blatt {
+  --zelle: 44 44 46;
 }
 
 /*
@@ -85,6 +95,16 @@ html, body, #root {
 }
 @media (min-width: 1024px) {
   :root { --leiste: 0px; }
+}
+
+/* Breite der App-Spalte (max-w-5xl, tailwind.config.js): am Laptop 64rem,
+   auf großen Bildschirmen breiter – sonst bleibt die Hälfte leer. */
+:root { --spalte: 64rem; }
+@media (min-width: 1400px) {
+  :root { --spalte: 74rem; }
+}
+@media (min-width: 1700px) {
+  :root { --spalte: 84rem; }
 }
 
 /* iPhone, App vom Home-Bildschirm (Statusleiste "black-translucent"):
@@ -174,8 +194,9 @@ button:not(:disabled) {
     @apply inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold;
   }
   /* Runder Glasknopf wie in der Navigationsleiste von iOS 26 */
+  /* 44 px: Mindestgröße für Tippflächen (Apple HIG) */
   .iconbtn {
-    @apply flex h-10 w-10 min-w-10 items-center justify-center rounded-full border border-black/[0.06]
+    @apply flex h-11 w-11 min-w-11 items-center justify-center rounded-full border border-black/[0.06]
            bg-white/80 text-[17px] text-tinte shadow-card backdrop-blur-xl transition duration-200 ease-ios
            active:scale-90 dark:border-white/10 dark:bg-slate-800/80 dark:text-slate-100 dark:shadow-none;
   }
@@ -183,11 +204,17 @@ button:not(:disabled) {
     @apply border-brand bg-brand text-white dark:border-brand dark:bg-brand;
   }
   /* Eingabefeld: graue Fuellung statt Rahmen */
+  /* Eingabefeld: weiße Zelle mit Haarlinie (wie Formulare in iOS) – keine
+     graue Füllfläche mehr. In weißen Karten bleibt es leicht grau. */
   .field {
-    @apply w-full rounded-xl border border-transparent bg-[rgb(118_118_128/0.12)] px-4 py-3 text-base
-           outline-none transition placeholder:text-tinte-leise
-           focus:border-brand/40 focus:bg-white focus:ring-4 focus:ring-brand/15
-           dark:bg-[rgb(118_118_128/0.24)] dark:text-slate-100 dark:focus:bg-slate-800;
+    @apply w-full rounded-xl border-0 bg-[rgb(var(--zelle))] px-4 py-3 text-base text-tinte
+           shadow-[0_0_0_0.5px_rgba(0,0,0,0.1),0_1px_2px_rgba(0,0,0,0.04)] outline-none transition
+           placeholder:text-tinte-leise focus:shadow-[0_0_0_1.5px_rgb(var(--brand)),0_0_0_5px_rgb(var(--brand)/0.14)]
+           dark:text-slate-100 dark:shadow-[0_0_0_0.5px_rgba(255,255,255,0.1)];
+  }
+  .card .field,
+  .liste .field {
+    @apply bg-[rgb(118_118_128/0.08)] shadow-none dark:bg-[rgb(118_118_128/0.2)];
   }
   /* Hauptknopf: Kapsel in Systemblau */
   .btn-primary {
@@ -201,37 +228,75 @@ button:not(:disabled) {
            active:scale-[.97] disabled:opacity-40 dark:bg-[rgb(118_118_128/0.24)] dark:text-brand;
   }
   /* Kleine Kapselknöpfe in Karten (wie „Öffnen“ im App Store) */
+  /* Update 1.4 (U3): sichtbar 40 px hoch, tippbar rund 48 px – die Trefferfläche
+     reicht über ::after 4 px über den Rand hinaus (Knöpfe in Zeilen liegen
+     weit genug auseinander, dass sich die Flächen nicht in die Quere kommen). */
   .btn-klein {
-    @apply inline-flex min-h-[2.25rem] items-center justify-center gap-1.5 rounded-full bg-brand px-4 text-[14px]
+    @apply relative inline-flex min-h-[2.5rem] items-center justify-center gap-1.5 rounded-full bg-brand px-4 text-[14px]
            font-semibold text-white transition duration-200 ease-ios active:scale-95 disabled:opacity-40;
   }
   .btn-klein-grau {
-    @apply inline-flex min-h-[2.25rem] items-center justify-center gap-1.5 rounded-full bg-[rgb(118_118_128/0.12)] px-4
+    @apply relative inline-flex min-h-[2.5rem] items-center justify-center gap-1.5 rounded-full bg-[rgb(118_118_128/0.12)] px-4
            text-[14px] font-semibold text-brand-dark transition duration-200 ease-ios active:scale-95 disabled:opacity-40
            dark:bg-[rgb(118_118_128/0.24)] dark:text-brand;
+  }
+  .btn-klein::after,
+  .btn-klein-grau::after {
+    content: "";
+    position: absolute;
+    inset: -4px;
   }
   /* Farbiges Symbol-Kästchen wie in den iOS-Einstellungen */
   .symbol {
     @apply flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-[8px] text-white;
   }
   /* Graue Füllfläche innerhalb von Karten und Blättern */
+  /* Fläche für eine Zeile/Gruppe: weiße Zelle auf grauem Grund. Nur in
+     weißen Karten bleibt sie hellgrau, damit sie sich abhebt. */
   .feld-grau {
-    @apply rounded-2xl bg-[rgb(118_118_128/0.08)] dark:bg-[rgb(118_118_128/0.18)];
+    @apply rounded-2xl bg-[rgb(var(--zelle))];
+  }
+  /* Zelle (früher graue Füllfläche): weiß auf grauem Grund */
+  .zelle {
+    background-color: rgb(var(--zelle));
+  }
+  .card .zelle,
+  .card .feld-grau {
+    @apply bg-[rgb(118_118_128/0.08)] dark:bg-[rgb(118_118_128/0.18)];
+  }
+  /* Gruppierte Liste (Liste.tsx → Gruppe) */
+  .gruppe-zellen {
+    @apply overflow-hidden rounded-[0.875rem] bg-[rgb(var(--zelle))];
+  }
+  .gruppe-zellen > * + * {
+    @apply relative;
+  }
+  .gruppe-zellen > * + *::before {
+    content: "";
+    @apply pointer-events-none absolute left-4 right-0 top-0 h-px scale-y-50 bg-black/[0.18] dark:bg-white/[0.16];
+  }
+  .card .gruppe-zellen {
+    @apply bg-[rgb(118_118_128/0.08)] dark:bg-[rgb(118_118_128/0.18)];
   }
   /* Segmentierte Auswahl (Alle / Rein / Raus …) */
   .seg {
     @apply flex rounded-[0.6rem] bg-[rgb(118_118_128/0.12)] p-[2px] dark:bg-[rgb(118_118_128/0.24)];
   }
   .seg-item {
-    @apply min-w-0 flex-1 rounded-[0.5rem] px-3 py-1.5 text-center text-[13px] font-semibold text-tinte
+    @apply relative min-w-0 flex-1 rounded-[0.5rem] px-3 py-1.5 text-center text-[13px] font-semibold text-tinte
            transition duration-200 ease-ios dark:text-slate-100;
+  }
+  /* Tippfläche 44 px hoch, auch wenn das Segment schmal aussieht (wie iOS) */
+  .seg-item::after {
+    content: "";
+    @apply absolute inset-x-0 -inset-y-1.5;
   }
   .seg-aktiv {
     @apply bg-white shadow-[0_3px_8px_rgba(0,0,0,.12),0_3px_1px_rgba(0,0,0,.04)] dark:bg-slate-600;
   }
   /* Gruppierte Liste mit eingerueckten Trennlinien (Einstellungen-Stil) */
   .liste {
-    @apply overflow-hidden rounded-[1.25rem] bg-white dark:bg-slate-900;
+    @apply overflow-hidden rounded-[1.25rem] bg-[rgb(var(--zelle))];
   }
   .liste > * + * {
     @apply relative;
@@ -251,16 +316,45 @@ button:not(:disabled) {
   .rounded-2xl.border.border-papier-linie:not(.border-dashed),
   .rounded-lg.border.border-papier-linie:not(.border-dashed) {
     border-color: transparent;
-    background-color: rgb(118 118 128 / 0.08);
-  }
-  .dark .rounded-xl.border.border-papier-linie:not(.border-dashed),
-  .dark .rounded-2xl.border.border-papier-linie:not(.border-dashed),
-  .dark .rounded-lg.border.border-papier-linie:not(.border-dashed) {
-    background-color: rgb(118 118 128 / 0.18);
+    background-color: rgb(var(--zelle));
   }
   /* Glas-Material fuer Kopf- und Tab-Leiste */
+  /* Update 1.4 (U3): deckender (0,86 statt 0,72) – Text unter der Leiste
+     kollidierte sonst mit den Beschriftungen. Ohne Weichzeichner (ältere
+     Android-WebViews, Energiesparmodus) fast deckend, siehe @supports unten. */
   .glas {
-    @apply bg-[rgb(var(--glas)/0.72)] backdrop-blur-2xl backdrop-saturate-[1.8];
+    @apply bg-[rgb(var(--glas)/0.86)] backdrop-blur-2xl backdrop-saturate-[1.8];
+  }
+  @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    .glas {
+      background-color: rgb(var(--glas) / 0.97);
+    }
+  }
+  /* Fehlertext: auf Weiß und auf Schwarz gut lesbar (red-500 hat nur 3,6:1) */
+  .text-fehler {
+    color: #d70015;
+  }
+  .dark .text-fehler {
+    color: #ff6961;
+  }
+  /* Gläserne Linse unter dem gewählten Reiter (GlasLeiste.tsx) */
+  .glas-linse {
+    background: linear-gradient(180deg, rgb(255 255 255 / 0.95), rgb(255 255 255 / 0.7));
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.9), inset 0 -1px 0 rgb(0 0 0 / 0.04),
+      0 4px 14px -4px rgb(0 0 0 / 0.18), 0 0 0 0.5px rgb(0 0 0 / 0.06);
+    -webkit-backdrop-filter: blur(8px) saturate(2);
+    backdrop-filter: blur(8px) saturate(2);
+  }
+  .dark .glas-linse {
+    background: linear-gradient(180deg, rgb(255 255 255 / 0.2), rgb(255 255 255 / 0.1));
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.22), 0 4px 14px -4px rgb(0 0 0 / 0.6), 0 0 0 0.5px rgb(255 255 255 / 0.1);
+  }
+  /* Leichte Linse, die mit Maus/Trackpad dem Zeiger folgt */
+  .glas-zeiger {
+    background: rgb(0 0 0 / 0.045);
+  }
+  .dark .glas-zeiger {
+    background: rgb(255 255 255 / 0.07);
   }
 }
 
@@ -293,9 +387,16 @@ button:not(:disabled) {
 .melde-haken { stroke-dasharray: 48; stroke-dashoffset: 48; animation: melde-haken 0.35s 0.25s ease-out forwards; }
 .melde-hoch { animation: melde-hoch 0.35s cubic-bezier(.32,.72,0,1) both; }
 .melde-hinein { animation: melde-hinein 0.2s ease-out both; }
+@keyframes melde-puls { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
 @media (prefers-reduced-motion: reduce) {
-  .melde-dreh, .melde-kreis, .melde-hoch, .melde-hinein { animation-duration: 0.01s; }
+  .melde-kreis, .melde-hoch, .melde-hinein { animation-duration: 0.01s; }
   .melde-haken { animation: none; stroke-dashoffset: 0; }
+  /* Der Lade-Kringel würde sonst mit 1 ms „einfrieren“ („Wird gemeldet …“
+     wirkte hängend): ruhig pulsieren statt drehen – das ist keine Bewegung */
+  .melde-dreh { animation: melde-puls 1.4s ease-in-out infinite !important; animation-iteration-count: infinite !important; }
+  /* Die Hervorhebung nach einem Sprung ist ein Aufleuchten, keine Bewegung –
+     sie muss die 2,4 s behalten, sonst ist sie unsichtbar */
+  .sprung-markiert { animation-duration: 2.4s !important; }
 }
 
 /* Sprung aus einer Benachrichtigung: kurz hervorheben (lib/sprung.ts) */
@@ -320,6 +421,22 @@ html.mit-hintergrund {
 html.mit-hintergrund .kopf-grund {
   background-color: transparent;
 }
+/* Kopfzeile (App.tsx): Platz für den Kopf eines geöffneten Chats. Nur am
+   Rechner/iPad quer – dort steht Zurück + Name genau da, wo sonst der
+   Seitentitel steht, statt als zweites Band darunter. Solange ein Chat
+   offen ist, treten Seitentitel und Seiten-Knöpfe zurück. */
+.kopf-ebene {
+  display: none;
+}
+@media (min-width: 1024px) {
+  .kopf-ebene:not(:empty) {
+    display: flex;
+  }
+  .kopf-zeile:has(> .kopf-ebene:not(:empty)) > .kopf-eigen {
+    display: none;
+  }
+}
+
 /* Kopfleiste beim Scrollen: Glas über die GANZE Breite (vorher nur so breit
    wie der Inhalt – am Laptop sah das Hintergrundbild abgeschnitten aus). */
 .kopf-band {
@@ -332,22 +449,89 @@ html.mit-hintergrund .kopf-grund {
   width: 100vw;
   transform: translateX(-50%);
   z-index: -1;
-  background-color: rgb(var(--glas) / 0.72);
-  -webkit-backdrop-filter: blur(40px) saturate(1.8);
-  backdrop-filter: blur(40px) saturate(1.8);
+  /* DECKEND (K4): Mit 0.95 und Weichzeichner stand Inhalt („ABI-ALBUM“,
+     „Jetzt ausfüllen“) scharf lesbar hinter dem kleinen Titel – der
+     Weichzeichner wirkt am ::before eines klebenden Kopfs nicht zuverlässig.
+     Design-Regel 3: nie lesbar durchscheinen. */
+  background-color: rgb(var(--glas));
   box-shadow: 0 0.5px 0 rgba(0, 0, 0, 0.18);
 }
 .dark .kopf-band::before {
   box-shadow: 0 0.5px 0 rgba(255, 255, 255, 0.15);
 }
-/* Mit eigenem Hintergrundbild: ruhige, fast deckende Leiste ohne Weichzeichner
-   und ohne Farbschein aus dem Bild */
-html.mit-hintergrund .kopf-band::before {
-  background-color: rgb(var(--papier) / 0.94);
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
+/* Text, der direkt auf dem Hintergrundbild steht (Abschnittstitel, Fußnoten
+   von Gruppen, großer Seitentitel): kräftigere Farbe + Lichthof in der
+   Grundfarbe, damit er auf jedem Foto lesbar bleibt. In Blättern (Sheet,
+   eigener deckender Grund) wirkt das nicht. */
+html.mit-hintergrund .auf-bild,
+html.mit-hintergrund .auf-bild .text-tinte-leise,
+html.mit-hintergrund .auf-bild.text-tinte-leise {
+  text-shadow: 0 0 2px rgb(var(--papier)), 0 0 8px rgb(var(--papier)), 0 0 16px rgb(var(--papier) / 0.9);
+}
+html.mit-hintergrund .auf-bild.text-tinte-leise,
+html.mit-hintergrund .auf-bild .text-tinte-leise {
+  color: rgb(var(--tinte-matt));
+}
+html.mit-hintergrund .blatt .auf-bild,
+html.mit-hintergrund .blatt .auf-bild .text-tinte-leise {
+  text-shadow: none;
+}
+html.mit-hintergrund .blatt .auf-bild.text-tinte-leise,
+html.mit-hintergrund .blatt .auf-bild .text-tinte-leise {
+  color: rgb(var(--tinte-leise));
+}
+/* Vollbild-Ebenen (ChatEbene) zeigen dasselbe Hintergrundbild wie die Seite –
+   vorher war die Ebene am Laptop schwarz, darüber (App-Kopf) das Foto. */
+html.mit-hintergrund .ebene-grund {
+  background-image: linear-gradient(rgb(var(--papier) / 0.45), rgb(var(--papier) / 0.45)), var(--hg-bild);
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
 }
 /* Die breite Leiste darf keinen waagerechten Scrollbalken erzeugen */
 #root {
   overflow-x: clip;
+}
+
+/* Graue Flächen (Segment, Suchfeld) direkt auf dem Hintergrundbild: deckend
+   in der Kartenfarbe, sonst scheinen Streifen/Fotos durch und die Schrift
+   wird unlesbar. In Blättern bleiben sie wie gehabt. */
+html.mit-hintergrund main .seg,
+html.mit-hintergrund .ebene-grund .seg,
+html.mit-hintergrund header .seg,
+html.mit-hintergrund .in-kopf .seg,
+html.mit-hintergrund .feld-auf-bild {
+  background-color: rgb(227 227 232);
+  box-shadow: 0 0 0 0.5px rgb(0 0 0 / 0.08);
+}
+html.dark.mit-hintergrund main .seg,
+html.dark.mit-hintergrund .ebene-grund .seg,
+html.dark.mit-hintergrund header .seg,
+html.dark.mit-hintergrund .in-kopf .seg,
+html.dark.mit-hintergrund .feld-auf-bild {
+  background-color: rgb(var(--glas));
+}
+/* Dunkel + Bild, gescrollt: Die Kopfzeile ist dann deckend in --glas – eine
+   Bahn in derselben Farbe war unsichtbar („Personen“ stand als loser Text da).
+   Ungescrollt (ohne kopf-band) bleibt die deckende Bahn auf dem Foto. */
+html.dark.mit-hintergrund header.kopf-band .seg {
+  background-color: rgb(118 118 128 / 0.24);
+}
+/* Segment IN einer Karte (z. B. „Alle | Nur offene“ in der Kassenliste) steht
+   nicht auf dem Foto: normale Bahn – sonst war sie im Dunkeln unsichtbar */
+html.mit-hintergrund .card .seg {
+  background-color: rgb(118 118 128 / 0.12);
+  box-shadow: none;
+}
+html.dark.mit-hintergrund .card .seg {
+  background-color: rgb(118 118 128 / 0.24);
+}
+html.mit-hintergrund .blatt .seg,
+html.mit-hintergrund .blatt .feld-auf-bild {
+  background-color: rgb(118 118 128 / 0.12);
+  box-shadow: none;
+}
+html.dark.mit-hintergrund .blatt .seg,
+html.dark.mit-hintergrund .blatt .feld-auf-bild {
+  background-color: rgb(118 118 128 / 0.24);
 }
