@@ -13,6 +13,10 @@ import type { Gewinner, GewinnerArt } from "../lib/teile";
  *                    Krone, „Gewinner der Herzen“ in Rosé mit Herz.
  *   KuerenBlatt      Auswahl aus den Kandidaten (mit Stimmen), je ein
  *                    Gewinner und optional ein Gewinner der Herzen.
+ *
+ * Den Gewinner der Herzen gibt es nur in Bereichen OHNE Aufteilung
+ * offiziell/inoffiziell (ohneHerzen) – mit Aufteilung übernimmt der
+ * inoffizielle Teil diese Rolle.
  */
 export interface Kandidat {
   id: string;
@@ -115,6 +119,7 @@ export function KuerenBlatt({
   onZuruecknehmen,
   hinweis,
   onFertig,
+  ohneHerzen = false,
 }: {
   open: boolean;
   onClose: () => void;
@@ -132,6 +137,8 @@ export function KuerenBlatt({
    * Aufrufer das Einstellungsblatt dahinter und zeigt die Gewinner-Bühne.
    */
   onFertig?: () => void;
+  /** Bereich ist offiziell/inoffiziell aufgeteilt – dann kein Gewinner der Herzen */
+  ohneHerzen?: boolean;
 }) {
   const [g, setG] = useState<string | null>(null);
   const [h, setH] = useState<string | null>(null);
@@ -211,9 +218,11 @@ export function KuerenBlatt({
           <Gruppe titel="Gewinner" className="">
             {kandidaten.map((k, i) => zeile(k, g, setG, "bg-[#E08A1E]", i + 1))}
           </Gruppe>
-          <Gruppe titel="Gewinner der Herzen (optional)" fuss="Zum Beispiel der Liebling vieler, der knapp nicht gewonnen hat.">
-            {kandidaten.filter((k) => k.id !== g).map((k, i) => zeile(k, h, setH, "bg-[#FF4F7B]", i + 1))}
-          </Gruppe>
+          {!ohneHerzen && (
+            <Gruppe titel="Gewinner der Herzen (optional)">
+              {kandidaten.filter((k) => k.id !== g).map((k, i) => zeile(k, h, setH, "bg-[#FF4F7B]", i + 1))}
+            </Gruppe>
+          )}
           {hinweis && <p className="mt-4 px-1 text-[13px] leading-snug text-tinte-leise">{hinweis}</p>}
           {/* Fußknopf immer sichtbar – vorher musste man bis ans Ende der Liste scrollen */}
           <FussLeiste>

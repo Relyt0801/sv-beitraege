@@ -11,6 +11,216 @@ ausführlich (auf Deutsch); hier steht der Überblick dazu.
 
 ---
 
+## Runde 8d: Korrekturen aus der Prüfung von Runde 8 (16.10.2026)
+
+Eine Prüfung aus drei Blickwinkeln (Offiziell/Inoffiziell, Finanzen,
+Handy/Profil) hat Fehler gefunden, jeder wurde gegengeprüft. Behoben sind
+alle bestätigten bis auf einen, der bewusst bleibt (Push-Zeile, unten).
+
+**Datenbank** (`supabase/teile-schaltbar.sql`, Nachtrag angewendet, nur
+CREATE/ALTER/UPDATE):
+- Schaltet man die Aufteilung aus, schließt `teile_setzen()` die offenen
+  Verschiebe-Anträge des Bereichs.
+- `motto_loeschen()`:
+  - Ein Herzens-Kandidat einer laufenden Runde ist nur löschbar, solange
+    das Herzens-Voting aus ist.
+  - Likes zählen nicht mehr.
+  - Runden-Kandidaten heißen „(gelöscht)“.
+  - Ein neuer Trigger schützt `geloescht_at`, gelöschte bleiben ausgeblendet.
+- `gewinner_kueren()`:
+  - Lehnt gelöschte Mottos ab.
+  - Holt ein gekürtes Motto erst in den Teil offiziell und prüft dabei den
+    Wortfilter.
+- `app_settings` lässt sich nicht löschen (Trigger).
+
+**App:**
+- **Gewinner der Herzen** ist bei Aufteilung überall aus:
+  - die laufende Runde und die Steuerung (`Runden.tsx`, Prop `mitHerz`)
+  - Ergebnis und Rangliste
+  - Motto-Karte
+  - Zitate-Ergebnis
+  - Küren bei Rankings
+- **Gelöschte Mottos** fehlen in Ranglisten und beim Küren (`lib/runden.ts`,
+  `Motto.tsx`).
+- **Zitate ohne Aufteilung:**
+  - Runden und Gewinner aus beiden Teilen bleiben sichtbar (`anzeigeGruppe`,
+    `gewinnerVon`). Vorher verschwanden alte Runden der Gruppe ''.
+  - Zurücknehmen trifft den richtigen Teil.
+- **Ohne Aufteilung:**
+  - keine Antrags-Chips (Motto, Zitate, Rankings, Chats → Anfragen)
+  - kein „Offiziell“/„Inoffiziell“ als Rundentitel
+- **Finanzen:**
+  - Karte und Blatt merken getrennt, welche Monate offen sind.
+  - Mit der Tastatur verdeckt der klebende Monatskopf keine Zeile mehr
+    (`scroll-pt`).
+  - Wer nur liest und keine Kostenanfragen hat, bekommt rechts die ganze
+    Höhe für die Buchungen; der Kassenwart sieht die Kostenanfragen immer.
+  - Design-Regel zur Handy-Reihenfolge berichtigt.
+- **Profil:**
+  - Im Kopf stehen nur Bild und Name.
+  - „Rolle“ und „Komitee“ sind eigene Zeilen unter Konto. Vorher wurde die
+    Rolle am Handy bis „Stufensprech…“ gekürzt.
+  - Die Push-Zeile heißt „Dieses Gerät“, Zustand „Nicht bereit“ statt
+    „Nicht eingerichtet“: passt an 320 px ohne „…“.
+  - Bewusst nicht geändert: Ohne Mitteilungen steht weiter „Anschalten“
+    direkt in der Zeile statt hinter einer aufklappbaren Prüfung. Die
+    Prüfung sagte dann ohnehin nur „anschalten“, der Knopf soll sofort
+    sichtbar sein.
+- **Funktionen:**
+  - Motto, Zitate und Rankings haben je zwei Wortfilter (offiziell und
+    inoffiziell).
+  - Ist nur einer erlaubt, steht sein Teil dabei.
+  - Lange Titel brechen nicht um.
+- **Barrierefreiheit:**
+  - Häkchen-Zeilen nutzen `aria-pressed` statt `menuitemcheckbox` (axe).
+  - Der Vorlesename der Kacheln beginnt nicht mehr mit einer nackten Zahl.
+- **Album-Kachel (Handy):** Warten Texte, öffnet ein Tipp gleich diese Texte.
+- **Glas-Leiste:** Der Ursprung der Linse springt nicht mehr, solange sie
+  gedrückt ist.
+
+**Prüfung (Demo r39, Chromium):**
+- Klicktest Herzen 9/9. Gegenprobe gegen den alten Stand: 3 Fehler, also
+  greift der Test.
+- Klicktest offiziell/inoffiziell 15/15, Vorsitz-Anfragen 9/9.
+- `ui-check` 280 Ansichten ohne Fund (axe ohne Befund, keine Konsolenfehler);
+  `leisten-check` 777 Zustände, 0 Abweichungen.
+- Typecheck und Build ohne Fehler.
+
+**Nachprüfung von 8d.** Eine zweite Prüfung aus drei Blickwinkeln, jeder Fund
+gegengeprüft, hat 14 Funde bestätigt (11 verschiedene). Alle sind behoben:
+- **Blockierend, durch 8d entstanden:** In Rankings ohne Aufteilung konnte
+  niemand mehr über den Gewinner der Herzen abstimmen. Der Wahl-Liste fehlte
+  `mitHerz`. Jetzt ist `mitHerz` in `RundenAbschnitt`, `RundenStandKarte`,
+  `RundenEinstellungen` und `RundeStartenSheet` Pflicht, der Typecheck meldet
+  jede vergessene Stelle. Umfragen übergeben ausdrücklich `false`.
+- **Zitate ohne Aufteilung:**
+  - Eine neue Runde zählt in der angezeigten Gruppe weiter. Vorher stand
+    „Runde 4 starten“ da, gestartet wurde aber „Runde 2“ in einer anderen
+    Gruppe.
+  - Eine noch offene Runde aus dem früheren anderen Teil lässt sich in den
+    Einstellungen beenden („Ältere Runde N beenden“), beim Motto ebenso.
+  - Beim Küren räumt die App einen alten Gewinner im anderen Teil still mit
+    weg, „Zurücknehmen“ nimmt beide. Vorher rückte der alte nach.
+- **Motto:** Der Abgleich gegen die geladenen Vorschläge gilt nur noch in der
+  Demo. Mit Datenbank sehen Schüler ausgeblendete Vorschläge nicht, sonst
+  fehlten diese in Rangliste und Küren. Nach dem Löschen lädt die App die
+  Runden neu.
+- **Datenbank `gewinner_kueren`:**
+  - Mit Aufteilung lehnt sie ein inoffizielles Motto ab („erst nach
+    Offiziell verschieben“). Küren ist kein Weg um die Zustimmungen herum.
+  - Ohne Aufteilung verschiebt sie das Motto mit Protokolleintrag
+    „bereich.verschoben“.
+  - Ist angewendet (`gewinner_kueren_aufteilung`, nur CREATE OR REPLACE).
+- **Profil:**
+  - „Stv. Schülersprecher*in“ heißt am 320-px-Handy „Stv. Sprecher*in“, statt
+    gekürzt zu werden.
+  - Bei einem offenen Komitee-Wechsel bleibt das jetzige Komitee rechts
+    stehen, „Wechsel angefragt“ steht klein darunter.
+- **Funktionen:**
+  - Ohne Aufteilung gibt es je Bereich nur einen Wortfilter, ohne
+    „(offiziell)“, wie in den Einstellungen des Bereichs.
+  - „Spotify im Steckbrief“ heißt unter 360 px „Spotify“.
+- **Kacheln:** Der Vorleser sagt, was die Zahl zählt: „neu“ bei Chats,
+  „Text wartet auf dich“ beim Album, sonst „offen“.
+
+**Prüfung (Demo r40 = Endstand, Chromium):**
+- Klicktest Herzen in Rankings 7/7. Gegenprobe auf r39: 2 Fehler, der Test
+  greift also.
+- Herzen beim Motto 9/9.
+- Zitate-Runden ohne Aufteilung 5/5.
+- Offiziell/inoffiziell 15/15, Vorsitz-Anfragen 9/9.
+- Fotos bei 320 px (hell, dunkel, Bild): nichts gekürzt, keine Seitenfehler.
+- `ui-check` 280 Ansichten ohne Fund (axe ohne Befund, keine Konsolenfehler);
+  `leisten-check` 777 Zustände, 0 Abweichungen.
+- Typecheck und Build ohne Fehler.
+
+## Runde 8a: Offiziell/Inoffiziell schaltbar, Info-Symbol, Mottos löschen (16.10.2026)
+
+Rückmeldung: „Gewinner der Herzen macht keinen Sinn mehr mit offiziell /
+inoffiziell. Man soll überall einstellen können, ob es diese Aufteilung
+geben soll … Wenn es beides gibt, ein kleines Info-Symbol … Mit 1 Stimme
+inoffiziell, umgekehrt die festgelegte Anzahl … Settings an einem klaren
+Ort … Mottos, die nicht in der Abstimmung sind (und die Herzens-Kandidaten),
+in inoffiziell, Komitee und Admins dürfen löschen – ohne Benachrichtigungen.“
+
+- **Aufteilung je Bereich schaltbar** (Motto, Zitate, Rankings,
+  Album-Kommentare): Schalter „Offiziell & Inoffiziell trennen“ steht im
+  Zahnrad-Blatt des Bereichs **ganz oben** (beim Album: Einstellungen →
+  „Kommentare · Offiziell & Inoffiziell“). Aus: kein Umschalter, alles in
+  einem Bereich, nirgends das Wort „offiziell“ (Titel ohne „· Offiziell“).
+  Neues landet intern im Teil „offiziell“, nichts wird verschoben oder
+  gelöscht – wieder an, liegt alles im alten Teil.
+  Datenbank: `app_settings.teile`, `teile_setzen()` (Recht wie Verschieben
+  im Bereich, Admin immer), Schutz-Trigger, Protokolleintrag
+  (`supabase/teile-schaltbar.sql`, angewendet). App: `useAufgeteilt`,
+  `imTeil`, `mitTeil` in `lib/teile.ts`.
+- **Info-Symbol (i)** neben dem Umschalter statt des Erklärsatzes: je
+  Bereich, was in Abizeitung, Pullis, Banner … kommen kann und was in der
+  Stufe bleibt, dazu die Regel fürs Verschieben (`TeilInfo`, `TEIL_INFO`).
+- **Verschieben:** nach inoffiziell reicht **eine** Stimme (sofort), nach
+  offiziell die eingestellte Zahl (Profil → Freigaben → „Nach offiziell
+  verschieben“). Datenbank `verschieben_noetig()`. Die Rückfrage sagt nur
+  noch dem Owner „deine Zustimmung reicht“ – vorher stand das für jeden
+  Admin, die Datenbank sah das anders.
+- **Gewinner der Herzen** nur noch in Bereichen ohne Aufteilung – mit
+  Aufteilung übernimmt der inoffizielle Teil diese Rolle (Küren-Blatt,
+  Runden-Start, Einstellungen, Bühne).
+- **Mottos löschen** (Komitee = „Motto verwalten“, Admin): „Vorschlag
+  löschen“ unten im Verwalten-Blatt (···), mit Rückfrage, ohne
+  Benachrichtigung. `motto_loeschen()` leert den Vorschlag und markiert ihn
+  (`geloescht_at`); der Text steht nur im Protokoll. Nicht für Kandidaten
+  einer laufenden Runde oder gekürte Gewinner.
+- **Daten (live, nur UPDATE):** Die 10 Kandidaten der laufenden
+  Motto-Abstimmung liegen jetzt im Teil offiziell, alle übrigen 56 Vorschläge
+  und die Herzens-Kandidaten bleiben inoffiziell; das Herzens-Voting der
+  laufenden Runde ist aus. Ein Protokolleintrag, keine Benachrichtigung.
+- **Einstellungen kompakter:** lange Fußtexte gekürzt, Wortfilter-Zeilen
+  einzeilig (der Schalter zeigt den Zustand).
+
+## Runde 8b: Finanzen – Einnahme/Ausgabe am Kontostand, Buchungen rechts oben (16.10.2026)
+
+- **Knöpfe in der Kontostand-Karte** (`FinanzenTab.tsx`, `UebersichtKarte`,
+  `onBuchen`, `hinweis`): „+ Einnahme“ / „− Ausgabe“ direkt unter dem Betrag,
+  voll grün/rot, 44 px – nur mit Recht „Kassenbuch führen“. Die eigene
+  Knopf-Zeile über der Seite ist weg (und mit ihr das leere Rasterfeld am
+  Handy). Wer nur liest, sieht dort „Nur lesen …“ statt eines Balkens.
+- **Laptop/iPad quer, rechts:** oben „Buchungen“ als eine Karte (Filter und
+  Suche bleiben stehen, Monate zuerst zugeklappt, Monatskopf klebt),
+  mindestens die obere Hälfte bzw. 16 rem; darunter die Kostenanfragen,
+  höchstens die Hälfte, scrollen in sich. Links: Kontostand,
+  Aktionen/Beiträge/Sonstiges, Geplante Aktionen.
+- Handy/iPad hoch unverändert; Design-Regeln Abschnitt 3 angepasst.
+
+## Runde 8c: Handy ohne seitliches Scrollen, Profil einzeilig, Glas-Leiste (16.10.2026)
+
+- **Mitmachen auf der Startseite (< 640 px):** statt eines seitlich
+  wischbaren Regals ein Raster aus zwei Spalten kleiner Kacheln
+  (`FarbKachel`): Album, Motto, Zitate je eine Kachel, die Rankings eine Reihe;
+  ungerade Zahl → letzte Kachel über beide Spalten. Ab 640 px unverändert.
+- **Auswahl-Leiste der Kasse:** Namen in EINER Zeile „Anna, Ben +3 ›“, alle im
+  Blatt (`MassBar.tsx`). **Protokoll:** am Handy „Bereich ›“ mit Häkchen-Liste
+  statt 11 wischbarer Chips. **Kontodaten:** IBAN/Verwendungszweck brechen um.
+- **Profil:** keine Untertexte/Fußnoten mehr, jede Einstellung eine Zeile;
+  Kopf kompakt; Erscheinungsbild als aufklappbare Zeile mit Wert; die
+  Push-Prüfung klappt „Auf diesem Gerät“ auf (`ProfilSheet.tsx`).
+- **Funktionen:** einzeilig, Erklärungen hinter dem „i“ im Kopf, mehrere
+  Wortfilter einer Funktion auf einer Unterseite (`FunktionenSheet.tsx`).
+- **Glas-Leiste:** Die Linse federte mit `cubic-bezier(.34,1.32,.5,1)` über
+  ihr Ziel – gemessen bis 12,5 px über die Kapsel (Laptop, erster → letzter
+  Reiter), am iPhone 5–6,5 px; „eckig“ war der Weichzeichner an der Linse in
+  Bewegung bzw. das gerade Abschneiden am Leistenrand. Jetzt
+  `cubic-bezier(.32,.72,0,1)` für Lage und Breite, kein `backdrop-filter` an
+  der Linse, am Rand wächst sie beim Drücken nur nach innen. Nachgemessen
+  0–700 ms bei 320, 390 und 1440 px: bleibt in der Kapsel.
+
+**Prüfung Runde 8 (zusammengeführter Stand, Demo, Chromium):**
+`leisten-check` 777 Zustände, 0 Abweichungen (84 offene Chats/Kalender in
+Ordnung); `ui-check` 280 Ansichten, nichts überstehend, nichts unter der
+Reiterleiste, keine Konsolenfehler, axe ohne Fund; Klicktest
+offiziell/inoffiziell 15/15 (iPhone hell, Laptop dunkel: Info-Symbol,
+Schalter aus/an, kein „Offiziell“ ohne Aufteilung, Motto löschen);
+Klicktest Vorsitz-Anfragen 9/9. Typecheck und Build ohne Fehler.
+
 ## Nachtrag: Vorsitz-Funktionen in der Demo, Terminanfragen nicht abgeschnitten (16.10.2026)
 
 Eine unabhängige Prüfung des Diffs von #19 fand Folgendes. Anfragen-Speicher,

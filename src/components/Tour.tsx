@@ -332,7 +332,7 @@ export function schuelerSchritte(staffel: Staffel, o: { nachtragen?: boolean; fi
     {
       tab: "kasse",
       title: "Offiziell oder Inoffiziell",
-      text: "Motto, Zitate, Rankings und Kommentare gibt es in zwei Teilen: Offiziell kommt ins Abibuch, Inoffiziell bleibt unter uns. Ganz oben im jeweiligen Bereich wechselst du.",
+      text: "Motto, Zitate, Rankings und Kommentare gibt es meist in zwei Teilen: Offiziell kann in die Abizeitung, Inoffiziell bleibt unter uns. Ganz oben im Bereich wechselst du – das (i) daneben erklärt, was wohin kommt.",
     },
     {
       tab: "kasse",
@@ -393,7 +393,7 @@ export function teamSchritte(o: {
       tab: "profil",
       anchor: "kacheln",
       title: "Deine Startseite",
-      text: "Wie bei allen Schülern: Abimotto, Zitate, Rankings und Album. Jeder Bereich hat oben ein Zahnrad mit allen Einstellungen – Offiziell und Inoffiziell getrennt.",
+      text: "Wie bei allen Schülern: Abimotto, Zitate, Rankings und Album. Jeder Bereich hat oben ein Zahnrad mit allen Einstellungen – ganz oben steht, ob Offiziell und Inoffiziell getrennt sind.",
     });
   s.push(
     { tab: "kasse", anchor: "kassenkopf", title: "Die Lage auf einen Blick", text: "Wie viel in der Stufe noch offen ist und wie viele noch zahlen müssen." },

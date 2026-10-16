@@ -282,7 +282,7 @@ function KontoWert({
       <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 px-4 py-2.5 md:min-h-[56px]">
         <div className="col-start-1 row-start-1 min-w-0 text-[12px] font-medium leading-tight text-tinte-leise">{label}</div>
         <div className="col-start-2 row-start-1 md:row-span-2">{knopf}</div>
-        <div className="no-scrollbar col-span-2 row-start-2 mt-1 select-all overflow-x-auto whitespace-nowrap text-[clamp(12px,3.75vw,18px)] font-semibold tabular-nums tracking-[0.03em] text-tinte dark:text-slate-100 md:col-span-1 md:mt-0.5 md:whitespace-normal md:text-[17px] md:leading-snug">
+        <div className="col-span-2 row-start-2 mt-1 select-all text-[clamp(12px,3.75vw,18px)] font-semibold tabular-nums tracking-[0.03em] text-tinte [overflow-wrap:anywhere] dark:text-slate-100 md:col-span-1 md:mt-0.5 md:text-[17px] md:leading-snug">
           {wert}
         </div>
       </div>
@@ -295,8 +295,9 @@ function KontoWert({
           {knopf}
         </div>
         {/* Ab 12 px passt die IBAN auch aufs iPhone SE (320 px). Reicht es
-            trotzdem nicht, scrollt nur diese Zeile, nie die ganze Seite. */}
-        <div className="no-scrollbar mt-1 select-all overflow-x-auto whitespace-nowrap text-[clamp(12px,3.75vw,18px)] font-semibold tabular-nums tracking-[0.03em] text-tinte dark:text-slate-100">
+            trotzdem nicht (langer Verwendungszweck), bricht der Wert um –
+            vorher scrollte die Zeile seitlich und das Ende war nicht zu sehen. */}
+        <div className="mt-1 select-all text-[clamp(12px,3.75vw,18px)] font-semibold tabular-nums tracking-[0.03em] text-tinte [overflow-wrap:anywhere] dark:text-slate-100">
           {wert}
         </div>
       </div>

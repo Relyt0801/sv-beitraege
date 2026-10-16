@@ -228,6 +228,9 @@ export function FarbKarte({
  * unten Titel und eine Zeile Stand. Eine große, blasse Deko in der Ecke macht
  * sie lebendig, ohne zu stören. Gleiche Farblogik wie FarbKarte: EINE Farbe
  * je Kachel, der Verlauf bleibt innerhalb dieser Farbe.
+ *
+ * Seit Runde 8 auch das Mitmachen-Regal der Startseite am Handy (Album,
+ * Motto, Zitate, Rankings – MyKasse.tsx) statt seitlich wischbarer Karten.
  */
 export function FarbKachel({
   verlauf,
@@ -237,11 +240,14 @@ export function FarbKachel({
   unter,
   zahl,
   zahlRot = false,
+  zahlWort = "offen",
   breit = false,
   gedaempft = false,
+  aus = false,
   onClick,
   label,
   tour,
+  className = "",
 }: {
   /** z. B. "from-[#0A84FF] to-[#0066CC]" – beide Töne derselben Farbe */
   verlauf: string;
@@ -256,15 +262,20 @@ export function FarbKachel({
   zahl?: number;
   /** true = rote Zahl (Ungelesenes/Offenes), sonst weiße Kapsel */
   zahlRot?: boolean;
+  /** Was die Zahl zählt – für den Vorleser („Chats, 5 neu“); Standard „offen“ */
+  zahlWort?: string;
   /** über beide Spalten */
   breit?: boolean;
   /** ruhiger (z. B. „nichts offen“): etwas blasser */
   gedaempft?: boolean;
+  /** Funktion ausgeschaltet (sehen nur, wer sie schalten darf): Marke „Aus“, blasser */
+  aus?: boolean;
   onClick: () => void;
   /** Vorlesetext, falls der Titel allein nicht reicht */
   label?: string;
   /** data-tour-Kennung für die Einführung */
   tour?: string;
+  className?: string;
 }) {
   return (
     <button
@@ -274,7 +285,7 @@ export function FarbKachel({
       data-tour={tour}
       className={`relative flex min-h-[7.25rem] flex-col overflow-hidden rounded-[1.4rem] bg-gradient-to-br p-3.5 text-left text-white transition duration-200 ease-ios active:scale-[.97] ${verlauf} ${schatten} ${
         breit ? "col-span-2" : ""
-      } ${gedaempft ? "opacity-80 saturate-[.85]" : ""}`}
+      } ${gedaempft || aus ? "opacity-80 saturate-[.85]" : ""} ${className}`}
     >
       {/* Deko: das Symbol noch einmal groß und blass in der Ecke. Ein <Icon> hat eine
           feste Pixelgröße – hier wird es auf Deko-Größe gezogen (Emoji: über die Schrift).
@@ -294,18 +305,24 @@ export function FarbKachel({
         <span aria-hidden className="flex h-9 w-9 items-center justify-center rounded-full bg-white/25 text-[19px] leading-none">
           {symbol}
         </span>
-        {zahl ? (
-          <span
-            className={`zahl flex h-[22px] min-w-[22px] items-center justify-center rounded-full px-1.5 text-[12.5px] font-bold ${
-              zahlRot ? "bg-[#FF3B30] text-white ring-2 ring-white/90" : "bg-white text-tinte"
-            }`}
-          >
-            {zahl > 99 ? "99+" : zahl}
-          </span>
-        ) : null}
+        <span className="flex items-center gap-1.5">
+          {aus && <span className="rounded-full bg-black/25 px-2 py-0.5 text-[12px] font-semibold">Aus</span>}
+          {/* Die Zahl liest der Vorleser nach dem Titel (sr-only unten), nicht davor ohne Bedeutung */}
+          {zahl ? (
+            <span
+              aria-hidden
+              className={`zahl flex h-[22px] min-w-[22px] items-center justify-center rounded-full px-1.5 text-[12.5px] font-bold ${
+                zahlRot ? "bg-[#FF3B30] text-white ring-2 ring-white/90" : "bg-white text-tinte"
+              }`}
+            >
+              {zahl > 99 ? "99+" : zahl}
+            </span>
+          ) : null}
+        </span>
       </span>
       <span className="relative mt-auto block pt-3">
         <span className="block text-[16px] font-semibold leading-tight tracking-[-0.01em]">{titel}</span>
+        {zahl ? <span className="sr-only">{`, ${zahl} ${zahlWort}`}</span> : null}
         {unter && <span className="mt-0.5 line-clamp-2 block text-[12.5px] leading-snug text-white/85">{unter}</span>}
       </span>
     </button>

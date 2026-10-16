@@ -25,11 +25,11 @@ import { RundenAbschnitt, RundenEinstellungen, RundenStandKarte, RundeStartenShe
 import { useErgebnisSichtbarkeit } from "../lib/ergebnisse";
 import { Icon } from "./Icon";
 import { WortfilterSchalter } from "./AutorInfo";
-import { TEIL_NAME, useGewinner, useTeil, useVerschiebungen, type GewinnerArt, type Teil } from "../lib/teile";
-import { TEIL_FARBE, TeilMarke, TeilUmschalter, TeilWischer, useVerschiebenRueckfrage } from "./TeilUmschalter";
+import { imTeil, mitTeil, TEIL_NAME, useAufgeteilt, useGewinner, useTeil, useVerschiebungen, type GewinnerArt, type Teil } from "../lib/teile";
+import { TEIL_FARBE, TeileSchalterZeile, TeilMarke, TeilUmschalter, TeilWischer, useVerschiebenRueckfrage } from "./TeilUmschalter";
 import { GewinnerBuehne, KuerenBlatt, type Kandidat as KuerKandidat } from "./Gewinner";
 import { KachelVerwaltung } from "./KachelVerwaltung";
-import { KARTE_KLICK_KLASSE, VerwaltetVon, karteKlick } from "./Kachel";
+import { FarbKachel, KARTE_KLICK_KLASSE, VerwaltetVon, karteKlick } from "./Kachel";
 
 /**
  * Abi-Rankings: „Wird am ehesten berühmt“ & Co. – je Kategorie eine geheime
@@ -85,12 +85,14 @@ function quellenFuer(k: RankingKategorie, r: Rankings, personen: StufenPerson[],
  * ihren Stimmen, auch die Herzens-Kandidaten für den Gewinner der Herzen)
  * und die Top 3 des Rankings – doppelte zusammengefasst, nach Stimmen.
  */
-function kuerKandidaten(k: RankingKategorie, r: Rankings, runden: RundenStand, name: NameFn): KuerKandidat[] {
+function kuerKandidaten(k: RankingKategorie, r: Rankings, runden: RundenStand, name: NameFn, mitHerz: boolean): KuerKandidat[] {
   const m = new Map<string, KuerKandidat>();
   const runde = runden.offeneVon(k.id) || runden.letzteBeendete(k.id);
   if (runde)
     for (const x of runden.kandidatenVon(runde.id))
-      m.set(x.ziel_id, { id: x.ziel_id, label: x.label, unter: x.hm ? "Herzens-Kandidat" : `Runde ${runde.nr} – Stichwahl`, stimmen: runden.zahl(runde.id, x.ziel_id) ?? null });
+      // Herzens-Kandidaten nur ohne Aufteilung (sonst gibt es keinen Gewinner der Herzen)
+      if (mitHerz || !x.hm)
+        m.set(x.ziel_id, { id: x.ziel_id, label: x.label, unter: x.hm ? "Herzens-Kandidat" : `Runde ${runde.nr} – Stichwahl`, stimmen: runden.zahl(runde.id, x.ziel_id) ?? null });
   for (const t of r.stand.find((s) => s.kategorie_id === k.id)?.top || [])
     if (!m.has(t.ziel)) m.set(t.ziel, { id: t.ziel, label: name(t.ziel), stimmen: t.n });
   return [...m.values()].sort((a, b) => (b.stimmen ?? -1) - (a.stimmen ?? -1));
@@ -112,44 +114,59 @@ const ART_STIL: Record<RankingArt, { titel: string; kurz: string }> = {
 
 export function RankingKarten({ className = "" }: { className?: string }) {
   const { can, isEltern, uid } = useRole();
-  const { sichtbar } = useFunktionen();
+  const { sichtbar, an } = useFunktionen();
   const darf = !isEltern && sichtbar("rankings") && (can("rankings.nutzen") || can("rankings.verwalten"));
   const [offen, setOffen] = useState<RankingArt | null>(null);
   const r = useRankings(darf, uid, offen !== null);
   const runden = useRunden("rankings", darf, uid, can("rankings.runden"));
-  // Noch etwas abzustimmen? Dann im Regal der Startseite (Handy) ganz vorn
-  // statt als vierte Karte hinter Album, Motto und Zitaten.
+  // Noch etwas abzustimmen? Dann im Raster der Startseite (Handy) ganz vorn
+  // statt als letzte Reihe hinter Album, Motto und Zitaten.
   const offenGesamt = r.kategorien.filter((k) => k.aktiv && !(k.id in r.meine)).length + runden.offene.length;
-  const wurzel = useRef<HTMLDivElement>(null);
-  // Die Rankings laden nach dem ersten Zeichnen; rückt die Karte dann nach
-  // vorn, rastet das Regal (snap) sonst wieder auf dem Album ein und die
-  // Rankings lägen links außerhalb. Darum einmal an den Anfang.
-  useLayoutEffect(() => {
-    const regal = wurzel.current?.parentElement;
-    if (offenGesamt > 0 && regal && regal.scrollWidth > regal.clientWidth) regal.scrollLeft = 0;
-  }, [offenGesamt > 0]); // eslint-disable-line react-hooks/exhaustive-deps
   if (!darf) return null;
 
   return (
-    <div ref={wurzel} className={`flex flex-col ${offenGesamt ? "max-sm:-order-1" : ""} ${className}`}>
-      <AusHinweis funktion="rankings" className="mb-1.5 px-1" />
+    // Am Handy eine ganze Reihe im Mitmachen-Raster (MyKasse.tsx): Schüler | Lehrer
+    <div className={`flex flex-col max-sm:col-span-2 ${offenGesamt ? "max-sm:-order-1" : ""} ${className}`}>
+      <AusHinweis funktion="rankings" className="mb-1.5 px-1 max-sm:hidden" />
       <div className="grid flex-1 grid-cols-2 gap-3">
         {(["schueler", "lehrer"] as RankingArt[]).map((art) => {
           const stil = KARTEN_STIL[art];
           const aktive = r.kategorien.filter((k) => k.aktiv && k.art === art);
           const offenAnzahl = aktive.filter((k) => !(k.id in r.meine)).length;
           const wahlen = runden.offene.filter((x) => aktive.some((k) => k.id === x.gruppe)).length;
-          return (
+          const stand = wahlen
+            ? `${wahlen} ${wahlen === 1 ? "Runde läuft" : "Runden laufen"}`
+            : aktive.length
+              ? offenAnzahl
+                ? `Noch ${offenAnzahl} von ${aktive.length} offen`
+                : `Alle ${aktive.length} abgestimmt`
+              : "Noch keine Kategorien";
+          return [
+            // Handy: kleine Kachel (ein Knopf), ein Tipp öffnet das Blatt
+            <FarbKachel
+              key={`${art}-kachel`}
+              className="sm:hidden"
+              verlauf={stil.verlauf}
+              schatten={stil.schatten}
+              symbol={<Icon name="pokal" size={19} strich={2.2} />}
+              titel={ART_STIL[art].titel}
+              unter={stand}
+              zahl={wahlen || offenAnzahl}
+              zahlRot
+              aus={!an.rankings}
+              onClick={() => setOffen(art)}
+            />,
             <section
               key={art}
               // Ganze Karte antippbar (öffnet das Blatt). Nur für Finger/Maus: der
               // Knopf unten tut dasselbe und ist für Tastatur/Vorlesen der Weg
               // (sonst Knopf im Knopf, axe „nested-interactive“)
               {...karteKlick(() => setOffen(art), undefined, true)}
-              className={`relative flex min-h-[164px] flex-col overflow-hidden rounded-[1.4rem] bg-gradient-to-br p-3.5 text-white sm:p-5 ${KARTE_KLICK_KLASSE} ${stil.verlauf} ${stil.schatten}`}
+              className={`relative flex min-h-[164px] flex-col overflow-hidden rounded-[1.4rem] bg-gradient-to-br p-3.5 text-white max-sm:hidden sm:p-5 ${KARTE_KLICK_KLASSE} ${stil.verlauf} ${stil.schatten}`}
             >
-              {/* Kleines Siegertreppchen oben rechts – am Handy nicht: im Regal ist
-                  die Kachel ~150 px breit, „ABI-RANKING“ lief in das Treppchen */}
+              {/* Kleines Siegertreppchen oben rechts (die Karte gibt es nur ab
+                  640 px; im früheren Handy-Regal war sie ~150 px breit und
+                  „ABI-RANKING“ lief in das Treppchen) */}
               <div aria-hidden className="pointer-events-none absolute right-3.5 top-3.5 flex items-end gap-[2px] opacity-90 max-sm:hidden sm:right-5 sm:top-5">
                 {[
                   { h: 15, f: MEDAILLE[1], n: 2 },
@@ -163,17 +180,9 @@ export function RankingKarten({ className = "" }: { className?: string }) {
                   Einzeilig: an Android 360 und iPad hoch brach „Abi-Ranking“ um und schob die Kachel 18 px tiefer */}
               <div className="whitespace-nowrap text-[12px] font-semibold uppercase tracking-[0.02em] text-white/80 sm:pr-14">Abi-Ranking</div>
               <div className="mt-0.5 text-[1.2rem] font-bold leading-tight">{ART_STIL[art].kurz}</div>
-              <div className="mt-1 text-[12.5px] leading-snug text-white/80">
-                {wahlen
-                  ? `${wahlen} ${wahlen === 1 ? "Runde läuft" : "Runden laufen"}`
-                  : aktive.length
-                    ? offenAnzahl
-                      ? `Noch ${offenAnzahl} von ${aktive.length} offen`
-                      : `Alle ${aktive.length} abgestimmt`
-                    : "Noch keine Kategorien"}
-              </div>
-              {/* Fortschritt wie beim Steckbrief – füllt die Kachel im Regal mit
-                  etwas Nützlichem statt leerer Fläche über dem Knopf */}
+              <div className="mt-1 text-[12.5px] leading-snug text-white/80">{stand}</div>
+              {/* Fortschritt wie beim Steckbrief – füllt die Karte mit etwas
+                  Nützlichem statt leerer Fläche über dem Knopf */}
               {aktive.length > 0 && !wahlen && (
                 <div aria-hidden className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/25">
                   <div className="h-full rounded-full bg-white transition-[width] duration-500" style={{ width: `${Math.round(((aktive.length - offenAnzahl) / aktive.length) * 100)}%` }} />
@@ -189,8 +198,8 @@ export function RankingKarten({ className = "" }: { className?: string }) {
               >
                 {offenAnzahl > 0 || wahlen ? "Abstimmen" : "Ergebnisse"}
               </button>
-            </section>
-          );
+            </section>,
+          ];
         })}
       </div>
       <RankingSheet art={offen} onClose={() => setOffen(null)} r={r} runden={runden} />
@@ -216,7 +225,7 @@ function RankingSheet({ art, onClose, r, runden }: { art: RankingArt | null; onC
   const { lehrer } = useLehrer(open);
   const name = useNamen(personen, lehrer);
   const gewinner = useGewinner("rankings", open);
-  const [teil, setTeil] = useTeil("rankings");
+  const [teil, setTeil, aufgeteilt] = useTeil("rankings");
   const [wahlId, setWahlId] = useState<string | null>(null);
   const [einstellungen, setEinstellungen] = useState(false);
   const [kueren, setKueren] = useState<RankingKategorie | null>(null);
@@ -231,14 +240,14 @@ function RankingSheet({ art, onClose, r, runden }: { art: RankingArt | null; onC
   const topSichtbar = useTopSichtbar();
 
   const alleArt = r.kategorien.filter((k) => k.aktiv && k.art === zuletzt);
-  const imTeil = alleArt.filter((k) => k.bereich === teil);
+  const hier = alleArt.filter((k) => imTeil(k.bereich, teil, aufgeteilt));
   const q = suche.trim().toLowerCase();
-  const gefiltert = q ? imTeil.filter((k) => k.titel.toLowerCase().includes(q)) : imTeil;
-  const offenAnzahl = imTeil.filter((k) => !(k.id in r.meine)).length;
+  const gefiltert = q ? hier.filter((k) => k.titel.toLowerCase().includes(q)) : hier;
+  const offenAnzahl = hier.filter((k) => !(k.id in r.meine)).length;
   // Die Kachel zählt beide Teile („Noch 8 von 8 offen“) – das Blatt zeigt einen
   // Teil. Was im anderen Teil noch offen ist, steht darum in der Stand-Karte.
   const andererTeil: Teil = teil === "offiziell" ? "inoffiziell" : "offiziell";
-  const offenAnders = alleArt.filter((k) => k.bereich === andererTeil && !(k.id in r.meine)).length;
+  const offenAnders = aufgeteilt ? alleArt.filter((k) => k.bereich === andererTeil && !(k.id in r.meine)).length : 0;
   // Beim Öffnen: ist im gemerkten Teil alles erledigt, im anderen aber nicht,
   // gleich dorthin (nur einmal je Öffnen, nie mitten im Abstimmen).
   const teilGeprueft = useRef(false);
@@ -253,7 +262,7 @@ function RankingSheet({ art, onClose, r, runden }: { art: RankingArt | null; onC
     if (offenAnzahl === 0 && offenAnders > 0) setTeil(andererTeil);
   }, [open, r.bereit, alleArt.length, offenAnzahl, offenAnders, andererTeil, setTeil]);
   // Ohne eigene Wahl: gibt es noch Offenes, zuerst „Abstimmen“, sonst „Ergebnisse“
-  const ansicht: Ansicht = ansichtWahl ?? (offenAnzahl > 0 || imTeil.some((k) => runden.offeneVon(k.id)) ? "abstimmen" : "ergebnisse");
+  const ansicht: Ansicht = ansichtWahl ?? (offenAnzahl > 0 || hier.some((k) => runden.offeneVon(k.id)) ? "abstimmen" : "ergebnisse");
   const wahl = wahlId ? r.kategorien.find((k) => k.id === wahlId) || null : null;
 
   // Wie in iOS: „‹ Schüler-Ranking“ kommt an derselben Stelle der Übersicht
@@ -288,10 +297,10 @@ function RankingSheet({ art, onClose, r, runden }: { art: RankingArt | null; onC
    * überspringen wir – die stehen oben in der Übersicht. null = alles erledigt.
    */
   const naechsteOffene = (aktuellId: string): RankingKategorie | null => {
-    const offene = imTeil.filter((x) => x.id !== aktuellId && !(x.id in r.meine) && !runden.offeneVon(x.id));
+    const offene = hier.filter((x) => x.id !== aktuellId && !(x.id in r.meine) && !runden.offeneVon(x.id));
     if (!offene.length) return null;
-    const i = imTeil.findIndex((x) => x.id === aktuellId);
-    return offene.find((x) => imTeil.indexOf(x) > i) ?? offene[0];
+    const i = hier.findIndex((x) => x.id === aktuellId);
+    return offene.find((x) => hier.indexOf(x) > i) ?? offene[0];
   };
   const nachStimme = (k: RankingKategorie) => {
     const n = naechsteOffene(k.id);
@@ -327,7 +336,7 @@ function RankingSheet({ art, onClose, r, runden }: { art: RankingArt | null; onC
         ) : fertig ? (
           <FertigAnsicht
             titel={ART_STIL[zuletzt].titel}
-            anzahl={imTeil.length}
+            anzahl={hier.length}
             onClose={schliessen}
             onUebersicht={() => setFertig(false)}
             onErgebnisse={() => {
@@ -361,7 +370,9 @@ function RankingSheet({ art, onClose, r, runden }: { art: RankingArt | null; onC
             />
             <AusHinweis funktion="rankings" className="-mt-2 mb-3" />
             <GesperrtZeile className="-mt-1 mb-3" />
+            {aufgeteilt && (
             <TeilUmschalter
+              bereich="rankings"
               teil={teil}
               setTeil={(t) => {
                 setTeil(t);
@@ -370,11 +381,13 @@ function RankingSheet({ art, onClose, r, runden }: { art: RankingArt | null; onC
               zahlen={{ offiziell: alleArt.filter((k) => k.bereich === "offiziell").length, inoffiziell: alleArt.filter((k) => k.bereich === "inoffiziell").length }}
               className="mb-4"
             />
-            <TeilWischer teil={teil} setTeil={setTeil}>
+            )}
+            <TeilWischer teil={teil} setTeil={setTeil} aus={!aufgeteilt}>
               <StandKarte
                 art={zuletzt}
                 teil={teil}
-                kategorien={imTeil}
+                aufgeteilt={aufgeteilt}
+                kategorien={hier}
                 r={r}
                 runden={runden}
                 onOeffnen={oeffnen}
@@ -382,7 +395,7 @@ function RankingSheet({ art, onClose, r, runden }: { art: RankingArt | null; onC
               />
 
               {/* Ein Weg zu den Ergebnissen: dieses Segment (die Karte oben hat keinen zweiten Knopf mehr) */}
-              {imTeil.length > 0 && (
+              {hier.length > 0 && (
                 <div className="seg mb-3 mt-4" role="tablist" aria-label="Ansicht">
                   {(["abstimmen", "ergebnisse"] as Ansicht[]).map((a) => (
                     <button key={a} role="tab" aria-selected={ansicht === a} className={`seg-item ${ansicht === a ? "seg-aktiv" : ""}`} onClick={() => setAnsicht(a)}>
@@ -392,7 +405,7 @@ function RankingSheet({ art, onClose, r, runden }: { art: RankingArt | null; onC
                 </div>
               )}
 
-              {imTeil.length > 6 && (
+              {hier.length > 6 && (
                 <label className="relative mb-3 block">
                   <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-tinte-leise">
                     <Icon name="lupe" size={16} />
@@ -401,8 +414,8 @@ function RankingSheet({ art, onClose, r, runden }: { art: RankingArt | null; onC
                 </label>
               )}
 
-              {imTeil.length === 0 ? (
-                <LeerHinweis teil={teil} darfAnlegen={can("rankings.verwalten")} onAnlegen={() => setNeuOffen(true)} />
+              {hier.length === 0 ? (
+                <LeerHinweis teil={teil} aufgeteilt={aufgeteilt} darfAnlegen={can("rankings.verwalten")} onAnlegen={() => setNeuOffen(true)} />
               ) : gefiltert.length === 0 ? (
                 <p className="py-6 text-center text-[14px] text-tinte-leise">Keine Kategorie mit „{suche.trim()}“.</p>
               ) : ansicht === "abstimmen" ? (
@@ -469,15 +482,21 @@ function FertigAnsicht({ titel, anzahl, onClose, onUebersicht, onErgebnisse }: {
 }
 
 /** Leerer Teil: sagen, was als Nächstes zu tun ist */
-function LeerHinweis({ teil, darfAnlegen, onAnlegen }: { teil: Teil; darfAnlegen: boolean; onAnlegen: () => void }) {
+function LeerHinweis({ teil, aufgeteilt, darfAnlegen, onAnlegen }: { teil: Teil; aufgeteilt: boolean; darfAnlegen: boolean; onAnlegen: () => void }) {
   return (
     <div className="feld-grau mt-4 flex flex-col items-center px-5 py-7 text-center">
       <span className={`flex h-11 w-11 items-center justify-center rounded-full ${TEIL_FARBE[teil].grund} ${TEIL_FARBE[teil].text}`}>
         <Icon name="pokal" size={20} />
       </span>
-      <div className="mt-2.5 text-[15px] font-semibold">Noch keine {teil === "offiziell" ? "offiziellen" : "inoffiziellen"} Kategorien</div>
+      <div className="mt-2.5 text-[15px] font-semibold">Noch keine {!aufgeteilt ? "" : teil === "offiziell" ? "offiziellen " : "inoffiziellen "}Kategorien</div>
       <p className="mt-1 text-[13px] leading-snug text-tinte-leise">
-        {darfAnlegen ? "Leg die erste an – sie landet in diesem Teil." : "Wisch zur Seite – vielleicht gibt es im anderen Teil schon etwas."}
+        {!aufgeteilt
+          ? darfAnlegen
+            ? "Leg die erste an."
+            : "Das Komitee legt die Kategorien an."
+          : darfAnlegen
+            ? "Leg die erste an – sie landet in diesem Teil."
+            : "Wisch zur Seite – vielleicht gibt es im anderen Teil schon etwas."}
       </p>
       {darfAnlegen && (
         <button className="btn-klein mt-3.5" onClick={onAnlegen}>
@@ -495,6 +514,7 @@ function LeerHinweis({ teil, darfAnlegen, onAnlegen }: { teil: Teil; darfAnlegen
 function StandKarte({
   art,
   teil,
+  aufgeteilt,
   kategorien,
   r,
   runden,
@@ -503,6 +523,7 @@ function StandKarte({
 }: {
   art: RankingArt;
   teil: Teil;
+  aufgeteilt: boolean;
   kategorien: RankingKategorie[];
   r: Rankings;
   runden: RundenStand;
@@ -519,7 +540,7 @@ function StandKarte({
     <section className={`relative overflow-hidden rounded-[1.4rem] bg-gradient-to-br p-4 text-white ${stil.verlauf} ${stil.schatten}`}>
       <div aria-hidden className="pointer-events-none absolute -right-8 -top-10 h-32 w-32 rounded-full bg-white/15 blur-2xl" />
       <div className="relative flex items-center gap-2">
-        <TeilMarke teil={teil} hell />
+        {aufgeteilt && <TeilMarke teil={teil} hell />}
         <span className="zahl ml-auto text-[12.5px] font-semibold text-white/80">
           {fertig} / {kategorien.length}
         </span>
@@ -670,6 +691,8 @@ function ErgebnisKacheln({
   gewinner: ReturnType<typeof useGewinner>;
   onOeffnen: (k: RankingKategorie) => void;
 }) {
+  // Gewinner der Herzen nur ohne Aufteilung offiziell/inoffiziell
+  const aufgeteilt = useAufgeteilt("rankings");
   return (
     <>
       {!topSichtbar && (
@@ -679,7 +702,7 @@ function ErgebnisKacheln({
         {kategorien.map((k) => {
           const st = r.stand.find((s) => s.kategorie_id === k.id);
           const g = gewinner.von(k.id, "gewinner");
-          const h = gewinner.von(k.id, "herzen");
+          const h = aufgeteilt ? null : gewinner.von(k.id, "herzen");
           return (
             <button
               key={k.id}
@@ -762,9 +785,10 @@ function KuerenFuerKategorie({
   /** Nach erfolgreichem Küren (Kategorie, die gekürt wurde) – schließt Einstellungen, zeigt die Bühne */
   onFertig?: (k: RankingKategorie) => void;
 }) {
+  const aufgeteilt = useAufgeteilt("rankings");
   // Nur neu bauen, wenn sich wirklich etwas ändert – sonst setzt das
   // KuerenBlatt bei jedem Neuladen (alle 15 s) die Auswahl zurück.
-  const roh = k ? kuerKandidaten(k, r, runden, name) : [];
+  const roh = k ? kuerKandidaten(k, r, runden, name, !aufgeteilt) : [];
   const schluessel = JSON.stringify(roh);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const kandidaten = useMemo(() => roh, [schluessel]);
@@ -775,11 +799,12 @@ function KuerenFuerKategorie({
       titel={k ? `Küren · ${k.titel}` : "Küren"}
       kandidaten={kandidaten}
       gewinner={k ? gewinner.von(k.id, "gewinner") : null}
-      herzen={k ? gewinner.von(k.id, "herzen") : null}
+      herzen={k && !aufgeteilt ? gewinner.von(k.id, "herzen") : null}
+      ohneHerzen={aufgeteilt}
       onKueren={(art: GewinnerArt, x, leise) => gewinner.kueren({ gruppe: k!.id, art, ziel_id: x.id, label: x.label, unter: "", stimmen: x.stimmen ?? null }, leise)}
       onZuruecknehmen={(art: GewinnerArt) => gewinner.zuruecknehmen(k!.id, art)}
       onFertig={() => k && onFertig?.(k)}
-      hinweis={k?.bereich === "offiziell" ? "Offizielle Gewinner kommen ins Abibuch." : "Inoffiziell: nur die Stufe sieht es."}
+      hinweis={!aufgeteilt ? undefined : k?.bereich === "offiziell" ? "Offizielle Gewinner kommen ins Abibuch." : "Inoffiziell: nur die Stufe sieht es."}
     />
   );
 }
@@ -812,6 +837,7 @@ function Abstimmen({
   onClose: () => void;
 }) {
   const { banned, can } = useRole();
+  const aufgeteilt = useAufgeteilt("rankings");
   // Kurze Pause nach der Stimme, damit man die Auswahl noch aufleuchten sieht;
   // neuester Rückruf per Ref, der Timer räumt beim Verlassen auf.
   const gestimmtRef = useRef(onGestimmt);
@@ -826,7 +852,7 @@ function Abstimmen({
   const topSichtbar = useTopSichtbar();
   const leitet = can("rankings.runden");
   const g = gewinner.von(k.id, "gewinner");
-  const h = gewinner.von(k.id, "herzen");
+  const h = aufgeteilt ? null : gewinner.von(k.id, "herzen");
   const aktiveLehrer = lehrer.filter((l) => l.aktiv);
   // Neue Kategorie (auch nach dem Weiterspringen): oben anfangen – die Liste
   // darunter ist lang, sonst stünde man mitten in den Namen der nächsten
@@ -842,7 +868,7 @@ function Abstimmen({
           sichtbar ist (vorher 139 px hoher Kasten mit 50 px hohen Balken) */}
       <div className="feld-grau mt-1 px-4 py-3 shadow-[0_1px_3px_rgba(0,0,0,.05)]">
         <div className="flex items-center gap-2">
-          <TeilMarke teil={k.bereich} />
+          {aufgeteilt && <TeilMarke teil={k.bereich} />}
           <span className="text-[12px] font-semibold uppercase tracking-[0.06em] text-tinte-leise">{ART_STIL[k.art].kurz}</span>
           <span className="zahl ml-auto text-[12.5px] text-tinte-leise">{stimmenText}</span>
         </div>
@@ -894,7 +920,7 @@ function Abstimmen({
         startText="Runde starten"
         wahlTitel="Stichwahl"
         standardName="Stichwahl"
-        mitHerz
+        mitHerz={!aufgeteilt}
         className="mt-3"
       />
 
@@ -909,6 +935,7 @@ function Abstimmen({
           startText="Runde starten"
           wahlTitel="Stichwahl"
           standardName="Stichwahl"
+          mitHerz={!aufgeteilt}
           nurWahl
         />
       </div>
@@ -1148,11 +1175,12 @@ function RankingEinstellungen({
   const leitet = can("rankings.runden");
   const darfKueren = leitet || darfVerwalten;
   const darfFilter = darfVerwalten || can("wortfilter.verwalten");
+  const aufgeteilt = useAufgeteilt("rankings");
   // Neu laden nach einem Verschieben – stabil, damit der Live-Kanal nicht neu aufgebaut wird
   const nachVerschieben = useCallback(() => void r.neuLaden(), [r.neuLaden]);
   const v = useVerschiebungen("ranking_kategorien", open && darfVerwalten, nachVerschieben);
 
-  const hier = r.kategorien.filter((k) => k.art === art && k.bereich === teil);
+  const hier = r.kategorien.filter((k) => k.art === art && imTeil(k.bereich, teil, aufgeteilt));
   const aktiv = hier.filter((k) => k.aktiv);
   const laufend = aktiv.filter((k) => runden.offeneVon(k.id));
   const mitStimmen = aktiv.filter((k) => (r.stand.find((s) => s.kategorie_id === k.id)?.stimmen ?? 0) > 0 || gewinner.von(k.id, "gewinner") || runden.letzteBeendete(k.id));
@@ -1166,13 +1194,24 @@ function RankingEinstellungen({
     <>
       {/* Bleibt offen unter Lehrkräfte/Runde starten (Unterseiten, Stapel in Sheet.tsx) */}
       <Sheet open={open} onClose={schliessen}>
-        <SheetKopf
-          titel={titel}
-          unter={titel === "Einstellungen" ? "Rankings – gilt für den gewählten Teil und die gewählte Art." : "Gilt für den gewählten Teil und die gewählte Art."}
-          onClose={schliessen}
-        />
-        <TeilUmschalter teil={teil} setTeil={setTeil} className="mb-3" />
-        <div className="seg mb-1" role="tablist" aria-label="Art">
+        <SheetKopf titel={titel} unter={titel === "Einstellungen" ? "Rankings" : undefined} onClose={schliessen} />
+
+        {/* 0) Offiziell & Inoffiziell – ganz oben, an fester Stelle */}
+        <Gruppe titel="Offiziell & Inoffiziell" className="">
+          <TeileSchalterZeile bereich="rankings" an={aufgeteilt} />
+          {darfFilter &&
+            (aufgeteilt ? (
+              <>
+                <WortfilterSchalter zeile bereich="rankings" titel="Wortfilter · Offiziell" />
+                <WortfilterSchalter zeile bereich="rankings_inoffiziell" titel="Wortfilter · Inoffiziell" />
+              </>
+            ) : (
+              <WortfilterSchalter zeile bereich="rankings" titel="Wortfilter" />
+            ))}
+        </Gruppe>
+        {/* Alles darunter gilt für den gewählten Teil und die gewählte Art */}
+        {aufgeteilt && <TeilUmschalter bereich="rankings" teil={teil} setTeil={setTeil} className="mb-3 mt-4" />}
+        <div className={`seg mb-1 ${aufgeteilt ? "" : "mt-4"}`} role="tablist" aria-label="Art">
           {(["schueler", "lehrer"] as RankingArt[]).map((a) => (
             <button key={a} role="tab" aria-selected={art === a} className={`seg-item ${art === a ? "seg-aktiv" : ""}`} onClick={() => setArt(a)}>
               {ART_STIL[a].titel}
@@ -1183,7 +1222,7 @@ function RankingEinstellungen({
         {/* 1) Abstimmung: Runden je Kategorie (die erste Runde heißt Stichwahl) */}
         {leitet && (
           <>
-            <Gruppe titel="Abstimmung · Runden" fuss="Je Kategorie läuft eine Runde. Die erste Runde ist die Stichwahl unter den Besten. Die Kategorie zeigt sie dann ganz oben.">
+            <Gruppe titel="Abstimmung · Runden">
               <button
                 type="button"
                 onClick={() => setStichwahlWahl(true)}
@@ -1210,7 +1249,7 @@ function RankingEinstellungen({
                 startText="Runde starten"
                 wahlTitel="Stichwahl"
                 standardName="Stichwahl"
-                mitHerz
+                mitHerz={!aufgeteilt}
               />
             ))}
           </>
@@ -1221,7 +1260,7 @@ function RankingEinstellungen({
 
         {/* 3) Gewinner */}
         {darfKueren && (
-          <Gruppe titel="Gewinner" fuss={mitStimmen.length ? "Gewinner und Gewinner der Herzen je Kategorie – erscheinen groß an der Kategorie." : "Küren geht, sobald eine Kategorie Stimmen hat."}>
+          <Gruppe titel="Gewinner" fuss={mitStimmen.length ? undefined : "Küren geht, sobald eine Kategorie Stimmen hat."}>
             {mitStimmen.map((k) => {
               const g = gewinner.von(k.id, "gewinner");
               return (
@@ -1241,15 +1280,8 @@ function RankingEinstellungen({
           </Gruppe>
         )}
 
-        {/* 4) Offiziell & Inoffiziell: Wortfilter je Teil, offene Verschiebe-Anträge */}
-        {darfFilter && (
-          <Gruppe titel="Offiziell & Inoffiziell" fuss="Offiziell kommt ins Abibuch (Wortfilter empfohlen). Inoffiziell bleibt in der Stufe.">
-            <WortfilterSchalter zeile bereich="rankings" titel="Wortfilter · Offiziell" />
-            <WortfilterSchalter zeile bereich="rankings_inoffiziell" titel="Wortfilter · Inoffiziell" />
-          </Gruppe>
-        )}
-        {darfVerwalten && v.liste.length > 0 && (
-          <Gruppe titel={`Verschiebe-Anträge · ${v.liste.length}`} fuss="Verschoben wird, sobald genug zugestimmt haben. Die Anträge stehen auch unter Chats → Anfragen.">
+        {darfVerwalten && aufgeteilt && v.liste.length > 0 && (
+          <Gruppe titel={`Verschiebe-Anträge · ${v.liste.length}`}>
             {v.liste.map((a) => (
               <div key={a.id} className="flex min-h-[56px] items-center gap-3 px-4 py-2">
                 <span className="min-w-0 flex-1">
@@ -1273,7 +1305,7 @@ function RankingEinstellungen({
         )}
 
         {/* 5) Kategorien verwalten */}
-        {darfVerwalten && <KategorienListe r={r} art={art} teil={teil} v={v} />}
+        {darfVerwalten && <KategorienListe r={r} art={art} teil={teil} aufgeteilt={aufgeteilt} v={v} />}
 
         {/* 6) Lehrkräfte */}
         {can("lehrer.verwalten") && (
@@ -1305,7 +1337,7 @@ function RankingEinstellungen({
 
       {/* Runde starten: erst die Kategorie wählen */}
       <Sheet open={open && stichwahlWahl} onClose={() => setStichwahlWahl(false)}>
-        <SheetKopf titel="Runde starten" unter={`${ART_STIL[art].titel} · ${TEIL_NAME[teil]} – welche Kategorie?`} onClose={() => setStichwahlWahl(false)} />
+        <SheetKopf titel="Runde starten" unter={`${mitTeil(ART_STIL[art].titel, teil, aufgeteilt)} – welche Kategorie?`} onClose={() => setStichwahlWahl(false)} />
         <Gruppe className="">
           {aktiv.map((k) => {
             const runde = runden.offeneVon(k.id);
@@ -1340,7 +1372,7 @@ function RankingEinstellungen({
         stand={runden}
         wahlTitel="Stichwahl"
         standardName="Stichwahl"
-        mitHerz
+        mitHerz={!aufgeteilt}
         onClose={() => setStartK(null)}
       />
     </>
@@ -1372,19 +1404,18 @@ function RankingSichtbarkeit() {
  * (umbenennen, an/aus, verschieben, löschen) im Blatt darüber („‹ Einstellungen“).
  * „Neue Kategorie“ ist die letzte Zeile in Blau (Design-Regeln 2).
  */
-function KategorienListe({ r, art, teil, v }: { r: Rankings; art: RankingArt; teil: Teil; v: ReturnType<typeof useVerschiebungen> }) {
+function KategorienListe({ r, art, teil, aufgeteilt, v }: { r: Rankings; art: RankingArt; teil: Teil; aufgeteilt: boolean; v: ReturnType<typeof useVerschiebungen> }) {
   const [blatt, setBlatt] = useState<string | null>(null);
   const [neuOffen, setNeuOffen] = useState(false);
-  const liste = r.kategorien.filter((k) => k.art === art && k.bereich === teil);
+  const liste = r.kategorien.filter((k) => k.art === art && imTeil(k.bereich, teil, aufgeteilt));
 
   return (
     <>
       <Gruppe
-        titel={`Kategorien · ${TEIL_NAME[teil]} · ${liste.length}`}
-        fuss="Aus: ausgeblendet, die Stimmen bleiben. Tipp: per Umfrage sammeln und im Ergebnis mit einem Tipp übernehmen."
+        titel={`${mitTeil("Kategorien", teil, aufgeteilt)} · ${liste.length}`}
       >
         {liste.map((k) => {
-          const antrag = v.antragZu(k.id);
+          const antrag = aufgeteilt ? v.antragZu(k.id) : null;
           const stimmen = r.stand.find((x) => x.kategorie_id === k.id)?.stimmen ?? 0;
           // Zweite Zeile immer (Stimmen, ggf. Antrag): so darf auch ein langer Titel umbrechen
           const unter = [stimmen ? `${stimmen} ${stimmen === 1 ? "Stimme" : "Stimmen"}` : "Noch keine Stimmen", antrag ? `Antrag nach ${TEIL_NAME[antrag.nach]} ${antrag.stimmen}/${antrag.noetig}` : ""]
@@ -1418,6 +1449,7 @@ function RankingKategorieBlatt({
   onClose: () => void;
 }) {
   const verschiebenFrage = useVerschiebenRueckfrage();
+  const aufgeteilt = useAufgeteilt("rankings");
   const [titel, setTitel] = useState("");
   const [an, setAn] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -1448,7 +1480,7 @@ function RankingKategorieBlatt({
     <Sheet open={k !== null} onClose={onClose}>
       {k && (
         <>
-          <SheetKopf titel={k.titel} unter={`${ART_STIL[k.art].titel} · ${TEIL_NAME[k.bereich]}`} onClose={onClose} />
+          <SheetKopf titel={k.titel} unter={mitTeil(ART_STIL[k.art].titel, k.bereich, aufgeteilt)} onClose={onClose} />
           {/* Titel als mehrzeiliges Feld – Ranking-Titel sind oft lang */}
           <Gruppe titel="Titel" className="mt-1">
             <textarea
@@ -1471,15 +1503,8 @@ function RankingKategorieBlatt({
               <Schalter an={an} onChange={setAn} label="Zum Abstimmen zeigen" />
             </ZeileMitSchalter>
           </Gruppe>
-          <Gruppe
-            fuss={
-              antrag
-                ? `Antrag nach ${TEIL_NAME[antrag.nach]} läuft: ${antrag.stimmen} von ${antrag.noetig} Zustimmungen.`
-                : anderer === "offiziell"
-                  ? "Offiziell kommt ins Abibuch."
-                  : "Inoffiziell bleibt in der Stufe."
-            }
-          >
+          {aufgeteilt && (
+          <Gruppe fuss={antrag ? `Antrag nach ${TEIL_NAME[antrag.nach]} läuft: ${antrag.stimmen} von ${antrag.noetig} Zustimmungen.` : undefined}>
             <Zeile
               label={`Nach ${TEIL_NAME[anderer]} verschieben`}
               blau
@@ -1495,6 +1520,7 @@ function RankingKategorieBlatt({
               }
             />
           </Gruppe>
+          )}
           <Gruppe>
             <Zeile
               label="Kategorie löschen"
@@ -1527,6 +1553,7 @@ function RankingKategorieBlatt({
  * (Schüler | Lehrer) kommt vom Blatt.
  */
 function KategorieNeuSheet({ open, onClose, r, art, startTeil }: { open: boolean; onClose: () => void; r: Rankings; art: RankingArt; startTeil: Teil }) {
+  const aufgeteilt = useAufgeteilt("rankings");
   const [titel, setTitel] = useState("");
   const [teil, setTeil] = useState<Teil>(startTeil);
   const [busy, setBusy] = useState(false);
@@ -1544,7 +1571,7 @@ function KategorieNeuSheet({ open, onClose, r, art, startTeil }: { open: boolean
     const f = await r.kategorieSpeichern({ titel, art, bereich: teil });
     setBusy(false);
     if (f) return meldeFehler("Ging nicht: " + f);
-    melde(`Kategorie angelegt – ${TEIL_NAME[teil]}`, "erfolg");
+    melde(aufgeteilt ? `Kategorie angelegt – ${TEIL_NAME[teil]}` : "Kategorie angelegt", "erfolg");
     onClose();
   };
 
@@ -1554,10 +1581,10 @@ function KategorieNeuSheet({ open, onClose, r, art, startTeil }: { open: boolean
       <Gruppe className="mt-1">
         <ZeileEingabe label="Titel" value={titel} onChange={setTitel} placeholder="z. B. Wird am ehesten berühmt" maxLength={120} autoFocus onEnter={() => void anlegen()} />
       </Gruppe>
-      <TeilUmschalter teil={teil} setTeil={setTeil} className="mt-4" />
+      {aufgeteilt && <TeilUmschalter bereich="rankings" teil={teil} setTeil={setTeil} className="mt-4" />}
       <FussLeisteBlatt>
         <button type="button" className="btn-primary w-full disabled:opacity-40" disabled={!titel.trim() || busy} onClick={() => void anlegen()}>
-          {busy ? "…" : `In ${TEIL_NAME[teil]} anlegen`}
+          {busy ? "…" : aufgeteilt ? `In ${TEIL_NAME[teil]} anlegen` : "Anlegen"}
         </button>
       </FussLeisteBlatt>
     </Sheet>

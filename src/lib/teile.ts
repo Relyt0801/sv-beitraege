@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { hasSupabase, supabase } from "./supabase";
 import { abonniere } from "./realtime";
 import { melde, meldeFehler } from "./melder";
+import { useRole } from "../auth/RoleProvider";
 
 /**
  * Offiziell / Inoffiziell (supabase/offiziell-inoffiziell.sql)
@@ -14,17 +15,145 @@ import { melde, meldeFehler } from "./melder";
  * Eltern sehen keinen der beiden Teile (die Lese-Regeln der Datenbank
  * schließen sie aus).
  *
- * Verschieben geht nur mit Zustimmungen (Profil → Freigaben → Verschieben);
- * Admins allein reichen. Gewinner küren: gewinner-Tabelle.
+ * Verschieben: nach inoffiziell reicht EINE Zustimmung (die eigene), nach
+ * offiziell braucht es so viele, wie unter Profil → Freigaben → „Verschieben“
+ * steht; der Owner allein reicht immer. Gewinner küren: gewinner-Tabelle.
+ *
+ * Aufteilung je Bereich schaltbar (supabase/teile-schaltbar.sql,
+ * app_settings.teile): Ist sie aus, gibt es nur EINEN Bereich ohne das Wort
+ * „offiziell“ (mitTeil lässt den Teil im Titel weg) – Neues landet im Teil
+ * „offiziell“, Runden und Gewinner laufen dort, angezeigt wird alles zusammen.
+ * Den „Gewinner der Herzen“ gibt es nur ohne Aufteilung: mit Aufteilung
+ * übernimmt der inoffizielle Teil diese Rolle.
  */
 export type Teil = "offiziell" | "inoffiziell";
 export const TEILE: Teil[] = ["offiziell", "inoffiziell"];
 
 export const TEIL_NAME: Record<Teil, string> = { offiziell: "Offiziell", inoffiziell: "Inoffiziell" };
-export const TEIL_ERKLAERUNG: Record<Teil, string> = {
-  offiziell: "Kommt ins Abibuch. Später sehen es auch Eltern und Lehrkräfte – bitte ohne Beleidigungen.",
-  inoffiziell: "Nur für unsere Stufe. Wird nicht gedruckt, Eltern sehen es nie.",
+
+/** Bereiche mit offiziell/inoffiziell (Schlüssel in app_settings.teile) */
+export type TeilBereich = "motto" | "zitate" | "rankings" | "kommentare";
+
+/**
+ * Was kommt wohin? – je Bereich, für das Info-Symbol neben dem Umschalter.
+ * Bewusst konkret: Was davon kann gedruckt werden, wer sieht es.
+ */
+export const TEIL_INFO: Record<TeilBereich, { titel: string; offiziell: string; inoffiziell: string }> = {
+  motto: {
+    titel: "Abimotto",
+    offiziell: "Kann unser Abimotto werden – auf Abizeitung, Pullis, Banner und zum Abiball. Das gekürte Motto sehen später auch Eltern und Lehrkräfte. Der Wortfilter prüft jeden Vorschlag.",
+    inoffiziell: "Insider und Spaß-Mottos nur für unsere Stufe. Wird nirgends gedruckt, Eltern sehen es nie.",
+  },
+  zitate: {
+    titel: "Zitate",
+    offiziell: "Kann in die Abizeitung (Zitate-Seite). Gedruckt lesen es auch Eltern und Lehrkräfte – darum prüft der Wortfilter.",
+    inoffiziell: "Bleibt in der App, nur für unsere Stufe. Kommt nicht in die Abizeitung.",
+  },
+  rankings: {
+    titel: "Rankings",
+    offiziell: "Diese Kategorien und ihre Gewinner können in die Abizeitung (Rankings-Seite).",
+    inoffiziell: "Nur für die Stufe – Ergebnisse werden nicht gedruckt.",
+  },
+  kommentare: {
+    titel: "Kommentare im Steckbrief",
+    offiziell: "Kann im Steckbrief der Abizeitung abgedruckt werden – also auch von Eltern und Lehrkräften gelesen.",
+    inoffiziell: "Bleibt im Album der App, nur unsere Stufe sieht es.",
+  },
 };
+
+/** Gehört ein Eintrag (Spalte bereich) zur gewählten Ansicht? Ohne Aufteilung: alles. */
+export const imTeil = (bereich: Teil | null | undefined, teil: Teil, aufgeteilt: boolean) =>
+  !aufgeteilt || (bereich ?? "inoffiziell") === teil;
+
+/** „Gewinner · Offiziell“ – ohne Aufteilung nur „Gewinner“ */
+export const mitTeil = (text: string, teil: Teil, aufgeteilt: boolean) => (aufgeteilt ? `${text} · ${TEIL_NAME[teil]}` : text);
+
+/* ---------------------------------------------------------------------- */
+/* Einstellung: Aufteilung je Bereich (EIN Stand für die ganze App)        */
+/* ---------------------------------------------------------------------- */
+const TEILE_STANDARD: Record<TeilBereich, boolean> = { motto: true, zitate: true, rankings: true, kommentare: true };
+const TEILE_DEMO = "sv-teile-demo";
+let teileStand: Record<TeilBereich, boolean> = (() => {
+  if (hasSupabase) return TEILE_STANDARD;
+  try {
+    return { ...TEILE_STANDARD, ...JSON.parse(localStorage.getItem(TEILE_DEMO) || "{}") };
+  } catch {
+    return TEILE_STANDARD;
+  }
+})();
+const teileHoerer = new Set<() => void>();
+let teileGeladen = false;
+let teileAbo: (() => void) | null = null;
+
+function teileMelden(neu: Record<TeilBereich, boolean>) {
+  teileStand = neu;
+  teileHoerer.forEach((f) => f());
+}
+async function teileLaden() {
+  if (!hasSupabase) return;
+  const { data } = await supabase!.from("app_settings").select("teile").eq("id", 1).maybeSingle();
+  const t = (data as { teile?: Partial<Record<TeilBereich, boolean>> } | null)?.teile;
+  if (t) teileMelden({ ...TEILE_STANDARD, ...t });
+}
+function teileAbonnieren(f: () => void) {
+  teileHoerer.add(f);
+  if (!teileGeladen && hasSupabase) {
+    teileGeladen = true;
+    void teileLaden();
+    teileAbo = abonniere({
+      name: "sv-teile",
+      nachholen: () => void teileLaden(),
+      aufbauen: (k) => k.on("postgres_changes", { event: "UPDATE", schema: "public", table: "app_settings" }, () => void teileLaden()),
+    });
+  }
+  return () => {
+    teileHoerer.delete(f);
+    if (teileHoerer.size === 0 && teileAbo) {
+      teileAbo();
+      teileAbo = null;
+      teileGeladen = false;
+    }
+  };
+}
+
+/** Ist ein Bereich in offiziell/inoffiziell aufgeteilt? (Standard: ja) */
+export function useAufgeteilt(bereich: TeilBereich): boolean {
+  return useSyncExternalStore(teileAbonnieren, () => teileStand[bereich] !== false);
+}
+
+/** Schalten (Einstellungen des Bereichs) – wer darf, wie in der Datenbank (teile_recht) */
+export function useTeileSchalten() {
+  const { can, isAdmin } = useRole();
+  const darf = useCallback(
+    (b: TeilBereich) =>
+      isAdmin ||
+      (b === "motto" && can("motto.verwalten")) ||
+      (b === "zitate" && can("zitate.pruefen")) ||
+      (b === "rankings" && can("rankings.verwalten")) ||
+      (b === "kommentare" && can("album.moderieren")),
+    [can, isAdmin],
+  );
+  const setzen = useCallback(async (b: TeilBereich, an: boolean): Promise<boolean> => {
+    const vorher = teileStand;
+    teileMelden({ ...teileStand, [b]: an });
+    if (!hasSupabase) {
+      try {
+        localStorage.setItem(TEILE_DEMO, JSON.stringify(teileStand));
+      } catch {
+        /* egal */
+      }
+      return true;
+    }
+    const { error } = await supabase!.rpc("teile_setzen", { p_bereich: b, p_an: an });
+    if (error) {
+      teileMelden(vorher);
+      meldeFehler(error.message);
+      return false;
+    }
+    return true;
+  }, []);
+  return { darf, setzen };
+}
 
 /** Tabelle in der Datenbank je Bereich (für Verschieben) */
 export type TeilTabelle = "zitate" | "ranking_kategorien" | "motto_vorschlaege" | "album_kommentare";
@@ -34,8 +163,13 @@ export function wortfilterSchluessel(basis: "motto" | "zitate" | "rankings" | "k
   return teil === "offiziell" ? basis : `${basis}_inoffiziell`;
 }
 
-/** Zuletzt gewählter Teil je Bereich – nur eine Bequemlichkeit pro Gerät. */
-export function useTeil(bereich: string): [Teil, (t: Teil) => void] {
+/**
+ * Zuletzt gewählter Teil je Bereich – nur eine Bequemlichkeit pro Gerät.
+ * Dritter Wert: ist der Bereich aufgeteilt? Ohne Aufteilung ist der Teil
+ * immer „offiziell“ (dort landet Neues, dort laufen Runden und Gewinner).
+ */
+export function useTeil(bereich: TeilBereich): [Teil, (t: Teil) => void, boolean] {
+  const aufgeteilt = useAufgeteilt(bereich);
   const schluessel = `sv:teil:${bereich}`;
   // Beim Abimotto geht es zuerst um das echte Motto (offiziell); Zitate und
   // Rankings starten im lockeren Teil der Stufe
@@ -59,7 +193,7 @@ export function useTeil(bereich: string): [Teil, (t: Teil) => void] {
     },
     [schluessel],
   );
-  return [teil, setTeil];
+  return [aufgeteilt ? teil : "offiziell", setTeil, aufgeteilt];
 }
 
 /* ====================================================================== */
@@ -232,7 +366,8 @@ export function useGewinner(bereich: GewinnerBereich, aktiv: boolean) {
   );
 
   const zuruecknehmen = useCallback(
-    async (gruppe: string, art: GewinnerArt) => {
+    // leise = true: ohne eigene Meldung (z. B. Aufräumen des anderen Teils)
+    async (gruppe: string, art: GewinnerArt, leise = false) => {
       if (!hasSupabase) {
         const i = demoGewinner.findIndex((x) => x.bereich === bereich && x.gruppe === gruppe && x.art === art);
         if (i >= 0) demoGewinner.splice(i, 1);
@@ -241,7 +376,7 @@ export function useGewinner(bereich: GewinnerBereich, aktiv: boolean) {
       }
       const { error } = await supabase!.rpc("gewinner_zuruecknehmen", { p_bereich: bereich, p_gruppe: gruppe, p_art: art });
       if (error) return meldeFehler(error.message);
-      melde("Zurückgenommen");
+      if (!leise) melde("Zurückgenommen");
       void laden();
     },
     [bereich, laden],
@@ -263,19 +398,24 @@ export const TABELLE_NAME: Record<TeilTabelle, string> = {
 /**
  * Rückfrage vor einem Verschiebe-Antrag – in Motto, Zitaten, Rankings und
  * Kommentaren wörtlich gleich, mit der Zahl der nötigen Zustimmungen.
- *   noetig  aus useVerschiebenNoetig()
- *   admin   Admins brauchen keine weiteren Zustimmungen
+ *   noetig  aus useVerschiebenNoetig() (gilt nur für „nach offiziell“)
+ *   allein  der Owner braucht keine weiteren Zustimmungen (zustimmung_allein)
+ * Nach inoffiziell reicht immer eine Stimme – es wird sofort verschoben.
  */
-export function verschiebenFrage(nach: Teil, noetig: number, admin: boolean, titel?: string): string {
+export function verschiebenFrage(nach: Teil, noetig: number, allein: boolean, titel?: string): string {
   const kopf = titel ? `„${titel}“ nach „${TEIL_NAME[nach]}“ verschieben?` : `Nach „${TEIL_NAME[nach]}“ verschieben?`;
-  if (admin) return `${kopf} Als Admin reicht deine Zustimmung – es wird sofort verschoben.`;
-  if (noetig <= 1) return `${kopf} Dafür reicht eine Zustimmung (deine). Du siehst den Antrag unter Chats → Anfragen.`;
+  if (nach === "inoffiziell") return `${kopf} Dafür reicht eine Stimme – es wird sofort verschoben.`;
+  if (allein) return `${kopf} Deine Zustimmung reicht – es wird sofort verschoben.`;
+  if (noetig <= 1) return `${kopf} Dafür reicht eine Zustimmung (deine).`;
   return `${kopf} Das braucht ${noetig} Zustimmungen aus dem Team (du zählst schon mit). Du siehst den Antrag unter Chats → Anfragen.`;
 }
 
+/** Wirkt das Verschieben sofort? (nach inoffiziell immer, sonst nur mit genug Rechten) */
+export const verschiebenSofort = (nach: Teil, noetig: number, allein: boolean) => nach === "inoffiziell" || allein || noetig <= 1;
+
 /**
- * Wie viele Zustimmungen braucht ein Verschieben? (Profil → Freigaben →
- * „Verschieben“, Standard 3). Für die Rückfrage vor dem Antrag.
+ * Wie viele Zustimmungen braucht ein Verschieben nach offiziell? (Profil →
+ * Freigaben → „Verschieben“, Standard 3). Für die Rückfrage vor dem Antrag.
  */
 export function useVerschiebenNoetig(): number {
   const [n, setN] = useState(3);
@@ -340,5 +480,13 @@ export function useAlleVerschiebungen(aktiv: boolean) {
     },
     [laden],
   );
-  return { liste, zustimmen, ablehnen, laden };
+  // Nur Bereiche, die gerade aufgeteilt sind (Ausschalten schließt die Anträge
+  // in der Datenbank; bis die Liste neu geladen ist, hier schon ausgeblendet)
+  const an: Record<TeilTabelle, boolean> = {
+    zitate: useAufgeteilt("zitate"),
+    ranking_kategorien: useAufgeteilt("rankings"),
+    motto_vorschlaege: useAufgeteilt("motto"),
+    album_kommentare: useAufgeteilt("kommentare"),
+  };
+  return { liste: liste.filter((v) => an[v.tabelle]), zustimmen, ablehnen, laden };
 }

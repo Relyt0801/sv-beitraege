@@ -16,7 +16,8 @@ import { Icon, type IconName } from "./Icon";
  *
  *  1. Wie viele Personen müssen zustimmen, bevor eine Anfrage durch ist?
  *     Termine, Kosten, Entsperren, Zitate, Steckbrief-Fotos und das
- *     Verschieben zwischen offiziell und inoffiziell – je 1 bis 10.
+ *     Verschieben nach offiziell – je 1 bis 10. Nach inoffiziell reicht
+ *     immer eine Stimme (verschieben_noetig in supabase/teile-schaltbar.sql).
  *  2. Wer bearbeitet Mithilfe-Nachträge? Niemand ausgewählt = wie bisher
  *     alle aus dem Team und alle mit „Beteiligungen eintragen“.
  *
@@ -44,7 +45,7 @@ const INHALTE: Art[] = [
   { key: "zitat", titel: "Zitate freigeben", text: "Bevor ein Zitat auf der Wand steht", icon: "zitat", farbe: "bg-[#A2845E]" },
   { key: "foto", titel: "Steckbrief-Fotos", text: "Bevor andere das Foto sehen", icon: "bild", farbe: "bg-[#FF2D55]", standard: 3 },
   // Neu in 1.4: bestaetigungen.verschieben (RPC bestaetigungen_setzen kennt den Schlüssel)
-  { key: "verschieben", titel: "Verschieben", text: "Offiziell ↔ inoffiziell", icon: "pfeile", farbe: "bg-[#5856D6]", standard: 3 },
+  { key: "verschieben", titel: "Nach offiziell verschieben", text: "Nach inoffiziell reicht eine Stimme", icon: "pfeile", farbe: "bg-[#5856D6]", standard: 3 },
 ];
 
 export function FreigabenSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -137,8 +138,8 @@ export function FreigabenSheet({ open, onClose }: { open: boolean; onClose: () =
         className="mt-6"
         fuss={
           <>
-            <b className="font-semibold">Verschieben</b> gilt für Zitate, Rankings, Mottos und Album-Kommentare: Offiziell kommt ins Abibuch, inoffiziell sieht nur
-            die Stufe. Wer den Bereich verwaltet, beantragt den Wechsel – erst mit genug Zustimmungen wandert der Eintrag. Du als Admin reichst allein.
+            <b className="font-semibold">Nach offiziell</b> (Zitate, Rankings, Mottos, Album-Kommentare) wandert ein Eintrag erst mit genug Zustimmungen. Nach
+            inoffiziell reicht eine Stimme.
           </>
         }
       >

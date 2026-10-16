@@ -173,8 +173,8 @@ export function ZeileHaken({
   return (
     <button
       type="button"
-      role="menuitemcheckbox"
-      aria-checked={gewaehlt}
+      // aria-pressed statt role=menuitemcheckbox: die Zeilen stehen in keinem Menü (axe)
+      aria-pressed={gewaehlt}
       onClick={onClick}
       disabled={disabled}
       className="flex min-h-[48px] w-full items-center gap-3 px-4 py-2 text-left transition active:bg-black/[0.04] disabled:opacity-40 dark:active:bg-white/[0.06]"

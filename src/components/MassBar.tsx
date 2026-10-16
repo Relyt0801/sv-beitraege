@@ -35,12 +35,16 @@ import { Icon } from "./Icon";
  * halb abgeschnitten und „Fertig“ stand allein in einer Zeile. Jetzt immer
  * drei feste Zeilen wie eine iOS-Werkzeugleiste:
  *   1. „8 ausgewählt“ · Halbjahr · Fertig
- *   2. Namen in EINER Zeile, waagerecht wischbar (Rand blendet aus, wenn mehr
- *      kommt); ohne Auswahl steht dort ein Hinweis – die Leiste springt nicht
+ *   2. Namen in EINER Zeile („Anna Berg, Ben Kurz +3 ›“), ein Tipp zeigt alle
+ *      im Blatt; ohne Auswahl steht dort ein Hinweis – die Leiste springt nicht
  *   3. bezahlt · erlassen · offen · Mithilfe, gleich breit
  * Ab iPad-Breite stehen die Aktionen mit in Zeile 1, die Namen darunter.
- * Die Namens-Kapseln sind 36 px hoch und über ::after 44 px antippbar
- * (vorher 22 px – man traf leicht den Nachbarn).
+ * Die Namens-Kapseln (im Blatt) sind 36 px hoch und über ::after 44 px
+ * antippbar (vorher 22 px – man traf leicht den Nachbarn).
+ *
+ * Runde 8 (Handy): Die Namen standen als seitlich wischbare Reihe aus Kapseln
+ * in der Leiste – unschön, und was rechts außerhalb stand, sah man nicht.
+ * Jetzt eine abgeschnittene Zeile mit „+3“, die ganze Liste im Blatt.
  */
 export function MassBar({
   selected,
@@ -59,6 +63,7 @@ export function MassBar({
   useEffect(() => setH(laeuft), [laeuft]);
   const [hjOffen, setHjOffen] = useState(false);
   const [punkteOffen, setPunkteOffen] = useState(false);
+  const [namenOffen, setNamenOffen] = useState(false);
   // Höhe der Leiste als --massleiste: damit die Liste darüber genau so viel
   // Luft unten bekommt, wie die Leiste braucht (App.tsx)
   const hoeheRef = useHoeheAlsVariable("--massleiste");
@@ -72,6 +77,11 @@ export function MassBar({
 
   const disabled = ausgewaehlt.length === 0;
   const n = ausgewaehlt.length;
+  // Den Letzten im Blatt abgewählt: Blatt zu (sonst ginge es beim nächsten
+  // Auswählen von selbst wieder auf)
+  useEffect(() => {
+    if (n === 0) setNamenOffen(false);
+  }, [n]);
 
   // Eintragen und kurz sagen, was passiert ist. Wer im Halbjahr nicht dabei
   // ist (noch nicht oder nicht mehr), wird übersprungen – auch das steht da.
@@ -127,9 +137,17 @@ export function MassBar({
         <button type="button" className="btn-klein order-3 shrink-0 !px-5 md:order-4" onClick={onDone}>
           Fertig
         </button>
-        <div className="order-4 w-full md:order-5">
-          <Namen ausgewaehlt={ausgewaehlt} onAbwaehlen={onAbwaehlen} />
+        <div className="order-4 w-full min-w-0 md:order-5">
+          <NamenZeile ausgewaehlt={ausgewaehlt} onOeffnen={() => setNamenOffen(true)} />
         </div>
+
+        {/* Alle Ausgewählten: hier brechen die Namen um, antippen wählt ab */}
+        <Sheet open={namenOffen} onClose={() => setNamenOffen(false)}>
+          <SheetKopf titel={`${n} ausgewählt`} onClose={() => setNamenOffen(false)} />
+          <div className="rounded-2xl zelle px-3 py-2">
+            <Namen ausgewaehlt={ausgewaehlt} onAbwaehlen={onAbwaehlen} />
+          </div>
+        </Sheet>
 
         <Sheet open={hjOffen} onClose={() => setHjOffen(false)}>
           <SheetKopf titel="Halbjahr" unter="Dafür gelten „bezahlt“, „erlassen“ und „offen“." onClose={() => setHjOffen(false)} />
@@ -160,7 +178,7 @@ export function MassBar({
             <div className="mt-4">
               <div className="mb-1.5 px-4 text-[13px] font-semibold uppercase tracking-[0.02em] text-tinte-leise">Wer war dabei?</div>
               <div className="rounded-2xl zelle px-3 py-2">
-                <Namen ausgewaehlt={ausgewaehlt} onAbwaehlen={onAbwaehlen} umbrechen />
+                <Namen ausgewaehlt={ausgewaehlt} onAbwaehlen={onAbwaehlen} />
               </div>
               <p className="mt-1.5 px-4 text-[12px] text-tinte-leise">Antippen zum Abwählen. Alle bekommen eine Mitteilung.</p>
             </div>
@@ -182,72 +200,95 @@ export function MassBar({
 }
 
 /**
- * Namen der Ausgewählten als Kapseln (antippen = abwählen).
- *
- * In der Leiste EINE Zeile, waagerecht wischbar: Wo noch mehr Namen kommen,
- * blendet der Rand aus. Im Mithilfe-Blatt (`umbrechen`) brechen sie um – dort
- * ist Platz. 36 px hoch, antippbar 44 px (::after 4 px darüber und darunter;
- * 8 px Abstand, damit sich die Flächen nicht überdecken).
+ * Die Ausgewählten in der Leiste: EINE Zeile „Anna Berg, Ben Kurz +3 ›“ – so
+ * viele Namen, wie hineinpassen, der Rest als Zahl. Gemessen wird an einer
+ * unsichtbaren Kopie (je Name ein Stück), neu bei jeder Änderung der Auswahl
+ * und der Breite (Drehen). Ein Tipp öffnet die ganze Liste im Blatt.
  */
-function Namen({
-  ausgewaehlt,
-  onAbwaehlen,
-  umbrechen,
-}: {
-  ausgewaehlt: Student[];
-  onAbwaehlen: (id: string) => void;
-  umbrechen?: boolean;
-}) {
-  const ref = useRef<HTMLDivElement>(null);
-  const [rand, setRand] = useState({ links: false, rechts: false });
+function NamenZeile({ ausgewaehlt, onOeffnen }: { ausgewaehlt: Student[]; onOeffnen: () => void }) {
+  const platzRef = useRef<HTMLSpanElement>(null);
+  const messRef = useRef<HTMLSpanElement>(null);
+  const namen = ausgewaehlt.map((s) => `${s.vorname} ${s.nachname}`.trim());
+  const [passen, setPassen] = useState(namen.length);
+  const schluessel = namen.join("\n");
   const messen = useCallback(() => {
-    const el = ref.current;
-    if (!el || umbrechen) return;
-    const links = el.scrollLeft > 2;
-    const rechts = el.scrollLeft + el.clientWidth < el.scrollWidth - 2;
-    setRand((r) => (r.links === links && r.rechts === rechts ? r : { links, rechts }));
-  }, [umbrechen]);
-  useLayoutEffect(messen, [messen, ausgewaehlt]);
-  // `leer` gehört dazu: Ohne Auswahl steht hier nur der Hinweis (ref leer) –
-  // sonst hinge der Beobachter nie an der Namenszeile, und nach dem Drehen
-  // bliebe der ausblendende Rand stehen, obwohl nichts mehr übersteht.
-  const leer = ausgewaehlt.length === 0;
+    const platz = platzRef.current?.clientWidth ?? 0;
+    const teile = Array.from(messRef.current?.children ?? []) as HTMLElement[];
+    if (!platz || !teile.length) return;
+    const ende = (i: number) => teile[i].offsetLeft + teile[i].offsetWidth;
+    let k = teile.length;
+    if (ende(k - 1) > platz) {
+      // Passen nicht alle, braucht „+12“ rechts noch Platz
+      k = 0;
+      while (k < teile.length - 1 && ende(k) + 46 <= platz) k++;
+    }
+    // Mindestens ein Name – notfalls mit „…“ gekürzt
+    setPassen(Math.max(1, k));
+  }, []);
+  useLayoutEffect(messen, [messen, schluessel]);
+  // `leer` gehört dazu: ohne Auswahl steht hier nur der Hinweis (ref leer) –
+  // sonst hinge der Beobachter nie an der Namenszeile
+  const leer = namen.length === 0;
   useEffect(() => {
-    const el = ref.current;
-    if (!el || umbrechen || typeof ResizeObserver === "undefined") return;
+    const el = platzRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
     const ro = new ResizeObserver(messen);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [messen, umbrechen, leer]);
+  }, [messen, leer]);
 
-  if (ausgewaehlt.length === 0)
-    return umbrechen ? null : (
-      <p className="flex min-h-[44px] items-center text-[13px] text-tinte-leise">Personen in der Liste antippen, um sie auszuwählen.</p>
-    );
+  if (leer)
+    return <p className="flex min-h-[44px] items-center text-[13px] text-tinte-leise">Personen in der Liste antippen, um sie auszuwählen.</p>;
 
-  const maske =
-    rand.links || rand.rechts
-      ? `linear-gradient(to right, ${rand.links ? "transparent, #000 1.5rem" : "#000"}, ${rand.rechts ? "#000 calc(100% - 1.5rem), transparent" : "#000"})`
-      : undefined;
-
+  const zeigen = Math.min(passen, namen.length);
+  const rest = namen.length - zeigen;
   return (
-    <div
-      ref={ref}
-      onScroll={messen}
-      className={umbrechen ? "flex flex-wrap gap-2 py-1" : "no-scrollbar -mx-3 flex gap-2 overflow-x-auto px-3 py-1"}
-      style={maske ? { maskImage: maske, WebkitMaskImage: maske } : undefined}
+    <button
+      type="button"
+      onClick={onOeffnen}
+      aria-haspopup="dialog"
+      aria-label={`Ausgewählt: ${namen.join(", ")} – alle anzeigen`}
+      className="flex min-h-[44px] w-full items-center gap-2 text-left transition active:opacity-60"
     >
+      <span ref={platzRef} className="relative flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden">
+        <span ref={messRef} aria-hidden className="invisible absolute left-0 top-0 whitespace-nowrap text-[14px] font-medium">
+          {namen.map((x, i) => (
+            <span key={i}>{(i ? ", " : "") + x}</span>
+          ))}
+        </span>
+        <span className="min-w-0 truncate text-[14px] font-medium text-tinte-matt dark:text-slate-300">{namen.slice(0, zeigen).join(", ")}</span>
+        {rest > 0 && (
+          <span className="zahl shrink-0 rounded-full bg-brand/10 px-2 py-0.5 text-[13px] font-semibold text-brand-dark dark:bg-brand/20 dark:text-brand">
+            +{rest}
+          </span>
+        )}
+      </span>
+      <span aria-hidden className="shrink-0 text-[17px] leading-none text-tinte-leise">
+        ›
+      </span>
+    </button>
+  );
+}
+
+/**
+ * Namen der Ausgewählten als Kapseln (antippen = abwählen), umbrechend – im
+ * Blatt „… ausgewählt“ und im Mithilfe-Blatt. 36 px hoch, antippbar 44 px
+ * (::after 4 px darüber und darunter; 8 px Abstand, damit sich die Flächen
+ * nicht überdecken).
+ */
+function Namen({ ausgewaehlt, onAbwaehlen }: { ausgewaehlt: Student[]; onAbwaehlen: (id: string) => void }) {
+  if (ausgewaehlt.length === 0) return null;
+  return (
+    <div className="flex flex-wrap gap-2 py-1">
       {ausgewaehlt.map((s) => (
         <button
           key={s.id}
           type="button"
           onClick={() => onAbwaehlen(s.id)}
           aria-label={`${s.vorname} ${s.nachname} abwählen`}
-          className={`relative flex min-h-9 items-center gap-1 rounded-full bg-brand/10 pl-3 pr-2 text-[13px] font-semibold text-tinte transition after:absolute after:inset-x-0 after:-inset-y-1 after:content-[''] active:scale-95 dark:bg-brand/20 dark:text-slate-200 ${
-            umbrechen ? "max-w-full" : "shrink-0 whitespace-nowrap"
-          }`}
+          className="relative flex min-h-9 max-w-full items-center gap-1 rounded-full bg-brand/10 pl-3 pr-2 text-[13px] font-semibold text-tinte transition after:absolute after:inset-x-0 after:-inset-y-1 after:content-[''] active:scale-95 dark:bg-brand/20 dark:text-slate-200"
         >
-          <span className={umbrechen ? "truncate" : ""}>
+          <span className="truncate">
             {s.nachname}, {s.vorname}
           </span>
           <span aria-hidden className="shrink-0 text-tinte-leise">

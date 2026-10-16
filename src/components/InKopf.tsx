@@ -4,7 +4,7 @@ import { useBreit } from "../lib/gescrollt";
 
 /**
  * Bedienelemente einer ganzen Seite (Umschalter wie „Personen | Rechte je
- * Rolle“, Knöpfe wie „Einnahme“) – am Rechner/iPad quer rechts in der
+ * Rolle“, Knöpfe wie „+ Neu“) – am Rechner/iPad quer rechts in der
  * Kopfzeile der App (Platzhalter #kopf-aktionen in App.tsx), am Handy an
  * Ort und Stelle über dem Inhalt.
  *

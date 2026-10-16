@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Sheet, SheetKopf } from "./Sheet";
-import { Gruppe, Wert, Zeile } from "./Liste";
+import { Gruppe, Wert, Zeile, ZeileHaken } from "./Liste";
 import { Icon } from "./Icon";
 import { Suchfeld } from "./KontoZeile";
 import { hasSupabase } from "../lib/supabase";
@@ -39,6 +39,8 @@ export function ProtokollSheet({
   const [mehr, setMehr] = useState(false);
   const [laedt, setLaedt] = useState(false);
   const [bereich, setBereich] = useState("");
+  // Handy: Bereich als Zeile „Bereich › Alles“, die Auswahl im Unterblatt
+  const [bereichWahl, setBereichWahl] = useState(false);
   const [suche, setSuche] = useState("");
   const [fehler, setFehler] = useState("");
 
@@ -369,17 +371,45 @@ export function ProtokollSheet({
             </button>
           </div>
 
-          {/* Filter: reine Text-Chips (keine Emojis). Am Handy waagerecht wischbar,
-              ab 640 px umbrechend (mit der Maus lässt sich nicht seitlich wischen).
-              Sichtbar 36 px hoch, Tippfläche 44 px (Design-Regeln 5). */}
-          <div className="no-scrollbar -mx-5 mb-1 flex gap-x-1.5 overflow-x-auto px-5 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0">
+          {/* Filter am Handy: EINE Zeile „Bereich › Alles“, die Auswahl als
+              Häkchen-Liste im Unterblatt (Design-Regeln 2). Vorher eine
+              seitlich wischbare Reihe aus 11 Chips – das meiste lag rechts
+              außerhalb. Ab 640 px reine Text-Chips (keine Emojis), umbrechend;
+              sichtbar 36 px hoch, Tippfläche 44 px (Design-Regeln 5). */}
+          <div className="gruppe-zellen mb-3 sm:hidden">
+            <Zeile label="Bereich" onClick={() => setBereichWahl(true)}>
+              <Wert>{BEREICHE.find((b) => b.key === bereich)?.label ?? "Alles"}</Wert>
+            </Zeile>
+          </div>
+          <Sheet open={open && bereichWahl} onClose={() => setBereichWahl(false)}>
+            <SheetKopf titel="Bereich" onClose={() => setBereichWahl(false)} />
+            <Gruppe className="mt-1">
+              {BEREICHE.map((b) => (
+                <ZeileHaken
+                  key={b.key}
+                  label={b.label}
+                  symbol={
+                    <span aria-hidden className="flex w-5 shrink-0 justify-center text-tinte-leise">
+                      <Icon name={b.icon} size={17} />
+                    </span>
+                  }
+                  gewaehlt={bereich === b.key}
+                  onClick={() => {
+                    setBereich(b.key);
+                    setBereichWahl(false);
+                  }}
+                />
+              ))}
+            </Gruppe>
+          </Sheet>
+          <div className="mb-1 hidden flex-wrap gap-x-1.5 sm:flex">
             {BEREICHE.map((b) => (
               <button
                 key={b.key}
                 type="button"
                 aria-pressed={bereich === b.key}
                 onClick={() => setBereich(b.key)}
-                className="flex min-h-[44px] shrink-0 items-center transition active:opacity-60"
+                className="flex min-h-[44px] items-center transition active:opacity-60"
               >
                 <span
                   className={`flex h-9 items-center rounded-full px-3.5 text-[13px] font-semibold ${

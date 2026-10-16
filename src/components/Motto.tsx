@@ -13,14 +13,14 @@ import { frage, melde, meldeFehler } from "../lib/melder";
 import { useRunden, type Runde, type RundenStand, type KandidatEingabe } from "../lib/runden";
 import { RundenAbschnitt, RundenEinstellungen, RundenMarke, RundeStartenSheet, SichtbarkeitWahl } from "./Runden";
 import { useErgebnisSichtbarkeit } from "../lib/ergebnisse";
-import { FarbKarte, KnopfGlas, KnopfHell, VerwaltetVon } from "./Kachel";
+import { FarbKachel, FarbKarte, KnopfGlas, KnopfHell, VerwaltetVon } from "./Kachel";
 import { AutorInfo, WortfilterSchalter } from "./AutorInfo";
 import { Gruppe, Zeile, Wert } from "./Liste";
 import { Icon } from "./Icon";
 import { KachelVerwaltung } from "./KachelVerwaltung";
 import { GewinnerBuehne, GewinnerMarke, KuerenBlatt, type Kandidat } from "./Gewinner";
-import { TeilUmschalter, TeilWischer, TEIL_FARBE, useVerschiebenRueckfrage } from "./TeilUmschalter";
-import { TEIL_NAME, useGewinner, useTeil, useVerschiebungen, type Gewinner, type GewinnerArt, type Teil, type Verschiebung } from "../lib/teile";
+import { TeileSchalterZeile, TeilUmschalter, TeilWischer, TEIL_FARBE, useVerschiebenRueckfrage } from "./TeilUmschalter";
+import { imTeil, mitTeil, TEIL_NAME, useAufgeteilt, useGewinner, useTeil, useVerschiebungen, type Gewinner, type GewinnerArt, type Teil, type Verschiebung } from "../lib/teile";
 import { useWfRecht } from "../lib/wortfilter-bereiche";
 import { hasSupabase } from "../lib/supabase";
 import { zeigeMottoEnthuellung } from "./MottoEnthuellung";
@@ -47,9 +47,13 @@ import { zeigeMottoEnthuellung } from "./MottoEnthuellung";
  * ihrer Kandidaten liegen, und werden mit derselben Gruppe fortgesetzt (so
  * sieht auch die ältere App-Version sie weiter).
  *
- * Gewinner: offizielles Motto + optional „Gewinner der Herzen“ je Teil
- * (Tabelle gewinner, gruppe = Teil). Das offizielle Motto löst bei allen –
- * auch Eltern – die Enthüllung aus (MottoEnthuellung.tsx).
+ * Gewinner: offizielles Motto (Tabelle gewinner, gruppe = Teil). Das
+ * offizielle Motto löst bei allen – auch Eltern – die Enthüllung aus
+ * (MottoEnthuellung.tsx). „Gewinner der Herzen“ nur, wenn die Aufteilung
+ * offiziell/inoffiziell aus ist – mit Aufteilung übernimmt der inoffizielle
+ * Teil diese Rolle (Einstellungen → „Offiziell & Inoffiziell trennen“).
+ * Komitee und Admin können Vorschläge löschen (motto_loeschen, ohne
+ * Benachrichtigung).
  */
 
 const MEDAILLE = ["#E9C460", "#C0C4CC", "#D4A373"];
@@ -77,10 +81,20 @@ function teilDerRunde(runde: Runde, r: RundenStand, teilVon: Map<string, Teil>):
   return ks.length > 0 && offiziell * 2 > ks.length ? "offiziell" : "inoffiziell";
 }
 
-/** Die maßgebliche Runde eines Teils: die offene, sonst die zuletzt gestartete. */
-function rundeVon(teil: Teil, r: RundenStand, teilVon: Map<string, Teil>): Runde | null {
-  const passend = r.runden.filter((x) => teilDerRunde(x, r, teilVon) === teil);
+/** Die maßgebliche Runde eines Teils: die offene, sonst die zuletzt gestartete (ohne Aufteilung: jede). */
+function rundeVon(teil: Teil, r: RundenStand, teilVon: Map<string, Teil>, aufgeteilt = true): Runde | null {
+  const passend = aufgeteilt ? r.runden.filter((x) => teilDerRunde(x, r, teilVon) === teil) : r.runden;
   return passend.find((x) => x.offen) || [...passend].sort((a, b) => b.created_at.localeCompare(a.created_at))[0] || null;
+}
+
+/**
+ * Gibt es den Vorschlag noch? Mit Datenbank erkennt kandidatenVon gelöschte
+ * schon am Label „(gelöscht)“ – m.mottos taugt dort nicht als Maßstab, weil
+ * Schüler ausgeblendete Vorschläge (RLS) gar nicht laden. In der Demo löscht
+ * loeschen() den Vorschlag nur aus der Liste, die Runde behält das Label.
+ */
+function nochDa(m: MottoWahl, id: string): boolean {
+  return hasSupabase || m.mottos.some((x) => x.id === id);
 }
 
 const teilKarte = (mottos: Motto[]) => new Map(mottos.map((x) => [x.id, x.bereich] as const));
@@ -106,11 +120,12 @@ function useMottoVerschieben(m: MottoWahl, vs: ReturnType<typeof useVerschiebung
 /* ====================================================================== */
 export function MottoKarte({ className = "" }: { className?: string }) {
   const { can, isEltern, uid, banned } = useRole();
-  const { sichtbar } = useFunktionen();
+  const { sichtbar, an } = useFunktionen();
   const darf = !isEltern && sichtbar("motto") && (can("motto.nutzen") || can("motto.verwalten"));
   const m = useMotto(darf, uid);
   const r = useRunden("motto", darf, uid, can("motto.runden"));
   const [teil, setTeil] = useTeil("motto");
+  const aufgeteilt = useAufgeteilt("motto");
   const [ansicht, setAnsicht] = useState<null | "liste" | "neu">(null);
   if (!darf) return null;
 
@@ -127,10 +142,35 @@ export function MottoKarte({ className = "" }: { className?: string }) {
     setAnsicht(a);
   };
 
+  // Handy-Kachel: eine Zeile Stand; läuft eine Runde, rot die noch offenen Stimmen
+  const kachelUnter = gewaehlt
+    ? `„${gewaehlt.text}“`
+    : runde
+      ? `Runde ${runde.nr} · ${r.meineIn(runde.id).length} von ${stimmenText(runde.stimmen)} vergeben`
+      : m.abstimmung
+        ? `Abstimmung läuft · ${vorschlaegeText(sichtbare.length)}`
+        : `${vorschlaegeText(sichtbare.length)} bisher`;
+  const offeneStimmen = runde && !gewaehlt ? Math.max(0, runde.stimmen - r.meineIn(runde.id).length) : 0;
+
   return (
-    <div className={`flex flex-col ${className}`} data-motto="karte">
-      <AusHinweis funktion="motto" className="mb-1.5 px-1" />
+    // data-regal: eine Kachel im Mitmachen-Raster der Startseite (MyKasse.tsx, index.css)
+    <div className={`flex flex-col ${className}`} data-motto="karte" data-regal="einzeln">
+      <AusHinweis funktion="motto" className="mb-1.5 px-1 max-sm:hidden" />
+      {/* Handy: kleine Kachel im Raster, ein Tipp öffnet das Blatt */}
+      <FarbKachel
+        className="flex-1 sm:hidden"
+        verlauf="from-[#FF9500] to-[#F26B00]"
+        schatten="shadow-[0_10px_24px_-14px_rgba(242,107,0,.8)]"
+        symbol={<Icon name="funke" size={19} strich={2.2} />}
+        titel="Abimotto"
+        unter={kachelUnter}
+        zahl={offeneStimmen}
+        zahlRot
+        aus={!an.motto}
+        onClick={() => oeffnen("liste")}
+      />
       <FarbKarte
+        className="max-sm:hidden"
         verlauf="from-[#FF9500] to-[#F26B00]"
         schatten="shadow-[0_12px_28px_-14px_rgba(242,107,0,.8)]"
         onClick={() => oeffnen("liste")}
@@ -139,7 +179,7 @@ export function MottoKarte({ className = "" }: { className?: string }) {
           runde && !gewaehlt ? (
             <span className="flex flex-wrap gap-1.5">
               <RundenMarke runde={runde} hell />
-              {runde.hm_aktiv && <span className="inline-flex items-center rounded-full bg-white/20 px-2.5 py-1 text-[12px] font-semibold">♥ Gewinner der Herzen</span>}
+              {!aufgeteilt && runde.hm_aktiv && <span className="inline-flex items-center rounded-full bg-white/20 px-2.5 py-1 text-[12px] font-semibold">♥ Gewinner der Herzen</span>}
             </span>
           ) : undefined
         }
@@ -180,15 +220,15 @@ export function MottoKarte({ className = "" }: { className?: string }) {
               </KnopfHell>
             ) : (
               // Kurz wie bei den Zitaten („Alle (6)“): mit „Alle ansehen“ brachen die
-              // beiden Knöpfe am Handy (Regal, 315 px) in zwei Reihen um
+              // beiden Knöpfe im früheren Handy-Regal (315 px) in zwei Reihen um
               <KnopfGlas onClick={() => oeffnen("liste")}>{sichtbare.length ? `Alle (${sichtbare.length})` : "Alle ansehen"}</KnopfGlas>
             )}
           </>
         }
       >
         {/* Ab iPad (zwei Karten nebeneinander, gleich hoch): die neuesten
-            Vorschläge statt leerer Fläche neben dem Steckbrief. Am Handy im
-            Regal nicht – die Karte soll dort nicht höher werden. */}
+            Vorschläge statt leerer Fläche neben dem Steckbrief. Am Handy steht
+            statt der Karte die Kachel oben. */}
         {!gewaehlt && sichtbare.length > 0 && (
           <div className="mt-3 flex flex-wrap gap-1.5 max-sm:hidden">
             {sichtbare.slice(0, 3).map((x) => (
@@ -236,6 +276,8 @@ function MottoSheet({
   const darfKueren = darfRunden || darfVerwalten;
   const darfEinstellungen = darfKueren || isAdmin || can("perms.manage");
   const offen = ansicht !== null;
+  // Aufteilung offiziell/inoffiziell an? Ohne: ein Bereich, teil ist dann immer „offiziell“
+  const aufgeteilt = useAufgeteilt("motto");
 
   const ergebnisse = useErgebnisSichtbarkeit(offen);
   const gw = useGewinner("motto", offen);
@@ -270,13 +312,13 @@ function MottoSheet({
 
   // ---------------------------------------------------------------- Stand des Teils
   const teilVon = teilKarte(m.mottos);
-  const imTeil = m.mottos.filter((x) => x.bereich === teil);
-  const sichtbare = imTeil.filter((x) => !x.ausgeblendet);
+  const hier = m.mottos.filter((x) => imTeil(x.bereich, teil, aufgeteilt));
+  const sichtbare = hier.filter((x) => !x.ausgeblendet);
   const zahlen: Record<Teil, number> = {
     offiziell: m.mottos.filter((x) => x.bereich === "offiziell" && !x.ausgeblendet).length,
     inoffiziell: m.mottos.filter((x) => x.bereich === "inoffiziell" && !x.ausgeblendet).length,
   };
-  const runde = rundeVon(teil, r, teilVon);
+  const runde = rundeVon(teil, r, teilVon, aufgeteilt);
   const offeneRunde = runde?.offen ? runde : null;
   // Wer leitet, sieht die Zahlen der Runde immer, alle anderen nach Freigabe
   const rundeZahlenDa = !!runde && (darfRunden || runde.ergebnis_sichtbar);
@@ -293,7 +335,8 @@ function MottoSheet({
     (gewaehlt
       ? { bereich: "motto", gruppe: "offiziell", art: "gewinner", ziel_id: gewaehlt.id, label: gewaehlt.text, unter: gewaehlt.erklaerung, stimmen: null, gekuert_at: gewaehlt.gewaehlt_at || "" }
       : null);
-  const herzen = gw.von(teil, "herzen");
+  // Gewinner der Herzen nur ohne Aufteilung (sonst ist das der inoffizielle Teil)
+  const herzen = aufgeteilt ? null : gw.von(teil, "herzen");
 
   const quellen: Quelle[] = sichtbare.map((x) => ({ id: x.id, label: x.text, unter: x.erklaerung, punkte: m.zahl(x.id, "like") }));
   const darfVorschlagen = !banned && ((!m.abstimmung && !offeneRunde) || darfVerwalten);
@@ -303,18 +346,25 @@ function MottoSheet({
     const herz = new Map<string, number>();
     let kandidaten: Kandidat[];
     if (runde) {
-      const ks = r.kandidatenVon(runde.id).map((k) => ({ ...k, n: rundeZahlenDa ? r.zahl(runde.id, k.ziel_id) ?? 0 : null }));
+      // gelöschte Vorschläge lassen sich nicht küren (siehe nochDa)
+      const ks = r
+        .kandidatenVon(runde.id)
+        .filter((k) => nochDa(m, k.ziel_id))
+        .map((k) => ({ ...k, n: rundeZahlenDa ? r.zahl(runde.id, k.ziel_id) ?? 0 : null }));
       const sortiert = (l: typeof ks) => (rundeZahlenDa ? [...l].sort((a, b) => (b.n ?? 0) - (a.n ?? 0)) : l);
       for (const k of ks) if (k.hm && k.n != null) herz.set(k.ziel_id, k.n);
       kandidaten = [
         ...sortiert(ks.filter((k) => !k.hm)).map((k) => ({ id: k.ziel_id, label: k.label, unter: k.unter || undefined, stimmen: k.n })),
-        // Herzens-Kandidaten aus dem Voting „Gewinner der Herzen“ – mit ihren Herzstimmen
-        ...sortiert(ks.filter((k) => k.hm)).map((k) => ({
-          id: k.ziel_id,
-          label: k.label,
-          unter: `Herzens-Kandidat${k.n != null ? ` · ${k.n} ♥` : ""}`,
-          stimmen: null,
-        })),
+        // Herzens-Kandidaten aus dem Voting „Gewinner der Herzen“ – mit ihren
+        // Herzstimmen; mit Aufteilung gibt es keinen Gewinner der Herzen
+        ...(aufgeteilt
+          ? []
+          : sortiert(ks.filter((k) => k.hm)).map((k) => ({
+              id: k.ziel_id,
+              label: k.label,
+              unter: `Herzens-Kandidat${k.n != null ? ` · ${k.n} ♥` : ""}`,
+              stimmen: null,
+            }))),
       ];
     } else {
       kandidaten = [...sichtbare]
@@ -385,9 +435,9 @@ function MottoSheet({
             />
             <AusHinweis funktion="motto" className="-mt-2 mb-3" />
             <GesperrtZeile className="-mt-1 mb-3" />
-            <TeilUmschalter teil={teil} setTeil={setTeil} zahlen={zahlen} className="mb-4" />
+            {aufgeteilt && <TeilUmschalter bereich="motto" teil={teil} setTeil={setTeil} zahlen={zahlen} className="mb-4" />}
 
-            <TeilWischer teil={teil} setTeil={setTeil}>
+            <TeilWischer teil={teil} setTeil={setTeil} aus={!aufgeteilt}>
               {/* ------------------------------------------ Gewinner oder aktueller Stand */}
               {(gewinner || herzen) && (
                 <div className="mb-3 scroll-mt-2" id="motto-gewinner">
@@ -399,6 +449,7 @@ function MottoSheet({
                   m={m}
                   r={r}
                   teil={teil}
+                  aufgeteilt={aufgeteilt}
                   runde={runde}
                   anzahl={sichtbare.length}
                   rundeZahlenDa={rundeZahlenDa}
@@ -433,7 +484,8 @@ function MottoSheet({
                 <VorschlagListe
                   m={m}
                   teil={teil}
-                  liste={imTeil.filter((x) => darfVerwalten || !x.ausgeblendet)}
+                  aufgeteilt={aufgeteilt}
+                  liste={hier.filter((x) => darfVerwalten || !x.ausgeblendet)}
                   offeneRunde={offeneRunde}
                   r={r}
                   gesperrt={banned}
@@ -457,6 +509,7 @@ function MottoSheet({
                   fuerAlle={ergebnisse.alle.motto}
                   darfKueren={darfKueren}
                   gekuert={!!gewinner}
+                  mitHerz={!aufgeteilt}
                   onKueren={kuerenOeffnen}
                 />
               )}
@@ -479,6 +532,7 @@ function MottoSheet({
         r={r}
         teil={teil}
         setTeil={setTeil}
+        aufgeteilt={aufgeteilt}
         runde={runde}
         rundenGruppe={rundenGruppe}
         quellen={quellen}
@@ -501,7 +555,7 @@ function MottoSheet({
         gruppe={rundenGruppe}
         gruppeTitel=""
         stand={r}
-        mitHerz
+        mitHerz={!aufgeteilt}
         wahlTitel="Abimotto-Wahl"
         onClose={() => setStarten(null)}
       />
@@ -512,6 +566,7 @@ function MottoSheet({
         kandidaten={kuer?.kandidaten ?? KEINE_KANDIDATEN}
         gewinner={gekuert}
         herzen={herzen}
+        ohneHerzen={aufgeteilt}
         onKueren={kueren}
         onZuruecknehmen={zuruecknehmen}
         hinweis={
@@ -521,7 +576,17 @@ function MottoSheet({
         }
         onFertig={nachKueren}
       />
-      <VorschlagBlatt x={offen ? bearbeiteMotto : null} onClose={() => setBearbeite(null)} m={m} verschieben={verschieben} vs={vs} />
+      <VorschlagBlatt
+        x={offen ? bearbeiteMotto : null}
+        onClose={() => setBearbeite(null)}
+        m={m}
+        verschieben={verschieben}
+        vs={vs}
+        aufgeteilt={aufgeteilt}
+        // Runden-Kandidaten neu laden: sie tragen jetzt das Label „(gelöscht)“
+        // (für runden_kandidaten gibt es kein Live-Abo)
+        onGeloescht={() => void r.laden()}
+      />
     </>
   );
 }
@@ -533,6 +598,7 @@ function StandKarte({
   m,
   r,
   teil,
+  aufgeteilt,
   runde,
   anzahl,
   rundeZahlenDa,
@@ -551,6 +617,7 @@ function StandKarte({
   m: MottoWahl;
   r: RundenStand;
   teil: Teil;
+  aufgeteilt: boolean;
   runde: Runde | null;
   anzahl: number;
   rundeZahlenDa: boolean;
@@ -610,7 +677,7 @@ function StandKarte({
     if (darfRunden && anzahl >= 2) knoepfe.push(neben("neu", `Nächste Runde (${runde.nr + 1}) starten`, onRundeStarten));
   } else if (m.abstimmung) {
     // Runde 1: alle liken
-    const meine = m.mottos.filter((x) => x.bereich === teil && !x.ausgeblendet && m.meine(x.id, "like")).length;
+    const meine = m.mottos.filter((x) => imTeil(x.bereich, teil, aufgeteilt) && !x.ausgeblendet && m.meine(x.id, "like")).length;
     symbol = { icon: "herz", farbe: "bg-[#FF375F]" };
     titel = "Abstimmung läuft";
     text = gesperrt
@@ -625,7 +692,9 @@ function StandKarte({
     titel = "Vorschläge sammeln";
     text = anzahl
       ? `${vorschlaegeText(anzahl)} bisher. Abgestimmt wird, sobald das Komitee die Abstimmung freigibt.`
-      : `Noch kein Vorschlag im Teil ${TEIL_NAME[teil]}. Mach den Anfang!`;
+      : aufgeteilt
+        ? `Noch kein Vorschlag im Teil ${TEIL_NAME[teil]}. Mach den Anfang!`
+        : "Noch kein Vorschlag. Mach den Anfang!";
     if (!gesperrt) knoepfe.push(haupt("vorschlag", "Vorschlag einreichen", onVorschlag));
     if (darfVerwalten) knoepfe.push(neben("abstimmung", "Abstimmung starten", onAbstimmung));
     else if (darfRunden && anzahl >= 2) knoepfe.push(neben("runde", "Runde 2 starten", onRundeStarten));
@@ -653,6 +722,7 @@ function StandKarte({
 function VorschlagListe({
   m,
   teil,
+  aufgeteilt,
   liste,
   offeneRunde,
   r,
@@ -668,6 +738,7 @@ function VorschlagListe({
 }: {
   m: MottoWahl;
   teil: Teil;
+  aufgeteilt: boolean;
   liste: Motto[];
   offeneRunde: Runde | null;
   r: RundenStand;
@@ -694,7 +765,7 @@ function VorschlagListe({
       {/* Läuft eine Runde, steht die Wahl ganz oben – abstimmen ohne Suchen.
           Steuerung steht im Zahnrad-Blatt (nurWahl); wer leitet, sieht die Zahlen. */}
       {offeneRunde && (
-        <RundenAbschnitt stand={r} gruppe={offeneRunde.gruppe} quellen={[]} leitet={darfRunden} nurWahl gesperrt={gesperrt} wahlTitel="Abimotto-Wahl" mitHerz />
+        <RundenAbschnitt stand={r} gruppe={offeneRunde.gruppe} quellen={[]} leitet={darfRunden} nurWahl gesperrt={gesperrt} wahlTitel="Abimotto-Wahl" mitHerz={!aufgeteilt} />
       )}
 
       <div className="mb-1.5 mt-1 flex min-h-[32px] items-center gap-2 px-1">
@@ -727,8 +798,9 @@ function VorschlagListe({
             m={m}
             gesperrt={gesperrt}
             darfVerwalten={darfVerwalten}
+            aufgeteilt={aufgeteilt}
             gewinner={x.id === gewinnerId ? "gewinner" : x.id === herzenId ? "herzen" : null}
-            antrag={darfVerwalten ? antragZu(x.id) : null}
+            antrag={darfVerwalten && aufgeteilt ? antragZu(x.id) : null}
             onBearbeiten={() => onBearbeiten(x)}
             onVerschieben={() => onVerschieben(x)}
           />
@@ -739,9 +811,11 @@ function VorschlagListe({
               <Icon name="funke" size={20} />
             </span>
             <p className="mt-2 text-[15px] font-semibold">Noch keine Vorschläge</p>
-            <p className="mt-0.5 text-[13px] leading-snug text-tinte-leise">
-              {teil === "offiziell" ? "Hier steht, was aufs Abibuch und die Pullis kommen kann." : "Hier ist Platz für alles, was nur unsere Stufe versteht."}
-            </p>
+            {aufgeteilt && (
+              <p className="mt-0.5 text-[13px] leading-snug text-tinte-leise">
+                {teil === "offiziell" ? "Hier steht, was aufs Abibuch und die Pullis kommen kann." : "Hier ist Platz für alles, was nur unsere Stufe versteht."}
+              </p>
+            )}
             {onVorschlag && (
               <button type="button" className="btn-klein mt-3" onClick={onVorschlag}>
                 Ersten Vorschlag einreichen
@@ -759,6 +833,7 @@ function MottoZeile({
   m,
   gesperrt,
   darfVerwalten,
+  aufgeteilt,
   gewinner,
   antrag,
   onBearbeiten,
@@ -768,6 +843,7 @@ function MottoZeile({
   m: MottoWahl;
   gesperrt: boolean;
   darfVerwalten: boolean;
+  aufgeteilt: boolean;
   gewinner: GewinnerArt | null;
   antrag: Verschiebung | null;
   onBearbeiten: () => void;
@@ -813,7 +889,7 @@ function MottoZeile({
               <MeldenKnopf onClick={() => melden("motto", x.id)} className="-my-2.5 min-h-[44px] -mx-1 px-1" />
             )}
             {/* Verschieben sichtbar an der Zeile (nicht nur hinter „···“) – wie bei den Zitaten */}
-            {darfVerwalten && !antrag && (
+            {darfVerwalten && aufgeteilt && !antrag && (
               <button type="button" onClick={onVerschieben} className={`-my-2.5 inline-flex min-h-[44px] items-center gap-1 text-[12.5px] font-semibold ${TEIL_FARBE[nach].text}`}>
                 Nach {TEIL_NAME[nach]}
               </button>
@@ -883,6 +959,7 @@ function ErgebnisAnsicht({
   fuerAlle,
   darfKueren,
   gekuert,
+  mitHerz,
   onKueren,
 }: {
   m: MottoWahl;
@@ -894,14 +971,22 @@ function ErgebnisAnsicht({
   fuerAlle: boolean;
   darfKueren: boolean;
   gekuert: boolean;
+  /** Gewinner der Herzen nur ohne Aufteilung */
+  mitHerz: boolean;
   onKueren: () => void;
 }) {
   const [alleLikes, setAlleLikes] = useState(false);
   const likes = sichtbare.map((x) => ({ id: x.id, label: x.text, unter: x.erklaerung, n: m.zahl(x.id, "like") })).sort((a, b) => b.n - a.n);
   const zeigeLikes = alleLikes ? likes : likes.slice(0, 10);
-  const ks = runde ? r.kandidatenVon(runde.id).map((k) => ({ id: k.ziel_id, label: k.label, unter: k.unter, hm: !!k.hm, n: r.zahl(runde.id, k.ziel_id) ?? 0 })) : [];
+  // gelöschte Vorschläge fallen aus der Rangliste (siehe nochDa)
+  const ks = runde
+    ? r
+        .kandidatenVon(runde.id)
+        .filter((k) => nochDa(m, k.ziel_id))
+        .map((k) => ({ id: k.ziel_id, label: k.label, unter: k.unter, hm: !!k.hm, n: r.zahl(runde.id, k.ziel_id) ?? 0 }))
+    : [];
   const wahl = ks.filter((k) => !k.hm).sort((a, b) => b.n - a.n);
-  const herz = ks.filter((k) => k.hm).sort((a, b) => b.n - a.n);
+  const herz = mitHerz ? ks.filter((k) => k.hm).sort((a, b) => b.n - a.n) : [];
   const nichts = !runde && (!likesSichtbar || likes.length === 0);
 
   return (
@@ -1018,6 +1103,7 @@ function EinstellungenBlatt({
   r,
   teil,
   setTeil,
+  aufgeteilt,
   runde,
   rundenGruppe,
   quellen,
@@ -1036,6 +1122,7 @@ function EinstellungenBlatt({
   r: RundenStand;
   teil: Teil;
   setTeil: (t: Teil) => void;
+  aufgeteilt: boolean;
   runde: Runde | null;
   rundenGruppe: string;
   quellen: Quelle[];
@@ -1062,16 +1149,51 @@ function EinstellungenBlatt({
 
   return (
     <Sheet open={offen} onClose={onClose}>
-      <SheetKopf
-        titel={fokusRunde ? "Runde steuern" : "Einstellungen"}
-        unter={fokusRunde ? "Abimotto · weitere Einstellungen findest du weiter unten" : "Abimotto · Runden, Ergebnis und Gewinner gelten je Teil"}
-        onClose={onClose}
-      />
-      <TeilUmschalter teil={teil} setTeil={setTeil} ohneErklaerung />
+      <SheetKopf titel={fokusRunde ? "Runde steuern" : "Einstellungen"} unter="Abimotto" onClose={onClose} />
+
+      {/* 0) Offiziell & Inoffiziell – ganz oben, an fester Stelle: trennen
+          an/aus, Wortfilter je Teil, offene Verschiebungen */}
+      <Gruppe titel="Offiziell & Inoffiziell" className="">
+        <TeileSchalterZeile bereich="motto" an={aufgeteilt} />
+        {darfWortfilter &&
+          (aufgeteilt ? (
+            <>
+              <WortfilterSchalter zeile bereich="motto" titel="Wortfilter · Offiziell" />
+              <WortfilterSchalter zeile bereich="motto_inoffiziell" titel="Wortfilter · Inoffiziell" />
+            </>
+          ) : (
+            <WortfilterSchalter zeile bereich="motto" titel="Wortfilter" />
+          ))}
+        {darfVerwalten && aufgeteilt && vs.liste.length === 0 && (
+          <Zeile label="Offene Verschiebungen">
+            <Wert>keine</Wert>
+          </Zeile>
+        )}
+        {darfVerwalten &&
+          aufgeteilt &&
+          vs.liste.map((v) => (
+            <div key={v.id} className="px-4 py-2.5">
+              <span className="block text-[15px] font-semibold leading-snug [overflow-wrap:anywhere]">{v.titel}</span>
+              <span className="block text-[12.5px] text-tinte-leise">
+                nach <span className={`font-semibold ${TEIL_FARBE[v.nach].text}`}>{TEIL_NAME[v.nach]}</span> · {v.stimmen} von {v.noetig} Zustimmungen
+              </span>
+              <div className="mt-2 flex gap-2">
+                <button type="button" className="btn-klein" disabled={v.ich} onClick={() => void vs.zustimmen(v.id)}>
+                  {v.ich ? "Zugestimmt" : "Zustimmen"}
+                </button>
+                <button type="button" className="btn-klein-grau !text-red-600 dark:!text-red-400" onClick={() => void vs.ablehnen(v.id)}>
+                  Verwerfen
+                </button>
+              </div>
+            </div>
+          ))}
+      </Gruppe>
+      {/* Runden, Ergebnis und Gewinner gelten je Teil – hier wählen, für welchen */}
+      {aufgeteilt && <TeilUmschalter bereich="motto" teil={teil} setTeil={setTeil} className="mt-4" />}
 
       {/* 1) Abstimmung – Likes für beide Teile, Runden je Teil */}
       {darfVerwalten && (
-        <Gruppe titel="Abstimmung" fuss="Gilt für beide Teile. Danach geht es mit Runde 2 weiter – einer engeren Auswahl.">
+        <Gruppe titel="Abstimmung">
           <label className="flex min-h-[52px] items-center gap-3 px-4 py-2">
             <span className="symbol bg-[#FF375F]">
               <Icon name="herz" size={16} strich={2.2} />
@@ -1100,17 +1222,18 @@ function EinstellungenBlatt({
           gruppe={rundenGruppe}
           quellen={quellen}
           leitet={darfRunden}
-          titel={darfVerwalten ? `Runden · ${TEIL_NAME[teil]}` : `Abstimmung · ${TEIL_NAME[teil]}`}
+          titel={mitTeil(darfVerwalten ? "Runden" : "Abstimmung", teil, aufgeteilt)}
           startText="Runde starten"
           wahlTitel="Abimotto-Wahl"
-          mitHerz
+          mitHerz={!aufgeteilt}
+          weitere={aufgeteilt ? [] : r.offene.filter((x) => x.id !== runde?.id)}
           className={darfVerwalten ? "mt-5" : "mt-4"}
         />
       </div>
 
       {/* 2) Ergebnisse */}
       {darfKueren && (
-        <Gruppe titel="Ergebnisse" fuss="Das Komitee sieht die Zahlen immer. Wer was gewählt hat, sieht niemand. Das Ergebnis steht für alle im Segment „Ergebnis“.">
+        <Gruppe titel="Ergebnisse" fuss="Wer was gewählt hat, sieht niemand.">
           <div className="px-4 py-1">
             <SichtbarkeitWahl titel="Likes sehen" alle={fuerAlle} onChange={(v) => void setFuerAlle(v)} />
           </div>
@@ -1133,12 +1256,8 @@ function EinstellungenBlatt({
       {/* 3) Gewinner */}
       {darfKueren && (
         <Gruppe
-          titel={`Gewinner · ${TEIL_NAME[teil]}`}
-          fuss={
-            teil === "offiziell"
-              ? "Das offizielle Motto sehen danach alle – auch Eltern – als Enthüllung beim nächsten Öffnen der App."
-              : "Der inoffizielle Gewinner bleibt in der Stufe – ohne Enthüllung."
-          }
+          titel={mitTeil("Gewinner", teil, aufgeteilt)}
+          fuss={teil === "offiziell" ? "Das gekürte Motto sehen alle – auch Eltern – als Enthüllung." : "Bleibt in der Stufe – ohne Enthüllung."}
         >
           <Zeile
             label="Gewinner küren …"
@@ -1177,38 +1296,7 @@ function EinstellungenBlatt({
         </Gruppe>
       )}
 
-      {/* 4) Offiziell & Inoffiziell */}
-      {(darfWortfilter || darfVerwalten) && (
-        <Gruppe titel="Offiziell & Inoffiziell" fuss="Verschieben beantragt man am Vorschlag („Nach Offiziell“). Es braucht Zustimmungen aus dem Team; Admins allein reichen. Offene Anträge stehen auch unter Chats → Anfragen.">
-          <WortfilterSchalter zeile bereich="motto" titel="Wortfilter · Offiziell" />
-          <WortfilterSchalter zeile bereich="motto_inoffiziell" titel="Wortfilter · Inoffiziell" />
-          {darfVerwalten &&
-            (vs.liste.length === 0 ? (
-              <Zeile label="Offene Verschiebungen">
-                <Wert>keine</Wert>
-              </Zeile>
-            ) : (
-              vs.liste.map((v) => (
-                <div key={v.id} className="px-4 py-2.5">
-                  <span className="block text-[15px] font-semibold leading-snug [overflow-wrap:anywhere]">{v.titel}</span>
-                  <span className="block text-[12.5px] text-tinte-leise">
-                    nach <span className={`font-semibold ${TEIL_FARBE[v.nach].text}`}>{TEIL_NAME[v.nach]}</span> · {v.stimmen} von {v.noetig} Zustimmungen
-                  </span>
-                  <div className="mt-2 flex gap-2">
-                    <button type="button" className="btn-klein" disabled={v.ich} onClick={() => void vs.zustimmen(v.id)}>
-                      {v.ich ? "Zugestimmt" : "Zustimmen"}
-                    </button>
-                    <button type="button" className="btn-klein-grau !text-red-600 dark:!text-red-400" onClick={() => void vs.ablehnen(v.id)}>
-                      Verwerfen
-                    </button>
-                  </div>
-                </div>
-              ))
-            ))}
-        </Gruppe>
-      )}
-
-      {/* 5) Wer darf was? */}
+      {/* 4) Wer darf was? */}
       <KachelVerwaltung kachel="motto" />
     </Sheet>
   );
@@ -1223,6 +1311,8 @@ function VorschlagBlatt({
   m,
   vs,
   verschieben,
+  aufgeteilt,
+  onGeloescht,
 }: {
   x: Motto | null;
   onClose: () => void;
@@ -1230,6 +1320,8 @@ function VorschlagBlatt({
   vs: ReturnType<typeof useVerschiebungen>;
   /** gemeinsame Rückfrage + Antrag (useMottoVerschieben) */
   verschieben: (x: Motto) => Promise<boolean>;
+  aufgeteilt: boolean;
+  onGeloescht: () => void;
 }) {
   const [text, setText] = useState("");
   const [erkl, setErkl] = useState("");
@@ -1256,7 +1348,7 @@ function VorschlagBlatt({
     <Sheet open={!!x} onClose={onClose}>
       {x && (
         <>
-          <SheetKopf titel="Vorschlag verwalten" unter={`Liegt im Teil ${TEIL_NAME[x.bereich]}`} onClose={onClose} />
+          <SheetKopf titel="Vorschlag verwalten" unter={aufgeteilt ? `Liegt im Teil ${TEIL_NAME[x.bereich]}` : undefined} onClose={onClose} />
           <Gruppe className="" titel="Text">
             <input className="w-full bg-transparent px-4 py-3 text-[16px] font-semibold outline-none" maxLength={80} value={text} onChange={(e) => setText(e.target.value)} aria-label="Motto" />
             <input
@@ -1281,7 +1373,7 @@ function VorschlagBlatt({
             </button>
           )}
 
-          <Gruppe titel="Sichtbarkeit" fuss="Ausgeblendete Vorschläge sieht nur, wer das Motto verwaltet.">
+          <Gruppe titel="Sichtbarkeit">
             <label className="flex min-h-[48px] items-center gap-3 px-4 py-2">
               <span className="min-w-0 flex-1 text-[15px]">Für alle sichtbar</span>
               <Schalter an={!x.ausgeblendet} label={`${x.text} sichtbar`} onChange={(v) => void speichern({ ausgeblendet: !v })} />
@@ -1291,14 +1383,8 @@ function VorschlagBlatt({
             </Zeile>
           </Gruppe>
 
-          <Gruppe
-            titel="Teil"
-            fuss={
-              nach === "offiziell"
-                ? "Offiziell kommt ins Abibuch und wird später auch Eltern gezeigt. Der Wortfilter prüft den Text dabei."
-                : "Inoffiziell sieht nur die Stufe – es wird nicht gedruckt."
-            }
-          >
+          {aufgeteilt && (
+          <Gruppe titel="Teil">
             {antrag ? (
               <Zeile label={`Nach ${TEIL_NAME[antrag.nach]} beantragt`}>
                 <Wert>
@@ -1317,6 +1403,25 @@ function VorschlagBlatt({
               />
             )}
           </Gruppe>
+          )}
+
+          {/* Löschen unten im Blatt, mit Rückfrage (Design-Regel 3) – ohne Benachrichtigung */}
+          <Gruppe>
+            <Zeile
+              label="Vorschlag löschen"
+              rot
+              onClick={() =>
+                void frage(`„${x.text}“ löschen? Der Vorschlag verschwindet für alle, Likes inklusive. Es geht keine Benachrichtigung raus.`, "Löschen", true).then(async (ok) => {
+                  if (!ok) return;
+                  const f = await m.loeschen(x.id);
+                  if (f) return meldeFehler("Ging nicht: " + f);
+                  melde("Gelöscht", "erfolg");
+                  onGeloescht();
+                  onClose();
+                })
+              }
+            />
+          </Gruppe>
         </>
       )}
     </Sheet>
@@ -1327,6 +1432,7 @@ function VorschlagBlatt({
 /* Vorschlagen                                                            */
 /* ====================================================================== */
 function Vorschlagen({ m, startTeil, fertig, schliessen }: { m: MottoWahl; startTeil: Teil; fertig: (t: Teil) => void; schliessen: () => void }) {
+  const aufgeteilt = useAufgeteilt("motto");
   const [text, setText] = useState("");
   const [erkl, setErkl] = useState("");
   // Standard ist der Teil, der gerade offen war
@@ -1335,9 +1441,9 @@ function Vorschlagen({ m, startTeil, fertig, schliessen }: { m: MottoWahl; start
   return (
     <div className="animate-vonRechts">
       <SheetKopf titel="Motto vorschlagen" unter="Alle aus der Stufe sehen den Vorschlag sofort." onClose={schliessen} zurueck={{ text: "Abimotto", onClick: () => fertig(startTeil) }} />
-      <TeilUmschalter teil={teil} setTeil={setTeil} />
-      <div className="mt-4 rounded-[1.25rem] zelle p-4">
-        <div className={`text-[12px] font-semibold uppercase tracking-[0.08em] ${TEIL_FARBE[teil].text}`}>Vorschau · {TEIL_NAME[teil]}</div>
+      {aufgeteilt && <TeilUmschalter bereich="motto" teil={teil} setTeil={setTeil} className="mb-4" />}
+      <div className="rounded-[1.25rem] zelle p-4">
+        <div className={`text-[12px] font-semibold uppercase tracking-[0.08em] ${aufgeteilt ? TEIL_FARBE[teil].text : "text-tinte-leise"}`}>{mitTeil("Vorschau", teil, aufgeteilt)}</div>
         <div className="mt-1 min-h-[1.8rem] text-[1.3rem] font-extrabold leading-tight [overflow-wrap:anywhere]">{text.trim() || "Dein Motto"}</div>
         {erkl.trim() && <div className="mt-0.5 text-[13px] text-tinte-matt dark:text-slate-300">{erkl.trim()}</div>}
       </div>
@@ -1352,13 +1458,13 @@ function Vorschlagen({ m, startTeil, fertig, schliessen }: { m: MottoWahl; start
           const f = await m.vorschlagen(text, erkl, teil);
           setSendet(false);
           if (f) return meldeFehler(f);
-          melde(`Vorschlag ist drin (${TEIL_NAME[teil]})`, "erfolg");
+          melde(aufgeteilt ? `Vorschlag ist drin (${TEIL_NAME[teil]})` : "Vorschlag ist drin", "erfolg");
           setText("");
           setErkl("");
           fertig(teil);
         }}
       >
-        {sendet ? "Wird gesendet …" : `Vorschlagen · ${TEIL_NAME[teil]}`}
+        {sendet ? "Wird gesendet …" : mitTeil("Vorschlagen", teil, aufgeteilt)}
       </button>
     </div>
   );
