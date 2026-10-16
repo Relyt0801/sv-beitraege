@@ -69,11 +69,19 @@ wieder passieren.**
     im Eingabefeld steht). Auch der Kalender ist so eine Ebene.
   - Umschalter und Knöpfe für eine ganze Seite (Kasse „Personen | Beiträge &
     Abiball“, Rollen „Personen | Rechte je Rolle“, Finanzen „Für alle
-    sichtbar | Alle Buchungen“ + Einnahme/Ausgabe) in `<InKopf>` packen: am
+    sichtbar | Alle Buchungen“) in `<InKopf>` packen: am
     Handy stehen sie über dem Inhalt, am Laptop rechts in der Kopfzeile
     (`#kopf-aktionen`) – wie „Chat | Pinnwand“ im Chat. Jeder Umschalter
     dort ist 19 rem breit; „+ Person/Neu“ steht links davon, damit alle
     Umschalter auf jeder Seite an derselben Stelle enden.
+  - Knöpfe, die zu **einer** Karte gehören, stehen in dieser Karte – nicht
+    im Kopf und nicht als eigene Zeile darüber: Finanzen „+ Einnahme |
+    − Ausgabe“ direkt unter dem Kontostand, nur wer buchen darf (wer nur
+    liest, sieht dort „Nur lesen …“). Finanzen am Laptop/iPad quer: links
+    Kontostand, Aktionen, Geplantes; rechts oben die Karte „Buchungen“
+    (Monate zugeklappt, mindestens die obere Hälfte), darunter die
+    Kostenanfragen (höchstens die Hälfte, scrollen in sich). Am Handy
+    bleibt die Reihenfolge Kontostand → Buchungen → Rest.
   - Zahlen an Reitern stehen nie im Textfluss (`GlasLeiste`: absolut an der
     Ecke) – sonst rutscht die mittig gesetzte Leiste, sobald eine Zahl kommt
     oder geht. In einem `ChatKopf` stehen Seiten-Knöpfe („+ Neu“) VOR dem

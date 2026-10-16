@@ -141,7 +141,7 @@ export function FinanzenTab({ kosten }: { kosten: KostenValue }) {
   // am Ende der Buchungen lief das Scrollen an die Seite weiter, und beim
   // Scrollen links rutschte die rechte Spalte mit, bis sie klebte.
   // Gemessen wird der Abstand vom Seitenanfang bis zu den Spalten (Kopfzeile,
-  // Reiter und die Zeile mit Einnahme/Ausgabe sind unterschiedlich hoch).
+  // Reiter und die Zeile mit dem Ansichtstext sind unterschiedlich hoch).
   // Handy/iPad hoch (unter 1024 px): Geplantes und Kostenanfragen als Zeilen
   const breit = useBreit();
   const spalten = useRef<HTMLDivElement>(null);
@@ -208,14 +208,12 @@ export function FinanzenTab({ kosten }: { kosten: KostenValue }) {
     );
 
   const zeigeAnfragen = darfSehen || meineVorsitze.length > 0;
-  // Gibt es etwas zu entscheiden (oder darf man selbst anfragen), stehen die
-  // Kostenanfragen gleich unter dem Kontostand – vorher erst nach anderthalb
-  // Bildschirmen. Ohne offene Anfragen bleibt die Karte weiter unten.
+  // Am Handy: Gibt es etwas zu entscheiden (oder darf man selbst anfragen),
+  // stehen die Kostenanfragen gleich unter dem Kontostand – vorher erst nach
+  // anderthalb Bildschirmen. Ohne offene Anfragen bleibt die Karte weiter
+  // unten. Am Laptop stehen sie immer rechts unter den Buchungen.
   const offeneAnfragen = kosten.anfragen.filter((a) => a.status === "offen").length;
   const kostenOben = zeigeAnfragen && (offeneAnfragen > 0 || meineVorsitze.length > 0);
-  const kostenKarte = (
-    <KostenKarte kosten={kosten} darfEntscheiden={darfBuchen} vorsitze={meineVorsitze} onEntschieden={fin.neuLaden} />
-  );
 
   return (
     // lg:pb-0/-mb-20: am Laptop hebt das die Seitenränder darunter auf (pb-4
@@ -225,52 +223,23 @@ export function FinanzenTab({ kosten }: { kosten: KostenValue }) {
       style={spaltenOben ? ({ "--finanz-oben": `${spaltenOben}px` } as CSSProperties) : undefined}
       className="grid grid-cols-[minmax(0,1fr)] gap-3 pb-6 lg:-mb-20 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-start lg:pb-0"
     >
-      {/* Oben, was der Kassenwart am häufigsten tut: Einnahme / Ausgabe buchen.
-          Vorher standen die Knöpfe unter Kontostand und Kreis – am Handy erst
-          nach gut einer Bildschirmhöhe. Die Ansicht-Wahl steht am Rechner in
-          der Kopfzeile (InKopf), die Knöpfe am Anfang der Seite. */}
+      {/* Die Ansicht-Wahl steht am Rechner in der Kopfzeile (InKopf), am
+          Handy über dem Inhalt. Einnahme/Ausgabe stehen in der Kontostand-
+          Karte (Rückmeldung 16.10.: „beim Kontostand“) – vorher eine eigene
+          Zeile darüber, ohne Buchen-Recht blieb davon ein leeres Rasterfeld. */}
       <InKopf className="lg:col-span-2">
         <AnsichtWahl ansicht={ansicht} setAnsicht={setAnsicht} />
       </InKopf>
-      {/* Am Rechner: links in einem Satz, was man gerade sieht, rechts Einnahme/
-          Ausgabe – nicht mehr oben neben „Nachtragen“ (zwei grüne Knöpfe
-          nebeneinander, Rückmeldung 15.10.). Am Handy direkt unter der Wahl. */}
-      <div className="flex flex-col gap-3 empty:hidden lg:col-span-2 lg:flex-row lg:items-center">
-        <p className="auf-bild hidden min-w-0 flex-1 px-1 text-[13px] leading-snug text-tinte-leise lg:block">{ANSICHT_TEXT[ansicht]}</p>
-        {darfBuchen && (
-          // Echte, volle Knöpfe (vorher blasse Pastell-Flächen, die wie
-          // abgeschaltet wirkten): grün = Einnahme, rot = Ausgabe, weiße Schrift.
-          <div className="grid grid-cols-2 gap-2 lg:flex">
-            <button
-              onClick={() => setBuchen({ typ: "ein" })}
-              className="flex min-h-[2.75rem] items-center justify-center gap-1.5 rounded-full bg-[#1E7B34] text-[16px] font-semibold text-white transition duration-200 ease-ios active:scale-[.97] lg:min-h-[2.5rem] lg:px-4 lg:text-[15px]"
-            >
-              <Icon name="plus" size={17} strich={2.4} />
-              Einnahme
-            </button>
-            <button
-              onClick={() => setBuchen({ typ: "aus" })}
-              className="flex min-h-[2.75rem] items-center justify-center gap-1.5 rounded-full bg-red-600 text-[16px] font-semibold text-white transition duration-200 ease-ios active:scale-[.97] lg:min-h-[2.5rem] lg:px-4 lg:text-[15px]"
-            >
-              <span className="text-[20px] leading-none">−</span>
-              Ausgabe
-            </button>
-          </div>
-        )}
-      </div>
-      {nurLesen && (
-        <div className="flex items-center gap-2 rounded-2xl zelle px-4 py-2.5 text-[14px] text-tinte-matt dark:text-slate-300 lg:col-span-2">
-          <Icon name="info" size={17} />
-          Nur lesen{kosten.aufsichtsrat ? " – du siehst die Finanzen als Aufsichtsrat" : ""}. Buchen kann nur der Kassenwart.
-        </div>
-      )}
+      {/* Am Rechner in einem Satz, was man gerade sieht (am Handy steht er
+          unter der Wahl). hidden: am Handy kein leeres Rasterfeld */}
+      <p className="auf-bild hidden px-1 text-[13px] leading-snug text-tinte-leise lg:col-span-2 lg:block">{ANSICHT_TEXT[ansicht]}</p>
 
-      {/* Aufteilung: Am Laptop links Kontostand, Aktionen, Geplantes und
-          Kostenanfragen untereinander, rechts von Anfang an die Buchungen –
-          sie bleiben beim Scrollen stehen und scrollen in sich (wie die
-          Liste in Mail). Vorher standen sie über die volle Breite erst unter
-          dem Falz. Am Handy (die linke Spalte ist dann „contents“) folgen
-          auf den Kontostand direkt die Buchungen, danach der Rest. */}
+      {/* Aufteilung am Laptop (Rückmeldung 16.10.): links Kontostand mit den
+          Buchen-Knöpfen, Aktionen und Geplantes untereinander; rechts oben die
+          Buchungen als eigene Karte, darunter die Kostenanfragen. Beide
+          Spalten bleiben stehen und scrollen in sich (wie Mail). Am Handy
+          (beide Spalten sind dann „contents“) folgen auf den Kontostand
+          direkt die Buchungen, danach der Rest. */}
       <div
         ref={spalten}
         className="contents lg:-mx-2 lg:flex lg:h-[calc(100dvh-var(--finanz-oben,14rem)-1rem)] lg:min-w-0 lg:flex-col lg:gap-3 lg:overflow-y-auto lg:overscroll-contain lg:px-2 lg:pb-3"
@@ -284,11 +253,21 @@ export function FinanzenTab({ kosten }: { kosten: KostenValue }) {
             ziel={fin.ziel}
             darf={darfBuchen}
             onEinstellungen={() => setEinstellungen(true)}
+            onBuchen={darfBuchen ? (typ) => setBuchen({ typ }) : undefined}
+            hinweis={
+              nurLesen
+                ? `Nur lesen${kosten.aufsichtsrat ? " – du siehst die Finanzen als Aufsichtsrat" : ""}. Buchen kann nur der Kassenwart.`
+                : null
+            }
           />
         </div>
 
-        {/* ================================================ Kostenanfragen (oben, wenn etwas ansteht) */}
-        {kostenOben && <div className="min-w-0 max-lg:order-1">{kostenKarte}</div>}
+        {/* ================================================ Kostenanfragen (Handy: oben, wenn etwas ansteht) */}
+        {!breit && kostenOben && (
+          <div className="min-w-0 max-lg:order-1">
+            <KostenKarte kosten={kosten} darfEntscheiden={darfBuchen} vorsitze={meineVorsitze} onEntschieden={fin.neuLaden} />
+          </div>
+        )}
 
         {/* ================================================ Aktionen, Beiträge, Ausgaben */}
         <PostenBereiche
@@ -303,28 +282,41 @@ export function FinanzenTab({ kosten }: { kosten: KostenValue }) {
         {/* ================================================ Geplantes + Kostenanfragen */}
         {/* Am Handy/iPad hoch: EINE Gruppe mit zwei Zeilen (wie die iOS-
             Einstellungen), die Listen im Blatt – vorher zwei Karten, ~300 px.
-            Am Laptop (linke Spalte) bleiben es Karten. */}
-        {!breit ? (
+            Am Laptop steht „Geplante Aktionen“ als Karte in PostenBereiche,
+            die Kostenanfragen stehen rechts. */}
+        {!breit && (
           <div className="gruppe-zellen min-w-0 max-lg:order-3">
             <GeplantKarte alsZeile darf={darfBuchen} fin={darfBuchen ? fin : null} />
             {zeigeAnfragen && !kostenOben && (
               <KostenKarte alsZeile kosten={kosten} darfEntscheiden={darfBuchen} vorsitze={meineVorsitze} onEntschieden={fin.neuLaden} />
             )}
           </div>
-        ) : (
-          zeigeAnfragen && !kostenOben && <div className="min-w-0">{kostenKarte}</div>
         )}
       </div>
 
-      {/* ================================================ Verlauf */}
-      <VerlaufKarte
-        buchungen={fin.buchungen}
-        kategorien={fin.kategorien}
-        darf={darfBuchen}
-        onLoeschen={fin.loeschen}
-        onKategorie={fin.buchungKategorie}
-        aktionName={aktionName}
-      />
+      {/* ================================================ Verlauf + Kostenanfragen (rechte Spalte) */}
+      {/* Gleiche Höhe wie die linke Spalte: oben die Buchungen (mindestens die
+          obere Hälfte, mindestens 16 rem für iPad quer), darunter die
+          Kostenanfragen – so viel, wie sie brauchen, höchstens die Hälfte;
+          dann scrollen sie in sich. Ohne Kostenanfragen nehmen die Buchungen
+          die ganze Höhe. Am Handy „contents“: sonst griffe max-lg:order-2
+          der Buchungen im äußeren Raster nicht mehr. Reicht die Höhe nicht
+          einmal dafür (sehr kleines Fenster), scrollt die Spalte als Ganzes;
+          px-2/-mx-2 wie links, damit der Schatten der Karte bleibt. */}
+      <div className="contents lg:-mx-2 lg:flex lg:h-[calc(100dvh-var(--finanz-oben,14rem)-1rem)] lg:min-w-0 lg:flex-col lg:gap-3 lg:overflow-y-auto lg:overscroll-contain lg:px-2 lg:pb-3">
+        <VerlaufKarte
+          buchungen={fin.buchungen}
+          kategorien={fin.kategorien}
+          darf={darfBuchen}
+          onLoeschen={fin.loeschen}
+          onKategorie={fin.buchungKategorie}
+          aktionName={aktionName}
+          allein={!zeigeAnfragen}
+        />
+        {breit && zeigeAnfragen && (
+          <KostenKarte spalte kosten={kosten} darfEntscheiden={darfBuchen} vorsitze={meineVorsitze} onEntschieden={fin.neuLaden} />
+        )}
+      </div>
 
       {darfBuchen && (
         <>
@@ -392,7 +384,7 @@ function AnsichtWahl({ ansicht, setAnsicht }: { ansicht: "standard" | "erweitert
 // ==================================================================== Übersicht
 
 function UebersichtKarte({
-  zahlen, offen, halbjahr, ziel, darf, onEinstellungen,
+  zahlen, offen, halbjahr, ziel, darf, onEinstellungen, onBuchen, hinweis,
 }: {
   zahlen: {
     stand: number; ein: number; aus: number; jeQuelle: Record<string, number>; letzterAbgleich: string | null; abgleich: number;
@@ -404,6 +396,10 @@ function UebersichtKarte({
   ziel: { ziel_cent: number; ziel_titel: string };
   darf: boolean;
   onEinstellungen: () => void;
+  /** Nur wer buchen darf: die Knöpfe „+ Einnahme“ / „− Ausgabe“ unter dem Kontostand */
+  onBuchen?: (typ: "ein" | "aus") => void;
+  /** Wer nur liest: an der Stelle der Knöpfe ein Hinweis */
+  hinweis?: string | null;
 }) {
   const dunkel = useDunkel();
   // Jede Kategorie bzw. Herkunft ein Bogen – in ihrer Farbe
@@ -485,6 +481,39 @@ function UebersichtKarte({
           </button>
         )}
       </div>
+
+      {/* Buchen direkt unter dem Kontostand (wie „Senden | Anfordern“ in
+          Apple Cash) – vorher eine eigene Zeile über der Seite. Volle Farbe
+          (grün/rot, weiße Schrift), damit sie sich klar von den Kacheln
+          „Einnahmen“/„Ausgaben“ darunter abheben; 44 px auch am iPad quer. */}
+      {onBuchen && (
+        <div className="mt-4 grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={() => onBuchen("ein")}
+            className="flex min-h-[2.75rem] min-w-0 items-center justify-center gap-1.5 rounded-full bg-[#1E7B34] px-3 text-[16px] font-semibold text-white transition duration-200 ease-ios hover:brightness-110 active:scale-[.97] lg:text-[15px]"
+          >
+            <Icon name="plus" size={17} strich={2.4} />
+            Einnahme
+          </button>
+          <button
+            type="button"
+            onClick={() => onBuchen("aus")}
+            className="flex min-h-[2.75rem] min-w-0 items-center justify-center gap-1.5 rounded-full bg-red-600 px-3 text-[16px] font-semibold text-white transition duration-200 ease-ios hover:brightness-110 active:scale-[.97] lg:text-[15px]"
+          >
+            <span aria-hidden className="text-[20px] leading-none">−</span>
+            Ausgabe
+          </button>
+        </div>
+      )}
+      {hinweis && (
+        <div className="mt-4 flex items-center gap-2.5 rounded-xl zelle px-3 py-2.5 text-[13px] leading-snug text-tinte-matt dark:text-slate-300">
+          <span className="shrink-0">
+            <Icon name="info" size={16} />
+          </span>
+          <span className="min-w-0 flex-1">{hinweis}</span>
+        </div>
+      )}
 
       <Kennzahlen ein={zahlen.ein} aus={zahlen.aus} offen={offen ? { ...offen, halbjahr } : null} />
 
@@ -775,15 +804,18 @@ const STATUS: Record<KostenAnfrage["status"], { text: string; klasse: string }> 
  * `alsZeile` (Kassenbuch am Handy, nichts offen): nur EINE Zeile
  * „Kostenanfragen · keine“ in einer Gruppe, die Liste im Blatt. Steht etwas
  * zur Entscheidung an, zeigt FinanzenTab die ganze Karte oben.
+ * `spalte` (Kassenbuch am Laptop, rechts unter den Buchungen): höchstens die
+ * halbe Spaltenhöhe; die Überschrift bleibt stehen, der Rest scrollt in sich.
  */
 function KostenKarte({
-  kosten, darfEntscheiden, vorsitze, onEntschieden, alsZeile = false,
+  kosten, darfEntscheiden, vorsitze, onEntschieden, alsZeile = false, spalte = false,
 }: {
   kosten: KostenValue;
   darfEntscheiden: boolean;
   vorsitze: string[];
   onEntschieden?: () => void;
   alsZeile?: boolean;
+  spalte?: boolean;
 }) {
   const { profile } = useProfiles();
   const [neu, setNeu] = useState(false);
@@ -906,6 +938,17 @@ function KostenKarte({
         </Sheet>
         {blaetter}
       </>
+    );
+
+  if (spalte)
+    return (
+      // Höchstens die Hälfte und nie so viel, dass für die Buchungen keine
+      // 16 rem bleiben (0,75 rem = Abstand zwischen beiden)
+      <section id="sprung-kosten" className="flex max-h-[min(calc(50%-0.375rem),calc(100%-16.75rem))] min-h-0 min-w-0 shrink-0 flex-col">
+        <div className="shrink-0">{kopf}</div>
+        <div className="min-h-0 overflow-y-auto overscroll-contain">{liste(false)}</div>
+        {blaetter}
+      </section>
     );
 
   return (
@@ -1151,7 +1194,7 @@ const monatName = (m: string) =>
 const VORSCHAU = 3;
 
 function VerlaufKarte({
-  buchungen, kategorien, darf, onLoeschen, onKategorie, aktionName,
+  buchungen, kategorien, darf, onLoeschen, onKategorie, aktionName, allein = false,
 }: {
   buchungen: Buchung[];
   kategorien: KassenKategorie[];
@@ -1159,6 +1202,8 @@ function VerlaufKarte({
   onLoeschen: (id: string) => Promise<string | null>;
   onKategorie: FinanzenValue["buchungKategorie"];
   aktionName: (id: string) => string;
+  /** Laptop: keine Kostenanfragen darunter – dann die ganze Spaltenhöhe */
+  allein?: boolean;
 }) {
   const [filter, setFilter] = useState<Filter>("alle");
   const [q, setQ] = useState("");
@@ -1177,8 +1222,10 @@ function VerlaufKarte({
   }, [buchungen, filter, q, aktionName]);
   const neueste = useMemo(() => [...buchungen].sort((x, y) => y.datum.localeCompare(x.datum)).slice(0, VORSCHAU), [buchungen]);
 
-  // Nach Monaten gruppiert, jeder Monat klappt auf. Offen ist zuerst nur der
-  // neueste; beim Suchen sind alle Treffer-Monate offen.
+  // Nach Monaten gruppiert, jeder Monat klappt auf. Am Laptop sind zuerst
+  // alle zu – man sieht die Monate mit ihrer Summe auf einen Blick
+  // (Rückmeldung 16.10.); im Blatt am Handy ist der neueste offen. Beim
+  // Suchen sind alle Treffer-Monate offen.
   const gruppen = useMemo(() => {
     const m = new Map<string, Buchung[]>();
     for (const b of liste) {
@@ -1189,7 +1236,7 @@ function VerlaufKarte({
   }, [liste]);
   const [offen, setOffen] = useState<Set<string>>(() => new Set());
   const neuester = gruppen[0]?.[0];
-  const istOffen = (monat: string) => (q.trim() ? true : offen.has(monat) !== (monat === neuester));
+  const istOffen = (monat: string, imBlatt: boolean) => (q.trim() ? true : offen.has(monat) !== (imBlatt && monat === neuester));
   const umschalten = (monat: string) =>
     setOffen((alt) => {
       const neu = new Set(alt);
@@ -1204,12 +1251,33 @@ function VerlaufKarte({
     ["aus", "Ausgaben"],
   ];
 
-  /** Filter, Suche und Monate – am Laptop in der Spalte, am Handy im Blatt */
-  const ganzeListe = (imBlatt: boolean) => (
+  /** Monatskopf: Name, Anzahl, Summe, Pfeil – ein Tipp klappt den Monat auf oder zu */
+  const monatKopf = (monat: string, zeilen: Buchung[], auf: boolean, klasse: string) => {
+    const summe = zeilen.reduce((n, b) => n + (b.quelle === "abgleich" ? 0 : b.cent), 0);
+    return (
+      <button onClick={() => umschalten(monat)} aria-expanded={auf} className={`flex min-h-[52px] w-full items-center gap-3 py-2.5 text-left transition ${klasse}`}>
+        <span className="min-w-0 flex-1">
+          <span className="block text-[16px] font-semibold">{monatName(monat)}</span>
+          <span className="block text-[12.5px] text-tinte-leise">
+            {zeilen.length} {zeilen.length === 1 ? "Buchung" : "Buchungen"}
+          </span>
+        </span>
+        <span className={`zahl shrink-0 text-[15px] font-semibold ${summe > 0 ? "text-bezahlt" : ""}`}>
+          {summe >= 0 ? "+" : "−"} {euro(Math.abs(summe))}
+        </span>
+        <span aria-hidden className={`shrink-0 text-[13px] text-tinte-leise transition-transform duration-200 ${auf ? "rotate-90" : ""}`}>
+          ›
+        </span>
+      </button>
+    );
+  };
+
+  /** Filter und Suche – im Blatt (Handy) und oben in der Karte (Laptop) */
+  const filterUndSuche = (imBlatt: boolean) => (
     <>
-      <div className="mb-2 flex flex-wrap items-center gap-3 px-1 pt-2 lg:shrink-0 lg:pt-0">
-        {!imBlatt && <h2 className="auf-bild mr-auto text-[1.375rem] font-bold tracking-[-0.02em]">Buchungen</h2>}
-        <div className="seg w-full sm:w-80" role="radiogroup" aria-label="Buchungen filtern">
+      <div className={imBlatt ? "mb-2 px-1 pt-2" : "mb-3 flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2"}>
+        {!imBlatt && <h2 className="mr-auto text-[17px] font-bold leading-tight">Buchungen</h2>}
+        <div className={`seg ${imBlatt ? "w-full sm:w-80" : "w-72"}`} role="radiogroup" aria-label="Buchungen filtern">
           {FILTER.map(([k, label]) => (
             <button key={k} role="radio" aria-checked={filter === k} onClick={() => setFilter(k)} className={`seg-item whitespace-nowrap ${filter === k ? "seg-aktiv" : ""}`}>
               {label}
@@ -1217,7 +1285,12 @@ function VerlaufKarte({
           ))}
         </div>
       </div>
-      <div className="feld-auf-bild mb-4 flex h-11 items-center gap-2 rounded-xl bg-[rgb(118_118_128/0.12)] px-3 dark:bg-[rgb(118_118_128/0.24)] lg:mb-3 lg:shrink-0">
+      {/* In der Karte steht das Feld nicht auf dem Foto – dort ohne feld-auf-bild */}
+      <div
+        className={`flex h-11 items-center gap-2 rounded-xl bg-[rgb(118_118_128/0.12)] px-3 dark:bg-[rgb(118_118_128/0.24)] ${
+          imBlatt ? "feld-auf-bild mb-4" : "mb-1 shrink-0"
+        }`}
+      >
         <span className="text-tinte-leise">
           <Icon name="lupe" size={17} />
         </span>
@@ -1234,47 +1307,22 @@ function VerlaufKarte({
           </button>
         )}
       </div>
+    </>
+  );
 
+  /** Handy/iPad hoch, im Blatt: Filter, Suche und je Monat eine eigene Liste */
+  const blattListe = () => (
+    <>
+      {filterUndSuche(true)}
       {liste.length === 0 ? (
         <div className="card py-10 text-center text-[14px] text-tinte-leise">Keine Buchungen.</div>
       ) : (
-        // Eigene Scroll-Fläche nur am Laptop; das Raster darin behält seine
-        // volle Höhe (in einem Raster mit fester Höhe würden die Monate gestaucht)
-        <div className="lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:overscroll-contain lg:rounded-[1.25rem]">
         <div className="grid grid-cols-[minmax(0,1fr)] gap-2.5">
           {gruppen.map(([monat, zeilen]) => {
-            const summe = zeilen.reduce((n, b) => n + (b.quelle === "abgleich" ? 0 : b.cent), 0);
-            const auf = istOffen(monat);
+            const auf = istOffen(monat, true);
             return (
-              // Am Laptop scrollt die Spalte in sich: der Monatskopf klebt
-              // dann oben (wie die Abschnittsköpfe in Mail), statt beim
-              // ersten Mausrad-Ruck angeschnitten zu verschwinden. „clip“
-              // statt „hidden“: schneidet die runden Ecken weiter ab, macht
-              // die Liste aber nicht selbst zur Scrollfläche (sonst klebt nichts).
-              <ul key={monat} className="liste border border-black/[0.04] dark:border-white/[0.06] lg:!overflow-clip">
-                <li className="lg:sticky lg:top-0 lg:z-[1] lg:bg-[rgb(var(--zelle))]">
-                <button
-                  onClick={() => umschalten(monat)}
-                  aria-expanded={auf}
-                  className="flex min-h-[52px] w-full items-center gap-3 px-4 py-2.5 text-left transition active:bg-black/[0.04] dark:active:bg-white/[0.06]"
-                >
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-[16px] font-semibold">{monatName(monat)}</span>
-                    <span className="block text-[12.5px] text-tinte-leise">
-                      {zeilen.length} {zeilen.length === 1 ? "Buchung" : "Buchungen"}
-                    </span>
-                  </span>
-                  <span className={`zahl shrink-0 text-[15px] font-semibold ${summe > 0 ? "text-bezahlt" : ""}`}>
-                    {summe >= 0 ? "+" : "−"} {euro(Math.abs(summe))}
-                  </span>
-                  <span
-                    aria-hidden
-                    className={`shrink-0 text-[13px] text-tinte-leise transition-transform duration-200 ${auf ? "rotate-90" : ""}`}
-                  >
-                    ›
-                  </span>
-                </button>
-                </li>
+              <ul key={monat} className="liste border border-black/[0.04] dark:border-white/[0.06]">
+                <li>{monatKopf(monat, zeilen, auf, "px-4 active:bg-black/[0.04] dark:active:bg-white/[0.06]")}</li>
                 {auf &&
                   zeilen.map((b) => (
                     <BuchungsZeile key={b.id} b={b} kategorien={kategorien} aktionName={aktionName} onOeffnen={() => setAuswahl(b)} />
@@ -1283,17 +1331,21 @@ function VerlaufKarte({
             );
           })}
         </div>
-        </div>
       )}
     </>
   );
 
   return (
-    // Am Laptop die rechte Spalte der geteilten Ansicht: so hoch wie der Platz
-    // (siehe spaltenOben in FinanzenTab), Filter und Suche bleiben stehen, nur
-    // die Monate scrollen – overscroll-contain: am Listenende läuft das
-    // Scrollen nicht an die linke Spalte oder die Seite weiter.
-    <section className="min-w-0 max-lg:order-2 lg:flex lg:h-[calc(100dvh-var(--finanz-oben,14rem)-1rem)] lg:flex-col">
+    // Am Laptop oben in der rechten Spalte: so hoch wie die Monate, aber
+    // mindestens die obere Hälfte (mindestens 16 rem, iPad quer) – so stehen
+    // die Kostenanfragen darunter ruhig, solange die Monate weniger brauchen.
+    // Mehr Monate, als Platz ist: die Karte endet über den Kostenanfragen,
+    // die Monate scrollen in ihr.
+    <section
+      className={`min-w-0 max-lg:order-2 lg:flex lg:flex-col ${
+        allein ? "lg:min-h-0 lg:flex-1" : "lg:min-h-[max(16rem,calc(50%-0.375rem))] lg:flex-[0_1_auto]"
+      }`}
+    >
       {/* Handy/iPad hoch: wie „Letzte Transaktionen“ in Wallet – die neuesten
           Buchungen und „Alle Buchungen ›“; Filter, Suche und Monate im Blatt.
           Vorher standen Filter, Suche und alle Monate auf der Seite (gut ein
@@ -1324,12 +1376,45 @@ function VerlaufKarte({
           </ul>
         )}
       </div>
-      {/* Laptop/iPad quer: die ganze Liste in der Spalte (contents: die Teile
-          bleiben Kinder der Flex-Spalte, sonst scrollt die Liste nicht in sich) */}
-      <div className="max-lg:hidden lg:contents">{ganzeListe(false)}</div>
+      {/* Laptop/iPad quer: EINE Karte „Buchungen“ (Rückmeldung 16.10.: „als
+          eigener Bereich“) – Filter und Suche bleiben stehen, nur die Monate
+          scrollen; overscroll-contain: am Listenende läuft das Scrollen nicht
+          an die linke Spalte oder die Seite weiter. Vorher stand jeder Monat
+          als eigene Karte direkt auf dem Hintergrund. */}
+      <div className="card flex min-h-0 flex-1 flex-col overflow-hidden p-5 pb-0 max-lg:hidden">
+        {filterUndSuche(false)}
+        <div className="-mx-5 min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-2">
+          {liste.length === 0 ? (
+            <p className="py-8 text-center text-[14px] text-tinte-leise">Keine Buchungen.</p>
+          ) : (
+            <ul className="divide-y divide-papier-linie dark:divide-slate-800">
+              {gruppen.map(([monat, zeilen]) => {
+                const auf = istOffen(monat, false);
+                return (
+                  <li key={monat}>
+                    {/* Der Monatskopf klebt beim Scrollen oben (wie die
+                        Abschnittsköpfe in Mail) – deckend in der Kartenfarbe,
+                        aufgeklappt mit Linie darunter (klebt mit) */}
+                    <div className="sticky top-0 z-[1] -mx-5 bg-white px-5 dark:bg-slate-900">
+                      {monatKopf(monat, zeilen, auf, `active:opacity-60 ${auf ? "border-b border-papier-linie dark:border-slate-800" : ""}`)}
+                    </div>
+                    {auf && (
+                      <ul className="divide-y divide-papier-linie dark:divide-slate-800">
+                        {zeilen.map((b) => (
+                          <BuchungsZeile key={b.id} inKarte b={b} kategorien={kategorien} aktionName={aktionName} onOeffnen={() => setAuswahl(b)} />
+                        ))}
+                      </ul>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+      </div>
       <Sheet open={alleOffen} onClose={() => setAlleOffen(false)}>
         <SheetKopf titel="Buchungen" onClose={() => setAlleOffen(false)} />
-        {ganzeListe(true)}
+        {blattListe()}
       </Sheet>
 
       <BuchungDetail
@@ -1372,12 +1457,14 @@ function Betrag({ b, gross }: { b: Buchung; gross?: boolean }) {
 }
 
 function BuchungsZeile({
-  b, kategorien, aktionName, onOeffnen,
+  b, kategorien, aktionName, onOeffnen, inKarte = false,
 }: {
   b: Buchung;
   kategorien: KassenKategorie[];
   aktionName: (id: string) => string;
   onOeffnen: () => void;
+  /** In der Karte „Buchungen“ (Laptop): ohne eigenen Rand, wie die Zeilen der Karten links */
+  inKarte?: boolean;
 }) {
   const kat = b.kategorie_id ? kategorien.find((k) => k.id === b.kategorie_id) : null;
   const zu = kat ? kat.name : zuweisungText(b, aktionName);
@@ -1385,7 +1472,11 @@ function BuchungsZeile({
     <li>
       <button
         onClick={onOeffnen}
-        className="flex w-full items-center gap-3 px-4 py-2.5 text-left transition hover:bg-black/[0.02] active:bg-black/[0.05] dark:hover:bg-white/[0.03] dark:active:bg-white/[0.07]"
+        className={`flex w-full items-center gap-3 py-2.5 text-left transition ${
+          inKarte
+            ? "active:opacity-60"
+            : "px-4 hover:bg-black/[0.02] active:bg-black/[0.05] dark:hover:bg-white/[0.03] dark:active:bg-white/[0.07]"
+        }`}
       >
         <Kachel b={b} kategorien={kategorien} />
         <span className="min-w-0 flex-1">
