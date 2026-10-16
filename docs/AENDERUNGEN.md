@@ -30,6 +30,13 @@ Doku, in der echten App unverändert):
 - Doku: die Rolle `vorsitz` steht jetzt in `README.md` und
   `docs/DESIGN-REGELN.md` (§6, Rollen für Fotos); `tests/README.md` nennt
   7 Rollen für `leisten-check`.
+- **Fehler im Test selbst:** Der Schritt „nach Blatt (gescrollt)“ in
+  `leisten-check.mjs` klickte den letzten Knopf in `<header>`. Am Laptop und
+  iPad quer steckt dort die Reiterleiste – es wurde ein Reiter gewechselt,
+  aber nie ein Blatt geöffnet. Die früheren Angaben „nach Blatt“ galten
+  dort also nicht. Jetzt wird der Profilknopf über seinen Namen getroffen
+  („Mein Profil“ bzw. „Ihr Zugang“), und der Test meldet eine Abweichung,
+  wenn das Blatt nicht auf- oder nicht wieder zugeht.
 
 Klicktest (Demo, iPhone-Größe): Kostenanfrage stellen → erscheint mit
 „wartet“, Kopf „2 offen“ → zurückziehen → weg; Terminanfrage stellen →

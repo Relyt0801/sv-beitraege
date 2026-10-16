@@ -128,12 +128,19 @@ for (const [w, h] of GERAETE) for (const rolle of ROLLEN) {
       await merke('Kalender geschlossen');
     }
   }
-  // Blatt (Profil) aus gescrollter Lage öffnen und schließen
+  // Blatt (Profil) aus gescrollter Lage öffnen und schließen. Den Profilknopf
+  // gezielt über seinen Namen treffen: am Laptop/iPad quer steckt die
+  // Reiterleiste in <header>, „letzter Knopf im Kopf“ war dort ein Reiter –
+  // es ging gar kein Blatt auf (Gegenprüfung Okt. 2026).
   await reiter(tabs[0]);
   await page.evaluate(() => scrollTo(0, Math.min(400, document.documentElement.scrollHeight))); await page.waitForTimeout(300);
-  await page.locator('header button').filter({ visible: true }).last().click().catch(() => {}); await page.waitForTimeout(800);
+  const dialoge = () => page.locator('[role=dialog]').filter({ visible: true }).count();
+  await page.getByRole('button', { name: /^(Mein Profil|Ihr Zugang)/ }).filter({ visible: true }).first().click({ timeout: 4000 }); await page.waitForTimeout(800);
+  const blattAuf = (await dialoge()) > 0;
   await page.keyboard.press('Escape'); await page.waitForTimeout(700);
+  const blattZu = (await dialoge()) === 0;
   await merke('nach Blatt (gescrollt)');
+  if (!blattAuf || !blattZu) zeilen.at(-1).blattFehler = `Blatt ${blattAuf ? 'nicht geschlossen' : 'nicht geöffnet'}`;
   await ctx.close();
 }
 await browser.close();
@@ -151,6 +158,7 @@ for (const [g, liste] of Object.entries(nachGeraet)) {
   const soll = Object.entries(zaehl).sort((a, b) => b[1] - a[1])[0][0];
   console.log(`${g}: ${normal.length} Zustände – ${soll}${zaehl[soll] === normal.length ? '' : ` (nur ${zaehl[soll]}×)`}`);
   for (const z of normal) if (sig(z) !== soll) { abweichungen++; console.log(`  ABWEICHUNG ${z.rolle} · ${z.zustand}: ${sig(z)}`); }
+  for (const z of normal) if (z.blattFehler) { abweichungen++; console.log(`  ABWEICHUNG ${z.rolle} · ${z.zustand}: ${z.blattFehler}`); }
   let ebenenFehler = 0;
   for (const z of liste.filter((x) => /offen$/.test(x.zustand))) {
     const ok = breit
