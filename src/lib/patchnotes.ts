@@ -73,7 +73,7 @@ export const PATCH: PatchVersion = {
         },
         {
           titel: "Offiziell & Inoffiziell",
-          text: "Kommentare, Zitate, Mottos und Rankings gibt es zweimal: offiziell fürs Abibuch, inoffiziell nur für die Stufe.",
+          text: "Kommentare, Zitate, Mottos und Rankings gibt es meist zweimal: offiziell für die Abizeitung, inoffiziell nur für die Stufe. Das (i) erklärt, was wohin kommt.",
           icon: "schild",
           farbe: "bg-[#5856D6]",
         },
@@ -103,7 +103,7 @@ export const PATCH: PatchVersion = {
       eintraege: [
         {
           titel: "Offiziell oder inoffiziell?",
-          text: "Offiziell kommt ins Abibuch – später lesen es auch Eltern und Lehrkräfte, also bitte ohne Beleidigungen. Inoffiziell bleibt in der Stufe: wird nicht gedruckt, Eltern sehen es nie. Verschieben geht nur mit Zustimmung.",
+          text: "Offiziell kann in die Abizeitung – später lesen es auch Eltern und Lehrkräfte. Inoffiziell bleibt in der Stufe. Nach inoffiziell reicht eine Stimme, nach offiziell braucht es Zustimmungen. Ob es die Trennung überhaupt gibt, stellt ihr im Zahnrad ganz oben ein.",
           icon: "schild",
           farbe: "bg-[#5856D6]",
           fuer: ["komitee"],

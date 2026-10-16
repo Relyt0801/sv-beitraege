@@ -71,6 +71,8 @@ export interface Motto {
   bereich: Teil;
   /** Seit wann das Motto feststeht (nur beim gekürten offiziellen Motto) */
   gewaehlt_at?: string | null;
+  /** Gelöscht (Komitee/Admin, motto_loeschen) – wird nicht mehr angezeigt */
+  geloescht_at?: string | null;
 }
 
 interface Stimme {
@@ -183,14 +185,15 @@ export function useMotto(aktiv: boolean, uid: string | null) {
     // Einreicher stehen nicht in der Liste (Spalten sind gesperrt) – welche
     // Vorschläge meine sind, sagt meine_eintraege().
     const [m, s, a, mi] = await Promise.all([
-      supabase!.from("motto_vorschlaege").select("id, text, erklaerung, created_at, ausgeblendet, gewaehlt, bereich, gewaehlt_at").order("created_at", { ascending: false }).limit(500),
+      supabase!.from("motto_vorschlaege").select("id, text, erklaerung, created_at, ausgeblendet, gewaehlt, bereich, gewaehlt_at, geloescht_at").order("created_at", { ascending: false }).limit(500),
       alleStimmen(),
       supabase!.from("app_settings").select("motto_abstimmung").eq("id", 1).maybeSingle(),
       supabase!.rpc("meine_eintraege"),
     ]);
     if (!mi.error) setMeineIds(new Set(((mi.data as { motto?: string[] } | null)?.motto) || []));
     if (!a.error) setAbstimmung(Boolean((a.data as { motto_abstimmung?: boolean } | null)?.motto_abstimmung));
-    if (!m.error) setMottos((m.data as Motto[]) || []);
+    // Gelöschte sind geleert und bleiben nur fürs Protokoll stehen
+    if (!m.error) setMottos(((m.data as Motto[]) || []).filter((x) => !x.geloescht_at));
     if (!s.error) setStimmen((s.data as Stimme[]) || []);
     setBereit(true);
     zBald();
@@ -261,6 +264,29 @@ export function useMotto(aktiv: boolean, uid: string | null) {
         await laden();
         return error.message;
       }
+      return null;
+    },
+    [laden],
+  );
+
+  /**
+   * Löschen (Komitee/Admin): leert den Vorschlag und blendet ihn für immer
+   * aus – der Text steht nur noch im Protokoll. Keine Benachrichtigung.
+   * Nicht für Kandidaten einer laufenden Runde oder gekürte Gewinner.
+   */
+  const loeschen = useCallback(
+    async (id: string): Promise<string | null> => {
+      if (!hasSupabase) {
+        const d = demoLesen();
+        d.mottos = d.mottos.filter((x) => x.id !== id);
+        d.stimmen = d.stimmen.filter((x) => x.vorschlag_id !== id);
+        demoSchreiben(d);
+        await laden();
+        return null;
+      }
+      const { error } = await supabase!.rpc("motto_loeschen", { p_id: id });
+      if (error) return error.message;
+      setMottos((l) => l.filter((x) => x.id !== id));
       return null;
     },
     [laden],
@@ -346,7 +372,7 @@ export function useMotto(aktiv: boolean, uid: string | null) {
     [laden],
   );
 
-  return { bereit, mottos, me, istMeins, laden, demoVerschieben, zahlenSichtbar, neuZaehlen: z.laden, abstimmung, abstimmungSetzen, vorschlagen, aendern, abstimmen, zahl, meine, punkte, meinFavorit, waehlende };
+  return { bereit, mottos, me, istMeins, laden, demoVerschieben, zahlenSichtbar, neuZaehlen: z.laden, abstimmung, abstimmungSetzen, vorschlagen, aendern, loeschen, abstimmen, zahl, meine, punkte, meinFavorit, waehlende };
 }
 
 export type MottoWahl = ReturnType<typeof useMotto>;

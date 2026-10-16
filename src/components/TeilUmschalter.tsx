@@ -1,15 +1,34 @@
 import { useCallback, useRef, useState, type ReactNode, type TouchEvent } from "react";
-import { TEIL_ERKLAERUNG, TEIL_NAME, useVerschiebenNoetig, verschiebenFrage, type Teil } from "../lib/teile";
+import {
+  TEIL_INFO,
+  TEIL_NAME,
+  useTeileSchalten,
+  useVerschiebenNoetig,
+  verschiebenFrage,
+  verschiebenSofort,
+  type Teil,
+  type TeilBereich,
+} from "../lib/teile";
 import { useRole } from "../auth/RoleProvider";
 import { frage } from "../lib/melder";
+import { Sheet, SheetKopf } from "./Sheet";
+import { Gruppe, Zeile, ZeileMitSchalter } from "./Liste";
+import { Icon } from "./Icon";
+import { Schalter } from "./Schalter";
 
 /**
  * Umschalter Offiziell ↔ Inoffiziell – überall gleich (Rankings, Zitate,
  * Motto, Kommentare). Zwei große Hälften mit eigenem Symbol und eigener
- * Farbe, darunter in einem Satz, was der gewählte Teil bedeutet.
+ * Farbe, daneben ein kleines Info-Symbol: Es erklärt je Bereich, was davon
+ * gedruckt werden kann (Abizeitung, Pullis …) und was in der Stufe bleibt.
+ * Vorher stand die Erklärung als Satz darunter – das kostete Platz und
+ * sagte nicht, worum es im jeweiligen Bereich konkret geht.
  *
- *   Offiziell    Blau, Siegel – „kommt ins Abibuch“
+ *   Offiziell    Blau, Siegel – „kann gedruckt werden“
  *   Inoffiziell  Violett, Schloss – „nur für die Stufe“
+ *
+ * Ist ein Bereich nicht aufgeteilt (Einstellungen des Bereichs), zeigt die
+ * App den Umschalter gar nicht (die Aufrufer fragen useTeil/useAufgeteilt).
  *
  * Dazu TeilWischer: Inhalt mit dem Finger seitlich wischen wechselt den Teil.
  */
@@ -53,39 +72,117 @@ export function TeilMarke({ teil, hell }: { teil: Teil; hell?: boolean }) {
 
 /**
  * Rückfrage vor einem Verschiebe-Antrag – für Motto, Zitate, Rankings und
- * Kommentare gleich: nennt die Zahl der nötigen Zustimmungen („du zählst
- * schon mit“), den Ort des Antrags (Chats → Anfragen) und für Admins, dass
- * ihre Zustimmung allein reicht. Liefert true, wenn beantragt werden soll.
+ * Kommentare gleich: nach inoffiziell reicht eine Stimme (sofort), nach
+ * offiziell nennt sie die Zahl der nötigen Zustimmungen („du zählst schon
+ * mit“) und den Ort des Antrags (Chats → Anfragen). Allein reicht – wie in
+ * der Datenbank (zustimmung_allein) – nur der Owner. Liefert true, wenn
+ * beantragt werden soll.
  *   const verschieben = useVerschiebenRueckfrage();
  *   if (await verschieben("offiziell", "Mein Motto")) …
  */
 export function useVerschiebenRueckfrage() {
   const noetig = useVerschiebenNoetig();
-  const { isAdmin } = useRole();
+  const { isOp } = useRole();
   return useCallback(
     (nach: Teil, titel?: string): Promise<boolean> =>
-      frage(verschiebenFrage(nach, noetig, isAdmin, titel), isAdmin || noetig <= 1 ? "Verschieben" : "Beantragen"),
-    [noetig, isAdmin],
+      frage(verschiebenFrage(nach, noetig, isOp, titel), verschiebenSofort(nach, noetig, isOp) ? "Verschieben" : "Beantragen"),
+    [noetig, isOp],
+  );
+}
+
+/**
+ * Info-Symbol (i) – öffnet ein kleines Blatt: was im Bereich offiziell bzw.
+ * inoffiziell bedeutet und wie Verschieben geht. 44 px Tippfläche.
+ */
+export function TeilInfo({ bereich, className = "" }: { bereich: TeilBereich; className?: string }) {
+  const [auf, setAuf] = useState(false);
+  const noetig = useVerschiebenNoetig();
+  const info = TEIL_INFO[bereich];
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setAuf(true)}
+        aria-label={`Was heißt offiziell und inoffiziell bei ${info.titel}?`}
+        className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-tinte-leise transition active:scale-90 ${className}`}
+      >
+        <Icon name="info" size={20} strich={2} />
+      </button>
+      <Sheet open={auf} onClose={() => setAuf(false)}>
+        <SheetKopf titel={`${info.titel}: offiziell & inoffiziell`} onClose={() => setAuf(false)} />
+        <Gruppe className="">
+          {(["offiziell", "inoffiziell"] as Teil[]).map((t) => (
+            <div key={t} className="flex gap-3 px-4 py-3">
+              <span className={`mt-0.5 shrink-0 ${TEIL_FARBE[t].text}`}>
+                <Symbol teil={t} size={20} />
+              </span>
+              <span className="min-w-0">
+                <span className={`block text-[15px] font-semibold ${TEIL_FARBE[t].text}`}>{TEIL_NAME[t]}</span>
+                <span className="block text-[14px] leading-snug text-tinte-matt dark:text-slate-300">{info[t]}</span>
+              </span>
+            </div>
+          ))}
+        </Gruppe>
+        <Gruppe titel="Verschieben">
+          <Zeile label="Nach inoffiziell">
+            <span className="text-[15px] text-tinte-leise">1 Stimme</span>
+          </Zeile>
+          <Zeile label="Nach offiziell">
+            <span className="text-[15px] text-tinte-leise">
+              {noetig} {noetig === 1 ? "Zustimmung" : "Zustimmungen"}
+            </span>
+          </Zeile>
+        </Gruppe>
+      </Sheet>
+    </>
+  );
+}
+
+/**
+ * Schalter „Offiziell & Inoffiziell trennen“ – steht in den Einstellungen
+ * jedes Bereichs ganz oben (klarer, fester Ort). Ohne Recht: nur der Stand.
+ */
+export function TeileSchalterZeile({ bereich, an }: { bereich: TeilBereich; an: boolean }) {
+  const { darf, setzen } = useTeileSchalten();
+  const ok = darf(bereich);
+  return (
+    <ZeileMitSchalter label="Offiziell & Inoffiziell trennen">
+      {ok ? (
+        <Schalter
+          an={an}
+          label="Offiziell & Inoffiziell trennen"
+          onChange={(v) => {
+            if (v) return void setzen(bereich, true);
+            void frage(
+              "Trennung ausschalten? Dann gibt es nur noch einen gemeinsamen Bereich – nichts wird gelöscht, schaltet man wieder an, liegt alles im alten Teil.",
+              "Ausschalten",
+            ).then((ja) => ja && void setzen(bereich, false));
+          }}
+        />
+      ) : (
+        <span className="text-[15px] text-tinte-leise">{an ? "An" : "Aus"}</span>
+      )}
+    </ZeileMitSchalter>
   );
 }
 
 export function TeilUmschalter({
+  bereich,
   teil,
   setTeil,
   zahlen,
   className = "",
-  ohneErklaerung,
 }: {
+  bereich: TeilBereich;
   teil: Teil;
   setTeil: (t: Teil) => void;
   /** optional: Anzahl Einträge je Teil */
   zahlen?: Partial<Record<Teil, number>>;
   className?: string;
-  ohneErklaerung?: boolean;
 }) {
   return (
-    <div className={className}>
-      <div className="relative grid grid-cols-2 rounded-[0.9rem] bg-[rgb(118_118_128/0.12)] p-[3px] dark:bg-[rgb(118_118_128/0.24)]" role="tablist" aria-label="Teil wählen">
+    <div className={`flex items-center gap-1 ${className}`}>
+      <div className="relative grid min-w-0 flex-1 grid-cols-2 rounded-[0.9rem] bg-[rgb(118_118_128/0.12)] p-[3px] dark:bg-[rgb(118_118_128/0.24)]" role="tablist" aria-label="Teil wählen">
         {/* gleitende Fläche unter dem gewählten Teil */}
         <span
           aria-hidden
@@ -108,12 +205,7 @@ export function TeilUmschalter({
           </button>
         ))}
       </div>
-      {!ohneErklaerung && (
-        <p key={teil} className="mt-1.5 animate-fadeIn px-1 text-[12.5px] leading-snug text-tinte-leise">
-          <span className={`mr-1.5 inline-block h-1.5 w-1.5 -translate-y-px rounded-full align-middle ${TEIL_FARBE[teil].punkt}`} />
-          {TEIL_ERKLAERUNG[teil]}
-        </p>
-      )}
+      <TeilInfo bereich={bereich} className="-mr-2" />
     </div>
   );
 }
@@ -121,9 +213,10 @@ export function TeilUmschalter({
 /**
  * Inhalt, den man seitlich wischen kann: nach links → Inoffiziell,
  * nach rechts → Offiziell. Der Inhalt folgt dem Finger gedämpft und
- * gleitet beim Wechsel von der passenden Seite herein.
+ * gleitet beim Wechsel von der passenden Seite herein. Ohne Aufteilung
+ * (aus = true) ist er nur eine Hülle.
  */
-export function TeilWischer({ teil, setTeil, children }: { teil: Teil; setTeil: (t: Teil) => void; children: ReactNode }) {
+export function TeilWischer({ teil, setTeil, children, aus }: { teil: Teil; setTeil: (t: Teil) => void; children: ReactNode; aus?: boolean }) {
   const start = useRef<{ x: number; y: number; waagerecht: boolean | null } | null>(null);
   const [zug, setZug] = useState(0);
   const [richtung, setRichtung] = useState<0 | 1 | -1>(0);
@@ -161,6 +254,7 @@ export function TeilWischer({ teil, setTeil, children }: { teil: Teil; setTeil: 
     },
   };
 
+  if (aus) return <>{children}</>;
   return (
     <div {...handler} className="touch-pan-y">
       <div

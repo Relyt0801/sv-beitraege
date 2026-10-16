@@ -23,8 +23,8 @@ import { FarbKarte, FussLeiste, KleinerRing, KnopfGlas, KnopfHell } from "./Kach
 import { FussLeiste as FussLeisteBlatt } from "./FussLeiste";
 import { WortfilterSchalter } from "./AutorInfo";
 import { useWfRecht } from "../lib/wortfilter-bereiche";
-import { TeilUmschalter, useVerschiebenRueckfrage } from "./TeilUmschalter";
-import { TEIL_NAME, useTeil, useVerschiebungen, type Teil } from "../lib/teile";
+import { TeileSchalterZeile, TeilUmschalter, useVerschiebenRueckfrage } from "./TeilUmschalter";
+import { imTeil, TEIL_NAME, useAufgeteilt, useTeil, useVerschiebungen, type Teil } from "../lib/teile";
 import { AusHinweis } from "./Funktionen";
 import { GesperrtZeile, GESPERRT_TEXT } from "./Gesperrt";
 import { MeldenKnopf } from "./Melden";
@@ -518,10 +518,11 @@ function SteckbriefAnsicht({
   const darfSchreiben = !ich && !!studentId && !!s && (s.freigabe === "alle" || (s.freigabe === "gezielt" && s.freigabe_an.includes(studentId)));
   // Kommentare haben zwei Teile: offiziell (kommt ins Abibuch) und
   // inoffiziell (nur für die Stufe). Oben umschalten, geschrieben wird in den
-  // offenen Teil. Moderation kann mit Zustimmungen verschieben.
-  const [teil, setTeil] = useTeil("kommentare");
+  // offenen Teil. Moderation kann verschieben. Ist die Aufteilung aus
+  // (Album → Einstellungen), stehen alle Kommentare zusammen.
+  const [teil, setTeil, aufgeteilt] = useTeil("kommentare");
   const alleKommentare = album.kommentare.filter((k) => k.student_id === id);
-  const kommentare = alleKommentare.filter((k) => (k.bereich ?? "inoffiziell") === teil);
+  const kommentare = alleKommentare.filter((k) => imTeil(k.bereich, teil, aufgeteilt));
   const zahlTeil = (t: Teil) => alleKommentare.filter((k) => (k.bereich ?? "inoffiziell") === t).length;
   const darfVerschieben = can("album.moderieren");
   const vs = useVerschiebungen("album_kommentare", darfVerschieben, album.neuLaden);
@@ -645,11 +646,12 @@ function SteckbriefAnsicht({
 
       {/* Kommentare */}
       <h3 className="mb-2 mt-6 px-1 text-[13px] font-normal uppercase tracking-[0.02em] text-tinte-leise">Kommentare</h3>
-      <TeilUmschalter teil={teil} setTeil={setTeil} zahlen={{ offiziell: zahlTeil("offiziell"), inoffiziell: zahlTeil("inoffiziell") }} className="mb-4" />
+      {aufgeteilt && (
+        <TeilUmschalter bereich="kommentare" teil={teil} setTeil={setTeil} zahlen={{ offiziell: zahlTeil("offiziell"), inoffiziell: zahlTeil("inoffiziell") }} className="mb-4" />
+      )}
       {kommentare.length === 0 && (
         <p className="px-1 text-[13.5px] text-tinte-leise">
-          {/* „ins Abibuch“ steht schon in der Zeile über dem Umschalter */}
-          {teil === "offiziell" ? "Noch kein offizieller Kommentar – schreib den ersten." : "Noch kein Kommentar – schreib den ersten."}
+          {aufgeteilt && teil === "offiziell" ? "Noch kein offizieller Kommentar – schreib den ersten." : "Noch kein Kommentar – schreib den ersten."}
         </p>
       )}
       <ul className="space-y-3.5">
@@ -669,6 +671,7 @@ function SteckbriefAnsicht({
                   {n > 0 && <span className="font-semibold">{n} „Gefällt mir“</span>}
                   {k.user_id !== album.me && <MeldenKnopf className={MINI_AKTION} onClick={() => melden("kommentar", k.id)} />}
                   {darfVerschieben &&
+                    aufgeteilt &&
                     (() => {
                       const antrag = vs.antragZu(k.id);
                       const nach: Teil = (k.bereich ?? "inoffiziell") === "offiziell" ? "inoffiziell" : "offiziell";
@@ -724,7 +727,7 @@ function SteckbriefAnsicht({
         <div className="flex items-center gap-2">
           <input
             className="field flex-1 !rounded-full"
-            placeholder={`${TEIL_NAME[teil]}er Kommentar …`}
+            placeholder={aufgeteilt ? `${TEIL_NAME[teil]}er Kommentar …` : "Kommentar …"}
             value={neu}
             maxLength={500}
             onChange={(e) => setNeu(e.target.value)}
@@ -1159,6 +1162,7 @@ export function KategorienSheet({
   const [busy, setBusy] = useState(false);
   const wfRecht = useWfRecht();
   const zeigeWf = mitWortfilter && (["steckbrief", "kommentare", "kommentare_inoffiziell"] as const).some((b) => wfRecht(b));
+  const aufgeteilt = useAufgeteilt("kommentare");
 
   // Beim nächsten Öffnen wieder auf der Liste starten
   useEffect(() => {
@@ -1244,12 +1248,23 @@ export function KategorienSheet({
         </div>
       ) : (
         <>
-          <SheetKopf titel="Steckbrief-Kategorien" unter="Die Felder, die alle im Steckbrief ausfüllen. Antippen zum Ändern." onClose={onClose} />
-          <Gruppe
-            titel={`Kategorien · ${liste.length}`}
-            className="mt-1"
-            fuss="Tipp: Welche Kategorien rein sollen, könnt ihr vorher per Umfrage abstimmen lassen."
-          >
+          <SheetKopf titel={mitWortfilter ? "Einstellungen" : "Steckbrief-Kategorien"} unter={mitWortfilter ? "Abi-Album" : undefined} onClose={onClose} />
+          {/* Kommentare: offiziell & inoffiziell – ganz oben, an fester Stelle (nur in den Album-Einstellungen) */}
+          {mitWortfilter && (
+            <Gruppe titel="Kommentare · Offiziell & Inoffiziell" className="mt-1">
+              <TeileSchalterZeile bereich="kommentare" an={aufgeteilt} />
+              {zeigeWf &&
+                (aufgeteilt ? (
+                  <>
+                    <WortfilterSchalter zeile bereich="kommentare" titel="Wortfilter · Offiziell" />
+                    <WortfilterSchalter zeile bereich="kommentare_inoffiziell" titel="Wortfilter · Inoffiziell" />
+                  </>
+                ) : (
+                  <WortfilterSchalter zeile bereich="kommentare" titel="Wortfilter" />
+                ))}
+            </Gruppe>
+          )}
+          <Gruppe titel={`Steckbrief-Kategorien · ${liste.length}`} className={mitWortfilter ? "mt-4" : "mt-1"}>
             {liste.map((x) => (
               // Zweite Zeile immer (Hinweis im Feld): so darf auch ein langer Titel umbrechen
               <Zeile key={x.id} label={x.titel} unter={x.platzhalter || "Ohne Hinweis im Feld"} onClick={() => oeffnen(x)}>
@@ -1261,8 +1276,6 @@ export function KategorienSheet({
           {zeigeWf && (
             <Gruppe titel="Wortfilter">
               <WortfilterSchalter zeile bereich="steckbrief" titel="Steckbriefe" />
-              <WortfilterSchalter zeile bereich="kommentare" titel="Kommentare · Offiziell" />
-              <WortfilterSchalter zeile bereich="kommentare_inoffiziell" titel="Kommentare · Inoffiziell" />
             </Gruppe>
           )}
         </>
