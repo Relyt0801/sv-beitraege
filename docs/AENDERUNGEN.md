@@ -59,6 +59,20 @@ Nach unabhängiger Gegenprüfung (3 Blickwinkel, 9 bestätigte Funde) zusätzlic
 - Umfrage-Editor: „Bearbeiten“ im Kopf jeder Frage (Typ, Reihenfolge,
   Entfernen) – die Zeile „Fragetyp ›“ allein verriet das nicht.
 
+Noch kürzer am Handy (nur unter 768 px, iPad/Laptop unverändert):
+
+- „Deine Stufenkasse“ ohne offenen Betrag = eine Zeile („0 € nichts fällig“
+  + „Kontodaten“) statt 170 px hoher Karte; ist etwas fällig, bleibt die
+  große Zahl (`MyKasse`).
+- Abiball-Ticket vor dem Verkauf: „Verkauf noch nicht gestartet“ als
+  Unterzeile im Kopf statt eigenem Kasten (`AbiTicket`).
+- Ranking-Kacheln mit Fortschrittsbalken (wie der Steckbrief) statt leerer
+  Fläche über dem Knopf; Regal am alten SE (320 px) 92 % breit.
+- Finanzen: Legende am Kreis zeigt die drei größten Teile + „Weitere (n)“
+  (einzeln stehen sie direkt darunter).
+- Gemessen (iPhone 390×844, Bildschirmhöhen): Übersicht 2,73 → 1,90,
+  Finanzen Kassenwart 3,34 → 2,87, Schüler 1,60 → 1,47, Eltern 1,64 → 1,51.
+
 ## Eltern und Verwaltung: weniger Scrollen (16.10.2026)
 
 Zwei Rollen gezielt nachgeschärft, die in der zweiten Prüfung am meisten

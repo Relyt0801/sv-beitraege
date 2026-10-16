@@ -698,7 +698,6 @@ export function TicketBereich({
   }, [zeigen, mitKasse, onMitKasse]);
 
   if (!zeigen) return null;
-  const p = ticketPreise(prozent, settings);
   // Vor dem Verkauf (nicht bei Eltern): klein und knapp
   const knapp = !mitKasse && !fuerEltern;
 
@@ -711,7 +710,11 @@ export function TicketBereich({
     <section className={`card p-4 sm:p-5 ${className}`} data-tour="abiball-ticket">
       <AusHinweis funktion="abiball" className="mb-2" />
       <div className="flex items-baseline justify-between gap-2">
-        <h2 className="text-[15px] font-semibold">Abiball-Ticket</h2>
+        <h2 className="text-[15px] font-semibold">
+          Abiball-Ticket
+          {/* Vor dem Verkauf am Handy als Unterzeile statt eigenem Kasten */}
+          {knapp && <span className="block text-[12.5px] font-normal text-tinte-leise md:hidden">Verkauf noch nicht gestartet</span>}
+        </h2>
         <button onClick={() => setAuf(true)} className="-my-3 -mr-3 flex min-h-[44px] items-center gap-0.5 px-3 text-[14px] font-semibold text-brand-dark dark:text-brand">
           Details <Icon name="chevron" size={14} strich={2.4} />
         </button>
@@ -724,13 +727,11 @@ export function TicketBereich({
               {/* Ab iPad steht die Karte neben „Mithilfe“ – dort ist Platz für
                   das Gäste-Ticket, am Handy reicht eine Zeile */}
               {!ohneGaeste && <div className="hidden md:block">{gaeste}</div>}
-              <Info>
-                {/* EIN Textstück – Info ist eine flex-Zeile, zwei Kinder stünden nebeneinander */}
-                <span>
-                  Verkauf noch nicht gestartet
-                  <span className="md:hidden"> · weitere Tickets: {p.preisSteht ? `je ${p.weiteres} €` : "Preis folgt"}</span>
-                </span>
-              </Info>
+              {/* Ab iPad als Kasten; am Handy steht der Satz im Kopf der Karte,
+                  die weiteren Tickets stehen in „Details“ */}
+              <div className="max-md:hidden">
+                <Info>Verkauf noch nicht gestartet</Info>
+              </div>
             </>
           ) : fuerEltern ? (
             <>

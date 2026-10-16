@@ -172,6 +172,13 @@ export function RankingKarten({ className = "" }: { className?: string }) {
                       : `Alle ${aktive.length} abgestimmt`
                     : "Noch keine Kategorien"}
               </div>
+              {/* Fortschritt wie beim Steckbrief – füllt die Kachel im Regal mit
+                  etwas Nützlichem statt leerer Fläche über dem Knopf */}
+              {aktive.length > 0 && !wahlen && (
+                <div aria-hidden className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/25">
+                  <div className="h-full rounded-full bg-white transition-[width] duration-500" style={{ width: `${Math.round(((aktive.length - offenAnzahl) / aktive.length) * 100)}%` }} />
+                </div>
+              )}
               <button
                 onClick={(e) => {
                   e.stopPropagation();

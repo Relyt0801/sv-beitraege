@@ -108,27 +108,50 @@ export function MyKasse({
       <ZuErledigen className="order-1 md:col-span-2" />
 
       {/* ------------------------------------------ die eine Zahl */}
-      <section className="leitkarte order-2 flex flex-col" data-tour="meine-karte">
-        <div className="text-[13px] font-medium text-white/60">
-          {offen > 0 ? "Du musst noch zahlen" : "Deine Stufenkasse"}
-        </div>
-        <div className="mt-1.5 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-          {/* Nichts offen: am Handy kleiner – die Karte soll nicht den halben Bildschirm füllen */}
-          <span className={`leitwert ${offen > 0 ? "text-white" : "text-[#30D158] max-md:!text-[2.25rem]"}`}>{offen} €</span>
-          <span className="text-[13px] text-white/60">
-            {offen > 0 ? `fällig bis ${settings.aktuelles_halbjahr}` : "Aktuell ist nichts fällig. Danke!"}
-          </span>
-        </div>
-        <div className={`mt-2 text-[12px] text-white/50 ${offen > 0 ? "" : "max-md:hidden"}`}>
-          {student.vorname} {student.nachname} · {gesamt} € über alle sechs Halbjahre
+      {/* Nichts fällig: am Handy EINE Zeile (Betrag links, Kontodaten rechts) –
+          vorher eine 170 px hohe Karte ohne Aufgabe. Ist etwas offen, bleibt
+          die große Zahl: dann ist sie das Wichtigste auf der Seite. */}
+      <section
+        className={`leitkarte order-2 flex flex-col ${offen > 0 ? "" : "max-md:flex-row max-md:items-center max-md:gap-3 max-md:!py-3"}`}
+        data-tour="meine-karte"
+      >
+        <div className={offen > 0 ? "" : "max-md:min-w-0 max-md:flex-1"}>
+          <div className="text-[13px] font-medium text-white/60">
+            {offen > 0 ? "Du musst noch zahlen" : "Deine Stufenkasse"}
+          </div>
+          <div className={`mt-1.5 flex flex-wrap items-baseline gap-x-3 gap-y-1 ${offen > 0 ? "" : "max-md:mt-0 max-md:gap-x-2"}`}>
+            <span className={`leitwert ${offen > 0 ? "text-white" : "text-[#30D158] max-md:!text-[1.75rem]"}`}>{offen} €</span>
+            <span className="text-[13px] text-white/60">
+              {offen > 0 ? (
+                `fällig bis ${settings.aktuelles_halbjahr}`
+              ) : (
+                <>
+                  <span className="md:hidden">nichts fällig</span>
+                  <span className="max-md:hidden">Aktuell ist nichts fällig. Danke!</span>
+                </>
+              )}
+            </span>
+          </div>
+          <div className={`mt-2 text-[12px] text-white/50 ${offen > 0 ? "" : "max-md:hidden"}`}>
+            {student.vorname} {student.nachname} · {gesamt} € über alle sechs Halbjahre
+          </div>
         </div>
         {/* Überweisen – falls Schüler selbst zahlen (sonst die Eltern) */}
         <button
           onClick={() => setUeberweisen(true)}
-          className="mt-3 inline-flex min-h-[44px] items-center gap-1.5 self-start rounded-full bg-white/15 px-4 text-[14px] font-semibold text-white transition active:scale-95 md:mt-auto"
+          className={`mt-3 inline-flex min-h-[44px] items-center gap-1.5 self-start rounded-full bg-white/15 px-4 text-[14px] font-semibold text-white transition active:scale-95 md:mt-auto ${
+            offen > 0 ? "" : "max-md:mt-0 max-md:shrink-0 max-md:self-center"
+          }`}
         >
           <Icon name="bank" size={15} />
-          Überweisen – Kontodaten
+          {offen > 0 ? (
+            "Überweisen – Kontodaten"
+          ) : (
+            <>
+              <span className="md:hidden">Kontodaten</span>
+              <span className="max-md:hidden">Überweisen – Kontodaten</span>
+            </>
+          )}
         </button>
       </section>
       <Sheet open={ueberweisen} onClose={() => setUeberweisen(false)}>
@@ -150,7 +173,7 @@ export function MyKasse({
         // Tastatur: die Karte mit dem Fokus ganz ins Bild holen (sonst blieb ein
         // Knopf zu 80 % rechts außerhalb stehen)
         onFocus={(e) => (e.target as HTMLElement).closest('[data-tour="kacheln"] > *')?.scrollIntoView({ inline: "start", block: "nearest" })}
-        className="no-scrollbar order-3 gap-3 max-sm:-mx-3 max-sm:-mb-7 max-sm:-mt-2 max-sm:flex max-sm:snap-x max-sm:snap-mandatory max-sm:scroll-px-3 max-sm:overflow-x-auto max-sm:px-3 max-sm:pb-7 max-sm:pt-2 max-sm:[&>*:only-child]:w-full max-sm:[&>*]:w-[86%] max-sm:[&>*]:shrink-0 max-sm:[&>*]:snap-start sm:grid sm:grid-cols-2 md:order-4 md:col-span-2 [&:empty]:hidden"
+        className="no-scrollbar order-3 gap-3 max-sm:-mx-3 max-sm:-mb-7 max-sm:-mt-2 max-sm:flex max-sm:snap-x max-sm:snap-mandatory max-sm:scroll-px-3 max-sm:overflow-x-auto max-sm:px-3 max-sm:pb-7 max-sm:pt-2 max-sm:[&>*:only-child]:w-full max-sm:[&>*]:w-[86%] max-[359px]:[&>*]:w-[92%] max-sm:[&>*]:shrink-0 max-sm:[&>*]:snap-start sm:grid sm:grid-cols-2 md:order-4 md:col-span-2 [&:empty]:hidden"
       >
         <AlbumKarte />
         <MottoKarte />

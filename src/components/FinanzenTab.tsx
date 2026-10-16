@@ -395,13 +395,27 @@ function UebersichtKarte({
             {ziel.ziel_cent > 0 ? `Ziel ${ziel.ziel_titel}: ${euroKurz(ziel.ziel_cent)}` : "Woher das Geld kommt"}
           </div>
           <ul className="grid grid-cols-[minmax(0,1fr)] gap-1.5">
-            {teile.map((t) => (
-              <li key={t.key} className="flex items-center gap-2.5 text-[13px]">
+            {/* Am Handy die drei größten Teile, der Rest als „Weitere“ – einzeln
+                stehen sie direkt darunter in „Aktionen, Beiträge und Sonstiges“.
+                Mit allen acht Zeilen war die Legende höher als der Kreis. */}
+            {teile.map((t, i) => (
+              <li key={t.key} className={`flex items-center gap-2.5 text-[13px] ${teile.length > 4 && i >= 3 ? "max-sm:hidden" : ""}`}>
                 <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: t.farbe }} />
                 <span className="min-w-0 flex-1 truncate font-semibold">{t.label}</span>
                 <span className="zahl shrink-0 font-bold">{euroKurz(t.cent)}</span>
               </li>
             ))}
+            {teile.length > 4 && (
+              <li className="flex items-center gap-2.5 text-[13px] sm:hidden">
+                <span className="flex h-3 w-3 shrink-0 overflow-hidden rounded-full">
+                  {teile.slice(3).map((t) => (
+                    <span key={t.key} className="h-full flex-1" style={{ background: t.farbe }} />
+                  ))}
+                </span>
+                <span className="min-w-0 flex-1 truncate font-semibold">Weitere ({teile.length - 3})</span>
+                <span className="zahl shrink-0 font-bold">{euroKurz(teile.slice(3).reduce((n, t) => n + t.cent, 0))}</span>
+              </li>
+            )}
             {zahlen.aus > 0 && (
               <li className="flex items-center gap-2.5 text-[13px] text-tinte-leise">
                 <span className="h-3 w-3 shrink-0" />
