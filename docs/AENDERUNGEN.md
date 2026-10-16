@@ -11,6 +11,20 @@ ausführlich (auf Deutsch); hier steht der Überblick dazu.
 
 ---
 
+## Update 1.4 live (16.10.2026)
+
+- `update-1-4` ist in `main` (Relyt0801/sv-beitraege#15 → #16), Vercel-Produktion
+  auf remi-abi28.de liefert 1.4 aus.
+- Datenbank vorher nur lesend geprüft: alle sechs neuen SQL-Dateien waren schon
+  eingespielt (`offiziell-inoffiziell`, `zitate-bereich-lesen`,
+  `motto-spalten-lesen`, `umfrage-eigene-antwort`, `abstimmung-sonstiges`,
+  `speicherwaechter`).
+- Edge-Function `send-push` neu bereitgestellt; Selbsttest aus der Datenbank
+  antwortet mit HTTP 200.
+- Update bei allen erzwungen: `app_settings.neu_laden_ab` auf den Zeitpunkt
+  nach dem Deploy gesetzt (wie der Knopf „Update bei allen erzwingen“ im
+  Profil). Offene Apps laden einmal neu, nie mitten beim Tippen.
+
 ## Abgeschnittener Text, Finanzen am Laptop, „Was ist neu“ nach Rollen (16.10.2026)
 
 - **Abgeschnittener Text über der Eingabe:** Die klebende Fußleiste in
@@ -51,9 +65,8 @@ werden (`offen.ts`: `x.error ? 0`). Drei echte Fehler, behoben:
   eine neue Frage schickte gar keine Mitteilung. Jetzt `pushAnTeam(…, { art:
   "eltern" })` in beiden Fällen (`eltern-store`), und die Edge-Function
   beachtet im Team-Zweig den Mitteilungs-Schalter „Eltern“
-  (`supabase/functions/send-push`). **Die Edge-Function muss nach der Freigabe
-  neu bereitgestellt werden** (`supabase functions deploy send-push`) – bis
-  dahin bekommen auch Teammitglieder mit abgeschaltetem Schalter die Mitteilung.
+  (`supabase/functions/send-push`). Am 16.10.2026 bereitgestellt (Version 29,
+  JWT-Prüfung an).
 - **Zitat-Stimmen:** Das Prüf-Komitee darf alle Stimmen lesen (1105) – die
   Datenbank liefert höchstens 1000 Zeilen, eigene Stimmen fehlten dann und
   ließen sich nicht zurücknehmen. Jetzt nur die eigenen (`zitate.ts`; Zahlen
