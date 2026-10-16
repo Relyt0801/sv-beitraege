@@ -28,7 +28,9 @@ Platz verschenkten:
   `KomiteeZugriff`, `RollenRechteTab`):** Ranking-Wahl als Liste mit Haken
   statt großer Kacheln, Suche ab 7 Einträgen, „Weiß nicht“ als Zeile,
   Podium kompakter. Komitees einer Person als eine Zeile mit Unterseite;
-  Legende der Passwort-Punkte; Eltern heißen „Eltern von …“. Themen mit nur
+  Legende der Passwort-Punkte, „Startpasswort“ als hohler Ring statt
+  grauem Punkt (im Dunkeln und auf dem Bild sonst unsichtbar,
+  `KontoZeile`); Eltern heißen „Eltern von …“. Themen mit nur
   einer Funktion öffnen diese direkt. Beim Fremdzugriff ist „Darf“
   änderbar. Die Rollen-Ansicht (Liste/Rechte) wird gemerkt.
 - **Tour:** Das Loch der Hervorhebung bleibt mindestens 4 px unter dem
