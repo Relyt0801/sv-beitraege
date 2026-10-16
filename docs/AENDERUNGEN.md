@@ -11,6 +11,30 @@ ausführlich (auf Deutsch); hier steht der Überblick dazu.
 
 ---
 
+## Kopf- und Reiterleiste: eigener Test (16.10.2026)
+
+Zum ursprünglichen Fehlerbild („die Headbar ist nach unten verschoben“ – am
+Laptop stand bei offenem Chat ein zweites Band unter der App-Kopfzeile) gibt
+es jetzt `tests/leisten-check.mjs`. Er misst die festen Leisten je Gerät und
+Rolle in jedem Reiter (oben und ganz unten gescrollt), beim Reiterwechsel aus
+gescrollter Lage, nach einem Blatt und mit offenem Chat/Kalender.
+
+- Ergebnis auf dem Stand von `main` (Demo, Chromium): 7 Größen (320–1440 px)
+  × 6 Rollen, 672 Zustände, **0 Abweichungen**. Handy/iPad hoch: Kopf
+  `[0,60]`, Reiterleiste unten; Laptop/iPad quer: eine Kopfzeile `[0,111]`
+  mit Reitern. Chat/Kalender: am Laptop kein zweites Band, ihr Kopf steht in
+  `#kopf-ebene`; am Handy eine Vollbild-Ebene ab 0 px über der Reiterleiste
+  (Zurück-Taste 8 px unter der Oberkante, Eingabe unten).
+- Gegenprobe: Baut man das alte zweite Band nach, meldet der Test
+  `ABWEICHUNG … oben [[0,111],[111,167]]` und endet mit Exit-Code 1.
+- Dieselben Zustände in WebKit (Safari-Engine, WebKitGTK 2.52 per WebDriver,
+  App in einem Rahmen mit exakter Gerätegröße): 320, 390, 820, 1180 und
+  1440 px × Schüler/Team/Kassenwart/Eltern, 150 Zustände – je Gerät überall
+  dieselben Leisten, alle 14 geöffneten Chats/Kalender wie erwartet.
+- Nicht prüfbar aus dieser Umgebung: echtes iPhone (Safe Area, Gummiband,
+  Tastatur) und echter Login – die Netzwerkregel der Cloud-Umgebung sperrt
+  `*.supabase.co`, und es ist kein Testkonto hinterlegt.
+
 ## Weniger Scrollen am Handy, Test in WebKit (16.10.2026)
 
 Gemessen mit Demo-Daten (Seitenhöhe in Bildschirmen, iPhone 390 × 844, alle
