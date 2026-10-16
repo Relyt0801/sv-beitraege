@@ -140,6 +140,16 @@ interface Block {
 const SCHICHT_MERKER = "sv:hinweis:schicht-antippen";
 
 /**
+ * Steht eine Schicht in der eingeklappten Gruppe? Was bis Sonntag dran ist,
+ * was mich betrifft (eingeteilt/gemeldet) und was vorbei, aber noch nicht
+ * bestätigt ist. EINE Regel für die Gruppe und die Höhenschätzung der
+ * Laptop-Spalten – vorher zählte die Schätzung auch „nicht bekommen“ mit.
+ */
+function sichtbarEingeklappt(t: Termin, bisSonntag: string, jetzt: number, st: (t: Termin) => SchichtStatus): boolean {
+  return t.datum <= bisSonntag || st(t) === "eingeteilt" || st(t) === "gemeldet" || schichtEnde(t).getTime() < jetzt;
+}
+
+/**
  * Die ausgeschriebenen Aktionen im Events-Reiter („Mitmachen“).
  *
  * Für alle: sehen, wann Waffelverkauf ist, und sich eintragen.
@@ -251,7 +261,7 @@ export function AktionenListe({ onAendern }: { onAendern?: (t: Termin) => void }
   const bisSonntag = sonntagVon(heuteKey());
   const hoehe = (b: Block) => {
     const sichtbar = b.aufklappbar
-      ? Math.max(1, b.schichten.filter((t) => t.datum <= bisSonntag || st(t) !== null || schichtEnde(t).getTime() < jetzt).length)
+      ? Math.max(1, b.schichten.filter((t) => sichtbarEingeklappt(t, bisSonntag, jetzt, st)).length)
       : b.schichten.length;
     // eingeklappt ohne Fußzeile (der Kopf zeigt „n Termine · k weitere“)
     return 1.2 + sichtbar;
@@ -388,8 +398,7 @@ function AktionGruppe({
   const naechste = kommend[0] || schichten[0];
   const farbe = farbeVon(naechste);
 
-  const wichtig = (t: Termin) =>
-    t.datum <= bisSonntag || st(t) === "eingeteilt" || st(t) === "gemeldet" || schichtEnde(t).getTime() < jetzt;
+  const wichtig = (t: Termin) => sichtbarEingeklappt(t, bisSonntag, jetzt, st);
   let sichtbar = schichten;
   if (block.aufklappbar && !auf) {
     sichtbar = schichten.filter(wichtig);
@@ -401,14 +410,16 @@ function AktionGruppe({
     <>
       <span
         aria-hidden
-        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-[11px] text-[22px] leading-none ${
+        // unter 360 px ohne das Zeichen – der Titel braucht den Platz
+        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-[11px] text-[22px] leading-none max-[359px]:hidden ${
           farbe ? farbe.chip : "bg-brand/10 dark:bg-brand/20"
         }`}
       >
         {erste?.icon || naechste.icon || "📌"}
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-[16px] font-semibold leading-tight">{block.titel}</span>
+        {/* zweizeilig statt abgeschnitten („Kuchenverkauf Elternspr…“ neben dem Prozent) */}
+        <span className="line-clamp-2 block text-[16px] font-semibold leading-tight [overflow-wrap:anywhere]">{block.titel}</span>
         <span className="mt-0.5 block truncate text-[13px] text-tinte-leise">
           {schichten.length === 1 ? "1 Termin" : `${schichten.length} Termine`}
           {/* eingeklappt: wie viele noch dahinter stehen */}

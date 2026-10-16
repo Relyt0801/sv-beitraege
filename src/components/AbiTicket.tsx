@@ -613,16 +613,15 @@ export function TicketFamilie({
   return (
     <section className="card p-4 sm:p-5" aria-label="Abiball-Tickets">
       <AusHinweis funktion="abiball" className="mb-2" />
-      <h2 className="text-[15px] font-semibold">
-        {zeigen ? "Abiball-Tickets" : "Mithilfe senkt den Ticketpreis"}
-        {/* Vor dem Verkauf am Handy: eine Zeile statt Ticket und Hinweiskasten
-            darunter (~130 px ohne neue Information) */}
-        {knapp && (
-          <span className={`block text-[12.5px] font-normal text-tinte-leise ${knappDa}`}>
-            Eltern &amp; Gäste: {gaestePreis.preisSteht ? `${gaestePreis.weiteres} € je Karte` : "Preis folgt"} · Verkauf noch nicht gestartet
-          </span>
-        )}
-      </h2>
+      <h2 className="text-[15px] font-semibold">{zeigen ? "Abiball-Tickets" : "Mithilfe senkt den Ticketpreis"}</h2>
+      {/* Vor dem Verkauf am Handy: eine Zeile statt Ticket und Hinweiskasten
+          darunter (~130 px ohne neue Information) – neben, nicht in der
+          Überschrift (sonst liest VoiceOver sie als Teil des Titels) */}
+      {knapp && (
+        <p className={`text-[12.5px] text-tinte-leise ${knappDa}`}>
+          Eltern &amp; Gäste: {gaestePreis.preisSteht ? `${gaestePreis.weiteres} € je Karte` : "Preis folgt"} · Verkauf noch nicht gestartet
+        </p>
+      )}
       {/* Am Laptop behält das Ticket Ticket-Maße (vorher ~780 px breit gezogen) */}
       <div
         className={`grid ${zeigen && breit ? "min-[700px]:grid-cols-2 min-[700px]:items-start min-[700px]:gap-x-6 lg:grid-cols-[minmax(0,24rem)_minmax(0,1fr)] lg:gap-x-10" : ""}`}

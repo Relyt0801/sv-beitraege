@@ -891,7 +891,8 @@ function KostenKarte({
           onClick={() => setListeAuf(true)}
         >
           <span className="zahl truncate text-[15px] text-tinte-leise">
-            {!kosten.bereit ? "…" : offene.length > 0 ? `${offene.length} offen` : erledigte.length > 0 ? `keine offen · ${erledigte.length} erledigt` : "keine"}
+            {/* kurz – „keine offen · 3 erledigt“ passte am iPhone nicht; die Erledigten stehen im Blatt */}
+            {!kosten.bereit ? "…" : offene.length > 0 ? `${offene.length} offen` : erledigte.length > 0 ? "keine offen" : "keine"}
           </span>
         </Zeile>
         <Sheet open={listeAuf} onClose={() => setListeAuf(false)}>
