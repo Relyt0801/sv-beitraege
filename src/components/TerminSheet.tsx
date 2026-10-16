@@ -715,6 +715,21 @@ export function TerminAnsehen({
         </Gruppe>
       )}
 
+      {/* Eingeteilt und es klappt doch nicht: direkt dem Stufenteam schreiben
+          (vorher war das Blatt eine Sackgasse ohne jede Aktion) */}
+      {status === "eingeteilt" && !darf && !schichtVorbei && (
+        <Gruppe className="mt-4" fuss="Das Stufenteam sucht dann Ersatz.">
+          <Zeile
+            blau
+            label="Kann nicht? Stufenteam schreiben"
+            onClick={() => {
+              onSchliessen();
+              window.location.hash = "chats/team";
+            }}
+          />
+        </Gruppe>
+      )}
+
       {termin_.beschreibung && (
         <Gruppe titel="Notiz">
           <p className="whitespace-pre-wrap px-4 py-3 text-[15px] leading-relaxed text-tinte-matt dark:text-slate-300">{termin_.beschreibung}</p>

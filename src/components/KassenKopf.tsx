@@ -179,20 +179,44 @@ function KassenKopfRoh({
           aria-label={waehlen ? "Laufendes Halbjahr" : "Die sechs Halbjahre"}
           className="grid grid-cols-3 gap-1 min-[375px]:grid-cols-6 sm:gap-1.5"
         >
-          {halbjahre.map((h) =>
-            waehlen && halbjahrSetzen ? (
+          {halbjahre.map((h) => {
+            // Gleicher Inhalt in beiden Zuständen – „ändern“ macht die Kacheln
+            // nur antippbar (laufendes = blau gefüllt). Vorher wurden daraus
+            // flachere Knöpfe, und die Liste darunter sprang um 14–22 px.
+            const weiss = waehlen && h.laeuft;
+            const inhalt = (
+              <>
+                <div className="flex items-baseline justify-between gap-1">
+                  <span className={`text-[12px] font-bold ${weiss ? "text-white" : h.laeuft ? "text-brand" : ""}`}>{h.name}</span>
+                  <span className={`zahl hidden text-[12px] font-semibold sm:inline ${weiss ? "text-white/85" : "text-tinte-leise"}`}>{h.preis} €</span>
+                </div>
+                <div
+                  className={`zahl mt-1 whitespace-nowrap text-[13px] font-bold leading-none tracking-[-0.02em] min-[400px]:text-[15px] sm:text-[17px] sm:tracking-normal ${weiss ? "text-white" : h.laeuft ? "text-brand" : ""}`}
+                >
+                  {/* schmales, festes Leerzeichen: „100 %“ bricht nie um */}
+                  {h.kommtNoch ? "–" : `${h.quote}\u202f%`}
+                </div>
+                {/* Kein Abschneiden („12 off…“ bei 375 px): passt „87 offen“ nicht
+                    in die Kachel, bricht „offen“ in die nächste Zeile um. */}
+                <div className={`mt-0.5 text-[12px] leading-tight ${weiss ? "text-white/85" : "text-tinte-leise"}`}>
+                  {h.kommtNoch ? "später" : h.rest === 0 ? "fertig" : `${h.rest} offen`}
+                </div>
+              </>
+            );
+            return waehlen && halbjahrSetzen ? (
               <button
                 key={h.name}
                 role="radio"
                 aria-checked={h.laeuft}
+                aria-label={h.name}
                 onClick={() => {
                   if (!h.laeuft) halbjahrSetzen(h.name);
                 }}
-                className={`min-h-[3.25rem] rounded-xl text-[13px] font-bold transition active:scale-95 ${
-                  h.laeuft ? "bg-brand text-white" : "bg-papier text-tinte dark:bg-slate-800/60 dark:text-slate-100"
+                className={`min-w-0 rounded-xl border px-1 py-1.5 text-left transition active:scale-95 sm:p-2 ${
+                  h.laeuft ? "border-brand bg-brand" : "border-brand/25 bg-papier dark:bg-slate-800/60"
                 }`}
               >
-                {h.name}
+                {inhalt}
               </button>
             ) : (
               <div
@@ -201,24 +225,10 @@ function KassenKopfRoh({
                   h.laeuft ? "border-brand/40 bg-brand/[0.06]" : "border-transparent bg-papier dark:bg-slate-800/60"
                 }`}
               >
-                <div className="flex items-baseline justify-between gap-1">
-                  <span className={`text-[12px] font-bold ${h.laeuft ? "text-brand" : ""}`}>{h.name}</span>
-                  <span className="zahl hidden text-[12px] font-semibold text-tinte-leise sm:inline">{h.preis} €</span>
-                </div>
-                <div
-                  className={`zahl mt-1 whitespace-nowrap text-[13px] font-bold leading-none tracking-[-0.02em] min-[400px]:text-[15px] sm:text-[17px] sm:tracking-normal ${h.laeuft ? "text-brand" : ""}`}
-                >
-                  {/* schmales, festes Leerzeichen: „100 %“ bricht nie um */}
-                  {h.kommtNoch ? "–" : `${h.quote}\u202f%`}
-                </div>
-                {/* Kein Abschneiden („12 off…“ bei 375 px): passt „87 offen“ nicht
-                    in die Kachel, bricht „offen“ in die nächste Zeile um. */}
-                <div className="mt-0.5 text-[12px] leading-tight text-tinte-leise">
-                  {h.kommtNoch ? "später" : h.rest === 0 ? "fertig" : `${h.rest} offen`}
-                </div>
+                {inhalt}
               </div>
-            ),
-          )}
+            );
+          })}
         </div>
       </div>
     </div>

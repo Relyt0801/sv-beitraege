@@ -169,6 +169,11 @@ export function ChatsTab() {
       if (!m) return;
       history.replaceState(null, "", window.location.pathname + window.location.search);
       const ziel = decodeURIComponent(m[1]);
+      // „#chats/team“: Schüler öffnen ihr Gespräch mit dem Stufenteam
+      if (unter && ziel === "team" && !isStaff) {
+        setOpenId(null);
+        return setTeamOffen(true);
+      }
       if (unter && isStaff && (["anfragen", "schueler", "eltern", "elterninfos"] as const).includes(ziel as never)) {
         setOpenId(null);
         return setAnsicht(ziel as Ansicht);

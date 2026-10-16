@@ -303,7 +303,23 @@ function Main() {
     () => tabAusAdresse(false) || letzterReiter() || (roleReady && hatProfilReiter ? "profil" : "kasse"),
   );
   // Kasse: Personen oder (wer darf) Beiträge & Abiball – früher ein eigener Reiter
-  const [kasseTeil, setKasseTeil] = useState<"personen" | "beitraege">("personen");
+  // Gewählter Teil der Kasse bleibt beim Reiterwechsel (pro Sitzung) –
+  // vorher sprang „Beiträge & Abiball“ immer zurück auf „Personen“
+  const [kasseTeil, setKasseTeilRoh] = useState<"personen" | "beitraege">(() => {
+    try {
+      return sessionStorage.getItem("sv:kasse-teil") === "beitraege" ? "beitraege" : "personen";
+    } catch {
+      return "personen";
+    }
+  });
+  const setKasseTeil = useCallback((t: "personen" | "beitraege") => {
+    setKasseTeilRoh(t);
+    try {
+      sessionStorage.setItem("sv:kasse-teil", t);
+    } catch {
+      /* egal */
+    }
+  }, []);
   // Prüfaufgaben des Teams („Zu erledigen“: Schichten bestätigen, Zitate,
   // Nachträge …) als Zahl an dem Reiter, auf dem die Liste steht – vorher wies
   // nichts darauf hin, wer zuletzt in Kasse, Rollen oder Events war. Was schon
@@ -472,7 +488,6 @@ function Main() {
     if (tab !== "kasse") {
       setMassMode(false);
       setShowFilter(false);
-      setKasseTeil("personen");
     }
   }, [tab]);
   // Auswahl und Filter gehören zur Personenliste – nicht zu „Beiträge & Abiball“
@@ -506,9 +521,11 @@ function Main() {
   // „lädt weitere …“ für immer da (iPhone, 28.09.).
   const [nachschub, setNachschub] = useState<HTMLElement | null>(null);
 
+  // Nicht beim Reiterwechsel zurücksetzen: sonst wäre die Liste beim
+  // Zurückkommen wieder kurz und die gemerkte Stelle (ab Person 40) weg
   useEffect(() => {
     setSichtbar(SCHRITT_LISTE);
-  }, [suche, min, max, onlyOpen, tab]);
+  }, [suche, min, max, onlyOpen]);
 
   // In „Nur offene“ bleibt, wer gerade abgehakt wurde, stehen (mit Haken),
   // bis Filter, Suche oder Reiter wechseln – sonst verschwand die Zeile beim

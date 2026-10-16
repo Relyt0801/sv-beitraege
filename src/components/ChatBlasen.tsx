@@ -101,15 +101,6 @@ export function ChatBlase({
         )}
         <div className={`mt-0.5 text-right text-[12px] ${meins ? "text-white/90" : "text-tinte-leise"}`}>
           {new Date(m.created_at).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })}
-          {(meins || darfLoeschen) && (
-            <button
-              onClick={() => void frage("Nachricht löschen?", "Löschen", true).then((ok) => { if (ok) void onDelete(m.id); })}
-              // Kleine Schrift, aber große Trefferfläche (Padding hebt sich mit negativem Rand auf)
-              className="-my-2.5 ml-1 px-2 py-2.5 underline"
-            >
-              löschen
-            </button>
-          )}
           {!meins && <MuteKnopf userId={m.created_by} name={m.author} topicId={m.topic_id} />}
         </div>
       </div>
@@ -151,6 +142,18 @@ export function ChatBlase({
               void navigator.clipboard?.writeText(m.body).then(() => melde("Kopiert"), () => undefined);
               setMenue(null);
             }}
+            // Löschen im Menü der Blase (lange drücken bzw. Rechtsklick) wie in
+            // iMessage – vorher stand „löschen“ als Textlink in jeder eigenen Blase
+            onLoeschen={
+              meins || darfLoeschen
+                ? () => {
+                    setMenue(null);
+                    void frage("Nachricht löschen?", "Löschen", true).then((ok) => {
+                      if (ok) void onDelete(m.id);
+                    });
+                  }
+                : undefined
+            }
             onSchliessen={() => setMenue(null)}
           />,
           document.body,
@@ -278,7 +281,7 @@ function WerReagiert({
  * über der Nachricht die Leiste mit den Reaktionen, darunter „Kopieren“.
  */
 function ReaktionsMenue({
-  rect, rechts, meine, liste, uid, onWahl, onKopieren, onMelden, onSchliessen,
+  rect, rechts, meine, liste, uid, onWahl, onKopieren, onMelden, onLoeschen, onSchliessen,
 }: {
   rect: DOMRect;
   rechts: boolean;
@@ -290,6 +293,7 @@ function ReaktionsMenue({
   onKopieren: () => void;
   /** nur bei fremden Nachrichten */
   onMelden?: () => void;
+  onLoeschen?: () => void;
   onSchliessen: () => void;
 }) {
   // Im gemeinsamen Escape-Stapel (Sheet.tsx): Escape schließt nur das Menü,
@@ -377,7 +381,7 @@ function ReaktionsMenue({
       ) : (
         <div
           className="absolute w-44 animate-popIn overflow-hidden rounded-2xl bg-white/95 shadow-glas backdrop-blur-xl dark:bg-slate-800/95"
-          style={{ left: Math.max(8, Math.min(vw - 184, rechts ? rect.right - 176 : rect.left)), top: Math.min(menueOben, window.innerHeight - (onMelden ? 112 : 60)) }}
+          style={{ left: Math.max(8, Math.min(vw - 184, rechts ? rect.right - 176 : rect.left)), top: Math.min(menueOben, window.innerHeight - (60 + (onMelden ? 52 : 0) + (onLoeschen ? 52 : 0))) }}
         >
           <button
             onClick={onKopieren}
@@ -391,6 +395,14 @@ function ReaktionsMenue({
               className="flex w-full items-center justify-between border-t border-black/[0.06] px-4 py-3 text-left text-[15px] font-medium text-red-600 hover:bg-black/[0.04] dark:border-white/[0.08] dark:text-red-400 dark:hover:bg-white/[0.06]"
             >
               Melden <span aria-hidden>⚑</span>
+            </button>
+          )}
+          {onLoeschen && (
+            <button
+              onClick={onLoeschen}
+              className="flex w-full items-center justify-between border-t border-black/[0.06] px-4 py-3 text-left text-[15px] font-medium text-red-600 hover:bg-black/[0.04] dark:border-white/[0.08] dark:text-red-400 dark:hover:bg-white/[0.06]"
+            >
+              Löschen <Icon name="muell" size={16} />
             </button>
           )}
         </div>

@@ -280,8 +280,13 @@ button:not(:disabled) {
     @apply flex rounded-[0.6rem] bg-[rgb(118_118_128/0.12)] p-[2px] dark:bg-[rgb(118_118_128/0.24)];
   }
   .seg-item {
-    @apply min-w-0 flex-1 rounded-[0.5rem] px-3 py-1.5 text-center text-[13px] font-semibold text-tinte
+    @apply relative min-w-0 flex-1 rounded-[0.5rem] px-3 py-1.5 text-center text-[13px] font-semibold text-tinte
            transition duration-200 ease-ios dark:text-slate-100;
+  }
+  /* Tippfläche 44 px hoch, auch wenn das Segment schmal aussieht (wie iOS) */
+  .seg-item::after {
+    content: "";
+    @apply absolute inset-x-0 -inset-y-1.5;
   }
   .seg-aktiv {
     @apply bg-white shadow-[0_3px_8px_rgba(0,0,0,.12),0_3px_1px_rgba(0,0,0,.04)] dark:bg-slate-600;

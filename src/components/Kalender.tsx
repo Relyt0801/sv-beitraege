@@ -593,13 +593,14 @@ function WochenAnsicht({
                     onClick={() => onOeffnen(t)}
                     className={`min-h-[44px] min-w-0 rounded-lg px-2 py-1.5 text-left transition active:scale-[.98] ${chipKlasse(t, meins(t), st(t))}`}
                   >
-                    <span className="block truncate text-[13px] font-bold leading-tight">
+                    {/* Woche: Spalten sind schmal, aber hoch – Titel darf zweizeilig sein */}
+                    <span className="line-clamp-2 break-words text-[13px] font-bold leading-tight">
                       {schichtVorzeichen(st(t))}
                       {t.privat ? "📱 " : <Zeichen icon={t.icon} auf={meins(t) || st(t) === "eingeteilt"} klein />}
                       {t.titel}
                     </span>
                     <span
-                      className={`block truncate text-[12px] ${
+                      className={`line-clamp-2 break-words text-[12px] ${
                         (meins(t) && st(t) !== "nicht") || st(t) === "eingeteilt" ? "text-white" : "opacity-80"
                       }`}
                     >
