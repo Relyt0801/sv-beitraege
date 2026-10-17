@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type AnimationEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { scrollSperren } from "../lib/scrollsperre";
 import { useBreit } from "../lib/gescrollt";
@@ -689,6 +689,14 @@ function useObersteEbene(sichtbar: boolean): boolean {
   return useSyncExternalStore(ebenenAbo, () => offeneEbenen[offeneEbenen.length - 1] === ich);
 }
 
+// Seitenleiste am Laptop (ChatSeitenleiste): Jede Ebene zeichnet ihre eigene
+// Kopie, sie soll sich aber wie EINE verhalten – derselbe Scrollstand, und
+// nach einem Tipp in der Leiste blendet die neue Ebene nicht ein und der Fokus
+// bleibt auf dem Eintrag (Prüfung Runde 11: Leiste sprang nach oben und fuhr
+// mit ein, der Fokus fiel auf <body>).
+const leiste = { scroll: 0, wechsel: -Infinity };
+const ueberLeiste = () => performance.now() - leiste.wechsel < 800;
+
 /**
  * Ein geöffneter Chat (oder eine Unterseite wie „Anfragen“) als Vollbild-Ebene.
  *
@@ -789,8 +797,40 @@ export function ChatEbene({
   }, [breit, sichtbar]);
 
   // Am Laptop mit Seitenleiste: Liste links in der Spalte, der Chat rechts
-  // daneben – Verlauf und Eingabe nur über der rechten Seite.
-  const mitSeite = Boolean(kopfZiel && seite);
+  // daneben – Verlauf und Eingabe nur über der rechten Seite. Hängt nur an
+  // Breite und Context, nicht an kopfZiel/sichtbar, und der Baum unten ist in
+  // jedem Zustand gleich: Sonst baute React beim Öffnen und Drehen Verlauf,
+  // Eingabe und Blätter neu auf (Scroll-Merker hing am alten Element,
+  // Entwürfe waren weg – Prüfung Runde 11).
+  const mitSeite = Boolean(breit && seite);
+  // Die Liste zeigt nur die oberste Ebene (sonst zwei „Alle Chats“, und die
+  // verdeckte bliebe im Tab-Weg); der Platz dafür bleibt immer frei.
+  const mitLeiste = mitSeite && oben && sichtbar;
+  const seiteRef = useRef<HTMLDivElement>(null);
+  const inhaltRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const el = seiteRef.current;
+    if (!mitLeiste || !el) return;
+    el.scrollTop = leiste.scroll;
+    const aktiv = el.querySelector<HTMLElement>('[aria-current="page"]');
+    if (!aktiv) return;
+    // Der markierte Eintrag ist immer zu sehen …
+    const r = aktiv.getBoundingClientRect();
+    const k = el.getBoundingClientRect();
+    if (r.top < k.top) el.scrollTop -= k.top - r.top + 8;
+    else if (r.bottom > k.bottom) el.scrollTop += r.bottom - k.bottom + 8;
+    // … und nach einem Wechsel über die Leiste hat er den Fokus
+    if (ueberLeiste()) aktiv.focus({ preventScroll: true });
+  }, [mitLeiste]);
+  // Einblenden nur beim Öffnen – nicht nach einem Tipp in der Leiste und
+  // nicht beim Drehen. Mit Leiste blendet nur der Chat ein, die Leiste steht.
+  const [einblenden, setEinblenden] = useState(() => !ueberLeiste());
+  useLayoutEffect(() => {
+    if (sichtbar) setEinblenden(!ueberLeiste());
+  }, [sichtbar]);
+  const eingeblendet = (e: AnimationEvent) => {
+    if (e.target === ebeneRef.current || e.target === inhaltRef.current) setEinblenden(false);
+  };
 
   // Die Seite dahinter scrollt nicht mit
   useEffect(() => {
@@ -822,7 +862,9 @@ export function ChatEbene({
     if (sc && warUnten.current) sc.scrollTop = sc.scrollHeight;
   }, [sicht.hoehe, fussH]);
 
-  const spalte = mitSeite ? "px-3 sm:px-5" : "mx-auto max-w-5xl px-3 sm:px-5";
+  // Mit Leiste nur links Abstand: rechts endet der Chat bündig mit Spalte und
+  // Kopfzeile (die äußere Hülle hat den Rand schon)
+  const spalte = mitSeite ? "pl-3 sm:pl-5" : "mx-auto max-w-5xl px-3 sm:px-5";
   const verlauf = (
     <>
       {/* Verlauf: läuft unter Kopf- und Fußleiste durch (Glas) */}
@@ -864,13 +906,11 @@ export function ChatEbene({
         sicht.tastatur ? "pb-2" : "pb-[calc(env(safe-area-inset-bottom)+0.5rem)]"
       }`}
     >
-      {mitSeite ? (
-        <div className="mx-auto max-w-5xl px-3 sm:px-5">
-          <div className={`ml-72 ${spalte}`}>{fuss}</div>
-        </div>
-      ) : (
-        <div className={spalte}>{fuss}</div>
-      )}
+      {/* Immer dieselben zwei Hüllen, nur die Klassen wechseln (die Eingabe
+          bleibt beim Drehen eingehängt – Entwurf und Fokus bleiben) */}
+      <div className={mitSeite ? "mx-auto max-w-5xl px-3 sm:px-5" : "contents"}>
+        <div className={mitSeite ? `ml-72 ${spalte}` : spalte}>{fuss}</div>
+      </div>
     </div>
   );
 
@@ -880,27 +920,43 @@ export function ChatEbene({
       role="region"
       aria-label={label}
       className={`ebene-grund fixed inset-x-0 top-0 z-[45] flex h-[100dvh] flex-col bg-papier dark:bg-slate-950 lg:bottom-0 lg:top-[var(--kopf)] lg:z-[15] lg:h-auto ${
-        sichtbar ? "animate-vonRechts" : "hidden"
+        !sichtbar ? "hidden" : einblenden && !mitSeite ? "animate-vonRechts" : ""
       }`}
       style={sicht.hoehe ? { height: sicht.hoehe, top: sicht.oben } : undefined}
+      onAnimationEnd={eingeblendet}
     >
-      {mitSeite ? (
-        // Liste und Chat in derselben Spalte wie Kopfzeile und Seiten (max-w-5xl):
-        // die Liste fluchtet links mit dem Titel, der Chat füllt den Rest. Die
-        // Liste ist eine Karte (ChatsTab) nur so hoch wie ihr Inhalt: lesbar auf
-        // dem Hintergrundbild, und zwei Einträge wirken nicht wie eine leere Spalte.
-        <div className="mx-auto flex min-h-0 w-full max-w-5xl flex-1 px-3 sm:px-5">
+      {/* Liste und Chat in derselben Spalte wie Kopfzeile und Seiten (max-w-5xl):
+          die Liste fluchtet links mit dem Titel, der Chat füllt den Rest. Die
+          Liste ist eine Karte (ChatsTab) nur so hoch wie ihr Inhalt: lesbar auf
+          dem Hintergrundbild, und zwei Einträge wirken nicht wie eine leere
+          Spalte. Ohne Leiste sind beide Hüllen „contents“ – derselbe Baum. */}
+      <div className={mitSeite ? "mx-auto flex min-h-0 w-full max-w-5xl flex-1 px-3 sm:px-5" : "contents"}>
+        {mitSeite && (
+          // Endet über dem Eingabe-Band (marginBottom): ein fokussierter
+          // Eintrag rutscht nie darunter
           <div
-            className="w-72 shrink-0 overflow-y-auto overscroll-contain pr-2 pt-3"
-            style={{ paddingBottom: (fuss ? fussH : 0) + 12 }}
+            ref={seiteRef}
+            className="w-72 shrink-0 overflow-y-auto overscroll-contain pb-3 pr-2 pt-3"
+            style={{ marginBottom: fuss ? fussH : 0 }}
+            onScroll={(e) => {
+              leiste.scroll = e.currentTarget.scrollTop;
+            }}
+            onClickCapture={(e) => {
+              if ((e.target as Element).closest("button")) leiste.wechsel = performance.now();
+            }}
           >
-            {seite}
+            {mitLeiste ? seite : null}
           </div>
-          <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">{verlauf}</div>
+        )}
+        <div
+          ref={inhaltRef}
+          className={
+            mitSeite ? `relative flex min-h-0 min-w-0 flex-1 flex-col ${sichtbar && einblenden ? "animate-vonRechts" : ""}` : "contents"
+          }
+        >
+          {verlauf}
         </div>
-      ) : (
-        verlauf
-      )}
+      </div>
       {fussBand}
     </div>,
     document.body,

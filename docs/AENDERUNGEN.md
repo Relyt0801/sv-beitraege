@@ -45,6 +45,32 @@ ausführlich (auf Deutsch); hier steht der Überblick dazu.
   - Vorher war jede Zeile 1600 px breit, und „Abstimmen“ bzw. „1 offen“
     stand weit weg vom Text.
   - Am Handy bleibt es eine Spalte.
+- **Korrekturen nach der Prüfung** (14 bestätigte Funde, `ChatBlasen.tsx`):
+  - **Baum stabil:** Mit und ohne Leiste hat `ChatEbene` denselben Aufbau.
+    Ohne Leiste stehen die Hüllen auf `contents`, und `mitSeite` hängt nur
+    an Breite und Context. Vorher baute React beim Öffnen und Drehen
+    Verlauf, Eingabe und Blätter neu auf. Folgen waren:
+    - Der Chat sprang beim Nachlesen nach unten.
+    - Beim Drehen gingen Entwürfe und der Fokus verloren.
+    - Die Anfragen luden bei jedem Öffnen neu.
+  - **Die Leiste verhält sich wie eine,** obwohl jede Ebene sie selbst
+    zeichnet. Den Scrollstand teilen sich alle Ebenen, und der markierte
+    Eintrag ist immer zu sehen. Nach einem Tipp in der Leiste:
+    - blendet die neue Ebene nicht ein, nichts scheint durch;
+    - liegt der Fokus auf dem neuen Eintrag, nicht auf `<body>`.
+  - **Einblenden:** Nur beim Öffnen. Mit Leiste blendet nur der Chat ein,
+    die Leiste steht still.
+  - **Gestapelte Ebenen:** Die Leiste steht nur in der obersten Ebene.
+    Vorher gab es zwei Navigationen „Alle Chats“ und 13 unsichtbare
+    Tab-Stopps.
+  - **Kleineres:**
+    - Die Leiste endet über dem Eingabe-Band, ein fokussierter Eintrag
+      liegt nie darunter.
+    - Chat und Eingabe fluchten rechts wieder mit der Kopfzeile.
+    - Der markierte Eintrag hat dunkel 4,5:1 Kontrast (`text-brand-dark`).
+    - Der Screenreader liest bei „Anfragen“ „3 offen“ statt „3 neu“.
+    - „Eltern“ führt aus einem offenen Gespräch zurück zur Liste, wie
+      „Schüler“.
 - **Bewusst nicht geändert:** Kurze Seiten am Laptop (Eltern „Infos“ und
   „Konto“) sind kurz, weil es dort wenig gibt. Alles steht auf einem
   Bildschirm, ohne Loch mitten in der Seite. Karten künstlich zu strecken

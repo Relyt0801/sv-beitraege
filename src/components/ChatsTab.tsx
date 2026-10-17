@@ -263,6 +263,8 @@ export function ChatsTab() {
   const glocke = (k: Kategorie) => ({ an: kategorieAn(mitteilungen, k), setAn: (an: boolean) => void setKategorie(k, an) });
   // Laptop/iPad quer: neben einem offenen Chat links alle Chats (Seitenleiste)
   const breit = useBreit();
+  // „Eltern“ in der Leiste: zählt hoch → ElternGespraecheEbene schließt ein offenes Gespräch
+  const [elternListe, setElternListe] = useState(0);
 
   if (!ready)
     return (
@@ -349,6 +351,8 @@ export function ChatsTab() {
     zeichen: React.ReactNode,
     zahl: number,
     onClick: () => void,
+    // wie zahlWort an den Kacheln: Anfragen sind „offen“, nicht „neu“
+    zahlWort = "neu",
   ) => {
     const aktiv = aktivSeite === key;
     return (
@@ -358,7 +362,8 @@ export function ChatsTab() {
           onClick={onClick}
           aria-current={aktiv ? "page" : undefined}
           className={`flex min-h-[44px] w-full items-center gap-2.5 rounded-xl px-2.5 py-1.5 text-left text-[14.5px] transition ${
-            aktiv ? "bg-brand/10 font-semibold text-brand-dark dark:bg-brand/20 dark:text-brand" : "active:bg-black/[0.05] dark:active:bg-white/[0.07]"
+            // text-brand-dark = Text auf getöntem Grund (dunkel #78B6FF, 4,5:1)
+            aktiv ? "bg-brand/10 font-semibold text-brand-dark dark:bg-brand/20" : "active:bg-black/[0.05] dark:active:bg-white/[0.07]"
           }`}
         >
           {zeichen}
@@ -366,7 +371,7 @@ export function ChatsTab() {
           {zahl > 0 && (
             <span className="zahl flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-red-500 px-1.5 text-[12px] font-bold text-white">
               <span aria-hidden>{zahl > 9 ? "9+" : zahl}</span>
-              <span className="sr-only">{`, ${zahl} neu`}</span>
+              <span className="sr-only">{`, ${zahl} ${zahlWort}`}</span>
             </span>
           )}
         </button>
@@ -397,12 +402,18 @@ export function ChatsTab() {
       {isStaff
         ? [
             seitenGruppe(null, [
-              seitenEintrag("anfragen", "Anfragen", seitenSymbol("bg-[#FF9500]", "haken"), anfragenZahl, () => wechsle({ ansicht: "anfragen" })),
+              seitenEintrag("anfragen", "Anfragen", seitenSymbol("bg-[#FF9500]", "haken"), anfragenZahl, () => wechsle({ ansicht: "anfragen" }), "offen"),
               ...(teamChat
                 ? [seitenEintrag(teamChat.id, "Stufenteam-Chat", seitenSymbol("bg-[#007AFF]", "chats"), unreadCount(teamChat.id), () => wechsle({ chat: teamChat.id }))]
                 : []),
               seitenEintrag("schueler", "Schüler", seitenSymbol("bg-[#1C9CB8]", "person"), ticketUngelesen, () => wechsle({ ansicht: "schueler" })),
-              seitenEintrag("eltern", "Eltern", seitenSymbol("bg-[#E8264F]", "rollen"), eltern.neu, () => wechsle({ ansicht: "eltern" })),
+              // Wie „Schüler“ bei offenem Ticket: ein Tipp führt aus einem
+              // offenen Gespräch zurück zur Liste (das Gespräch liegt in
+              // ElternGespraecheEbene, darum ein Zähler statt openId)
+              seitenEintrag("eltern", "Eltern", seitenSymbol("bg-[#E8264F]", "rollen"), eltern.neu, () => {
+                wechsle({ ansicht: "eltern" });
+                setElternListe((n) => n + 1);
+              }),
               seitenEintrag("elterninfos", "Infos für Eltern", seitenSymbol("bg-[#A64BDB]", "info"), 0, () => wechsle({ ansicht: "elterninfos" })),
             ]),
             seitenGruppe(meineChats.length ? "Deine Komitees" : null, meineChats.map(komiteeEintrag)),
@@ -649,7 +660,7 @@ export function ChatsTab() {
           glocke={glocke("schueler")}
         />
       )}
-      {isStaff && ansicht === "eltern" && <ElternGespraecheEbene onBack={() => setAnsicht(null)} glocke={<MitteilungsGruppe {...glocke("eltern")} name="Chats mit Eltern" fuss="Kommt als Mitteilung aufs Handy, sobald Eltern schreiben." />} />}
+      {isStaff && ansicht === "eltern" && <ElternGespraecheEbene liste={elternListe} onBack={() => setAnsicht(null)} glocke={<MitteilungsGruppe {...glocke("eltern")} name="Chats mit Eltern" fuss="Kommt als Mitteilung aufs Handy, sobald Eltern schreiben." />} />}
       {isStaff && ansicht === "elterninfos" && <ElternInfosEbene onBack={() => setAnsicht(null)} />}
 
       {/* Schüler: durchgehender Chat mit dem Stufenteam */}
