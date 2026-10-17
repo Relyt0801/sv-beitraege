@@ -758,6 +758,7 @@ export function ChatEbene({
 }) {
   const sicht = useSichtfenster(sichtbar);
   const oben = useObersteEbene(sichtbar);
+  const seite = useContext(ChatSeitenleiste);
   const ebeneRef = useRef<HTMLDivElement>(null);
   useEscapeSchliesst(sichtbar && Boolean(onSchliessen), () => {
     // Ein angefangener Text geht mit Esc nicht verloren: Steht noch etwas in
@@ -786,6 +787,10 @@ export function ChatEbene({
   useLayoutEffect(() => {
     setKopfZiel(breit && sichtbar ? document.getElementById("kopf-ebene") : null);
   }, [breit, sichtbar]);
+
+  // Am Laptop mit Seitenleiste: Liste links in der Spalte, der Chat rechts
+  // daneben – Verlauf und Eingabe nur über der rechten Seite.
+  const mitSeite = Boolean(kopfZiel && seite);
 
   // Die Seite dahinter scrollt nicht mit
   useEffect(() => {
@@ -817,16 +822,9 @@ export function ChatEbene({
     if (sc && warUnten.current) sc.scrollTop = sc.scrollHeight;
   }, [sicht.hoehe, fussH]);
 
-  return createPortal(
-    <div
-      ref={ebeneRef}
-      role="region"
-      aria-label={label}
-      className={`ebene-grund fixed inset-x-0 top-0 z-[45] flex h-[100dvh] flex-col bg-papier dark:bg-slate-950 lg:bottom-0 lg:top-[var(--kopf)] lg:z-[15] lg:h-auto ${
-        sichtbar ? "animate-vonRechts" : "hidden"
-      }`}
-      style={sicht.hoehe ? { height: sicht.hoehe, top: sicht.oben } : undefined}
-    >
+  const spalte = mitSeite ? "px-3 sm:px-5" : "mx-auto max-w-5xl px-3 sm:px-5";
+  const verlauf = (
+    <>
       {/* Verlauf: läuft unter Kopf- und Fußleiste durch (Glas) */}
       <div
         ref={scroller}
@@ -837,7 +835,7 @@ export function ChatEbene({
           paddingBottom: fuss ? fussH : "calc(env(safe-area-inset-bottom) + 1.5rem)",
         }}
       >
-        <div className="mx-auto max-w-5xl px-3 sm:px-5">{children}</div>
+        <div className={spalte}>{children}</div>
       </div>
 
       {/* Am Rechner: nur die oberste Ebene legt ihren Kopf in die Kopfzeile –
@@ -853,18 +851,57 @@ export function ChatEbene({
           <div className="mx-auto max-w-5xl px-3 sm:px-5">{kopf}</div>
         </div>
       )}
-
-      {fuss && (
-        <div
-          ref={fussRef}
-          data-ebene-fuss
-          className={`glas absolute inset-x-0 bottom-0 z-10 !bg-[rgb(var(--glas))] pt-2 shadow-[0_-0.5px_0_rgba(0,0,0,0.16)] dark:shadow-[0_-0.5px_0_rgba(255,255,255,0.14)] ${
-            sicht.tastatur ? "pb-2" : "pb-[calc(env(safe-area-inset-bottom)+0.5rem)]"
-          }`}
-        >
-          <div className="mx-auto max-w-5xl px-3 sm:px-5">{fuss}</div>
+    </>
+  );
+  // Eingabe: immer ein Band über die volle Breite der Ebene, wie die Kopfzeile.
+  // Mit Seitenleiste steht nur das Feld unter dem Chat (ml-72 = Breite der
+  // Liste) – ein Band nur über der rechten Seite endete mitten im Bild.
+  const fussBand = fuss && (
+    <div
+      ref={fussRef}
+      data-ebene-fuss
+      className={`glas absolute inset-x-0 bottom-0 z-10 !bg-[rgb(var(--glas))] pt-2 shadow-[0_-0.5px_0_rgba(0,0,0,0.16)] dark:shadow-[0_-0.5px_0_rgba(255,255,255,0.14)] ${
+        sicht.tastatur ? "pb-2" : "pb-[calc(env(safe-area-inset-bottom)+0.5rem)]"
+      }`}
+    >
+      {mitSeite ? (
+        <div className="mx-auto max-w-5xl px-3 sm:px-5">
+          <div className={`ml-72 ${spalte}`}>{fuss}</div>
         </div>
+      ) : (
+        <div className={spalte}>{fuss}</div>
       )}
+    </div>
+  );
+
+  return createPortal(
+    <div
+      ref={ebeneRef}
+      role="region"
+      aria-label={label}
+      className={`ebene-grund fixed inset-x-0 top-0 z-[45] flex h-[100dvh] flex-col bg-papier dark:bg-slate-950 lg:bottom-0 lg:top-[var(--kopf)] lg:z-[15] lg:h-auto ${
+        sichtbar ? "animate-vonRechts" : "hidden"
+      }`}
+      style={sicht.hoehe ? { height: sicht.hoehe, top: sicht.oben } : undefined}
+    >
+      {mitSeite ? (
+        // Liste und Chat in derselben Spalte wie Kopfzeile und Seiten (max-w-5xl):
+        // die Liste fluchtet links mit dem Titel, der Chat füllt den Rest. Die
+        // Liste ist eine Karte (ChatsTab) nur so hoch wie ihr Inhalt: lesbar auf
+        // dem Hintergrundbild, und zwei Einträge wirken nicht wie eine leere Spalte.
+        <div className="mx-auto flex min-h-0 w-full max-w-5xl flex-1 px-3 sm:px-5">
+          <div
+            className="w-72 shrink-0 overflow-y-auto overscroll-contain pr-2 pt-3"
+            style={{ paddingBottom: (fuss ? fussH : 0) + 12 }}
+          >
+            {seite}
+          </div>
+          <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">{verlauf}</div>
+        </div>
+      ) : (
+        verlauf
+      )}
+      {fussBand}
     </div>,
     document.body,
   );
@@ -872,6 +909,14 @@ export function ChatEbene({
 
 /** Wo ein ChatKopf steht: im eigenen Band der Ebene oder in der App-Kopfzeile. */
 const KopfArt = createContext<"band" | "zeile">("band");
+
+/**
+ * Seitenleiste neben einem geöffneten Chat am Laptop/iPad quer (ab 1024 px) –
+ * wie Nachrichten am Mac: links alle Chats, der offene markiert, rechts der
+ * Chat (Runde 11, Okt. 2026). ChatsTab stellt sie bereit; Ebenen außerhalb
+ * (Kalender) haben keine und bleiben, wie sie sind. Am Handy ist sie null.
+ */
+export const ChatSeitenleiste = createContext<ReactNode>(null);
 
 /**
  * Kopfleiste einer ChatEbene: links der runde Zurück-Knopf, in der Mitte

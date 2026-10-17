@@ -8,7 +8,8 @@ import { ElternGespraecheEbene, ElternInfosEbene, useElternZahlen } from "./Elte
 import { COMMITTEES, committeeIcon, committeeLabel } from "../lib/committees";
 import { KomiteePage } from "./KomiteePage";
 import { BannHinweis } from "./BannHinweis";
-import { ChatBlasen, ChatEbene, ChatEingabe, ChatKopf, GespraechKnoepfe, GespraechMehrBlatt } from "./ChatBlasen";
+import { ChatBlasen, ChatEbene, ChatEingabe, ChatKopf, ChatSeitenleiste, GespraechKnoepfe, GespraechMehrBlatt } from "./ChatBlasen";
+import { useBreit } from "../lib/gescrollt";
 import { Avatar } from "./Avatar";
 import { useProfiles } from "../profiles-store";
 import { useStore } from "../store";
@@ -260,6 +261,8 @@ export function ChatsTab() {
   };
 
   const glocke = (k: Kategorie) => ({ an: kategorieAn(mitteilungen, k), setAn: (an: boolean) => void setKategorie(k, an) });
+  // Laptop/iPad quer: neben einem offenen Chat links alle Chats (Seitenleiste)
+  const breit = useBreit();
 
   if (!ready)
     return (
@@ -311,6 +314,108 @@ export function ChatsTab() {
     ? null
     : items.filter((i) => ticketIds.has(i.topic_id) && i.type === "nachricht").sort(neuesteZuerst)[0] ?? null;
   const vorschauZahl = vorschauKomitees.length + (teamLetzte ? 1 : 0);
+
+  // ------------------------------------------------------ Seitenleiste
+  // Am Laptop steht neben jedem aus „Chats“ geöffneten Chat links die Liste
+  // aller Chats – wie Nachrichten am Mac (Runde 11, Okt. 2026). Ein Tipp
+  // wechselt direkt, ohne Zurück; der offene ist markiert. Reihenfolge und
+  // Namen wie die Kacheln, damit man nichts neu suchen muss.
+  const aktivSeite: string | null = offen
+    ? offen.kind === "ticket" && isStaff
+      ? "schueler"
+      : offen.id
+    : teamOffen
+      ? "frag"
+      : ansicht;
+  const wechsle = (ziel: { chat?: string; ansicht?: Ansicht; frag?: boolean }) => {
+    setAnschreiben(false);
+    if (ziel.chat) {
+      setAnsicht(null);
+      setTeamOffen(false);
+      oeffne(ziel.chat);
+    } else if (ziel.frag) {
+      setOpenId(null);
+      setAnsicht(null);
+      setTeamOffen(true);
+    } else {
+      setOpenId(null);
+      setTeamOffen(false);
+      setAnsicht(ziel.ansicht ?? null);
+    }
+  };
+  const seitenEintrag = (
+    key: string,
+    titel: string,
+    zeichen: React.ReactNode,
+    zahl: number,
+    onClick: () => void,
+  ) => {
+    const aktiv = aktivSeite === key;
+    return (
+      <li key={key}>
+        <button
+          type="button"
+          onClick={onClick}
+          aria-current={aktiv ? "page" : undefined}
+          className={`flex min-h-[44px] w-full items-center gap-2.5 rounded-xl px-2.5 py-1.5 text-left text-[14.5px] transition ${
+            aktiv ? "bg-brand/10 font-semibold text-brand-dark dark:bg-brand/20 dark:text-brand" : "active:bg-black/[0.05] dark:active:bg-white/[0.07]"
+          }`}
+        >
+          {zeichen}
+          <span className="min-w-0 flex-1 truncate">{titel}</span>
+          {zahl > 0 && (
+            <span className="zahl flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-red-500 px-1.5 text-[12px] font-bold text-white">
+              <span aria-hidden>{zahl > 9 ? "9+" : zahl}</span>
+              <span className="sr-only">{`, ${zahl} neu`}</span>
+            </span>
+          )}
+        </button>
+      </li>
+    );
+  };
+  const seitenSymbol = (farbe: string, name: IconName) => (
+    <Symbol farbe={farbe}>
+      <Icon name={name} size={15} strich={2.3} />
+    </Symbol>
+  );
+  const komiteeSymbol = (t: Topic) => (
+    <span aria-hidden className="flex h-[29px] w-[29px] shrink-0 items-center justify-center rounded-full bg-[rgb(118_118_128/0.12)] text-[15px] dark:bg-[rgb(118_118_128/0.24)]">
+      {committeeIcon(t.tag)}
+    </span>
+  );
+  const komiteeEintrag = (t: Topic) =>
+    seitenEintrag(t.id, committeeLabel(t.tag), komiteeSymbol(t), zaehlt(t) ? unreadCount(t.id) : 0, () => wechsle({ chat: t.id }));
+  const seitenGruppe = (titel: string | null, eintraege: React.ReactNode[]) =>
+    eintraege.length ? (
+      <div key={titel ?? "oben"} className="py-1">
+        {titel && <div className="px-2.5 pb-1 pt-2 text-[12px] font-semibold uppercase tracking-[0.04em] text-tinte-leise">{titel}</div>}
+        <ul className="grid gap-0.5">{eintraege}</ul>
+      </div>
+    ) : null;
+  const seitenleiste = breit ? (
+    <nav aria-label="Alle Chats" className="card p-1.5">
+      {isStaff
+        ? [
+            seitenGruppe(null, [
+              seitenEintrag("anfragen", "Anfragen", seitenSymbol("bg-[#FF9500]", "haken"), anfragenZahl, () => wechsle({ ansicht: "anfragen" })),
+              ...(teamChat
+                ? [seitenEintrag(teamChat.id, "Stufenteam-Chat", seitenSymbol("bg-[#007AFF]", "chats"), unreadCount(teamChat.id), () => wechsle({ chat: teamChat.id }))]
+                : []),
+              seitenEintrag("schueler", "Schüler", seitenSymbol("bg-[#1C9CB8]", "person"), ticketUngelesen, () => wechsle({ ansicht: "schueler" })),
+              seitenEintrag("eltern", "Eltern", seitenSymbol("bg-[#E8264F]", "rollen"), eltern.neu, () => wechsle({ ansicht: "eltern" })),
+              seitenEintrag("elterninfos", "Infos für Eltern", seitenSymbol("bg-[#A64BDB]", "info"), 0, () => wechsle({ ansicht: "elterninfos" })),
+            ]),
+            seitenGruppe(meineChats.length ? "Deine Komitees" : null, meineChats.map(komiteeEintrag)),
+            seitenGruppe(komiteeTitel, andereChats.map(komiteeEintrag)),
+          ]
+        : [
+            seitenGruppe(meineChats.length ? "Deine Komitees" : null, meineChats.map(komiteeEintrag)),
+            seitenGruppe(null, [
+              seitenEintrag("frag", "Frag das Stufenteam", seitenSymbol("bg-[#007AFF]", "schild"), ticketUngelesen, () => wechsle({ frag: true })),
+            ]),
+          ]}
+    </nav>
+  ) : null;
 
   // ------------------------------------------------------------ Kacheln
   const kacheln: JSX.Element[] = [];
@@ -444,6 +549,7 @@ export function ChatsTab() {
     n === 1 ? "lg:grid-cols-1" : n === 2 ? "lg:grid-cols-2" : n === 3 || n === 5 || n === 6 || n === 9 ? "lg:grid-cols-3" : "lg:grid-cols-4";
 
   return (
+    <ChatSeitenleiste.Provider value={seitenleiste}>
     <div className="space-y-6 pb-4">
       <div className={`grid grid-cols-2 gap-3 ${lgSpalten}`}>
         {kacheln.map((k, i) =>
@@ -580,6 +686,7 @@ export function ChatsTab() {
         </Sheet>
       )}
     </div>
+    </ChatSeitenleiste.Provider>
   );
 }
 
@@ -706,8 +813,10 @@ function KomiteeVorschau({ topic, onOeffnen }: { topic: Topic; onOeffnen: (teil:
     );
   }
   if (!zeilen.length) return null;
+  // Ab Laptop zwei Spalten wie „Zu erledigen“: vorher war jede Zeile 1600 px
+  // breit, „Abstimmen“/„1 offen“ stand weit weg vom Text (Okt. 2026)
   return (
-    <Gruppe className="" titel={committeeLabel(topic.tag)}>
+    <Gruppe className="" titel={committeeLabel(topic.tag)} spalten>
       {zeilen}
     </Gruppe>
   );

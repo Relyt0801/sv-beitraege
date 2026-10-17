@@ -1,4 +1,4 @@
-# Änderungen – Stand 16.10.2026
+# Änderungen – Stand 17.10.2026
 
 Diese Datei erklärt, was sich in den letzten Runden geändert hat, **wo** es im
 Code steht und **warum** es so gebaut ist. Die Kommentare im Code selbst sind
@@ -10,6 +10,56 @@ ausführlich (auf Deutsch); hier steht der Überblick dazu.
 > ausgeschlossen. Bitte so beibehalten.
 
 ---
+
+## Runde 11: Chats am Laptop mit Seitenleiste (17.10.2026)
+
+- **Vorher:** Am Laptop füllte ein geöffneter Chat die ganze Spalte. Wer vom
+  Stufenteam-Chat zu den Anfragen oder in ein Komitee wollte, musste erst
+  zurück, die Kachel suchen und neu öffnen. Das Stufenteam (Vorsitz,
+  Kassenwart) wechselt am Tag oft zwischen Anfragen, Team-Chat, Schüler- und
+  Elternfragen. Dazu kam viel leere Fläche links und rechts vom Verlauf.
+- **Jetzt:** Ab 1024 px (Laptop, iPad quer) steht links in der Spalte die
+  Liste aller Chats, wie bei Nachrichten am Mac. Der offene Chat ist
+  markiert, neue Nachrichten stehen als rote Zahl dabei, und ein Tipp
+  wechselt direkt, ohne Zurück.
+  - Gruppen und Reihenfolge sind wie bei den Kacheln.
+  - Stufenteam: Anfragen, Stufenteam-Chat, Schüler, Eltern, Infos für
+    Eltern; darunter „Deine Komitees“ und die weiteren Komitees.
+  - Schüler: „Deine Komitees“ und „Frag das Stufenteam“.
+- **Wo:**
+  - `ChatSeitenleiste` (Context) und das Layout in `ChatEbene`
+    (`ChatBlasen.tsx`).
+  - Die Liste selbst baut `ChatsTab.tsx` (`seitenleiste`, `wechsle`).
+  - Die Kopfzeile bleibt EINE: Der Kopf des Chats liegt weiter in
+    `#kopf-ebene`.
+- **Gestaltung:**
+  - Die Liste ist eine Karte, nur so hoch wie ihr Inhalt. Ohne Karte war
+    der Text auf dem eigenen Hintergrundbild schlecht lesbar, und bei
+    Schülern (zwei Einträge) wirkte die Leiste wie eine leere Spalte.
+  - Die Eingabe bleibt ein Band über die volle Breite, nur das Feld steht
+    unter dem Chat. Ein Band nur über der rechten Seite endete mitten im
+    Bild.
+- **Dazu, Schüler „Chats“ am Laptop:** Die Vorschau des eigenen Komitees
+  (Angepinnt, Abstimmungen, To-dos) steht ab 1024 px in zwei Spalten
+  (`Gruppe spalten`, wie „Zu erledigen“).
+  - Vorher war jede Zeile 1600 px breit, und „Abstimmen“ bzw. „1 offen“
+    stand weit weg vom Text.
+  - Am Handy bleibt es eine Spalte.
+- **Bewusst nicht geändert:** Kurze Seiten am Laptop (Eltern „Infos“ und
+  „Konto“) sind kurz, weil es dort wenig gibt. Alles steht auf einem
+  Bildschirm, ohne Loch mitten in der Seite. Karten künstlich zu strecken
+  hieße mehr Weg für das Auge, ohne Nutzen.
+- **Unverändert:**
+  - Handy und iPad hoch: Der Chat bleibt eine Vollbild-Ebene ohne Liste.
+  - Esc und ein erneuter Tipp auf den Reiter schließen wie bisher.
+  - Der Kalender hat keine Seitenleiste.
+- **Geprüft:**
+  - Klicktest mit 26 Schritten: jeder Eintrag wechselt und markiert sich;
+    der Kopf liegt in `#kopf-ebene`; Esc und Reiter schließen; die Leiste
+    steht in der Spalte; kein Überstehen; keine Leiste bei 390/820 px und
+    im Kalender.
+  - Fotos Laptop und iPad quer, jeweils hell, dunkel und mit Bild.
+  - Gesamtprüfung siehe PR.
 
 ## Nachtrag zu Runde 10: Fokus in „Geplante Aktionen“ (17.10.2026)
 
