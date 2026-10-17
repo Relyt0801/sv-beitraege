@@ -840,7 +840,9 @@ export function GeplantKarte({ darf, fin, className = "", alsZeile = false }: { 
         const offen = [...document.querySelectorAll<HTMLElement>('[role="dialog"][aria-modal="true"]')].pop();
         const geht = ziel?.isConnected && (!offen || offen.contains(ziel));
         if (geht) ziel!.focus({ preventScroll: true });
-        else if (offen) (offen.querySelector<HTMLElement>('[tabindex="-1"]') ?? offen).focus({ preventScroll: true });
+        // Das Panel, nicht das erste [tabindex=-1] – das ist der unsichtbare
+        // Hintergrund-Knopf „Schließen“ (Enter/Leertaste schloss sonst das Blatt)
+        else if (offen) (offen.querySelector<HTMLElement>("[data-blatt-panel]") ?? offen).focus({ preventScroll: true });
         else document.getElementById(anker)?.focus({ preventScroll: true });
       }),
     );

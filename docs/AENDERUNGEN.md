@@ -25,6 +25,19 @@ ausführlich (auf Deutsch); hier steht der Überblick dazu.
 - Nachgeprüft bei 390 × 844, 768 × 1024 und 1024 × 768 mit Esc, ✕, „Zurück“,
   Speichern, Löschen und Drehen: Der Fokus liegt nie hinter einem offenen
   Blatt.
+- **Korrektur nach der Prüfung:** Schritt 2 nahm das erste Element mit
+  `tabindex="-1"` im Blatt. Das ist aber der unsichtbare Hintergrund-Knopf
+  „Schließen“, nicht das Blatt selbst.
+  - Folge: Nach „Aus der Planung löschen“ las ein Screenreader „Schließen,
+    Taste“, und Enter oder Leertaste schloss die Liste.
+  - Lief man per Tab aus einem Buchungsblatt heraus, schloss die Leertaste
+    sogar das Buchungsblatt samt eingetipptem Betrag.
+  - Jetzt trägt das Blatt `data-blatt-panel` (`Sheet.tsx`), und genau das
+    bekommt den Fokus.
+  - Nachgeprüft: In allen drei nachgestellten Abläufen bleibt das Blatt
+    offen. In der Matrix (228 Kombinationen) liegt der Fokus nie auf dem
+    Hintergrund, nie hinter einem offenen Blatt und nie auf der leeren
+    Seite.
 - **Prüfung in WebKit** (Safaris Engine, WebKitGTK 2.52 per WebDriver, App in
   einem Rahmen mit exakter Gerätegröße):
   - Kopf- und Reiterleiste: 30 Läufe (6 Rollen × 5 Größen), 0 Abweichungen.
