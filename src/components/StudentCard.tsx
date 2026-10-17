@@ -147,7 +147,7 @@ function StudentCardRoh({
               steht vorn und darf auf eine zweite Zeile umbrechen: Abgeschnitten
               würde sonst genau das, wofür die Zeile da ist (ab Q1.1 mit zwei
               offenen Halbjahren schon am iPhone). */}
-          <span className="line-clamp-2 text-[12px] text-tinte-leise md:hidden">
+          <span className="line-clamp-2 text-[12px] text-tinte-leise max-[359px]:line-clamp-3 md:hidden">
             {fruehereOffen.length > 0 && (
               <>
                 <span className="text-offen dark:text-amber-300">
@@ -157,11 +157,10 @@ function StudentCardRoh({
                 {" · "}
               </>
             )}
-            {/* festes Leerzeichen nur zwischen Zahl und „%“: Die Zahl bleibt so immer
-                sichtbar; schlimmstenfalls rutscht das Wort „Mithilfe“ in die nächste
-                Zeile oder fällt bei 320 px weg. Als ganze Einheit verschwand dort
-                mit „auch … offen“ davor die Zahl selbst (Prüfung Okt. 2026). */}
-            {prozent}{"\u00a0"}% Mithilfe
+            {/* „0 % Mithilfe“ als Einheit (feste Leerzeichen): nie die Zahl ohne ihr
+                Wort. Unter 360 px darf die Zeile dafür dreizeilig werden – zwei
+                reichten dort mit „auch … offen“ davor nicht (Prüfung Okt. 2026). */}
+            {prozent}{"\u00a0"}%{"\u00a0"}Mithilfe
             {unter && ` · ${unter}`}
           </span>
         </span>
@@ -181,8 +180,10 @@ function StudentCardRoh({
           Am Handy nur das laufende (w-11 = ein Kästchen, die anderen per CSS
           ausgeblendet). Auch wer nur liest (Stufenteam, Sprecher), sieht es –
           nicht antippbar, aber sonst wüsste er nicht, wer das laufende
-          Halbjahr schon bezahlt hat (Prüfung Okt. 2026). */}
-      <div className={`flex w-11 shrink-0 gap-1.5 md:w-auto ${SPALTE_HALBJAHRE}`}>
+          Halbjahr schon bezahlt hat (Prüfung Okt. 2026). Beim Auswählen ist es
+          ohnehin nicht antippbar und fällt am Handy weg: Neben dem Auswahl-
+          kästchen blieben bei 320 px sonst ~60 px für Name und Unterzeile. */}
+      <div className={`flex w-11 shrink-0 gap-1.5 md:w-auto ${SPALTE_HALBJAHRE} ${selectable ? "max-md:hidden" : ""}`}>
         {HY.map((h, i) => (
           <TermChip
             key={h}

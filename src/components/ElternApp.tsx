@@ -507,7 +507,10 @@ export function ElternApp() {
       <Tour
         open={tour}
         steps={elternSchritte({ mehrereKinder: kinder.length > 1 })}
-        onTab={(t) => setReiter(t as Reiter)}
+        onTab={(t) => {
+          // den schon offenen Reiter nicht noch einmal setzen (scrollte nach oben)
+          if (t !== reiter) setReiter(t as Reiter);
+        }}
         onClose={() => {
           setTour(false);
           setReiter("uebersicht");

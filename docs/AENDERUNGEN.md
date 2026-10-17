@@ -100,7 +100,7 @@ links, Chat rechts, wie Nachrichten am Mac) wäre der richtige nächste
 Schritt. Sie ändert aber die Ebenen-Regel (DESIGN-REGELN 3) und ist hier
 nicht gebaut.
 
-**Weitere Nachprüfungen (vier Runden):** Jede Korrektur wurde in der Demo
+**Weitere Nachprüfungen (fünf Runden):** Jede Korrektur wurde in der Demo
 neu nachgestellt, und ein eigener Prüfer hat den Diff der Korrekturen
 gelesen, bis keine neuen Funde mehr kamen. Behoben wurde dabei:
 - Schaltet man die Glocke bei einem Komitee mit Ungelesenem aus, sprang die
@@ -115,18 +115,24 @@ gelesen, bis keine neuen Funde mehr kamen. Behoben wurde dabei:
 - Kasse am Handy:
   - Drei und mehr aufeinanderfolgende offene Halbjahre stehen als Spanne da
     („EF.1–Q1.2“).
-  - Zahl und „%“ bleiben zusammen, die Zahl ist immer sichtbar.
-  - Das Wort „Mithilfe“ darf in die zweite Zeile rutschen. Bei 320 px mit
-    langem „auch … offen“ davor fällt es notfalls weg. Als feste Einheit
-    verschwand dort sonst die Zahl selbst.
+  - „0 % Mithilfe“ bleibt als Einheit zusammen, die Zahl steht nie ohne
+    ihr Wort.
+  - Unter 360 px darf die Unterzeile dreizeilig werden, denn zwei Zeilen
+    reichten dort mit „auch … offen“ davor nicht.
+  - Beim Auswählen fällt das Halbjahr-Kästchen am Handy weg. Es ist dann
+    ohnehin nicht antippbar, und bei 320 px blieben sonst rund 60 px für
+    Name und Unterzeile.
 - Einführung (Fehler zum Teil schon vor Runde 10, jetzt mitbehoben):
   - Am iPad quer lag „Weiter“ für Admins unter dem Bildrand. Bei Schülern
     fehlten oben Titel und „Überspringen“ (Karte bei −114 px).
   - Jetzt misst die Karte ihre Höhe und bleibt an beiden Kanten im Bild.
   - Passt sie weder über noch unter das Element (Handy quer), steht sie
     daneben.
-  - Ursache für ein Element unter dem Rand behoben: Derselbe Reiter wird
-    nicht noch einmal gesetzt, das scrollte sonst nach oben.
+  - Ursache für ein Element unter dem Rand behoben: Den schon offenen
+    Reiter setzen App und ElternApp nicht noch einmal, das scrollte sonst
+    nach oben.
+  - Während zum Element gescrollt wird, ist die Karte kurz unsichtbar.
+    Sonst sprang ihre Lage mitten im Scrollen.
   - Punkte enger und im Fluss:
     - 12 Schritte (Admin) passen am iPad/Laptop in eine Reihe (Karte
       384 px).

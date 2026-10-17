@@ -110,21 +110,18 @@ export function Tour({
   }, []);
 
   // Schritt wechselt: erst den Reiter umschalten, dann auf das Element warten.
-  // Nur bei einem ANDEREN Reiter umschalten: Derselbe Reiter noch einmal
-  // scrollte die Seite sanft nach oben (useReiter) – gegen das Scrollen zum
-  // Element, das dann unter dem Bildrand landete (Prüfung Okt. 2026).
-  const letzterReiter = useRef<string | null>(null);
-  useLayoutEffect(() => {
-    if (!open) letzterReiter.current = null;
-  }, [open]);
+  // (Den schon offenen Reiter setzen App/ElternApp nicht noch einmal – das
+  // scrollte sanft nach oben, gegen das Scrollen zum Element.)
+  // Während zum Element gescrollt wird, ist die Karte unsichtbar: Ihre Lage
+  // hängt vom Element ab und sprang sonst mitten im Scrollen von „verdeckt“
+  // über „darunter“ zur Seite (Prüfung Okt. 2026).
+  const [scrollt, setScrollt] = useState(false);
   useLayoutEffect(() => {
     if (!open || !step) return;
-    if (step.tab && step.tab !== letzterReiter.current) {
-      letzterReiter.current = step.tab;
-      onTab?.(step.tab);
-    }
+    if (step.tab) onTab?.(step.tab);
     ziel.current = null;
     setRect(null);
+    setScrollt(false);
     if (!step.anchor) return;
 
     let versuche = 0;
@@ -143,13 +140,20 @@ export function Tour({
       if (!fest) {
         if (window.innerWidth < 640) {
           // Handy: das Element direkt unter den Kopf, darunter bleibt Platz für die Karte
-          if (Math.abs(r.top - 84) > 8) window.scrollBy({ top: r.top - 84, behavior: "smooth" });
+          if (Math.abs(r.top - 84) > 8) {
+            setScrollt(true);
+            window.scrollBy({ top: r.top - 84, behavior: "smooth" });
+          }
         } else if (r.top < 80 || r.bottom > window.innerHeight - 100) {
+          setScrollt(true);
           el.scrollIntoView({ block: "center", behavior: "smooth" });
         }
       }
       messen();
-      nachScroll = setTimeout(messen, 380);
+      nachScroll = setTimeout(() => {
+        messen();
+        setScrollt(false);
+      }, 380);
     };
     suchen();
     return () => {
@@ -302,7 +306,10 @@ export function Tour({
 
       {/* Erklärkarte: aussen die Lage, innen die Einblend-Bewegung – sonst
           überschreibt die Animation die Zentrierung. */}
-      <div className={`absolute ${rect ? "" : "w-[min(24rem,calc(100vw-24px))]"}`} style={kartenStil}>
+      <div
+        className={`absolute transition-opacity duration-150 ${rect ? "" : "w-[min(24rem,calc(100vw-24px))]"} ${scrollt ? "pointer-events-none opacity-0" : ""}`}
+        style={kartenStil}
+      >
       <div
         key={i}
         ref={karte}
