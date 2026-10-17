@@ -110,9 +110,19 @@ export function Tour({
   }, []);
 
   // Schritt wechselt: erst den Reiter umschalten, dann auf das Element warten.
+  // Nur bei einem ANDEREN Reiter umschalten: Derselbe Reiter noch einmal
+  // scrollte die Seite sanft nach oben (useReiter) – gegen das Scrollen zum
+  // Element, das dann unter dem Bildrand landete (Prüfung Okt. 2026).
+  const letzterReiter = useRef<string | null>(null);
+  useLayoutEffect(() => {
+    if (!open) letzterReiter.current = null;
+  }, [open]);
   useLayoutEffect(() => {
     if (!open || !step) return;
-    if (step.tab) onTab?.(step.tab);
+    if (step.tab && step.tab !== letzterReiter.current) {
+      letzterReiter.current = step.tab;
+      onTab?.(step.tab);
+    }
     ziel.current = null;
     setRect(null);
     if (!step.anchor) return;
@@ -223,14 +233,36 @@ export function Tour({
     // Senkrecht immer ganz im Bild: Reicht der Platz neben dem Element nicht,
     // rückt die Karte an den Rand und darf das Element teilweise verdecken –
     // besser als ein „Weiter“, das man nicht erreicht.
+    // Passt sie weder darüber noch darunter (Handy quer, große Kachelflächen),
+    // steht sie daneben, wenn dort Platz ist – sonst verdeckte sie das Element,
+    // um das es geht, ganz (Prüfung Okt. 2026: „Mithelfen senkt den
+    // Ticketpreis“ bei 844 × 390).
     const RAND = 12;
-    if (unten) {
+    const passtOben = rect.top - PAD - 12 - kartenHoehe >= RAND;
+    const passtUnten = rect.top + rect.height + PAD + 12 + kartenHoehe <= hoehe - RAND;
+    const rechtsX = rect.left + rect.width + PAD + 12;
+    const linksX = rect.left - PAD - 12 - w;
+    const seitlich =
+      kartenHoehe > 0 && !passtOben && !passtUnten
+        ? rechtsX + w <= window.innerWidth - 16
+          ? rechtsX
+          : linksX >= 16
+            ? linksX
+            : null
+        : null;
+    if (seitlich !== null) {
+      const mitte = rect.top + rect.height / 2 - kartenHoehe / 2;
+      kartenStil = { top: Math.min(Math.max(RAND, mitte), Math.max(RAND, hoehe - RAND - kartenHoehe)), left: seitlich, width: w };
+    } else if (unten) {
       let unterkante = rect.top - PAD - 12;
       if (unterkante - kartenHoehe < RAND) unterkante = Math.min(hoehe - RAND, kartenHoehe + RAND);
+      // auch die andere Kante: liegt das Element (noch) unter dem Bildrand
+      unterkante = Math.min(unterkante, hoehe - RAND);
       kartenStil = { bottom: hoehe - unterkante, left: links, width: w };
     } else {
       let oben = rect.top + rect.height + PAD + 12;
       if (oben + kartenHoehe > hoehe - RAND) oben = Math.max(RAND, hoehe - RAND - kartenHoehe);
+      oben = Math.max(oben, RAND);
       kartenStil = { top: oben, left: links, width: w };
     }
   }
