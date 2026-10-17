@@ -511,6 +511,7 @@ export function Sheet({ open, onClose, children, hoch }: { open: boolean; onClos
       <div
         ref={panel}
         tabIndex={-1}
+        data-blatt-panel
         className={`relative max-h-[92dvh] w-full max-w-2xl overflow-y-auto overscroll-contain outline-none blatt rounded-t-[1.75rem] bg-papier px-5 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] pt-1.5 shadow-2xl dark:bg-slate-900 max-sm:min-h-[min(var(--blatt-min,0px),92dvh)] sm:max-h-[88dvh] sm:origin-top sm:rounded-[1.75rem] sm:pt-5 ${
           hoch ? "max-sm:!min-h-[92dvh]" : ""
         } ${verdeckt && versteckt ? "invisible" : ""}`}

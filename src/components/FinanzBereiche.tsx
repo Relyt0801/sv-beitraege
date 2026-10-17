@@ -822,13 +822,34 @@ export function GeplantKarte({ darf, fin, className = "", alsZeile = false }: { 
   // offen war, gibt es den Auslöser nicht mehr (aus der Zeile wurde eine Karte
   // oder umgekehrt) – dann geht der Fokus hierher statt auf die Seite.
   const anker = useId();
-  const fokusZurueck = () =>
+  // Reihenfolge: 1. der Auslöser, falls es ihn noch gibt; 2. ist noch ein
+  // Blatt offen (z. B. die Liste unter „Neue geplante Aktion“), dieses Blatt –
+  // nie die Seite dahinter (Prüfung Okt. 2026: Tab sprang sonst in den
+  // Hintergrund); 3. Zeile bzw. Karte.
+  const ausloeser = useRef<{ liste: HTMLElement | null; blatt: HTMLElement | null }>({ liste: null, blatt: null });
+  const merke = (welches: "liste" | "blatt") => {
+    const a = document.activeElement;
+    ausloeser.current[welches] = a instanceof HTMLElement && a !== document.body ? a : null;
+  };
+  const fokusZurueck = (welches: "liste" | "blatt") =>
     requestAnimationFrame(() =>
       requestAnimationFrame(() => {
         const a = document.activeElement;
-        if (!a || a === document.body || !a.isConnected) document.getElementById(anker)?.focus({ preventScroll: true });
+        if (a && a !== document.body && a.isConnected) return;
+        const ziel = ausloeser.current[welches];
+        const offen = [...document.querySelectorAll<HTMLElement>('[role="dialog"][aria-modal="true"]')].pop();
+        const geht = ziel?.isConnected && (!offen || offen.contains(ziel));
+        if (geht) ziel!.focus({ preventScroll: true });
+        // Das Panel, nicht das erste [tabindex=-1] – das ist der unsichtbare
+        // Hintergrund-Knopf „Schließen“ (Enter/Leertaste schloss sonst das Blatt)
+        else if (offen) (offen.querySelector<HTMLElement>("[data-blatt-panel]") ?? offen).focus({ preventScroll: true });
+        else document.getElementById(anker)?.focus({ preventScroll: true });
       }),
     );
+  const oeffneBlatt = (g: KassenGeplant | "neu") => {
+    merke("blatt");
+    setOffen(g);
+  };
   const h = heuteKey();
   // Vorbei ist vorbei – nur der Kassenwart sieht sie noch (zum Aufräumen)
   const sichtbar = liste.filter((g) => darf || !g.datum || g.datum >= h);
@@ -844,7 +865,7 @@ export function GeplantKarte({ darf, fin, className = "", alsZeile = false }: { 
       fin={fin}
       onClose={() => {
         setOffen(null);
-        fokusZurueck();
+        fokusZurueck("blatt");
       }}
       onSpeichern={speichern}
       onLoeschen={loeschen}
@@ -873,7 +894,10 @@ export function GeplantKarte({ darf, fin, className = "", alsZeile = false }: { 
               <Icon name="kalender" size={16} strich={2.2} />
             </Symbol>
           }
-          onClick={() => setListeAuf(true)}
+          onClick={() => {
+            merke("liste");
+            setListeAuf(true);
+          }}
         >
           <span className="zahl whitespace-nowrap text-[15px] text-tinte-leise">{anstehend.length || "keine"}</span>
         </Zeile>
@@ -886,14 +910,14 @@ export function GeplantKarte({ darf, fin, className = "", alsZeile = false }: { 
         open={listeAuf}
         onClose={() => {
           setListeAuf(false);
-          fokusZurueck();
+          fokusZurueck("liste");
         }}
       >
         <SheetKopf
           titel="Geplante Aktionen"
           onClose={() => {
             setListeAuf(false);
-            fokusZurueck();
+            fokusZurueck("liste");
           }}
         />
         {geplantListe(true)}
@@ -908,7 +932,7 @@ export function GeplantKarte({ darf, fin, className = "", alsZeile = false }: { 
   function geplantListe(karte: boolean) {
     return (
       <div className={karte ? "card p-4" : ""}>
-        <BereichKopf titel={karte ? [anstehend.length ? `${anstehend.length} geplant` : "Nichts geplant", anzahlVorbei ? `${anzahlVorbei} vorbei` : null].filter(Boolean).join(" · ") : "Geplante Aktionen"} onNeu={darf ? () => setOffen("neu") : undefined} />
+        <BereichKopf titel={karte ? [anstehend.length ? `${anstehend.length} geplant` : "Nichts geplant", anzahlVorbei ? `${anzahlVorbei} vorbei` : null].filter(Boolean).join(" · ") : "Geplante Aktionen"} onNeu={darf ? () => oeffneBlatt("neu") : undefined} />
         {sichtbar.length === 0 ? (
           <p className="text-[13px] text-tinte-leise">Gerade ist nichts geplant.</p>
         ) : (
@@ -921,7 +945,7 @@ export function GeplantKarte({ darf, fin, className = "", alsZeile = false }: { 
                 <li key={g.id}>
                   <button
                     type="button"
-                    onClick={() => setOffen(g)}
+                    onClick={() => oeffneBlatt(g)}
                     className={`flex min-h-[52px] w-full items-center gap-3 py-2 text-left transition active:opacity-60 ${vorbei ? "opacity-60" : ""}`}
                   >
                     <span className="flex w-11 shrink-0 flex-col items-center rounded-lg border border-papier-linie py-1 leading-none dark:border-slate-700">

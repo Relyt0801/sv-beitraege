@@ -11,6 +11,46 @@ ausführlich (auf Deutsch); hier steht der Überblick dazu.
 
 ---
 
+## Nachtrag zu Runde 10: Fokus in „Geplante Aktionen“ (17.10.2026)
+
+- **Fehler aus `4e2b013` (schon in `main`):** Schloss man ein Unterblatt
+  („Neue geplante Aktion“, Detail, Löschen), während die Liste darunter
+  offen blieb, setzte der neue Fokus-Rückfall den Fokus auf die Zeile hinter
+  dem offenen Blatt. Tab sprang dann in den Hintergrund.
+- Jetzt merkt sich „Geplante Aktionen“ den Auslöser. Beim Schließen geht der
+  Fokus der Reihe nach:
+  1. zurück auf den Auslöser, falls es ihn noch gibt (z. B. „Neu anlegen“);
+  2. sonst in das noch offene Blatt;
+  3. sonst auf die Zeile bzw. die Karte, etwa nach dem Drehen.
+- Nachgeprüft bei 390 × 844, 768 × 1024 und 1024 × 768 mit Esc, ✕, „Zurück“,
+  Speichern, Löschen und Drehen: Der Fokus liegt nie hinter einem offenen
+  Blatt.
+- **Korrektur nach der Prüfung:** Schritt 2 nahm das erste Element mit
+  `tabindex="-1"` im Blatt. Das ist aber der unsichtbare Hintergrund-Knopf
+  „Schließen“, nicht das Blatt selbst.
+  - Folge: Nach „Aus der Planung löschen“ las ein Screenreader „Schließen,
+    Taste“, und Enter oder Leertaste schloss die Liste.
+  - Lief man per Tab aus einem Buchungsblatt heraus, schloss die Leertaste
+    sogar das Buchungsblatt samt eingetipptem Betrag.
+  - Jetzt trägt das Blatt `data-blatt-panel` (`Sheet.tsx`), und genau das
+    bekommt den Fokus.
+  - Nachgeprüft: In allen drei nachgestellten Abläufen bleibt das Blatt
+    offen. In der Matrix (228 Kombinationen) liegt der Fokus nie auf dem
+    Hintergrund, nie hinter einem offenen Blatt und nie auf der leeren
+    Seite.
+- **Prüfung in WebKit** (Safaris Engine, WebKitGTK 2.52 per WebDriver, App in
+  einem Rahmen mit exakter Gerätegröße):
+  - Kopf- und Reiterleiste: 30 Läufe (6 Rollen × 5 Größen), 0 Abweichungen.
+    Chat und Kalender verhalten sich wie erwartet.
+  - Runde 10: Kasse (eine Zeile, Spanne und „0 % Mithilfe“ nie getrennt),
+    Kassenkopf, Team-Chats, Finanzen und Einführung in Ordnung.
+  - Zwei kleine Typografie-Punkte gab es schon vorher:
+    - Bei 320 px wird der Name gekürzt.
+    - Ein „·“ kann am Zeilenanfang stehen.
+  - Grenze der Testumgebung: In WebKitGTK schlagen nachgeladene Teile fehl,
+    sobald der Service Worker die Seite steuert. Das betrifft nur die
+    Automatisierung, bitte aber am echten iPhone gegenprüfen.
+
 ## Runde 10: Handy kürzer, aus Sicht der Rollen (16.10.2026)
 
 Anlass: In Runde 9 war das Handy unverändert (Mittel 2,09 Bildschirme). Die
