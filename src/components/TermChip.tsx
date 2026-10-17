@@ -18,6 +18,7 @@ export function TermChip({
   onToggle,
   big,
   kompakt,
+  className = "",
 }: {
   student: Student;
   h: Halbjahr;
@@ -27,6 +28,12 @@ export function TermChip({
   big?: boolean;
   /** schmale Variante fuer die Kassenliste: nur Kuerzel und Zeichen */
   kompakt?: boolean;
+  /**
+   * Zusätzliche Klassen für den Knopf – die Kassenliste blendet damit am
+   * Handy alle Halbjahre außer dem laufenden per CSS aus (Okt. 2026). CSS
+   * statt JS-Weiche: die Zeile wird beim Drehen nicht neu aufgebaut.
+   */
+  className?: string;
 }) {
   const t = student.terms[h];
   const pre = isPreJoin(student, i);
@@ -75,7 +82,7 @@ export function TermChip({
       }}
       className={`flex flex-1 basis-0 flex-col items-center justify-center gap-0.5 border font-bold leading-none transition ${kompakt ? "rounded-lg" : "rounded-xl"} ${size} ${cls} ${ring} ${
         clickable ? "cursor-pointer active:scale-95" : "cursor-default"
-      }`}
+      } ${className}`}
     >
       {/* Früher 8 px mit 70 % Deckkraft – kaum lesbar (Kontrast 3,1:1). */}
       <span className={`font-semibold ${kompakt ? "text-[12px] leading-none" : "text-[12px] lg:text-[13px]"}`}>{h}</span>

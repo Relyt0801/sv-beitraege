@@ -278,24 +278,23 @@ export function FinanzenTab({ kosten }: { kosten: KostenValue }) {
           d={postenDaten}
           fin={darfBuchen ? fin : null}
           listeKlasse="max-lg:order-3"
-          geplantKlasse="max-lg:order-3"
-          ohneGeplant={!breit}
           onBuchung={darfBuchen ? setBuchungAuf : undefined}
         />
 
         {/* ================================================ Geplantes + Kostenanfragen */}
         {/* Am Handy/iPad hoch: EINE Gruppe mit zwei Zeilen (wie die iOS-
             Einstellungen), die Listen im Blatt – vorher zwei Karten, ~300 px.
-            Am Laptop steht „Geplante Aktionen“ als Karte in PostenBereiche,
-            die Kostenanfragen stehen rechts. */}
-        {!breit && (
-          <div className="gruppe-zellen min-w-0 max-lg:order-3">
-            <GeplantKarte alsZeile darf={darfBuchen} fin={darfBuchen ? fin : null} />
-            {zeigeAnfragen && !kostenOben && (
-              <KostenKarte alsZeile kosten={kosten} darfEntscheiden={darfBuchen} vorsitze={meineVorsitze} onEntschieden={fin.neuLaden} />
-            )}
-          </div>
-        )}
+            Am Laptop steht „Geplante Aktionen“ als Karte direkt nach den
+            Posten (Hülle „contents“), die Kostenanfragen stehen rechts.
+            Immer DIESELBE Hülle mit derselben GeplantKarte – nur Klasse und
+            Form wechseln: Beim Drehen über 1024 px bleiben offene Blätter und
+            ein angefangener Entwurf erhalten (vorher zwei Instanzen). */}
+        <div className={breit ? "contents" : "gruppe-zellen min-w-0 max-lg:order-3"}>
+          <GeplantKarte alsZeile={!breit} darf={darfBuchen} fin={darfBuchen ? fin : null} />
+          {!breit && zeigeAnfragen && !kostenOben && (
+            <KostenKarte alsZeile kosten={kosten} darfEntscheiden={darfBuchen} vorsitze={meineVorsitze} onEntschieden={fin.neuLaden} />
+          )}
+        </div>
       </div>
 
       {/* ================================================ Verlauf + Kostenanfragen (rechte Spalte) */}
@@ -317,6 +316,12 @@ export function FinanzenTab({ kosten }: { kosten: KostenValue }) {
           aktionName={aktionName}
           allein={!kostenRechts}
         />
+        {/* Handy: der Satz zur Ansicht als Fußnote unter den Buchungen (am
+            Laptop steht er oben). order-2 wie die Buchungen, damit er im
+            äußeren Raster direkt darunter steht; -mt-1.5 hebt die halbe
+            Rasterlücke auf – so sitzt er wie die Fußnote einer Gruppe dicht
+            an seiner Karte und nicht mittig zwischen zwei Karten. */}
+        <p className="auf-bild -mt-1.5 px-4 text-[13px] leading-snug text-tinte-leise max-lg:order-2 lg:hidden">{ANSICHT_TEXT.erweitert}</p>
         {breit && kostenRechts && (
           <KostenKarte spalte kosten={kosten} darfEntscheiden={darfBuchen} vorsitze={meineVorsitze} onEntschieden={fin.neuLaden} />
         )}
@@ -354,7 +359,8 @@ export function FinanzenTab({ kosten }: { kosten: KostenValue }) {
  * sieht. Vorher „Standard – wie alle“ / „Erweitert“: unverständlich.
  */
 const ANSICHT_TEXT = {
-  // kurz: am Handy eine Zeile unter dem Umschalter
+  // kurz: am Handy „standard“ eine Zeile unter dem Umschalter, „erweitert“
+  // als Fußnote unter den Buchungen (FinanzenTab)
   standard: "So sehen es Schüler und Eltern: nur Summen.",
   erweitert: "Jede Buchung mit Namen – nur für dich und die Kasse.",
 } as const;
@@ -380,7 +386,12 @@ function AnsichtWahl({ ansicht, setAnsicht }: { ansicht: "standard" | "erweitert
           </button>
         ))}
       </div>
-      <p className="auf-bild mt-1.5 px-3 text-[13px] leading-snug text-tinte-leise lg:hidden">{ANSICHT_TEXT[ansicht]}</p>
+      {/* Am Handy nur in „Für alle sichtbar“: im Kassenbuch kostete der Satz
+          eine Zeile vor dem Kontostand und steht jetzt als Fußnote unter den
+          Buchungen, wo die Namen zu sehen sind (Okt. 2026) */}
+      {ansicht === "standard" && (
+        <p className="auf-bild mt-1.5 px-3 text-[13px] leading-snug text-tinte-leise lg:hidden">{ANSICHT_TEXT.standard}</p>
+      )}
     </div>
   );
 }
@@ -510,8 +521,11 @@ function UebersichtKarte({
           </button>
         </div>
       )}
+      {/* Wer nur liest: an der Stelle der Knöpfe eine schlichte Zeile mit
+          Info-Symbol – vorher ein grauer Kasten, der wie ein Bedienelement
+          wirkte und Platz kostete (Okt. 2026) */}
       {hinweis && (
-        <div className="mt-4 flex items-center gap-2.5 rounded-xl zelle px-3 py-2.5 text-[13px] leading-snug text-tinte-matt dark:text-slate-300">
+        <div className="mt-3 flex items-center gap-2 text-[13px] leading-snug text-tinte-matt">
           <span className="shrink-0">
             <Icon name="info" size={16} />
           </span>
@@ -822,6 +836,7 @@ function KostenKarte({
   spalte?: boolean;
 }) {
   const { profile } = useProfiles();
+  const { uid } = useRole();
   const [neu, setNeu] = useState(false);
   const [auswahl, setAuswahl] = useState<KostenAnfrage | null>(null);
   const [alle, setAlle] = useState(false);
@@ -829,6 +844,9 @@ function KostenKarte({
 
   const offene = kosten.anfragen.filter((a) => a.status === "offen");
   const erledigte = kosten.anfragen.filter((a) => a.status !== "offen");
+  // Hat der Vorsitz schon einmal angefragt, kennt er den Ablauf – dann am
+  // Handy ohne den Erklärsatz (Rollen-Prüfung Vorsitz, Okt. 2026)
+  const hatEigene = uid !== null && kosten.anfragen.some((a) => a.created_by === uid);
   const sichtbarErledigt = alle ? erledigte : erledigte.slice(0, 3);
   // Aus der Benachrichtigung „Kostenanfrage“: gleich die Anfrage öffnen
   useSprungziel("kosten", darfEntscheiden && offene.length > 0, () => {
@@ -883,11 +901,12 @@ function KostenKarte({
           ))}
         </div>
       )}
-      {/* Ohne Anfragen am Handy ohne Erklärzeile – „Keine Anfragen“ reicht
-          (im Blatt steht sie immer: dort fragt man sich, wozu das da ist) */}
+      {/* Ohne Anfragen am Handy ohne Erklärzeile – „Keine Anfragen“ reicht;
+          ebenso für den Vorsitz, sobald er eine eigene Anfrage hat (im Blatt
+          steht sie immer: dort fragt man sich, wozu das da ist) */}
       <p
         className={`auf-bild mt-1.5 px-4 text-[13px] leading-snug text-tinte-leise ${
-          !imBlatt && kosten.anfragen.length === 0 && vorsitze.length === 0 ? "max-lg:hidden" : ""
+          !imBlatt && ((kosten.anfragen.length === 0 && vorsitze.length === 0) || (vorsitze.length > 0 && hatEigene)) ? "max-lg:hidden" : ""
         }`}
       >
         {vorsitze.length > 0
@@ -1214,6 +1233,10 @@ function VerlaufKarte({
   const [auswahl, setAuswahl] = useState<Buchung | null>(null);
   // Handy/iPad hoch: alle Buchungen (Filter, Suche, Monate) im Blatt
   const [alleOffen, setAlleOffen] = useState(false);
+  // Beitrags-Buchungen zeigen „Nachname, Vorname“ als Titel (BuchungsZeile)
+  const { students } = useStore();
+  const namen = useMemo(() => new Map(students.map((s) => [s.id, `${s.nachname}, ${s.vorname}`])), [students]);
+  const nameVon = (b: Buchung) => (b.student_id ? namen.get(b.student_id) ?? null : null);
 
   const liste = useMemo(() => {
     const n = q.trim().toLowerCase();
@@ -1333,7 +1356,7 @@ function VerlaufKarte({
                 <li>{monatKopf(monat, zeilen, auf, true, "px-4 active:bg-black/[0.04] dark:active:bg-white/[0.06]")}</li>
                 {auf &&
                   zeilen.map((b) => (
-                    <BuchungsZeile key={b.id} b={b} kategorien={kategorien} aktionName={aktionName} onOeffnen={() => setAuswahl(b)} />
+                    <BuchungsZeile key={b.id} b={b} name={nameVon(b)} kategorien={kategorien} aktionName={aktionName} onOeffnen={() => setAuswahl(b)} />
                   ))}
               </ul>
             );
@@ -1367,7 +1390,7 @@ function VerlaufKarte({
         ) : (
           <ul className="liste border border-black/[0.04] dark:border-white/[0.06]">
             {neueste.map((b) => (
-              <BuchungsZeile key={b.id} b={b} kategorien={kategorien} aktionName={aktionName} onOeffnen={() => setAuswahl(b)} />
+              <BuchungsZeile key={b.id} b={b} name={nameVon(b)} kategorien={kategorien} aktionName={aktionName} onOeffnen={() => setAuswahl(b)} />
             ))}
             <li>
               <button
@@ -1410,7 +1433,7 @@ function VerlaufKarte({
                     {auf && (
                       <ul className="divide-y divide-papier-linie dark:divide-slate-800">
                         {zeilen.map((b) => (
-                          <BuchungsZeile key={b.id} inKarte b={b} kategorien={kategorien} aktionName={aktionName} onOeffnen={() => setAuswahl(b)} />
+                          <BuchungsZeile key={b.id} inKarte b={b} name={nameVon(b)} kategorien={kategorien} aktionName={aktionName} onOeffnen={() => setAuswahl(b)} />
                         ))}
                       </ul>
                     )}
@@ -1466,7 +1489,7 @@ function Betrag({ b, gross }: { b: Buchung; gross?: boolean }) {
 }
 
 function BuchungsZeile({
-  b, kategorien, aktionName, onOeffnen, inKarte = false,
+  b, kategorien, aktionName, onOeffnen, inKarte = false, name = null,
 }: {
   b: Buchung;
   kategorien: KassenKategorie[];
@@ -1474,9 +1497,21 @@ function BuchungsZeile({
   onOeffnen: () => void;
   /** In der Karte „Buchungen“ (Laptop): ohne eigenen Rand, wie die Zeilen der Karten links */
   inKarte?: boolean;
+  /** Beitrags-Buchung: „Nachname, Vorname“ der Person (null = gelöscht/unbekannt → alter Titel) */
+  name?: string | null;
 }) {
   const kat = b.kategorie_id ? kategorien.find((k) => k.id === b.kategorie_id) : null;
   const zu = kat ? kat.name : zuweisungText(b, aktionName);
+  const tag = new Date(b.datum + "T12:00:00").toLocaleDateString("de-DE", { day: "numeric", month: "short" });
+  // Beiträge: der Name als Titel, „Beitrag EF.1“ darunter. Vorher stand
+  // „Stufenbeitrag EF.1 – Lena Bauer“ über „Stufenbeitrag · 14. Okt.“ – das
+  // Wort doppelt und der Name brach in eine zweite Zeile um (Okt. 2026).
+  // Suche und Detailseite gehen weiter über den gespeicherten Titel.
+  const beitragName = b.quelle === "beitrag" ? name : null;
+  const titel = beitragName || b.titel || zu;
+  const unter = beitragName
+    ? `${["Beitrag", b.halbjahr, b.cent < 0 ? "zurückgenommen" : null].filter(Boolean).join(" ")}${kat ? ` · ${kat.name}` : ""} · ${tag}`
+    : `${zu !== b.titel ? `${zu} · ` : ""}${tag}`;
   return (
     <li>
       <button
@@ -1489,12 +1524,9 @@ function BuchungsZeile({
       >
         <Kachel b={b} kategorien={kategorien} />
         <span className="min-w-0 flex-1">
-          {/* Zwei Zeilen statt abgeschnitten: am Ende steht oft der Name („… – Bauer, Lena“) */}
-          <span className="line-clamp-2 text-[15px] font-medium leading-snug [overflow-wrap:anywhere]">{b.titel || zu}</span>
-          <span className="block truncate text-[13px] text-tinte-leise">
-            {zu !== b.titel ? `${zu} · ` : ""}
-            {new Date(b.datum + "T12:00:00").toLocaleDateString("de-DE", { day: "numeric", month: "short" })}
-          </span>
+          {/* Zwei Zeilen statt abgeschnitten: lange Titel brechen um */}
+          <span className="line-clamp-2 text-[15px] font-medium leading-snug [overflow-wrap:anywhere]">{titel}</span>
+          <span className="block truncate text-[13px] text-tinte-leise">{unter}</span>
         </span>
         <Betrag b={b} />
       </button>

@@ -272,25 +272,25 @@ export function ProfilSheet({
       {/* ------------------------------------------------ Mitteilungen
           Keine Fußnote mehr: Hinweise und „Kommt nichts an?“ klappt die
           Zeile „Dieses Gerät“ auf. */}
-      {(hasSupabase || !istEltern) && (
-        <Gruppe titel="Mitteilungen">
-          {!istEltern && (
-            <ZeileMitSchalter label="Chats" symbol={<Sym icon="chats" farbe="bg-[#34C759]" />}>
-              <Schalter
-                an={mein?.push_chats ?? true}
-                label="Mitteilungen für Chats"
-                onChange={async (neu) => {
-                  aktualisiere({ push_chats: neu });
-                  const r = await speichereProfil({ push_chats: neu });
-                  if (!r.ok) setFarbFehler("Einstellung konnte nicht gespeichert werden: " + r.error);
-                  else neuLaden();
-                }}
-              />
-            </ZeileMitSchalter>
-          )}
-          {hasSupabase && <PushZeile istEltern={istEltern} />}
-        </Gruppe>
-      )}
+      {/* Auch in der Demo (dort „Nicht bereit“, die Prüfung sagt warum) – so
+          lassen sich Zeile und Aufklappen ohne Datenbank testen und fotografieren */}
+      <Gruppe titel="Mitteilungen">
+        {!istEltern && (
+          <ZeileMitSchalter label="Chats" symbol={<Sym icon="chats" farbe="bg-[#34C759]" />}>
+            <Schalter
+              an={mein?.push_chats ?? true}
+              label="Mitteilungen für Chats"
+              onChange={async (neu) => {
+                aktualisiere({ push_chats: neu });
+                const r = await speichereProfil({ push_chats: neu });
+                if (!r.ok) setFarbFehler("Einstellung konnte nicht gespeichert werden: " + r.error);
+                else neuLaden();
+              }}
+            />
+          </ZeileMitSchalter>
+        )}
+        <PushZeile istEltern={istEltern} />
+      </Gruppe>
 
       {/* ------------------------------------------------ Konto */}
       {/* Ohne Fußnote: „Angefragt“ steht schon rechts in der Komitee-Zeile */}

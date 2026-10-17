@@ -320,8 +320,10 @@ export function KomiteePage({
                   item={u}
                   kannLoeschen={u.created_by === uid || darfEintraege}
                   onDelete={() => deleteItem(u.id)}
-                  // Beendete nur mit Frage und Ergebnis – antippen klappt sie auf
+                  // Beendete und schon abgestimmte nur mit Frage und Ergebnis – antippen klappt sie auf
                   kompakt
+                  // Aus der Vorschau im Chats-Reiter angesprungen: offen, man will sie ja sehen
+                  startAuf={startZiel === u.id}
                 />
               </div>
             ))}

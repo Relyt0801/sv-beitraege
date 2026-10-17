@@ -32,16 +32,28 @@ const GRUPPE_AB = 3;
  * `ausserTag`: der im Wochenstreifen gewählte Tag – den zeigt schon die Tagesliste.
  */
 export function MeineSchichten({
-  ausserTag, className = "", spalte = false,
+  ausserTag, className = "", spalte = false, nurOhneAktion = false,
 }: {
   ausserTag?: string;
   className?: string;
   /** Laptop: als schmale Spalte neben dem Wochenstreifen – Tickets untereinander */
   spalte?: boolean;
+  /**
+   * Team am Handy: nur Schichten ohne (vorhandene) Aktion. Die anderen stehen
+   * fürs Team schon unter „Mitmachen“ – grüner Strich, „Eingeteilt“, auch
+   * eingeklappt – und in der Übersicht als „Deine nächste Schicht“. Das Ticket
+   * davor kostete am Handy 133 px bis „Mitmachen“ (Prüfung Okt. 2026).
+   */
+  nurOhneAktion?: boolean;
 }) {
   const { aktionen } = useTermine();
   const [alle, setAlle] = useState(false);
-  const meine = useMeineSchichten(ausserTag);
+  const alleMeinen = useMeineSchichten(ausserTag);
+  // Gleiche Regel wie in AktionenListe (nachId.has): nur Schichten einer
+  // vorhandenen Aktion stehen dort – alle anderen behalten ihr Ticket.
+  const meine = nurOhneAktion
+    ? alleMeinen.filter((t) => !t.aktion_id || !aktionen.some((a) => a.id === t.aktion_id))
+    : alleMeinen;
   if (!meine.length) return null;
   const sichtbar = alle ? meine : meine.slice(0, 2);
   return (

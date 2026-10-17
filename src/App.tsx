@@ -1375,7 +1375,9 @@ function Main() {
             setKasseTeil("personen");
             setQuery("");
           }
-          setTab(t as Tab);
+          // Den schon offenen Reiter nicht noch einmal setzen: useReiter scrollte
+          // dann sanft nach oben – gegen das Scrollen der Einführung zum Element
+          if (t !== gewaehlt) setTab(t as Tab);
         }}
         onClose={() => {
           setShowTour(false);

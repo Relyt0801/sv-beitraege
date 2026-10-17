@@ -78,12 +78,18 @@ export function Tour({
   const [hoehe, setHoehe] = useState(() => window.innerHeight);
   const ziel = useRef<HTMLElement | null>(null);
   const karte = useRef<HTMLDivElement | null>(null);
+  // Höhe der Karte – damit sie am iPad/Laptop nie über den oberen oder unteren
+  // Rand ragt (Prüfung Okt. 2026: am iPad quer lag „Weiter“ unter dem Rand)
+  const [kartenHoehe, setKartenHoehe] = useState(0);
 
   const step = steps[i];
   const letzter = i >= steps.length - 1;
 
+  // Beim Öffnen UND Schließen auf Schritt 1: Sonst lief beim Neustart aus dem
+  // Profil ein Bild lang der alte Schritt (samt Reiterwechsel) – setI(0) nach
+  // dem Öffnen kam erst nach dem ersten Zeichnen (Prüfung Okt. 2026).
   useEffect(() => {
-    if (open) setI(0);
+    setI(0);
   }, [open]);
 
   // Anderen melden: „hier läuft eine Einführung“ (useTourOffen)
@@ -107,41 +113,88 @@ export function Tour({
   }, []);
 
   // Schritt wechselt: erst den Reiter umschalten, dann auf das Element warten.
+  // (Den schon offenen Reiter setzen App/ElternApp nicht noch einmal – das
+  // scrollte sanft nach oben, gegen das Scrollen zum Element.)
+  // Bis das Element gefunden und (falls nötig) hingescrollt ist, ist die Karte
+  // unsichtbar: Ihre Lage hängt vom Element ab und sprang sonst mitten im
+  // Scrollen von „verdeckt“ über „darunter“ zur Seite (Prüfung Okt. 2026).
+  const [scrollt, setScrollt] = useState(false);
   useLayoutEffect(() => {
     if (!open || !step) return;
     if (step.tab) onTab?.(step.tab);
     ziel.current = null;
     setRect(null);
+    setScrollt(Boolean(step.anchor));
     if (!step.anchor) return;
 
     let versuche = 0;
     let raf = 0;
-    let nachScroll: ReturnType<typeof setTimeout> | undefined;
+    let fertig = false;
+    let obergrenze: ReturnType<typeof setTimeout> | undefined;
+    const zeigen = () => {
+      if (fertig) return;
+      fertig = true;
+      cancelAnimationFrame(raf);
+      if (obergrenze) clearTimeout(obergrenze);
+      window.removeEventListener("scrollend", zeigen);
+      messen();
+      setScrollt(false);
+    };
+    // Ende des Scrollens abwarten statt einer festen Zeit (lange Wege dauern
+    // über 450 ms): „scrollend“, für Safari zusätzlich „scrollY drei Bilder
+    // lang unverändert“, spätestens nach 1,2 s.
+    const warteAufRuhe = () => {
+      window.addEventListener("scrollend", zeigen, { once: true });
+      let letztY = window.scrollY;
+      let ruhig = 0;
+      let bilder = 0;
+      const pruefen = () => {
+        if (fertig) return;
+        const y = window.scrollY;
+        ruhig = y === letztY ? ruhig + 1 : 0;
+        letztY = y;
+        if (++bilder > 4 && ruhig >= 3) return zeigen();
+        raf = requestAnimationFrame(pruefen);
+      };
+      raf = requestAnimationFrame(pruefen);
+      obergrenze = setTimeout(zeigen, 1200);
+    };
     const suchen = () => {
       const el = finde(step.anchor!);
       if (!el) {
         // Nach einem Reiterwechsel ist das Element evtl. noch nicht gezeichnet.
+        // Fehlt es ganz, steht die Karte in der Mitte.
         if (++versuche < 45) raf = requestAnimationFrame(suchen);
+        else zeigen();
         return;
       }
       ziel.current = el;
       const r = el.getBoundingClientRect();
       const fest = getComputedStyle(el).position === "fixed" || el.closest("nav, header") !== null;
+      let scrollen = false;
       if (!fest) {
         if (window.innerWidth < 640) {
           // Handy: das Element direkt unter den Kopf, darunter bleibt Platz für die Karte
-          if (Math.abs(r.top - 84) > 8) window.scrollBy({ top: r.top - 84, behavior: "smooth" });
+          if (Math.abs(r.top - 84) > 8) {
+            scrollen = true;
+            window.scrollBy({ top: r.top - 84, behavior: "smooth" });
+          }
         } else if (r.top < 80 || r.bottom > window.innerHeight - 100) {
+          scrollen = true;
           el.scrollIntoView({ block: "center", behavior: "smooth" });
         }
       }
-      messen();
-      nachScroll = setTimeout(messen, 380);
+      if (scrollen) {
+        messen();
+        warteAufRuhe();
+      } else zeigen();
     };
     suchen();
     return () => {
+      fertig = true;
       cancelAnimationFrame(raf);
-      if (nachScroll) clearTimeout(nachScroll);
+      if (obergrenze) clearTimeout(obergrenze);
+      window.removeEventListener("scrollend", zeigen);
     };
     // onTab absichtlich nicht: sonst liefe der Schritt bei jedem Zeichnen neu.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -190,6 +243,13 @@ export function Tour({
     return () => window.removeEventListener("keydown", taste, true);
   }, [open, weiter, zurueck, onClose]);
 
+  // Nach jedem Zeichnen nachmessen; ändert sich die Höhe kaum, bleibt der Wert
+  // (sonst zeichnete jede Messung neu).
+  useLayoutEffect(() => {
+    const h = karte.current?.offsetHeight ?? 0;
+    setKartenHoehe((v) => (Math.abs(v - h) > 1 ? h : v));
+  });
+
   if (!open || !step) return null;
 
   // ------------------------------------------------ Wo steht die Karte?
@@ -205,11 +265,54 @@ export function Tour({
       : { bottom: "calc(env(safe-area-inset-bottom) + 12px)", left: 12, right: 12 };
   } else {
     // Rechner/Tablet: direkt über oder unter dem Element, mittig ausgerichtet
-    const w = 360;
+    // 384 px wie die mittige Karte (24rem): mit den engeren Punkten passen bis
+    // zu zwölf Schritte (Admin), „Zurück“ und „Weiter“ in eine Reihe – bei 360
+    // brach sie am iPad um (Prüfung Okt. 2026)
+    const w = Math.min(384, window.innerWidth - 32);
     const links = Math.min(Math.max(16, rect.left + rect.width / 2 - w / 2), window.innerWidth - w - 16);
-    kartenStil = unten
-      ? { bottom: hoehe - rect.top + PAD + 12, left: links, width: w }
-      : { top: rect.top + rect.height + PAD + 12, left: links, width: w };
+    // Senkrecht immer ganz im Bild: Reicht der Platz neben dem Element nicht,
+    // rückt die Karte an den Rand und darf das Element teilweise verdecken –
+    // besser als ein „Weiter“, das man nicht erreicht.
+    // Passt sie weder darüber noch darunter (Handy quer, große Kachelflächen),
+    // steht sie daneben, wenn dort Platz ist – sonst verdeckte sie das Element,
+    // um das es geht, ganz (Prüfung Okt. 2026: „Mithelfen senkt den
+    // Ticketpreis“ bei 844 × 390).
+    const RAND = 12;
+    const passtOben = rect.top - PAD - 12 - kartenHoehe >= RAND;
+    const passtUnten = rect.top + rect.height + PAD + 12 + kartenHoehe <= hoehe - RAND;
+    // Daneben darf die Karte schmaler werden (bis 300 px): Am Handy quer sind
+    // neben dem Element oft nur 340–380 px frei.
+    const rechtsX = rect.left + rect.width + PAD + 12;
+    const rechtsFrei = window.innerWidth - 16 - rechtsX;
+    const linksFrei = rect.left - PAD - 12 - 16;
+    const seiteBreite = Math.min(w, Math.max(rechtsFrei, linksFrei));
+    const seitlich =
+      kartenHoehe > 0 && !passtOben && !passtUnten && seiteBreite >= 300
+        ? rechtsFrei >= linksFrei
+          ? rechtsX
+          : rect.left - PAD - 12 - seiteBreite
+        : null;
+    if (seitlich !== null) {
+      // kartenHoehe ist ab dem zweiten Bild die der schmaleren Karte (schmaler =
+      // höher – passt dann erst recht nicht darüber/darunter, die Lage bleibt)
+      const mitte = rect.top + rect.height / 2 - kartenHoehe / 2;
+      kartenStil = {
+        top: Math.min(Math.max(RAND, mitte), Math.max(RAND, hoehe - RAND - kartenHoehe)),
+        left: seitlich,
+        width: seiteBreite,
+      };
+    } else if (unten) {
+      let unterkante = rect.top - PAD - 12;
+      if (unterkante - kartenHoehe < RAND) unterkante = Math.min(hoehe - RAND, kartenHoehe + RAND);
+      // auch die andere Kante: liegt das Element (noch) unter dem Bildrand
+      unterkante = Math.min(unterkante, hoehe - RAND);
+      kartenStil = { bottom: hoehe - unterkante, left: links, width: w };
+    } else {
+      let oben = rect.top + rect.height + PAD + 12;
+      if (oben + kartenHoehe > hoehe - RAND) oben = Math.max(RAND, hoehe - RAND - kartenHoehe);
+      oben = Math.max(oben, RAND);
+      kartenStil = { top: oben, left: links, width: w };
+    }
   }
 
   // Das Loch nie über den oberen Rand: Der Profil-Knopf (44 px bei y = 8)
@@ -247,7 +350,10 @@ export function Tour({
 
       {/* Erklärkarte: aussen die Lage, innen die Einblend-Bewegung – sonst
           überschreibt die Animation die Zentrierung. */}
-      <div className={`absolute ${rect ? "" : "w-[min(24rem,calc(100vw-24px))]"}`} style={kartenStil}>
+      <div
+        className={`absolute ${rect ? "" : "w-[min(24rem,calc(100vw-24px))]"} ${scrollt ? "pointer-events-none opacity-0" : "transition-opacity duration-150"}`}
+        style={kartenStil}
+      >
       <div
         key={i}
         ref={karte}
@@ -268,9 +374,13 @@ export function Tour({
         <h3 className={`text-[17px] font-semibold leading-snug tracking-[-0.01em] ${letzter ? "" : rect ? "pr-28" : step.zeichen ? "px-6" : "pt-9"}`}>{step.title}</h3>
         <p className="mt-1.5 text-[15px] leading-relaxed text-tinte-matt dark:text-slate-300">{step.text}</p>
 
-        <div className={`mt-4 flex items-center gap-3 ${rect ? "" : "justify-center"}`}>
-          {/* Seitenpunkte wie auf dem iPhone-Homescreen */}
-          <div className={`flex items-center gap-1.5 ${rect ? "mr-auto" : "absolute bottom-[1.6rem] left-5"}`} aria-label={`Schritt ${i + 1} von ${steps.length}`}>
+        {/* flex-wrap: bei 320 px passen 10 Punkte, „Zurück“ und „Weiter“ nicht in
+            eine Reihe – dann rutschen die Knöpfe rechtsbündig darunter, statt über
+            den Rand zu ragen (Prüfung Okt. 2026) */}
+        <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2">
+          {/* Seitenpunkte wie auf dem iPhone-Homescreen – im Fluss, nicht mehr
+              absolut: bei 320/375 px lagen sie sonst unter „Zurück“/„Los geht’s“ */}
+          <div className="mr-auto flex items-center gap-1" aria-label={`Schritt ${i + 1} von ${steps.length}`}>
             {steps.map((_, k) => (
               <span
                 key={k}
@@ -280,7 +390,7 @@ export function Tour({
               />
             ))}
           </div>
-          <div className={`flex items-center gap-1 ${rect ? "" : "ml-auto"}`}>
+          <div className="ml-auto flex items-center gap-1">
             {i > 0 && (
               <button onClick={zurueck} className="min-h-[44px] rounded-full px-4 text-[15px] font-semibold text-brand transition active:scale-95">
                 Zurück
@@ -402,7 +512,7 @@ export function teamSchritte(o: {
       anchor: "person",
       title: "Eine Person",
       text: o.kasseBearbeiten
-        ? "Ein Tipp auf ein Halbjahr schaltet zwischen offen und bezahlt. Ein Tipp auf den Namen öffnet alle Details und die Mithilfe – dort kannst du ein Halbjahr auch erlassen."
+        ? "Ein Tipp auf ein Halbjahr schaltet zwischen offen und bezahlt – am Handy steht nur das laufende (blau umrandet). Ein Tipp auf den Namen öffnet alle sechs Halbjahre und die Mithilfe – dort kannst du auch frühere oder spätere Halbjahre abhaken oder erlassen."
         : "Ein Tipp auf den Namen öffnet alle Details – dort trägst du auch ein, wobei jemand geholfen hat.",
     },
   );

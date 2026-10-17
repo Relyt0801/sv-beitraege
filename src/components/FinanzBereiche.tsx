@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { committeeLabel } from "../lib/committees";
 import {
   KASSEN_FARBEN, centAus, euro, euroKurz, farbHex, postenFarbe, schuljahrVon, useGeplant,
@@ -46,25 +46,31 @@ export function mitVorzeichen(cent: number, kurz = false): string {
 }
 
 /**
- * `listeKlasse` / `geplantKlasse` setzen die beiden Karten im Raster der
- * Seite an ihren Platz (z. B. am Laptop links/rechts oder am Handy in eine
- * andere Reihenfolge) – PostenBereiche liefert sie ohne eigene Hülle.
+ * `listeKlasse` setzt die Karte im Raster der Seite an ihren Platz (z. B. am
+ * Laptop rechts oder am Handy in eine andere Reihenfolge) – PostenBereiche
+ * liefert sie ohne eigene Hülle. „Geplante Aktionen“ stellt der Aufrufer
+ * selbst dar (GeplantKarte, je nach Breite als Zeile oder Karte – EINE
+ * Instanz an fester Stelle, siehe FinanzStandard/FinanzenTab).
  */
 export function PostenBereiche({
-  d, fin, listeKlasse = "", geplantKlasse = "", ohneGeplant = false, onBuchung,
+  d, fin, listeKlasse = "", onBuchung, vollAb = "lg",
 }: {
   d: FinanzUebersicht;
   fin?: FinanzenValue | null;
   listeKlasse?: string;
-  geplantKlasse?: string;
-  /** „Geplante Aktionen“ stellt der Aufrufer selbst dar (Kassenbuch am Handy: als Zeile) */
-  ohneGeplant?: boolean;
   /**
    * Eine einzelne Buchung eines Postens öffnen – dieselbe Detailseite wie
    * in der Buchungsliste (FinanzenTab). Sie geht als Unterseite über dem
    * Posten auf („‹ Waffelverkauf“), weil dessen Blatt offen bleibt.
    */
   onBuchung?: (b: Buchung) => void;
+  /**
+   * Ab welcher Breite die Liste ganz dasteht: „lg“ (Kassenbuch – darunter eine
+   * Spalte) oder „md“ (Standard-Ansicht – ab dem iPad hoch steht die Liste in
+   * einer eigenen rechten Spalte; gekürzt blieb darunter der halbe Bildschirm
+   * leer, platz-check Okt. 2026).
+   */
+  vollAb?: "md" | "lg";
 }) {
   const dunkel = useDunkel();
   const [auswahl, setAuswahl] = useState<Auswahl>(null);
@@ -76,9 +82,9 @@ export function PostenBereiche({
     (a, b) => REIHENFOLGE[a.art] - REIHENFOLGE[b.art] || Math.abs(b.ein_cent - b.aus_cent) - Math.abs(a.ein_cent - a.aus_cent),
   );
   const gewaehlt = auswahl?.typ === "posten" ? d.posten.find((p) => postenKey(p) === auswahl.key) ?? null : null;
-  // Am Handy/iPad zuerst die Elternbeiträge und die KURZ_POSTEN größten Posten
+  // Schmal zuerst die Elternbeiträge und die KURZ_POSTEN größten Posten
   // (dieselben Kategorien stehen schon in der Legende am Kreis darüber); der
-  // Rest hinter „Alle … anzeigen“. Am Laptop alles (nur CSS, wie die Buchungen).
+  // Rest hinter „Alle … anzeigen“. Ab `vollAb` alles (nur CSS, wie die Buchungen).
   const [alle, setAlle] = useState(false);
   const kuerzen = !alle && liste.length > KURZ_POSTEN + 1;
 
@@ -102,11 +108,11 @@ export function PostenBereiche({
               unter={unterzeile(p)}
               betrag={p.ein_cent - p.aus_cent}
               onClick={() => setAuswahl({ typ: "posten", key: postenKey(p) })}
-              klasse={kuerzen && i >= KURZ_POSTEN ? "max-lg:hidden" : undefined}
+              klasse={kuerzen && i >= KURZ_POSTEN ? (vollAb === "md" ? "max-md:hidden" : "max-lg:hidden") : undefined}
             />
           ))}
           {kuerzen && (
-            <li className="lg:hidden">
+            <li className={vollAb === "md" ? "md:hidden" : "lg:hidden"}>
               <button
                 type="button"
                 onClick={(e) => {
@@ -123,8 +129,6 @@ export function PostenBereiche({
           )}
         </ul>
       </section>
-
-      {!ohneGeplant && <GeplantKarte darf={Boolean(fin)} fin={fin ?? null} className={geplantKlasse} />}
 
       <BeitraegeDetail open={auswahl?.typ === "beitraege"} d={d} onClose={() => setAuswahl(null)} />
       <PostenDetail
@@ -814,6 +818,17 @@ export function GeplantKarte({ darf, fin, className = "", alsZeile = false }: { 
   const { liste, speichern, loeschen } = useGeplant(true);
   const [offen, setOffen] = useState<KassenGeplant | "neu" | null>(null);
   const [listeAuf, setListeAuf] = useState(false);
+  // Ziel für die Fokus-Rückgabe: Wurde das Gerät gedreht, während ein Blatt
+  // offen war, gibt es den Auslöser nicht mehr (aus der Zeile wurde eine Karte
+  // oder umgekehrt) – dann geht der Fokus hierher statt auf die Seite.
+  const anker = useId();
+  const fokusZurueck = () =>
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        const a = document.activeElement;
+        if (!a || a === document.body || !a.isConnected) document.getElementById(anker)?.focus({ preventScroll: true });
+      }),
+    );
   const h = heuteKey();
   // Vorbei ist vorbei – nur der Kassenwart sieht sie noch (zum Aufräumen)
   const sichtbar = liste.filter((g) => darf || !g.datum || g.datum >= h);
@@ -827,21 +842,30 @@ export function GeplantKarte({ darf, fin, className = "", alsZeile = false }: { 
       g={offen}
       darf={darf}
       fin={fin}
-      onClose={() => setOffen(null)}
+      onClose={() => {
+        setOffen(null);
+        fokusZurueck();
+      }}
       onSpeichern={speichern}
       onLoeschen={loeschen}
     />
   );
 
-  if (alsZeile) {
-    // Rechts nur die Anzahl, Datum und „vorbei“ in der zweiten Zeile – rechts
-    // daneben war am Handy kein Platz („1 · ab 3. Nov. · 2 v…“, Prüfung Okt. 2026)
-    const kommend = anstehend.filter((g) => g.datum);
-    const ab = kommend[0]?.datum ? new Date(kommend[0].datum + "T12:00:00").toLocaleDateString("de-DE", { day: "numeric", month: "short" }) : null;
-    const unter = [ab ? `nächste am ${ab}` : null, anzahlVorbei ? `${anzahlVorbei} vorbei` : null].filter(Boolean).join(" · ");
-    return (
-      <>
+  // Rechts nur die Anzahl, Datum und „vorbei“ in der zweiten Zeile – rechts
+  // daneben war am Handy kein Platz („1 · ab 3. Nov. · 2 v…“, Prüfung Okt. 2026)
+  const kommend = anstehend.filter((g) => g.datum);
+  const ab = kommend[0]?.datum ? new Date(kommend[0].datum + "T12:00:00").toLocaleDateString("de-DE", { day: "numeric", month: "short" }) : null;
+  const unter = [ab ? `nächste am ${ab}` : null, anzahlVorbei ? `${anzahlVorbei} vorbei` : null].filter(Boolean).join(" · ");
+
+  // EINE Form für Zeile und Karte: Inhalt, Listenblatt und Detailblatt stehen
+  // immer an denselben Plätzen. FinanzStandard schaltet alsZeile beim Drehen
+  // um – so hängt dabei kein Blatt neu ein: Ein offenes Blatt bleibt offen und
+  // geht beim Zurückdrehen nicht von selbst wieder auf (Prüfung Okt. 2026).
+  return (
+    <>
+      {alsZeile ? (
         <Zeile
+          id={anker}
           label="Geplante Aktionen"
           unter={unter || undefined}
           symbol={
@@ -853,20 +877,29 @@ export function GeplantKarte({ darf, fin, className = "", alsZeile = false }: { 
         >
           <span className="zahl whitespace-nowrap text-[15px] text-tinte-leise">{anstehend.length || "keine"}</span>
         </Zeile>
-        <Sheet open={listeAuf} onClose={() => setListeAuf(false)}>
-          <SheetKopf titel="Geplante Aktionen" onClose={() => setListeAuf(false)} />
-          {geplantListe(true)}
-        </Sheet>
-        {blatt}
-      </>
-    );
-  }
-
-  return (
-    <section className={`card min-w-0 p-4 sm:p-5 ${className}`}>
-      {geplantListe(false)}
+      ) : (
+        <section id={anker} tabIndex={-1} className={`card min-w-0 p-4 outline-none sm:p-5 ${className}`}>
+          {geplantListe(false)}
+        </section>
+      )}
+      <Sheet
+        open={listeAuf}
+        onClose={() => {
+          setListeAuf(false);
+          fokusZurueck();
+        }}
+      >
+        <SheetKopf
+          titel="Geplante Aktionen"
+          onClose={() => {
+            setListeAuf(false);
+            fokusZurueck();
+          }}
+        />
+        {geplantListe(true)}
+      </Sheet>
       {blatt}
-    </section>
+    </>
   );
 
   // Kopf und Liste – in der Karte oder im Blatt (dort selbst als Karte).

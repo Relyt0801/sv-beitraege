@@ -15,6 +15,7 @@ import { FaulGrenze, faul } from "./FaulLaden";
 import type { EventItem } from "../lib/events";
 import type { Termin } from "../lib/termine";
 import { Icon, type IconName } from "./Icon";
+import { useBreit } from "../lib/gescrollt";
 
 /**
  * „Für dich offen“ (Schüler) bzw. „Zu erledigen“ (Team) – ganz oben in der
@@ -73,13 +74,15 @@ export function ZuErledigen({ className = "" }: { className?: string }) {
   // Die eigene nächste Schicht im Blatt (fürs Team dasselbe wie unter „Mitmachen“)
   const [schichtOffen, setSchichtOffen] = useState<Termin | null>(null);
   const { topics, items, myVotes, committeesOf, uid } = useTopics();
+  const breit = useBreit();
 
   if (isEltern) return null;
 
   // Was in den eigenen Komitees offen ist (Abstimmung ohne eigene Stimme,
   // offene To-dos) – vorher sah man das nur, wenn man in Chats nachschaute.
-  // Eigene Gruppe: Komitee-Aufgaben gehören allen Mitgliedern, die Zahl am
-  // Reiter zählt nur, was oben unter „Zu erledigen“ steht.
+  // Stehen hinten in derselben Gruppe. Die Zahl am Reiter (App.tsx →
+  // aufgabenZahl) zählt sie bewusst nicht: Komitee-Aufgaben gehören allen
+  // Mitgliedern, nicht einem selbst.
   const meineKoms = uid ? committeesOf(uid) : [];
   const jetzt = Date.now();
   const komitee: ReactNode[] = topics
@@ -179,23 +182,24 @@ export function ZuErledigen({ className = "" }: { className?: string }) {
     );
   }
 
+  // EINE Gruppe bei jeder Breite, die Komitee-Zeilen hinten dran (Sprechblase
+  // + Komitee-Name zeigen, woher sie kommen); ab Laptop/iPad quer in zwei
+  // Spalten. Vorher zwei Gruppen nebeneinander: bei 3–4 Aufgaben und
+  // 1 Komitee blieben rechts 2–3 Zeilen leer (platz-check Okt. 2026). Am
+  // Handy stand „Aus deinen Komitees“ als zweite Gruppe darunter – die zweite
+  // Überschrift kostete Höhe für meist eine Zeile (Runde 10, Okt. 2026).
+  // Alle Zeilen stehen so bei JEDER Breite an derselben Stelle im Baum. Sonst
+  // baute React sie beim Drehen des iPads neu auf, und nach dem Schließen
+  // eines Blatts fand der Fokus seinen Auslöser nicht mehr (Sheet.tsx).
+  const titel = isStaff ? "Zu erledigen" : "Für dich offen";
   return (
     <>
       {(zeilen.length > 0 || komitee.length > 0) && (
-        // Ab Laptop/iPad quer stehen beide Listen nebeneinander – vorher stand
-        // „Aus deinen Komitees“ (meist 1–2 Zeilen) über die volle Breite darunter.
-        // Halb/halb wie die Karten darunter, damit die Kanten fluchten.
-        <div className={`${className} ${zeilen.length > 0 && komitee.length > 0 ? "lg:grid lg:grid-cols-2 lg:items-start lg:gap-3" : ""}`}>
-          {zeilen.length > 0 && (
-            <Gruppe titel={isStaff ? "Zu erledigen" : "Für dich offen"} className="">
-              {zeilen}
-            </Gruppe>
-          )}
-          {komitee.length > 0 && (
-            <Gruppe titel="Aus deinen Komitees" className={zeilen.length ? "mt-4 lg:mt-0" : ""}>
-              {komitee}
-            </Gruppe>
-          )}
+        <div className={className}>
+          <Gruppe titel={zeilen.length ? titel : "Aus deinen Komitees"} className="" spalten={breit}>
+            {zeilen}
+            {komitee}
+          </Gruppe>
         </div>
       )}
       <AbstimmungBlatt id={abstimmungId} onClose={() => setAbstimmungId(null)} />

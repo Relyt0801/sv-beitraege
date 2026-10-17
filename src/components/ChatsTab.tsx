@@ -31,6 +31,10 @@ import { ZustimmungsMarke } from "./ZustimmungsMarke";
 import { TABELLE_NAME, TEIL_NAME, useAlleVerschiebungen, type Verschiebung, type TeilTabelle } from "../lib/teile";
 import { sprungAusHash, type Sprungziel } from "../lib/sprung";
 const TEAM_CHAT_TITLE = "Stufenteam";
+/** Fußnote unter der Komitee-Liste mit Glocken (Laptop-Liste und Blatt am Handy) */
+const GLOCKE_FUSS = "Glocke an = Mitteilungen und roter Punkt auch für Komitees, in denen du nicht bist.";
+/** Wie lange ein Komitee nach dem letzten Eintrag am Handy noch oben steht */
+const KUERZLICH_MS = 14 * 24 * 60 * 60 * 1000;
 
 /**
  * Farben der Kacheln im Chats-Reiter – je Bereich EINE Systemfarbe (wie die
@@ -87,6 +91,13 @@ export function ChatsTab() {
   const { topics, items, members, ready, unreadCount, createTopic, committeesOf, uid, myVotes } = useTopics();
   const { can, isStaff } = useRole();
   const [anschreiben, setAnschreiben] = useState(false);
+  // Blatt „Weitere Komitees“ – am Handy steht dort der ruhige Rest der Liste
+  const [alleKomitees, setAlleKomitees] = useState(false);
+  // Komitees, deren Glocke man in der kurzen Handy-Liste eben ausgeschaltet
+  // hat: Sie bleiben stehen (zeigen „aus“), statt unter dem Finger zu
+  // verschwinden – bis man zur Wurzel des Reiters zurückkehrt (wie
+  // offenGehalten in Freitext.tsx).
+  const [gehalten, setGehalten] = useState<ReadonlySet<string>>(() => new Set());
   const { mitteilungen, setKategorie, setKomitee } = useMitteilungen();
   const zaehlt = useZaehltMit();
   const darfVerwalten = can("chats.manage");
@@ -139,6 +150,8 @@ export function ChatsTab() {
       setTeamOffen(false);
       setAnsicht(null);
       setAnschreiben(false);
+      setAlleKomitees(false);
+      setGehalten(new Set());
     };
     window.addEventListener("sv:reiter-wurzel", zurWurzel);
     return () => window.removeEventListener("sv:reiter-wurzel", zurWurzel);
@@ -266,6 +279,30 @@ export function ChatsTab() {
     .sort((a, b) => (reihenfolge.get(a.tag) ?? 99) - (reihenfolge.get(b.tag) ?? 99));
   const meineChats = komiteeChats.filter((t) => meineKoms.includes(t.tag));
   const andereChats = komiteeChats.filter((t) => !meineKoms.includes(t.tag));
+  // Fürs Team am Handy (unter md) nur die Komitees, in denen etwas los ist –
+  // höchstens 3, der Rest im Blatt. Anlass (Runde 10, Okt. 2026): 7 Zeilen
+  // „Noch keine Nachricht · aus“ kosteten ~470 px, „Chats“ musste man am
+  // iPhone scrollen. Aktiv = Ungelesenes, Glocke an oder ein Eintrag (keine
+  // Systemzeile) aus den letzten 14 Tagen. Komitees mit gezähltem
+  // Ungelesenem fallen NIE ins Blatt – sonst stünde am Reiter eine Zahl, die
+  // auf der Seite keiner Zeile gehört (Prüfung Okt. 2026); die übrigen Plätze
+  // bis 3 füllen die anderen aktiven, in der Reihenfolge der Komitees.
+  const grenze = Date.now() - KUERZLICH_MS;
+  const kuerzlich = new Set(
+    isStaff ? items.filter((i) => i.type !== "system" && new Date(i.created_at).getTime() > grenze).map((i) => i.topic_id) : [],
+  );
+  // Ungelesenes und eben Bedientes (gehalten) stehen immer da – auch über die
+  // 3 hinaus; sonst spränge eine Zeile, deren Glocke man gerade ausschaltet,
+  // unter dem Finger weg (und der nächste Tipp träfe die Zeile darunter).
+  const ungelesen = (t: Topic) => zaehlt(t) && unreadCount(t.id) > 0;
+  const fest = (t: Topic) => ungelesen(t) || gehalten.has(t.id);
+  const aktiv = (t: Topic) => komiteeAn(mitteilungen, t.tag, false) || kuerzlich.has(t.id);
+  let freiePlaetze = Math.max(0, 3 - andereChats.filter(fest).length);
+  const aktiveKomitees = andereChats.filter((t) => fest(t) || (aktiv(t) && freiePlaetze-- > 0));
+  // Bliebe nur EIN Komitee übrig, steht es direkt da – „Alle 1 Komitees ›“
+  // wäre eine Zeile, die nur auf eine andere Zeile zeigt.
+  const handyKomitees = andereChats.length - aktiveKomitees.length <= 1 ? andereChats : aktiveKomitees;
+  const komiteeTitel = meineChats.length ? "Weitere Komitees" : "Komitees";
   // Vorschau-Gruppen unter den Kacheln (nur Schüler): eigene Komitees mit Inhalt
   // und die letzte Nachricht im Gespräch mit dem Team
   const vorschauKomitees = isStaff ? [] : meineChats.filter((t) => items.some((i) => i.topic_id === t.id && i.type !== "system"));
@@ -288,6 +325,32 @@ export function ChatsTab() {
       zahlWort="neu"
       zahlRot
       onClick={() => oeffne(t.id)}
+    />
+  );
+  /** Ein Komitee, in dem man nicht ist, als Listenzeile mit Glocke (Team).
+   *  ort: „kurz“ = gekürzte Handy-Liste (nur dort hält „Glocke aus“ die Zeile
+   *  fest), „liste“ = ganze Liste ab iPad, „blatt“ = Blatt „Alle N Komitees“
+   *  (ein Tipp schließt erst das Blatt, dann geht das Komitee auf – sonst
+   *  ginge die Ebene unter dem Blatt auf). */
+  const komiteeZeile = (t: Topic, ort: "kurz" | "liste" | "blatt") => (
+    <ChatZeile
+      key={t.id}
+      titel={committeeLabel(t.tag)}
+      icon={committeeIcon(t.tag)}
+      unter={komiteeUnter(t, "Noch keine Nachricht")}
+      unread={zaehlt(t) ? unreadCount(t.id) : 0}
+      onOpen={() => {
+        if (ort === "blatt") setAlleKomitees(false);
+        oeffne(t.id);
+      }}
+      glocke={{
+        an: komiteeAn(mitteilungen, t.tag, false),
+        setAn: (x) => {
+          if (!x && ort === "kurz") setGehalten((g) => new Set(g).add(t.id));
+          void setKomitee(t.tag, x);
+        },
+        name: committeeLabel(t.tag),
+      }}
     />
   );
 
@@ -413,29 +476,28 @@ export function ChatsTab() {
         </div>
       )}
 
-      {/* Komitee-Chats: ruhige Liste. Fürs Team mit Glocke je Komitee. */}
+      {/* Komitee-Chats: ruhige Liste. Fürs Team mit Glocke je Komitee.
+          Am Handy (unter md) nur die aktiven, dahinter „Alle N Komitees ›“
+          (wie „Alle 8 anzeigen“ in Finanzen; grau, Blau ist „Neu anlegen“).
+          Ab md (iPad) die ganze Liste mit Fußnote wie bisher – dort passt
+          sie ohne Scrollen, gekürzt bliebe nur ein leerer halber Bildschirm. Weiche per CSS statt
+          useBreit: beide Gruppen bleiben eingehängt, die Zeile, die das Blatt
+          öffnet, wird beim Drehen nicht neu gebaut (Fokus-Rückgabe). */}
       {andereChats.length > 0 &&
         (isStaff ? (
-          <Gruppe
-            className=""
-            titel={meineChats.length ? "Weitere Komitees" : "Komitees"}
-            fuss="Glocke an = Mitteilungen und roter Punkt auch für Komitees, in denen du nicht bist."
-          >
-            {andereChats.map((t) => {
-              const an = komiteeAn(mitteilungen, t.tag, false);
-              return (
-                <ChatZeile
-                  key={t.id}
-                  titel={committeeLabel(t.tag)}
-                  icon={committeeIcon(t.tag)}
-                  unter={komiteeUnter(t, "Noch keine Nachricht")}
-                  unread={zaehlt(t) ? unreadCount(t.id) : 0}
-                  onOpen={() => oeffne(t.id)}
-                  glocke={{ an, setAn: (x) => void setKomitee(t.tag, x), name: committeeLabel(t.tag) }}
-                />
-              );
-            })}
-          </Gruppe>
+          <>
+            <Gruppe className="md:hidden" titel={komiteeTitel}>
+              {handyKomitees.map((t) => komiteeZeile(t, "kurz"))}
+              {andereChats.length > handyKomitees.length && (
+                <Zeile label={`Alle ${andereChats.length} Komitees`} onClick={() => setAlleKomitees(true)} />
+              )}
+            </Gruppe>
+            {/* ab Laptop zwei Spalten (Gruppe spalten): 7 Komitees sind dann
+                4 Zeilen statt 7 über die ganze Breite (DESIGN-REGELN 2) */}
+            <Gruppe className="max-md:hidden" titel={komiteeTitel} fuss={GLOCKE_FUSS} spalten>
+              {andereChats.map((t) => komiteeZeile(t, "liste"))}
+            </Gruppe>
+          </>
         ) : (
           // Schüler sehen andere Komitees normalerweise gar nicht (Datenbank);
           // falls doch (Testbetrieb), zugeklappt, damit nichts überladen wirkt.
@@ -506,6 +568,17 @@ export function ChatsTab() {
         ))}
 
       {isStaff && <SchuelerAnschreiben open={anschreiben} onClose={() => setAnschreiben(false)} />}
+
+      {/* Handy: alle übrigen Komitees mit Glocke. Erst das Blatt schließen,
+          dann das Komitee öffnen – sonst ginge die Ebene unter dem Blatt auf. */}
+      {isStaff && (
+        <Sheet open={alleKomitees} onClose={() => setAlleKomitees(false)}>
+          <SheetKopf titel={komiteeTitel} onClose={() => setAlleKomitees(false)} />
+          <Gruppe className="" fuss={GLOCKE_FUSS}>
+            {andereChats.map((t) => komiteeZeile(t, "blatt"))}
+          </Gruppe>
+        </Sheet>
+      )}
     </div>
   );
 }
