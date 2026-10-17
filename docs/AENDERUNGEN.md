@@ -100,9 +100,9 @@ links, Chat rechts, wie Nachrichten am Mac) wäre der richtige nächste
 Schritt. Sie ändert aber die Ebenen-Regel (DESIGN-REGELN 3) und ist hier
 nicht gebaut.
 
-**Zweite und dritte Nachprüfung:** Jede Korrektur wurde in der Demo neu
-nachgestellt, und ein eigener Prüfer hat den Diff der Korrekturen gelesen.
-Dabei kamen noch einmal 9 kleine Funde heraus; alle sind behoben:
+**Weitere Nachprüfungen (vier Runden):** Jede Korrektur wurde in der Demo
+neu nachgestellt, und ein eigener Prüfer hat den Diff der Korrekturen
+gelesen, bis keine neuen Funde mehr kamen. Behoben wurde dabei:
 - Schaltet man die Glocke bei einem Komitee mit Ungelesenem aus, sprang die
   Zeile trotzdem weg. Jetzt bleibt sie über die 3 hinaus stehen.
 - Festgehalten wird nur in der kurzen Handy-Liste.
@@ -115,12 +115,26 @@ Dabei kamen noch einmal 9 kleine Funde heraus; alle sind behoben:
 - Kasse am Handy:
   - Drei und mehr aufeinanderfolgende offene Halbjahre stehen als Spanne da
     („EF.1–Q1.2“).
-  - Zahl und „%“ bleiben zusammen.
-  - Bei 320 px steht die Mithilfe wieder in der Zeile.
-- Einführung:
-  - Am Handy rutschen die Knöpfe bei 320 px unter die Punkte.
-  - Am iPad/Laptop ist die Karte 384 px breit, die Reihe bricht dort nicht
-    um. Das Überstehen bei 320 px gab es schon vor Runde 10.
+  - Zahl und „%“ bleiben zusammen, die Zahl ist immer sichtbar.
+  - Das Wort „Mithilfe“ darf in die zweite Zeile rutschen. Bei 320 px mit
+    langem „auch … offen“ davor fällt es notfalls weg. Als feste Einheit
+    verschwand dort sonst die Zahl selbst.
+- Einführung (Fehler zum Teil schon vor Runde 10, jetzt mitbehoben):
+  - Am iPad quer lag „Weiter“ für Admins unter dem Bildrand. Bei Schülern
+    fehlten oben Titel und „Überspringen“ (Karte bei −114 px).
+  - Jetzt misst die Karte ihre Höhe und bleibt an beiden Kanten im Bild.
+  - Passt sie weder über noch unter das Element (Handy quer), steht sie
+    daneben.
+  - Ursache für ein Element unter dem Rand behoben: Derselbe Reiter wird
+    nicht noch einmal gesetzt, das scrollte sonst nach oben.
+  - Punkte enger und im Fluss:
+    - 12 Schritte (Admin) passen am iPad/Laptop in eine Reihe (Karte
+      384 px).
+    - Am Handy liegen die Punkte nicht mehr unter „Zurück“ oder „Los
+      geht’s“.
+    - Bei 320 px rutschen die Knöpfe darunter.
+  - Nachgemessen: 1152 Schritte über alle Rollen und 8 Größen. Jede Karte
+    ist ganz im Bild, „Weiter“ war jedes Mal anklickbar.
 - Team-Chats am Laptop: „Weitere Komitees“ in zwei Spalten, aus 7 Zeilen
   werden 4. Am iPad quer passt die Seite jetzt ohne Scrollen (1,15 → 1,00).
 
