@@ -100,7 +100,7 @@ links, Chat rechts, wie Nachrichten am Mac) wäre der richtige nächste
 Schritt. Sie ändert aber die Ebenen-Regel (DESIGN-REGELN 3) und ist hier
 nicht gebaut.
 
-**Weitere Nachprüfungen (fünf Runden):** Jede Korrektur wurde in der Demo
+**Weitere Nachprüfungen (sechs Runden):** Jede Korrektur wurde in der Demo
 neu nachgestellt, und ein eigener Prüfer hat den Diff der Korrekturen
 gelesen, bis keine neuen Funde mehr kamen. Behoben wurde dabei:
 - Schaltet man die Glocke bei einem Komitee mit Ungelesenem aus, sprang die
@@ -117,8 +117,9 @@ gelesen, bis keine neuen Funde mehr kamen. Behoben wurde dabei:
     („EF.1–Q1.2“).
   - „0 % Mithilfe“ bleibt als Einheit zusammen, die Zahl steht nie ohne
     ihr Wort.
-  - Unter 360 px darf die Unterzeile dreizeilig werden, denn zwei Zeilen
-    reichten dort mit „auch … offen“ davor nicht.
+  - Die Unterzeile wird nicht mehr abgeschnitten. Mit „auch … offen“ davor
+    und „· verlässt …“ dahinter braucht sie bei 320 px bis zu vier Zeilen.
+    Das betrifft nur Personen mit viel Info; sonst fehlte genau etwas.
   - Beim Auswählen fällt das Halbjahr-Kästchen am Handy weg. Es ist dann
     ohnehin nicht antippbar, und bei 320 px blieben sonst rund 60 px für
     Name und Unterzeile.
@@ -131,8 +132,13 @@ gelesen, bis keine neuen Funde mehr kamen. Behoben wurde dabei:
   - Ursache für ein Element unter dem Rand behoben: Den schon offenen
     Reiter setzen App und ElternApp nicht noch einmal, das scrollte sonst
     nach oben.
-  - Während zum Element gescrollt wird, ist die Karte kurz unsichtbar.
-    Sonst sprang ihre Lage mitten im Scrollen.
+  - Bis zum Element gescrollt ist, bleibt die Karte unsichtbar. Sie wartet
+    auf das echte Ende des Scrollens, nicht auf eine feste Zeit. Danach
+    blendet sie ein, ohne Aufblitzen und ohne Sprung.
+  - Ein Neustart aus dem Profil beginnt sofort bei Schritt 1. Vorher war ein
+    Bild lang der alte Schritt zu sehen.
+  - Daneben darf die Karte schmaler werden, bis 300 px. Am Handy quer sind
+    neben dem Element oft nur 340–380 px frei.
   - Punkte enger und im Fluss:
     - 12 Schritte (Admin) passen am iPad/Laptop in eine Reihe (Karte
       384 px).

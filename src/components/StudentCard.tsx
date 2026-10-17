@@ -144,10 +144,10 @@ function StudentCardRoh({
               frühere offene Halbjahre (nur das laufende steht als Kästchen da)
               und die Mithilfe (die Spalte fällt weg). So bleibt die Person
               eine Zeile hoch – Okt. 2026: 103 → 65 px je Person. Das Offene
-              steht vorn und darf auf eine zweite Zeile umbrechen: Abgeschnitten
+              steht vorn und darf in weitere Zeilen umbrechen: Abgeschnitten
               würde sonst genau das, wofür die Zeile da ist (ab Q1.1 mit zwei
               offenen Halbjahren schon am iPhone). */}
-          <span className="line-clamp-2 text-[12px] text-tinte-leise max-[359px]:line-clamp-3 md:hidden">
+          <span className="block text-[12px] text-tinte-leise md:hidden">
             {fruehereOffen.length > 0 && (
               <>
                 <span className="text-offen dark:text-amber-300">
@@ -158,8 +158,9 @@ function StudentCardRoh({
               </>
             )}
             {/* „0 % Mithilfe“ als Einheit (feste Leerzeichen): nie die Zahl ohne ihr
-                Wort. Unter 360 px darf die Zeile dafür dreizeilig werden – zwei
-                reichten dort mit „auch … offen“ davor nicht (Prüfung Okt. 2026). */}
+                Wort. Die Unterzeile wird dafür nicht abgeschnitten – mit „auch …
+                offen“ davor und „· verlässt …“ dahinter braucht sie bei 320 px
+                bis zu vier Zeilen, sonst fehlte genau etwas (Prüfung Okt. 2026). */}
             {prozent}{"\u00a0"}%{"\u00a0"}Mithilfe
             {unter && ` · ${unter}`}
           </span>

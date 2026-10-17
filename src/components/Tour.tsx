@@ -85,8 +85,11 @@ export function Tour({
   const step = steps[i];
   const letzter = i >= steps.length - 1;
 
+  // Beim Öffnen UND Schließen auf Schritt 1: Sonst lief beim Neustart aus dem
+  // Profil ein Bild lang der alte Schritt (samt Reiterwechsel) – setI(0) nach
+  // dem Öffnen kam erst nach dem ersten Zeichnen (Prüfung Okt. 2026).
   useEffect(() => {
-    if (open) setI(0);
+    setI(0);
   }, [open]);
 
   // Anderen melden: „hier läuft eine Einführung“ (useTourOffen)
@@ -112,53 +115,86 @@ export function Tour({
   // Schritt wechselt: erst den Reiter umschalten, dann auf das Element warten.
   // (Den schon offenen Reiter setzen App/ElternApp nicht noch einmal – das
   // scrollte sanft nach oben, gegen das Scrollen zum Element.)
-  // Während zum Element gescrollt wird, ist die Karte unsichtbar: Ihre Lage
-  // hängt vom Element ab und sprang sonst mitten im Scrollen von „verdeckt“
-  // über „darunter“ zur Seite (Prüfung Okt. 2026).
+  // Bis das Element gefunden und (falls nötig) hingescrollt ist, ist die Karte
+  // unsichtbar: Ihre Lage hängt vom Element ab und sprang sonst mitten im
+  // Scrollen von „verdeckt“ über „darunter“ zur Seite (Prüfung Okt. 2026).
   const [scrollt, setScrollt] = useState(false);
   useLayoutEffect(() => {
     if (!open || !step) return;
     if (step.tab) onTab?.(step.tab);
     ziel.current = null;
     setRect(null);
-    setScrollt(false);
+    setScrollt(Boolean(step.anchor));
     if (!step.anchor) return;
 
     let versuche = 0;
     let raf = 0;
-    let nachScroll: ReturnType<typeof setTimeout> | undefined;
+    let fertig = false;
+    let obergrenze: ReturnType<typeof setTimeout> | undefined;
+    const zeigen = () => {
+      if (fertig) return;
+      fertig = true;
+      cancelAnimationFrame(raf);
+      if (obergrenze) clearTimeout(obergrenze);
+      window.removeEventListener("scrollend", zeigen);
+      messen();
+      setScrollt(false);
+    };
+    // Ende des Scrollens abwarten statt einer festen Zeit (lange Wege dauern
+    // über 450 ms): „scrollend“, für Safari zusätzlich „scrollY drei Bilder
+    // lang unverändert“, spätestens nach 1,2 s.
+    const warteAufRuhe = () => {
+      window.addEventListener("scrollend", zeigen, { once: true });
+      let letztY = window.scrollY;
+      let ruhig = 0;
+      let bilder = 0;
+      const pruefen = () => {
+        if (fertig) return;
+        const y = window.scrollY;
+        ruhig = y === letztY ? ruhig + 1 : 0;
+        letztY = y;
+        if (++bilder > 4 && ruhig >= 3) return zeigen();
+        raf = requestAnimationFrame(pruefen);
+      };
+      raf = requestAnimationFrame(pruefen);
+      obergrenze = setTimeout(zeigen, 1200);
+    };
     const suchen = () => {
       const el = finde(step.anchor!);
       if (!el) {
         // Nach einem Reiterwechsel ist das Element evtl. noch nicht gezeichnet.
+        // Fehlt es ganz, steht die Karte in der Mitte.
         if (++versuche < 45) raf = requestAnimationFrame(suchen);
+        else zeigen();
         return;
       }
       ziel.current = el;
       const r = el.getBoundingClientRect();
       const fest = getComputedStyle(el).position === "fixed" || el.closest("nav, header") !== null;
+      let scrollen = false;
       if (!fest) {
         if (window.innerWidth < 640) {
           // Handy: das Element direkt unter den Kopf, darunter bleibt Platz für die Karte
           if (Math.abs(r.top - 84) > 8) {
-            setScrollt(true);
+            scrollen = true;
             window.scrollBy({ top: r.top - 84, behavior: "smooth" });
           }
         } else if (r.top < 80 || r.bottom > window.innerHeight - 100) {
-          setScrollt(true);
+          scrollen = true;
           el.scrollIntoView({ block: "center", behavior: "smooth" });
         }
       }
-      messen();
-      nachScroll = setTimeout(() => {
+      if (scrollen) {
         messen();
-        setScrollt(false);
-      }, 380);
+        warteAufRuhe();
+      } else zeigen();
     };
     suchen();
     return () => {
+      fertig = true;
       cancelAnimationFrame(raf);
-      if (nachScroll) clearTimeout(nachScroll);
+      if (obergrenze) clearTimeout(obergrenze);
+      window.removeEventListener("scrollend", zeigen);
     };
     // onTab absichtlich nicht: sonst liefe der Schritt bei jedem Zeichnen neu.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -315,7 +351,7 @@ export function Tour({
       {/* Erklärkarte: aussen die Lage, innen die Einblend-Bewegung – sonst
           überschreibt die Animation die Zentrierung. */}
       <div
-        className={`absolute transition-opacity duration-150 ${rect ? "" : "w-[min(24rem,calc(100vw-24px))]"} ${scrollt ? "pointer-events-none opacity-0" : ""}`}
+        className={`absolute ${rect ? "" : "w-[min(24rem,calc(100vw-24px))]"} ${scrollt ? "pointer-events-none opacity-0" : "transition-opacity duration-150"}`}
         style={kartenStil}
       >
       <div
