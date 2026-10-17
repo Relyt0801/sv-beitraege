@@ -258,12 +258,22 @@ function InfoBlatt({ info, onClose }: { info: ElternInfo | null; onClose: () => 
 /* ====================================================================== */
 
 /** Eigene Ebene „Gespräche mit Eltern“ (aus der Kachel im Chats-Reiter) */
-export function ElternGespraecheEbene({ onBack, glocke }: { onBack: () => void; glocke?: ReactNode }) {
+export function ElternGespraecheEbene({
+  onBack,
+  glocke,
+  liste = 0,
+}: {
+  onBack: () => void;
+  glocke?: ReactNode;
+  /** Zählt hoch, wenn „Eltern“ in der Seitenleiste angetippt wird → zurück zur Liste */
+  liste?: number;
+}) {
   const { tickets, nachrichten } = useEltern();
   const absender = useAbsender();
   const istNeu = useIstNeu();
   const [neu, setNeu] = useState(false);
   const [offenId, setOffenId] = useState<string | null>(null);
+  useEffect(() => setOffenId(null), [liste]);
   const offene = tickets.filter((t) => !t.erledigt);
   const erledigte = tickets.filter((t) => t.erledigt);
   const offen = offenId ? tickets.find((t) => t.id === offenId) ?? null : null;

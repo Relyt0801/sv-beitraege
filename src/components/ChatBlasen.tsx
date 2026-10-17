@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type AnimationEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { scrollSperren } from "../lib/scrollsperre";
 import { useBreit } from "../lib/gescrollt";
@@ -689,6 +689,14 @@ function useObersteEbene(sichtbar: boolean): boolean {
   return useSyncExternalStore(ebenenAbo, () => offeneEbenen[offeneEbenen.length - 1] === ich);
 }
 
+// Seitenleiste am Laptop (ChatSeitenleiste): Jede Ebene zeichnet ihre eigene
+// Kopie, sie soll sich aber wie EINE verhalten – derselbe Scrollstand, und
+// nach einem Tipp in der Leiste blendet die neue Ebene nicht ein und der Fokus
+// bleibt auf dem Eintrag (Prüfung Runde 11: Leiste sprang nach oben und fuhr
+// mit ein, der Fokus fiel auf <body>).
+const leiste = { scroll: 0, wechsel: -Infinity };
+const ueberLeiste = () => performance.now() - leiste.wechsel < 800;
+
 /**
  * Ein geöffneter Chat (oder eine Unterseite wie „Anfragen“) als Vollbild-Ebene.
  *
@@ -758,6 +766,7 @@ export function ChatEbene({
 }) {
   const sicht = useSichtfenster(sichtbar);
   const oben = useObersteEbene(sichtbar);
+  const seite = useContext(ChatSeitenleiste);
   const ebeneRef = useRef<HTMLDivElement>(null);
   useEscapeSchliesst(sichtbar && Boolean(onSchliessen), () => {
     // Ein angefangener Text geht mit Esc nicht verloren: Steht noch etwas in
@@ -787,6 +796,47 @@ export function ChatEbene({
     setKopfZiel(breit && sichtbar ? document.getElementById("kopf-ebene") : null);
   }, [breit, sichtbar]);
 
+  // Am Laptop mit Seitenleiste: Liste links in der Spalte, der Chat rechts
+  // daneben – Verlauf und Eingabe nur über der rechten Seite. Hängt nur an
+  // Breite und Context, nicht an kopfZiel/sichtbar, und der Baum unten ist in
+  // jedem Zustand gleich: Sonst baute React beim Öffnen und Drehen Verlauf,
+  // Eingabe und Blätter neu auf (Scroll-Merker hing am alten Element,
+  // Entwürfe waren weg – Prüfung Runde 11).
+  const mitSeite = Boolean(breit && seite);
+  // Die Liste zeigt nur die oberste Ebene (sonst zwei „Alle Chats“, und die
+  // verdeckte bliebe im Tab-Weg); der Platz dafür bleibt immer frei.
+  const mitLeiste = mitSeite && oben && sichtbar;
+  const seiteRef = useRef<HTMLDivElement>(null);
+  const inhaltRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const el = seiteRef.current;
+    if (!mitLeiste || !el) return;
+    el.scrollTop = leiste.scroll;
+    // Nach einem Wechsel über die Leiste hat der neue Eintrag den Fokus
+    if (ueberLeiste()) el.querySelector<HTMLElement>('[aria-current="page"]')?.focus({ preventScroll: true });
+  }, [mitLeiste]);
+  // Der markierte Eintrag ist immer zu sehen – auch noch, wenn die Höhe des
+  // Eingabe-Bands erst danach gemessen ist (die Leiste endet darüber; vorher
+  // lag der fokussierte Eintrag unten außerhalb der Leiste)
+  useLayoutEffect(() => {
+    const el = seiteRef.current;
+    const aktiv = mitLeiste ? el?.querySelector<HTMLElement>('[aria-current="page"]') : null;
+    if (!el || !aktiv) return;
+    const r = aktiv.getBoundingClientRect();
+    const k = el.getBoundingClientRect();
+    if (r.top < k.top) el.scrollTop -= k.top - r.top + 8;
+    else if (r.bottom > k.bottom) el.scrollTop += r.bottom - k.bottom + 8;
+  }, [mitLeiste, fussH]);
+  // Einblenden nur beim Öffnen – nicht nach einem Tipp in der Leiste und
+  // nicht beim Drehen. Mit Leiste blendet nur der Chat ein, die Leiste steht.
+  const [einblenden, setEinblenden] = useState(() => !ueberLeiste());
+  useLayoutEffect(() => {
+    if (sichtbar) setEinblenden(!ueberLeiste());
+  }, [sichtbar]);
+  const eingeblendet = (e: AnimationEvent) => {
+    if (e.target === ebeneRef.current || e.target === inhaltRef.current) setEinblenden(false);
+  };
+
   // Die Seite dahinter scrollt nicht mit
   useEffect(() => {
     if (!sichtbar) return;
@@ -812,21 +862,17 @@ export function ChatEbene({
     sc.addEventListener("scroll", merken, { passive: true });
     return () => sc.removeEventListener("scroll", merken);
   }, []);
+  // Auch beim Drehen (Leiste kommt/geht, Kopfband am Handy) bleibt man unten
   useLayoutEffect(() => {
     const sc = scroller.current;
     if (sc && warUnten.current) sc.scrollTop = sc.scrollHeight;
-  }, [sicht.hoehe, fussH]);
+  }, [sicht.hoehe, fussH, kopfH, mitSeite]);
 
-  return createPortal(
-    <div
-      ref={ebeneRef}
-      role="region"
-      aria-label={label}
-      className={`ebene-grund fixed inset-x-0 top-0 z-[45] flex h-[100dvh] flex-col bg-papier dark:bg-slate-950 lg:bottom-0 lg:top-[var(--kopf)] lg:z-[15] lg:h-auto ${
-        sichtbar ? "animate-vonRechts" : "hidden"
-      }`}
-      style={sicht.hoehe ? { height: sicht.hoehe, top: sicht.oben } : undefined}
-    >
+  // Mit Leiste nur links Abstand: rechts endet der Chat bündig mit Spalte und
+  // Kopfzeile (die äußere Hülle hat den Rand schon)
+  const spalte = mitSeite ? "pl-3 sm:pl-5" : "mx-auto max-w-5xl px-3 sm:px-5";
+  const verlauf = (
+    <>
       {/* Verlauf: läuft unter Kopf- und Fußleiste durch (Glas) */}
       <div
         ref={scroller}
@@ -837,7 +883,7 @@ export function ChatEbene({
           paddingBottom: fuss ? fussH : "calc(env(safe-area-inset-bottom) + 1.5rem)",
         }}
       >
-        <div className="mx-auto max-w-5xl px-3 sm:px-5">{children}</div>
+        <div className={spalte}>{children}</div>
       </div>
 
       {/* Am Rechner: nur die oberste Ebene legt ihren Kopf in die Kopfzeile –
@@ -853,18 +899,74 @@ export function ChatEbene({
           <div className="mx-auto max-w-5xl px-3 sm:px-5">{kopf}</div>
         </div>
       )}
+    </>
+  );
+  // Eingabe: immer ein Band über die volle Breite der Ebene, wie die Kopfzeile.
+  // Mit Seitenleiste steht nur das Feld unter dem Chat (ml-72 = Breite der
+  // Liste) – ein Band nur über der rechten Seite endete mitten im Bild.
+  const fussBand = fuss && (
+    <div
+      ref={fussRef}
+      data-ebene-fuss
+      className={`glas absolute inset-x-0 bottom-0 z-10 !bg-[rgb(var(--glas))] pt-2 shadow-[0_-0.5px_0_rgba(0,0,0,0.16)] dark:shadow-[0_-0.5px_0_rgba(255,255,255,0.14)] ${
+        sicht.tastatur ? "pb-2" : "pb-[calc(env(safe-area-inset-bottom)+0.5rem)]"
+      }`}
+    >
+      {/* Immer dieselben zwei Hüllen, nur die Klassen wechseln (die Eingabe
+          bleibt beim Drehen eingehängt – Entwurf und Fokus bleiben) */}
+      <div className={mitSeite ? "mx-auto max-w-5xl px-3 sm:px-5" : "contents"}>
+        <div className={mitSeite ? `ml-72 ${spalte}` : spalte}>{fuss}</div>
+      </div>
+    </div>
+  );
 
-      {fuss && (
+  return createPortal(
+    <div
+      ref={ebeneRef}
+      role="region"
+      aria-label={label}
+      className={`ebene-grund fixed inset-x-0 top-0 z-[45] flex h-[100dvh] flex-col bg-papier dark:bg-slate-950 lg:bottom-0 lg:top-[var(--kopf)] lg:z-[15] lg:h-auto ${
+        !sichtbar ? "hidden" : einblenden && !mitSeite ? "animate-vonRechts" : ""
+      }`}
+      style={sicht.hoehe ? { height: sicht.hoehe, top: sicht.oben } : undefined}
+      onAnimationEnd={eingeblendet}
+    >
+      {/* Liste und Chat in derselben Spalte wie Kopfzeile und Seiten (max-w-5xl):
+          die Liste fluchtet links mit dem Titel, der Chat füllt den Rest. Die
+          Liste ist eine Karte (ChatsTab) nur so hoch wie ihr Inhalt: lesbar auf
+          dem Hintergrundbild, und zwei Einträge wirken nicht wie eine leere
+          Spalte. Ohne Leiste sind beide Hüllen „contents“ – derselbe Baum. */}
+      <div className={mitSeite ? "mx-auto flex min-h-0 w-full max-w-5xl flex-1 px-3 sm:px-5" : "contents"}>
+        {mitSeite && (
+          // Endet über dem Eingabe-Band (marginBottom): ein fokussierter
+          // Eintrag rutscht nie darunter
+          <div
+            ref={seiteRef}
+            className="w-72 shrink-0 overflow-y-auto overscroll-contain pb-3 pr-2 pt-3"
+            style={{ marginBottom: fuss ? fussH : 0 }}
+            onScroll={(e) => {
+              // Nur solange die Liste hier steht: Geht ein Gespräch darüber auf,
+              // leert sich diese Leiste, scrollt auf 0 – das darf den
+              // gemeinsamen Stand nicht überschreiben
+              if (mitLeiste) leiste.scroll = e.currentTarget.scrollTop;
+            }}
+            onClickCapture={(e) => {
+              if ((e.target as Element).closest("button")) leiste.wechsel = performance.now();
+            }}
+          >
+            {mitLeiste ? seite : null}
+          </div>
+        )}
         <div
-          ref={fussRef}
-          data-ebene-fuss
-          className={`glas absolute inset-x-0 bottom-0 z-10 !bg-[rgb(var(--glas))] pt-2 shadow-[0_-0.5px_0_rgba(0,0,0,0.16)] dark:shadow-[0_-0.5px_0_rgba(255,255,255,0.14)] ${
-            sicht.tastatur ? "pb-2" : "pb-[calc(env(safe-area-inset-bottom)+0.5rem)]"
-          }`}
+          ref={inhaltRef}
+          className={
+            mitSeite ? `relative flex min-h-0 min-w-0 flex-1 flex-col ${sichtbar && einblenden ? "animate-vonRechts" : ""}` : "contents"
+          }
         >
-          <div className="mx-auto max-w-5xl px-3 sm:px-5">{fuss}</div>
+          {verlauf}
         </div>
-      )}
+      </div>
+      {fussBand}
     </div>,
     document.body,
   );
@@ -872,6 +974,14 @@ export function ChatEbene({
 
 /** Wo ein ChatKopf steht: im eigenen Band der Ebene oder in der App-Kopfzeile. */
 const KopfArt = createContext<"band" | "zeile">("band");
+
+/**
+ * Seitenleiste neben einem geöffneten Chat am Laptop/iPad quer (ab 1024 px) –
+ * wie Nachrichten am Mac: links alle Chats, der offene markiert, rechts der
+ * Chat (Runde 11, Okt. 2026). ChatsTab stellt sie bereit; Ebenen außerhalb
+ * (Kalender) haben keine und bleiben, wie sie sind. Am Handy ist sie null.
+ */
+export const ChatSeitenleiste = createContext<ReactNode>(null);
 
 /**
  * Kopfleiste einer ChatEbene: links der runde Zurück-Knopf, in der Mitte

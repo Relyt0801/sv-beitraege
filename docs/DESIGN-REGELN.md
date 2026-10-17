@@ -127,6 +127,16 @@ wieder passieren.**
     öffnet (ChatsTab, EventsTab/Kalender), hört darauf und schließt sie.
   - Keine zweite klebende Leiste unter der Kopfzeile. Neue Unterseiten als
     `ChatEbene` mit `ChatKopf` oder als Blatt (`Sheet`).
+  - **Chats am Laptop/iPad quer: Seitenleiste wie Nachrichten am Mac.** Ist
+    ein Chat (oder Anfragen, Schüler, Eltern …) offen, steht links in der
+    Spalte die Liste aller Chats als Karte (`ChatSeitenleiste` in
+    `ChatBlasen.tsx`, gefüllt von `ChatsTab`) – ein Tipp wechselt direkt,
+    der offene ist markiert, Zahlen wie an den Kacheln. Die Karte ist nur so
+    hoch wie ihr Inhalt (lesbar auf dem Bild, zwei Einträge wirken nicht wie
+    eine leere Spalte). Die Eingabe bleibt ein Band über die volle Breite;
+    nur das Feld steht unter dem Chat. Am Handy/iPad hoch bleibt der Chat
+    eine Vollbild-Ebene ohne Liste. Andere Ebenen (Kalender) haben keine
+    Seitenleiste.
 - Die Spalte (`max-w-5xl`) ist eine Variable (`--spalte`, index.css): 64rem,
   ab 1400 px 74rem, ab 1700 px 84rem. Nie eine feste Breite dagegen setzen.
 
