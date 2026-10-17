@@ -150,10 +150,11 @@ gelesen, bis keine neuen Funde mehr kamen. Behoben wurde dabei:
 - Team-Chats am Laptop: „Weitere Komitees“ in zwei Spalten, aus 7 Zeilen
   werden 4. Am iPad quer passt die Seite jetzt ohne Scrollen (1,15 → 1,00).
 
-**Bekannter Rest:** Dreht man das Gerät, während das Blatt „Geplante
-Aktionen“ offen ist, bleibt das Blatt offen. Nach dem Schließen landet der
-Fokus aber auf der Seite statt auf der Zeile, denn die Zeile ist inzwischen
-eine Karte. Vorher ging dabei das ganze Blatt verloren.
+- **Drehen bei offenem Blatt „Geplante Aktionen“:** Das Blatt bleibt offen.
+  Nach dem Schließen geht der Fokus auf die Zeile bzw. die Karte, auch wenn
+  es den Auslöser durch das Drehen nicht mehr gibt (`Zeile id`, Rückfall in
+  `GeplantKarte`). Vorher ging erst das ganze Blatt verloren, später der
+  Fokus.
 
 **Prüfung (Demo r54 = Endstand `d02118d`, Chromium):**
 - `platz-check`: 165 Ansichten, 0 über den Grenzen. Keine Ansicht ist länger

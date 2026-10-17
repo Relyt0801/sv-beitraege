@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { committeeLabel } from "../lib/committees";
 import {
   KASSEN_FARBEN, centAus, euro, euroKurz, farbHex, postenFarbe, schuljahrVon, useGeplant,
@@ -818,6 +818,17 @@ export function GeplantKarte({ darf, fin, className = "", alsZeile = false }: { 
   const { liste, speichern, loeschen } = useGeplant(true);
   const [offen, setOffen] = useState<KassenGeplant | "neu" | null>(null);
   const [listeAuf, setListeAuf] = useState(false);
+  // Ziel für die Fokus-Rückgabe: Wurde das Gerät gedreht, während ein Blatt
+  // offen war, gibt es den Auslöser nicht mehr (aus der Zeile wurde eine Karte
+  // oder umgekehrt) – dann geht der Fokus hierher statt auf die Seite.
+  const anker = useId();
+  const fokusZurueck = () =>
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        const a = document.activeElement;
+        if (!a || a === document.body || !a.isConnected) document.getElementById(anker)?.focus({ preventScroll: true });
+      }),
+    );
   const h = heuteKey();
   // Vorbei ist vorbei – nur der Kassenwart sieht sie noch (zum Aufräumen)
   const sichtbar = liste.filter((g) => darf || !g.datum || g.datum >= h);
@@ -831,7 +842,10 @@ export function GeplantKarte({ darf, fin, className = "", alsZeile = false }: { 
       g={offen}
       darf={darf}
       fin={fin}
-      onClose={() => setOffen(null)}
+      onClose={() => {
+        setOffen(null);
+        fokusZurueck();
+      }}
       onSpeichern={speichern}
       onLoeschen={loeschen}
     />
@@ -851,6 +865,7 @@ export function GeplantKarte({ darf, fin, className = "", alsZeile = false }: { 
     <>
       {alsZeile ? (
         <Zeile
+          id={anker}
           label="Geplante Aktionen"
           unter={unter || undefined}
           symbol={
@@ -863,10 +878,24 @@ export function GeplantKarte({ darf, fin, className = "", alsZeile = false }: { 
           <span className="zahl whitespace-nowrap text-[15px] text-tinte-leise">{anstehend.length || "keine"}</span>
         </Zeile>
       ) : (
-        <section className={`card min-w-0 p-4 sm:p-5 ${className}`}>{geplantListe(false)}</section>
+        <section id={anker} tabIndex={-1} className={`card min-w-0 p-4 outline-none sm:p-5 ${className}`}>
+          {geplantListe(false)}
+        </section>
       )}
-      <Sheet open={listeAuf} onClose={() => setListeAuf(false)}>
-        <SheetKopf titel="Geplante Aktionen" onClose={() => setListeAuf(false)} />
+      <Sheet
+        open={listeAuf}
+        onClose={() => {
+          setListeAuf(false);
+          fokusZurueck();
+        }}
+      >
+        <SheetKopf
+          titel="Geplante Aktionen"
+          onClose={() => {
+            setListeAuf(false);
+            fokusZurueck();
+          }}
+        />
         {geplantListe(true)}
       </Sheet>
       {blatt}

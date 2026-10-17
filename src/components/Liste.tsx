@@ -59,6 +59,7 @@ export function Zeile({
   unter,
   blau,
   ohnePfeil,
+  id,
 }: {
   label: ReactNode;
   children?: ReactNode;
@@ -69,6 +70,8 @@ export function Zeile({
   unter?: ReactNode;
   blau?: boolean;
   ohnePfeil?: boolean;
+  /** id des Knopfs – z. B. als Ziel, wenn ein Blatt den Fokus zurückgibt */
+  id?: string;
 }) {
   const farbe = rot ? "text-red-600 dark:text-red-400" : blau ? "text-brand-dark dark:text-brand" : "";
   const hatWert = children !== undefined && children !== null && children !== false && children !== "";
@@ -95,6 +98,7 @@ export function Zeile({
   if (onClick)
     return (
       <button
+        id={id}
         type="button"
         onClick={onClick}
         disabled={disabled}
