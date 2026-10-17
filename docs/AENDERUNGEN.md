@@ -71,21 +71,8 @@ ausführlich (auf Deutsch); hier steht der Überblick dazu.
     - Der Screenreader liest bei „Anfragen“ „3 offen“ statt „3 neu“.
     - „Eltern“ führt aus einem offenen Gespräch zurück zur Liste, wie
       „Schüler“.
-- **Fehler aus einer Meldung: Hintergrundbild in Chats/Anfragen doppelt**
-  (iPad quer und alle Fenster ab 1024 px).
-  - Ursache: Die Chat-Ebene zeigte das Bild mit
-    `background-attachment: fixed`, und das ignoriert Safari auf iPad und
-    iPhone. Das Bild begann dann oben an der Ebene, also unter der
-    Kopfzeile, und nicht oben am Bildschirm. Sein oberer Teil stand
-    doppelt da.
-  - Jetzt liegt das Bild als eigene, am Bildschirm feste Fläche in der
-    Ebene (`.ebene-grund::before`, `index.css`), genau wie
-    `HintergrundEbene`.
-  - Nachgestellt in WebKit (Engine von Safari) und Chromium, jeweils mit
-    einem Bild, dessen oberste 15 % rot sind, bei 1180 × 820 px. Auf dem
-    alten Stand reichte Rot mit Safari-Verhalten von y 0 bis 216 (doppelt),
-    jetzt in beiden Engines von 0 bis 122. Fotos: Laptop dunkel mit Bild,
-    iPad hoch, iPhone.
+- **Hintergrundbild doppelt (iPad):** schon vorab live, siehe
+  „Fehlerbehebung“ unten (#25).
 - **Bewusst nicht geändert:** Kurze Seiten am Laptop (Eltern „Infos“ und
   „Konto“) sind kurz, weil es dort wenig gibt. Alles steht auf einem
   Bildschirm, ohne Loch mitten in der Seite. Karten künstlich zu strecken
@@ -101,6 +88,27 @@ ausführlich (auf Deutsch); hier steht der Überblick dazu.
     im Kalender.
   - Fotos Laptop und iPad quer, jeweils hell, dunkel und mit Bild.
   - Gesamtprüfung siehe PR.
+## Fehlerbehebung: Hintergrundbild in Chats/Anfragen doppelt (17.10.2026)
+
+- **Meldung:** Am iPad quer und in allen Fenstern ab 1024 px stand in
+  geöffneten Chats und Anfragen der obere Teil des eigenen Hintergrundbilds
+  doppelt da.
+- **Ursache:** Die Chat-Ebene zeigte das Bild mit
+  `background-attachment: fixed`, und das ignoriert Safari auf iPad und
+  iPhone. Das Bild begann dann oben an der Ebene, also unter der
+  Kopfzeile, und nicht oben am Bildschirm.
+- **Jetzt:** Das Bild liegt als eigene Fläche in der Ebene
+  (`.ebene-grund::before`, `index.css`), genau wie `HintergrundEbene`.
+  - Am Handy ist sie `position: fixed`.
+  - Ab 1024 px ist sie absolut mit Rand bis an den oberen Bildschirmrand.
+    Grund: Die Einblend-Animation (transform) hätte ein festes Bild sonst
+    kurz um die Kopfhöhe versetzt.
+- **Geprüft** in WebKit (Engine von Safari) und Chromium, jeweils mit
+  einem Bild, dessen oberste 15 % rot sind, bei 1180 × 820 px:
+  - Vorher reichte Rot mit Safari-Verhalten von y 0 bis 216, stand also
+    doppelt da.
+  - Jetzt reicht es während und nach dem Einblenden von 0 bis 122.
+  - Fotos am Laptop mit Bild und am iPhone dunkel mit Bild.
 
 ## Nachtrag zu Runde 10: Fokus in „Geplante Aktionen“ (17.10.2026)
 

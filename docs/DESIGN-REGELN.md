@@ -154,11 +154,10 @@ wieder passieren.**
   Unterseiten (Motto, Album …) als `<Sheet hoch>` (am Handy volle Höhe).
 - Vollbild-Ebenen tragen die Klasse `ebene-grund`, damit sie dasselbe
   Hintergrundbild zeigen wie die Seite (sonst: oben Foto, darunter schwarz).
-  Das Bild liegt dort als feste Fläche (`::before`, `position: fixed`).
-  Ein Bild, das am Bildschirm stehen soll, nie mit
-  `background-attachment: fixed` bauen: Safari auf iPad und iPhone
-  ignoriert das. Das Bild beginnt dann oben am Element statt oben am
-  Bildschirm, und sein oberer Teil steht doppelt da.
+  Das Bild liegt dort als eigene Fläche (`::before`). Ein Bild, das am
+  Bildschirm stehen soll, nie mit `background-attachment: fixed` bauen:
+  Safari auf iPad und iPhone ignoriert das. Das Bild beginnt dann oben am
+  Element statt oben am Bildschirm, und sein oberer Teil steht doppelt da.
 - Banner (Push-Hinweis, Install-Karte) stehen in derselben Spalte wie der
   Inhalt, nie unter/über der Kopfleiste eingeklemmt.
 
