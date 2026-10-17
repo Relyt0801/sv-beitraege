@@ -533,6 +533,16 @@ html.mit-hintergrund .ebene-grund::before {
   background-size: cover;
   background-position: center;
 }
+/* Ab 1024 px beginnt die Ebene unter der Kopfzeile. Dort absolut mit Rand
+   nach oben statt fixed: Die Einblend-Animation (transform) macht die Ebene
+   zum Bezug für fixed – das Bild stand sonst kurz um die Kopfhöhe versetzt
+   und sprang danach. So steht es immer genau wie das Bild der Seite. */
+@media (min-width: 1024px) {
+  html.mit-hintergrund .ebene-grund::before {
+    position: absolute;
+    inset: calc(-1 * var(--kopf)) 0 0 0;
+  }
+}
 /* Die breite Leiste darf keinen waagerechten Scrollbalken erzeugen */
 #root {
   overflow-x: clip;
