@@ -812,16 +812,21 @@ export function ChatEbene({
     const el = seiteRef.current;
     if (!mitLeiste || !el) return;
     el.scrollTop = leiste.scroll;
-    const aktiv = el.querySelector<HTMLElement>('[aria-current="page"]');
-    if (!aktiv) return;
-    // Der markierte Eintrag ist immer zu sehen …
+    // Nach einem Wechsel über die Leiste hat der neue Eintrag den Fokus
+    if (ueberLeiste()) el.querySelector<HTMLElement>('[aria-current="page"]')?.focus({ preventScroll: true });
+  }, [mitLeiste]);
+  // Der markierte Eintrag ist immer zu sehen – auch noch, wenn die Höhe des
+  // Eingabe-Bands erst danach gemessen ist (die Leiste endet darüber; vorher
+  // lag der fokussierte Eintrag unten außerhalb der Leiste)
+  useLayoutEffect(() => {
+    const el = seiteRef.current;
+    const aktiv = mitLeiste ? el?.querySelector<HTMLElement>('[aria-current="page"]') : null;
+    if (!el || !aktiv) return;
     const r = aktiv.getBoundingClientRect();
     const k = el.getBoundingClientRect();
     if (r.top < k.top) el.scrollTop -= k.top - r.top + 8;
     else if (r.bottom > k.bottom) el.scrollTop += r.bottom - k.bottom + 8;
-    // … und nach einem Wechsel über die Leiste hat er den Fokus
-    if (ueberLeiste()) aktiv.focus({ preventScroll: true });
-  }, [mitLeiste]);
+  }, [mitLeiste, fussH]);
   // Einblenden nur beim Öffnen – nicht nach einem Tipp in der Leiste und
   // nicht beim Drehen. Mit Leiste blendet nur der Chat ein, die Leiste steht.
   const [einblenden, setEinblenden] = useState(() => !ueberLeiste());
@@ -857,10 +862,11 @@ export function ChatEbene({
     sc.addEventListener("scroll", merken, { passive: true });
     return () => sc.removeEventListener("scroll", merken);
   }, []);
+  // Auch beim Drehen (Leiste kommt/geht, Kopfband am Handy) bleibt man unten
   useLayoutEffect(() => {
     const sc = scroller.current;
     if (sc && warUnten.current) sc.scrollTop = sc.scrollHeight;
-  }, [sicht.hoehe, fussH]);
+  }, [sicht.hoehe, fussH, kopfH, mitSeite]);
 
   // Mit Leiste nur links Abstand: rechts endet der Chat bündig mit Spalte und
   // Kopfzeile (die äußere Hülle hat den Rand schon)
@@ -939,7 +945,10 @@ export function ChatEbene({
             className="w-72 shrink-0 overflow-y-auto overscroll-contain pb-3 pr-2 pt-3"
             style={{ marginBottom: fuss ? fussH : 0 }}
             onScroll={(e) => {
-              leiste.scroll = e.currentTarget.scrollTop;
+              // Nur solange die Liste hier steht: Geht ein Gespräch darüber auf,
+              // leert sich diese Leiste, scrollt auf 0 – das darf den
+              // gemeinsamen Stand nicht überschreiben
+              if (mitLeiste) leiste.scroll = e.currentTarget.scrollTop;
             }}
             onClickCapture={(e) => {
               if ((e.target as Element).closest("button")) leiste.wechsel = performance.now();

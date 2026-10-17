@@ -88,6 +88,14 @@ ausführlich (auf Deutsch); hier steht der Überblick dazu.
     im Kalender.
   - Fotos Laptop und iPad quer, jeweils hell, dunkel und mit Bild.
   - Gesamtprüfung siehe PR.
+- **Nachprüfung der Korrekturen:** 13 der 14 Funde sind nachgestellt
+  behoben. Den letzten und zwei neue Kleinigkeiten habe ich behoben:
+  - Nach einem Wechsel per Tastatur lag der fokussierte Eintrag unten
+    außerhalb der Leiste.
+  - Nach dem Schließen eines Gesprächs fiel der Scrollstand der Leiste
+    auf 0.
+  - Nach dem Drehen stand der Chat 104 px über dem Ende.
+
 ## Fehlerbehebung: Hintergrundbild in Chats/Anfragen doppelt (17.10.2026)
 
 - **Meldung:** Am iPad quer und in allen Fenstern ab 1024 px stand in
