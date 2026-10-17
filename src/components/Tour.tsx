@@ -244,19 +244,27 @@ export function Tour({
     const RAND = 12;
     const passtOben = rect.top - PAD - 12 - kartenHoehe >= RAND;
     const passtUnten = rect.top + rect.height + PAD + 12 + kartenHoehe <= hoehe - RAND;
+    // Daneben darf die Karte schmaler werden (bis 300 px): Am Handy quer sind
+    // neben dem Element oft nur 340–380 px frei.
     const rechtsX = rect.left + rect.width + PAD + 12;
-    const linksX = rect.left - PAD - 12 - w;
+    const rechtsFrei = window.innerWidth - 16 - rechtsX;
+    const linksFrei = rect.left - PAD - 12 - 16;
+    const seiteBreite = Math.min(w, Math.max(rechtsFrei, linksFrei));
     const seitlich =
-      kartenHoehe > 0 && !passtOben && !passtUnten
-        ? rechtsX + w <= window.innerWidth - 16
+      kartenHoehe > 0 && !passtOben && !passtUnten && seiteBreite >= 300
+        ? rechtsFrei >= linksFrei
           ? rechtsX
-          : linksX >= 16
-            ? linksX
-            : null
+          : rect.left - PAD - 12 - seiteBreite
         : null;
     if (seitlich !== null) {
+      // kartenHoehe ist ab dem zweiten Bild die der schmaleren Karte (schmaler =
+      // höher – passt dann erst recht nicht darüber/darunter, die Lage bleibt)
       const mitte = rect.top + rect.height / 2 - kartenHoehe / 2;
-      kartenStil = { top: Math.min(Math.max(RAND, mitte), Math.max(RAND, hoehe - RAND - kartenHoehe)), left: seitlich, width: w };
+      kartenStil = {
+        top: Math.min(Math.max(RAND, mitte), Math.max(RAND, hoehe - RAND - kartenHoehe)),
+        left: seitlich,
+        width: seiteBreite,
+      };
     } else if (unten) {
       let unterkante = rect.top - PAD - 12;
       if (unterkante - kartenHoehe < RAND) unterkante = Math.min(hoehe - RAND, kartenHoehe + RAND);
