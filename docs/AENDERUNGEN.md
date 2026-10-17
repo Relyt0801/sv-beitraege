@@ -155,7 +155,7 @@ Aktionen“ offen ist, bleibt das Blatt offen. Nach dem Schließen landet der
 Fokus aber auf der Seite statt auf der Zeile, denn die Zeile ist inzwischen
 eine Karte. Vorher ging dabei das ganze Blatt verloren.
 
-**Prüfung (Demo r49/r50 = Endstand, Chromium):**
+**Prüfung (Demo r54 = Endstand `d02118d`, Chromium):**
 - `platz-check`: 165 Ansichten, 0 über den Grenzen. Keine Ansicht ist länger
   als vor Runde 10. Handy 2,09 → 1,84 Bildschirme.
 - `ui-check`: 280 Ansichten ohne Fund (axe ohne Befund, keine
