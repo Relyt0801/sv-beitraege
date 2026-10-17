@@ -515,12 +515,33 @@ html.mit-hintergrund .blatt .auf-bild .text-tinte-leise {
   color: rgb(var(--tinte-leise));
 }
 /* Vollbild-Ebenen (ChatEbene) zeigen dasselbe Hintergrundbild wie die Seite –
-   vorher war die Ebene am Laptop schwarz, darüber (App-Kopf) das Foto. */
-html.mit-hintergrund .ebene-grund {
+   vorher war die Ebene am Laptop schwarz, darüber (App-Kopf) das Foto.
+   Als eigene, am Bildschirm feste Fläche (::before, position: fixed) genau
+   wie HintergrundEbene – NICHT mit background-attachment: fixed: Das
+   ignoriert Safari auf iPad/iPhone, das Bild begann dann oben an der Ebene
+   (unter der Kopfzeile) statt oben am Bildschirm, und sein oberer Teil stand
+   doppelt da (Meldung Okt. 2026, Chats → Anfragen am iPad quer). Die Ebene
+   ist ein eigener Stapel (z-index), z-index -1 liegt also über ihrem Grund
+   und unter ihrem Inhalt. */
+html.mit-hintergrund .ebene-grund::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
   background-image: linear-gradient(rgb(var(--papier) / 0.45), rgb(var(--papier) / 0.45)), var(--hg-bild);
   background-size: cover;
   background-position: center;
-  background-attachment: fixed;
+}
+/* Ab 1024 px beginnt die Ebene unter der Kopfzeile. Dort absolut mit Rand
+   nach oben statt fixed: Die Einblend-Animation (transform) macht die Ebene
+   zum Bezug für fixed – das Bild stand sonst kurz um die Kopfhöhe versetzt
+   und sprang danach. So steht es immer genau wie das Bild der Seite. */
+@media (min-width: 1024px) {
+  html.mit-hintergrund .ebene-grund::before {
+    position: absolute;
+    inset: calc(-1 * var(--kopf)) 0 0 0;
+  }
 }
 /* Die breite Leiste darf keinen waagerechten Scrollbalken erzeugen */
 #root {

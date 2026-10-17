@@ -11,6 +11,28 @@ ausführlich (auf Deutsch); hier steht der Überblick dazu.
 
 ---
 
+## Fehlerbehebung: Hintergrundbild in Chats/Anfragen doppelt (17.10.2026)
+
+- **Meldung:** Am iPad quer und in allen Fenstern ab 1024 px stand in
+  geöffneten Chats und Anfragen der obere Teil des eigenen Hintergrundbilds
+  doppelt da.
+- **Ursache:** Die Chat-Ebene zeigte das Bild mit
+  `background-attachment: fixed`, und das ignoriert Safari auf iPad und
+  iPhone. Das Bild begann dann oben an der Ebene, also unter der
+  Kopfzeile, und nicht oben am Bildschirm.
+- **Jetzt:** Das Bild liegt als eigene Fläche in der Ebene
+  (`.ebene-grund::before`, `index.css`), genau wie `HintergrundEbene`.
+  - Am Handy ist sie `position: fixed`.
+  - Ab 1024 px ist sie absolut mit Rand bis an den oberen Bildschirmrand.
+    Grund: Die Einblend-Animation (transform) hätte ein festes Bild sonst
+    kurz um die Kopfhöhe versetzt.
+- **Geprüft** in WebKit (Engine von Safari) und Chromium, jeweils mit
+  einem Bild, dessen oberste 15 % rot sind, bei 1180 × 820 px:
+  - Vorher reichte Rot mit Safari-Verhalten von y 0 bis 216, stand also
+    doppelt da.
+  - Jetzt reicht es während und nach dem Einblenden von 0 bis 122.
+  - Fotos am Laptop mit Bild und am iPhone dunkel mit Bild.
+
 ## Nachtrag zu Runde 10: Fokus in „Geplante Aktionen“ (17.10.2026)
 
 - **Fehler aus `4e2b013` (schon in `main`):** Schloss man ein Unterblatt
